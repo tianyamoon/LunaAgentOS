@@ -9,6 +9,12 @@ Validated on `2026-05-18` with the bundled Python runtime:
 - `test_runner.py`
 - `plugins/mock/manifest.json`
 
+Validated on `2026-05-18` with a real desktop-shell build path:
+
+- `desktop-shell/`
+- `Tauri 2`
+- `Rust toolchain + MSVC build tools`
+
 ## Protocol result
 
 The mock flow completed successfully with noisy stdout mixed into the stream:
@@ -55,3 +61,13 @@ That means the protocol layer is validated, but real-runtime integration still d
 This validation was performed with Python as a protocol-proof tool only.
 
 It should not be interpreted as a final product-stack decision. The current preferred long-term direction is documented in `docs/tech-stack-decision.md`.
+
+## Desktop shell note
+
+The first desktop-shell milestone is now real:
+
+- Tauri 2 project initialized
+- control-console prototype integrated into the shell frontend
+- release executable built successfully with `--no-bundle`
+
+See `docs/desktop-shell-validation.md` for the desktop-side checkpoint.

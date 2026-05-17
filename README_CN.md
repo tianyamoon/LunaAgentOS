@@ -103,6 +103,12 @@ LunaAgentOS 的目标，就是把这些异构 Agent 收拢进一个统一的控�
   - 项目动机
 - `docs/open-questions.md`
   - 当前开放问题
+- `docs/competitive-positioning.md`
+  - amux / Goose / Fusion 竞品定位
+- `docs/light-core-principles.md`
+  - 第一版轻核心原则
+- `docs/desktop-shell-validation.md`
+  - 桌面壳验证记录
 - `CONTRIBUTING.md`
   - 贡献指南
 - `prototype/console/`
@@ -182,6 +188,23 @@ INIT -> THINK -> TOOLING -> RESP -> DONE
 - `prototype/console/`
 
 这套原型的目标不是替代最终桌面产品，而是提前把“控制台长什么样、最小交互闭环长什么样”做成可见资产，方便吸引参与者和承接未来桌面壳。
+
+## 当前桌面壳进展
+
+仓库里已经不只是静态原型，而是开始进入真实桌面壳工程：
+
+- `desktop-shell/`
+
+当前已经完成：
+
+- `Tauri 2` 工程初始化
+- Rust / MSVC 编译链打通
+- 控制台原型接入桌面壳前端
+- 无 bundling 的 release 构建验证
+
+当前可验证产物：
+
+- `desktop-shell/src-tauri/target/release/desktop-shell.exe`
 
 ## 国际化与本地化策略
 

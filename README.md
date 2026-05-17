@@ -47,6 +47,12 @@ LunaAgentOS 是一个面向多 Agent 编排的通用控制台项目。
   - 为什么做这个项目
 - `docs/open-questions.md`
   - 当前开放问题
+- `docs/competitive-positioning.md`
+  - amux / Goose / Fusion 的竞争定位与我们的生存空间
+- `docs/light-core-principles.md`
+  - 第一版必须坚持的轻核心原则
+- `docs/desktop-shell-validation.md`
+  - 桌面壳验证记录
 - `CONTRIBUTING.md`
   - 贡献指南
 - `prototype/console/`
@@ -89,6 +95,16 @@ INIT -> THINK -> TOOLING -> RESP -> DONE
 - 底部人类输入入口
 
 原型文件位于 `prototype/console/`，用于承接未来桌面壳实现。
+
+### 桌面壳进展
+
+当前已经初始化真实 `Tauri 2` 桌面工程，并将控制台原型接入：
+
+- `desktop-shell/`
+
+当前可验证产物：
+
+- `desktop-shell/src-tauri/target/release/desktop-shell.exe`
 
 ### 国际化说明
 
