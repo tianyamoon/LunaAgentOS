@@ -11,12 +11,35 @@
 - 初始化 `Tauri 2` 桌面工程
 - 将 LunaAgentOS 最小控制台原型接入桌面壳前端
 - 完成一次无 bundling 的 release 构建
+- 接入 `Claude Code CLI` 的真实运行时探测与非交互事件流调用
+- 探测到 `WSL Hermes` 真实运行时
 
 ## 可验证产物
 
 当前已生成的可执行文件：
 
 - `desktop-shell/src-tauri/target/release/desktop-shell.exe`
+
+## 当前真实运行时状态
+
+### Claude Code
+
+当前状态：
+
+- 已安装并可调用
+- `claude --version` 可返回版本
+- `claude -p --verbose --output-format stream-json` 已可返回真实结构化事件流
+
+这意味着当前桌面壳中的 `Claude Code` 不再只是静态样例位，而是已经具备真实运行时接线。
+
+### Hermes
+
+当前状态：
+
+- 在 `WSL` 中已探测到真实运行时
+- 已确认 `hermes --version` 可返回
+
+当前仍未在桌面壳内直接下发真实任务，后续接入会沿 `WSL bridge` 路线推进。
 
 ## 为什么使用 no-bundle 验证
 

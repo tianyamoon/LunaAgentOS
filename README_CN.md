@@ -201,6 +201,8 @@ INIT -> THINK -> TOOLING -> RESP -> DONE
 - Rust / MSVC 编译链打通
 - 控制台原型接入桌面壳前端
 - 无 bundling 的 release 构建验证
+- `Claude Code CLI` 真实运行时接线
+- `WSL Hermes` 真实运行时探测
 
 当前可验证产物：
 

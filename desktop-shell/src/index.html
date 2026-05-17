@@ -9,13 +9,14 @@
   <body>
     <div class="app-shell">
       <header class="topbar">
-        <div>
+        <div class="brand">
           <p class="eyebrow">LunaAgentOS</p>
-          <h1>第一版桌面控制台原型</h1>
+          <h1>统一 Agent 控制台</h1>
+          <p class="subline">统一接入强大、通用与免费入口，让任务状态、工具过程与最终结果在一个桌面工作台里可见。</p>
         </div>
         <div class="actions">
-          <button id="playBtn" class="primary">播放样例任务</button>
-          <button id="resetBtn">重置</button>
+          <button id="refreshBtn" class="secondary">刷新状态</button>
+          <button id="runBtn" class="primary">执行任务</button>
         </div>
       </header>
 
@@ -31,43 +32,45 @@
         <section class="panel session-panel">
           <div class="panel-header">
             <div>
-              <h2 id="sessionTitle">Hermes</h2>
-              <p id="sessionSubtitle" class="caption">通用样板</p>
+              <h2 id="sessionTitle">Claude Code</h2>
+              <p id="sessionSubtitle" class="caption">强大样板</p>
             </div>
             <div id="stateBadge" class="state-badge state-idle">IDLE</div>
           </div>
 
-          <div id="heroCard" class="hero-card">
-            <p class="caption">当前任务</p>
-            <h3 id="heroTask">等待任务</h3>
-            <p id="heroSummary" class="hero-summary">选择 Agent 或播放样例任务查看统一状态流。</p>
-          </div>
+          <div class="session-scroll">
+            <div id="heroCard" class="hero-card">
+              <p class="caption">当前任务</p>
+              <h3 id="heroTask">等待任务下发</h3>
+              <p id="heroSummary" class="hero-summary">当前会话尚未开始。选择一个 Agent 并提交任务，控制台将展示它的状态流、工具调用与最终结果。</p>
+            </div>
 
-          <div class="stream-layout">
-            <section class="stream-card">
-              <div class="stream-header">
-                <h3>消息流</h3>
-                <span class="caption">统一消息格式</span>
-              </div>
-              <div id="messageStream" class="message-stream"></div>
-            </section>
+            <div class="stream-layout">
+              <section class="stream-card">
+                <div class="stream-header">
+                  <h3>消息流</h3>
+                  <span class="caption">统一消息格式</span>
+                </div>
+                <div id="messageStream" class="message-stream"></div>
+              </section>
 
-            <section class="tool-card">
-              <div class="stream-header">
-                <h3>工具面板</h3>
-                <span class="caption">可见的 TOOLING</span>
-              </div>
-              <div id="toolPanel" class="tool-panel empty">
-                <p>暂无工具调用</p>
-              </div>
-            </section>
-          </div>
+              <section class="tool-card">
+                <div class="stream-header">
+                  <h3>工具面板</h3>
+                  <span class="caption">TOOLING 可见</span>
+                </div>
+                <div id="toolPanel" class="tool-panel empty">
+                  <p>当前没有工具调用</p>
+                </div>
+              </section>
+            </div>
 
-          <div class="composer">
-            <label for="promptBox">人类输入入口</label>
-            <div class="composer-row">
-              <textarea id="promptBox" rows="3">帮我总结今天的适配器验证状态，并说明下一步该接哪一个真实 Agent。</textarea>
-              <button id="sendBtn" class="primary">模拟发送</button>
+            <div class="composer">
+              <label for="promptBox">任务输入</label>
+              <div class="composer-row">
+                <textarea id="promptBox" rows="4">请检查当前工作目录，确认 LunaAgentOS 已有哪些可验证产物，并给出下一步最应该接入的真实 Agent。</textarea>
+                <button id="sendBtn" class="primary compact">发送</button>
+              </div>
             </div>
           </div>
         </section>
@@ -75,11 +78,11 @@
         <aside class="panel timeline-panel">
           <div class="panel-header">
             <h2>状态与时间线</h2>
-            <span class="caption">呼吸感状态机</span>
+            <span class="caption">生命周期总览</span>
           </div>
           <div id="runtimeMeta" class="runtime-meta">
             <div class="meta-chip">
-              <span class="caption">桌面壳</span>
+              <span class="caption">桌面容器</span>
               <strong>Tauri 2</strong>
             </div>
             <div class="meta-chip">
