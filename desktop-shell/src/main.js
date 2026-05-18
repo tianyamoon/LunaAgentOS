@@ -482,7 +482,14 @@ function appendErrorToTurn(sessionId, turnId, message) {
   turn.state = 9;
   turn.logs = [message, ...turn.logs];
   session.state = 9;
+  if (session.acpSessionId) {
+    session.runtimeState = "resume_failed";
+    if (activeSessionIds[session.agentId] === session.id) {
+      delete activeSessionIds[session.agentId];
+    }
+  }
   renderWorkspace();
+  renderHistory();
   setAppNotice(`会话 ${session.agentName} 执行失败：${message}`, "error");
 }
 

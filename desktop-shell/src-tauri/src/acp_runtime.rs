@@ -54,8 +54,16 @@ pub fn run_claude_acp_prompt(
         }
     };
 
-    send_prompt(session, prompt, &mut events)?;
-    Ok(events)
+    match send_prompt(session, prompt, &mut events) {
+        Ok(()) => Ok(events),
+        Err(error) => {
+            if let Some(mut broken) = sessions.remove(&runtime_session_id) {
+                let _ = broken.child.kill();
+                let _ = broken.child.wait();
+            }
+            Err(error)
+        }
+    }
 }
 
 pub fn resume_claude_acp_session(
