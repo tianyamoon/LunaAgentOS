@@ -355,6 +355,11 @@ button:disabled {
   background: rgba(255, 255, 255, 0.62);
 }
 
+.session-card.is-active-receiver {
+  border-color: rgba(217, 108, 58, 0.56);
+  box-shadow: 0 0 0 2px rgba(217, 108, 58, 0.12), 0 18px 34px rgba(52, 37, 18, 0.1);
+}
+
 .session-card.fullscreen {
   position: fixed;
   inset: 18px 24px;
@@ -491,9 +496,15 @@ button:disabled {
 
 .composer-row {
   display: grid;
-  grid-template-columns: 1fr 96px;
+  grid-template-columns: 1fr 96px 96px;
   gap: 10px;
   align-items: end;
+}
+
+.composer-row .secondary.is-active {
+  border-color: rgba(217, 108, 58, 0.35);
+  background: rgba(255, 247, 239, 0.96);
+  color: var(--accent);
 }
 
 textarea {

@@ -122,6 +122,7 @@ const sessionDeck = document.getElementById("sessionDeck");
 const historyList = document.getElementById("historyList");
 const appNotice = document.getElementById("appNotice");
 const promptBox = document.getElementById("promptBox");
+const newSessionToggle = document.getElementById("newSessionToggle");
 const sendBtn = document.getElementById("sendBtn");
 
 let mainAgentId = localStorage.getItem(MAIN_AGENT_KEY) || "claude-main";
@@ -133,6 +134,7 @@ let turnSeq = 0;
 let customAgentSeq = 0;
 let runningSessions = 0;
 let isHistoryLoading = true;
+let sendAsNewSession = false;
 
 function allAgents() {
   return providers.flatMap((provider) => provider.agents);
@@ -205,6 +207,8 @@ function updateActionLabels() {
   const sendText = sending ? `发送中 (${runningSessions})` : "发送";
   sendBtn.textContent = sendText;
   sendBtn.disabled = sending;
+  newSessionToggle.disabled = sending;
+  newSessionToggle.classList.toggle("is-active", sendAsNewSession);
 }
 
 function saveMainAgent(agentId) {
@@ -532,8 +536,9 @@ function renderTurn(turn, index) {
 
 function renderSessionCard(session) {
   const runtimeState = sessionRuntimeState(session);
+  const isActiveReceiver = activeSessionIds[session.agentId] === session.id && canSendToSession(session);
   return `
-    <article class="session-card ${session.fullscreen ? "fullscreen" : ""}" data-session-id="${session.id}">
+    <article class="session-card ${session.fullscreen ? "fullscreen" : ""} ${isActiveReceiver ? "is-active-receiver" : ""}" data-session-id="${session.id}">
       <div class="session-card-header">
         <div>
           <div class="session-card-title-row">
@@ -911,6 +916,8 @@ function startSessionFromPrompt(forceNewSession = false) {
   if (!session) return;
   const turn = createTurn(session, task);
   promptBox.value = "";
+  sendAsNewSession = false;
+  updateActionLabels();
 
   if (provider.id === "claude") {
     void startClaudeSession(session, turn);
@@ -925,7 +932,12 @@ providerManagerBtn?.addEventListener("click", () => {
 });
 
 sendBtn.addEventListener("click", () => {
-  startSessionFromPrompt();
+  startSessionFromPrompt(sendAsNewSession);
+});
+
+newSessionToggle.addEventListener("click", () => {
+  sendAsNewSession = !sendAsNewSession;
+  updateActionLabels();
 });
 
 renderProviders();
