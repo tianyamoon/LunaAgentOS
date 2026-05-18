@@ -279,17 +279,14 @@ function renderProviders() {
       <p class="caption provider-note">${provider.note}</p>
       <div class="provider-agents">
         ${provider.agents.map((agent) => `
-          <div class="agent-entry ${agent.id === mainAgentId ? "is-main-agent" : ""}">
+          <div class="agent-entry ${agent.id === mainAgentId ? "is-main-agent" : "is-selectable"}" data-agent-id="${agent.id}">
             <div class="agent-entry-top">
               <strong>${agent.name}</strong>
-              <span class="state-pill ${stateClasses[agent.state] || "state-idle"}">${stateNames[agent.state]}</span>
             </div>
             <div class="agent-entry-sub">${agent.subtitle}</div>
-            <div class="agent-entry-actions">
-              ${agent.id === mainAgentId
-                ? ""
-                : `<button type="button" class="mini-btn set-main-btn" data-agent-id="${agent.id}">设为主 Agent</button>`}
-            </div>
+            ${agent.id === mainAgentId
+              ? ""
+              : `<div class="agent-entry-actions"><span class="agent-action-hint">设为主入口</span></div>`}
           </div>
         `).join("")}
       </div>
@@ -306,10 +303,9 @@ function renderProviders() {
     });
   });
 
-  agentList.querySelectorAll(".set-main-btn").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.stopPropagation();
-      const agentId = button.dataset.agentId;
+  agentList.querySelectorAll(".agent-entry.is-selectable").forEach((entry) => {
+    entry.addEventListener("click", () => {
+      const agentId = entry.dataset.agentId;
       if (!agentId) return;
       setMainAgent(agentId);
     });
