@@ -7,6 +7,8 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use tauri::{AppHandle, Manager};
 
+mod acp_runtime;
+
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 
@@ -283,6 +285,11 @@ fn run_claude_stream(prompt: String) -> Result<Vec<Value>, String> {
     Ok(events)
 }
 
+#[tauri::command]
+fn runtime_acp_claude_prompt(prompt: String, cwd: Option<String>) -> Result<Vec<Value>, String> {
+    acp_runtime::run_claude_acp_prompt(prompt, cwd)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -291,7 +298,8 @@ pub fn run() {
             load_history_entries,
             append_history_entry,
             probe_runtimes,
-            run_claude_stream
+            run_claude_stream,
+            runtime_acp_claude_prompt
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
