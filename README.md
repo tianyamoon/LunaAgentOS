@@ -41,6 +41,8 @@ LunaAgentOS 是一个面向多 Agent 编排的通用控制台项目。
   - 当前技术选型决策（主推荐 `Tauri 2 + Rust`，保留 `Avalonia + C#`）
 - `docs/mvp-v1-scope.md`
   - 第一版最小需求路径
+- `docs/mvp-v1-interaction-model.md`
+  - 第一版主交互模型与主 agent 多会话机制
 - `docs/architecture-overview.md`
   - 架构总览
 - `docs/why-lunaagentos.md`

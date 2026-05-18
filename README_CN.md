@@ -97,6 +97,8 @@ LunaAgentOS 的目标，就是把这些异构 Agent 收拢进一个统一的控�
   - 技术选型决策文档
 - `docs/mvp-v1-scope.md`
   - 第一版最小需求路径
+- `docs/mvp-v1-interaction-model.md`
+  - 第一版主交互模型与主 agent 多会话机制
 - `docs/architecture-overview.md`
   - 架构总览
 - `docs/why-lunaagentos.md`

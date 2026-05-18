@@ -14,7 +14,7 @@
         </div>
         <div class="actions">
           <button id="refreshBtn" class="secondary">刷新状态</button>
-          <button id="runBtn" class="primary">执行任务</button>
+          <button id="runBtn" class="primary">发给主 Agent</button>
         </div>
       </header>
 
@@ -27,69 +27,37 @@
           <div id="agentList" class="agent-list"></div>
         </aside>
 
-        <section class="panel session-panel">
-          <div class="panel-header">
+        <section class="panel workspace-panel">
+          <div class="panel-header workspace-header">
             <div>
-              <h2 id="sessionTitle">Claude Code</h2>
-              <p id="sessionSubtitle" class="caption">强大样板</p>
+              <h2>会话工作台</h2>
+              <p id="workspaceStatus" class="caption">请选择主 Agent，然后发送第一条任务。</p>
             </div>
-            <div id="stateBadge" class="state-badge state-idle">IDLE</div>
           </div>
 
-          <div class="session-body">
-            <div id="heroCard" class="hero-card">
-              <p class="caption">当前任务</p>
-              <h3 id="heroTask">等待任务下发</h3>
-              <p id="heroSummary" class="hero-summary">当前会话尚未开始。选择一个 Agent 并提交任务，控制台将展示它的状态流、工具调用与最终结果。</p>
+          <div class="workspace-body">
+            <div id="workspaceEmpty" class="workspace-empty">
+              <strong>主 Agent 尚未入场</strong>
+              <p>先在左侧把一个 Agent 设为主入口，再通过底部输入框发起会话。</p>
             </div>
-
-            <div class="stream-layout">
-              <section class="stream-card">
-                <div class="stream-header">
-                  <h3>消息流</h3>
-                  <span class="caption">统一消息格式</span>
-                </div>
-                <div id="messageStream" class="message-stream"></div>
-              </section>
-
-              <section class="tool-card">
-                <div class="stream-header">
-                  <h3>工具面板</h3>
-                  <span class="caption">TOOLING 可见</span>
-                </div>
-                <div id="toolPanel" class="tool-panel empty">
-                  <p>当前没有工具调用</p>
-                </div>
-              </section>
-            </div>
+            <div id="sessionDeck" class="session-deck"></div>
           </div>
 
           <div class="composer">
             <label for="promptBox">任务输入</label>
             <div class="composer-row">
-              <textarea id="promptBox" rows="4">请检查当前工作目录，确认 LunaAgentOS 已有哪些可验证产物，并给出下一步最应该接入的真实 Agent。</textarea>
+              <textarea id="promptBox" rows="4" placeholder="输入发送给主 Agent 的任务。"></textarea>
               <button id="sendBtn" class="primary compact">发送</button>
             </div>
           </div>
         </section>
 
-        <aside class="panel timeline-panel">
+        <aside class="panel history-panel">
           <div class="panel-header">
-            <h2>状态与时间线</h2>
-            <span class="caption">生命周期总览</span>
+            <h2>历史任务</h2>
+            <span class="caption">按日期归档</span>
           </div>
-          <div id="runtimeMeta" class="runtime-meta">
-            <div class="meta-chip">
-              <span class="caption">桌面容器</span>
-              <strong>Tauri 2</strong>
-            </div>
-            <div class="meta-chip">
-              <span class="caption">当前定位</span>
-              <strong>轻量桌面控制台</strong>
-            </div>
-          </div>
-          <div id="stateLegend" class="state-legend"></div>
-          <div id="timeline" class="timeline"></div>
+          <div id="historyList" class="history-list"></div>
         </aside>
       </main>
     </div>

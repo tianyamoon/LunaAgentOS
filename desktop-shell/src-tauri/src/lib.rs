@@ -1,9 +1,55 @@
+use chrono::Local;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::fs;
 use std::io::Write;
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
+use tauri::{AppHandle, Manager};
+
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct HistoryEntry {
+    id: String,
+    date: String,
+    created_at: String,
+    provider_id: String,
+    provider_name: String,
+    agent_id: String,
+    agent_name: String,
+    task: String,
+    status: String,
+    summary: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct HistoryEntryInput {
+    provider_id: String,
+    provider_name: String,
+    agent_id: String,
+    agent_name: String,
+    task: String,
+    status: String,
+    summary: String,
+}
+
+fn build_command(program: &str) -> Command {
+    let mut command = Command::new(program);
+    #[cfg(windows)]
+    {
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    command
+}
 
 fn run_shell(shell: &str, args: &[&str]) -> Result<String, String> {
-    let output = Command::new(shell)
+    let output = build_command(shell)
         .args(args)
         .output()
         .map_err(|error| error.to_string())?;
@@ -18,6 +64,75 @@ fn run_shell(shell: &str, args: &[&str]) -> Result<String, String> {
     } else {
         Err(stdout)
     }
+}
+
+fn history_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    let base_dir = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|error| error.to_string())?;
+    let history_dir = base_dir.join("history");
+    fs::create_dir_all(&history_dir).map_err(|error| error.to_string())?;
+    Ok(history_dir)
+}
+
+fn history_file_for_today(app: &AppHandle) -> Result<(PathBuf, String, String), String> {
+    let now = Local::now();
+    let date = now.format("%Y-%m-%d").to_string();
+    let timestamp = now.to_rfc3339();
+    Ok((history_dir(app)?.join(format!("{date}.json")), date, timestamp))
+}
+
+fn load_history_file(path: &PathBuf) -> Result<Vec<HistoryEntry>, String> {
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let raw = fs::read_to_string(path).map_err(|error| error.to_string())?;
+    if raw.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+    serde_json::from_str::<Vec<HistoryEntry>>(&raw).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn load_history_entries(app: AppHandle) -> Result<Vec<HistoryEntry>, String> {
+    let directory = history_dir(&app)?;
+    let mut entries = Vec::new();
+
+    for item in fs::read_dir(&directory).map_err(|error| error.to_string())? {
+        let item = item.map_err(|error| error.to_string())?;
+        let path = item.path();
+        if path.extension().and_then(|value| value.to_str()) != Some("json") {
+            continue;
+        }
+        let mut day_entries = load_history_file(&path)?;
+        entries.append(&mut day_entries);
+    }
+
+    entries.sort_by(|left, right| right.created_at.cmp(&left.created_at));
+    Ok(entries)
+}
+
+#[tauri::command]
+fn append_history_entry(app: AppHandle, entry: HistoryEntryInput) -> Result<HistoryEntry, String> {
+    let (path, date, timestamp) = history_file_for_today(&app)?;
+    let mut entries = load_history_file(&path)?;
+    let saved = HistoryEntry {
+        id: format!("{}-{}", date, timestamp.replace([':', '+'], "-")),
+        date,
+        created_at: timestamp,
+        provider_id: entry.provider_id,
+        provider_name: entry.provider_name,
+        agent_id: entry.agent_id,
+        agent_name: entry.agent_name,
+        task: entry.task,
+        status: entry.status,
+        summary: entry.summary,
+    };
+    entries.push(saved.clone());
+    let json = serde_json::to_string_pretty(&entries).map_err(|error| error.to_string())?;
+    fs::write(path, json).map_err(|error| error.to_string())?;
+    Ok(saved)
 }
 
 #[tauri::command]
@@ -35,9 +150,17 @@ fn probe_runtimes() -> serde_json::Value {
         }),
     };
 
-    let hermes = match run_shell("wsl.exe", &["-e", "bash", "-lc", "command -v hermes && hermes --version"]) {
+    let hermes = match run_shell(
+        "wsl.exe",
+        &["-e", "bash", "-lc", "command -v hermes && hermes --version"],
+    ) {
         Ok(stdout) => {
-            let version_line = stdout.lines().nth(1).unwrap_or(stdout.as_str()).trim().to_string();
+            let version_line = stdout
+                .lines()
+                .last()
+                .unwrap_or(stdout.as_str())
+                .trim()
+                .to_string();
             serde_json::json!({
                 "available": true,
                 "version": version_line,
@@ -67,7 +190,7 @@ fn probe_runtimes() -> serde_json::Value {
 fn parse_claude_stream(raw: &str) -> Vec<Value> {
     raw.lines()
         .filter_map(|line| serde_json::from_str::<Value>(line).ok())
-        .filter_map(|value| map_claude_event(value))
+        .filter_map(map_claude_event)
         .collect()
 }
 
@@ -127,13 +250,8 @@ fn map_claude_event(value: Value) -> Option<Value> {
 }
 
 #[tauri::command]
-fn probe_claude_session() -> Result<Vec<Value>, String> {
-    run_claude_stream("请只回复一句当前运行时已就绪。".to_string())
-}
-
-#[tauri::command]
 fn run_claude_stream(prompt: String) -> Result<Vec<Value>, String> {
-    let mut child = Command::new("cmd")
+    let mut child = build_command("cmd")
         .args([
             "/c",
             "claude -p --verbose --output-format stream-json --input-format text --tools \"\"",
@@ -170,8 +288,9 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
+            load_history_entries,
+            append_history_entry,
             probe_runtimes,
-            probe_claude_session,
             run_claude_stream
         ])
         .run(tauri::generate_context!())
