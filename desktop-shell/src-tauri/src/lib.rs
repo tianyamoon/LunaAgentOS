@@ -28,6 +28,7 @@ struct HistoryEntry {
     task: String,
     status: String,
     summary: String,
+    turn: Option<Value>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -41,6 +42,7 @@ struct HistoryEntryInput {
     task: String,
     status: String,
     summary: String,
+    turn: Option<Value>,
 }
 
 fn build_command(program: &str) -> Command {
@@ -133,6 +135,7 @@ fn append_history_entry(app: AppHandle, entry: HistoryEntryInput) -> Result<Hist
         task: entry.task,
         status: entry.status,
         summary: entry.summary,
+        turn: entry.turn,
     };
     entries.push(saved.clone());
     let json = serde_json::to_string_pretty(&entries).map_err(|error| error.to_string())?;

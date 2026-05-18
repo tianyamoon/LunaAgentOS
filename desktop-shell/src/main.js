@@ -445,7 +445,7 @@ function getOrCreateActiveSession(task, forceNew = false) {
   if (!agent) return null;
   const activeSessionId = activeSessionIds[agent.id];
   const existing = !forceNew ? sessions.find((item) => item.id === activeSessionId) : null;
-  return existing || createSession(task);
+  return existing && !existing.archived ? existing : createSession(task);
 }
 
 function updateTurnFromEvents(sessionId, turnId, events) {
@@ -534,6 +534,7 @@ function renderSessionCard(session) {
           <div class="session-card-title-row">
             <strong>${session.agentName}</strong>
             <span class="state-pill ${stateClasses[session.state] || "state-idle"}">${formatSessionStatus(session)}</span>
+            ${session.archived ? `<span class="state-pill state-idle">ARCHIVE</span>` : ""}
           </div>
           <div class="caption session-task">${session.task}</div>
         </div>
@@ -599,6 +600,16 @@ function archivedSessionsFromHistory(entries) {
   const bySession = new Map();
   entries.forEach((entry) => {
     const key = entry.session_id || entry.id;
+    const turn = entry.turn || {
+      id: entry.id,
+      task: entry.task,
+      state: 5,
+      thoughts: [],
+      outputs: [],
+      finalResponse: entry.summary,
+      logs: ["由历史归档恢复，当前不是运行中的 runtime session。"],
+      createdAt: entry.created_at,
+    };
     const current = bySession.get(key);
     if (!current) {
       bySession.set(key, {
@@ -606,11 +617,14 @@ function archivedSessionsFromHistory(entries) {
         date: entry.date,
         createdAt: entry.created_at,
         updatedAt: entry.created_at,
+        providerId: entry.provider_id,
         providerName: entry.provider_name,
+        agentId: entry.agent_id,
         agentName: entry.agent_name,
         title: entry.task,
         summary: entry.summary,
         turnCount: 1,
+        turns: [turn],
         source: "archive",
       });
       return;
@@ -618,8 +632,14 @@ function archivedSessionsFromHistory(entries) {
     current.updatedAt = current.updatedAt > entry.created_at ? current.updatedAt : entry.created_at;
     current.summary = entry.summary || current.summary;
     current.turnCount += 1;
+    current.turns.push(turn);
   });
-  return [...bySession.values()].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  return [...bySession.values()]
+    .map((session) => ({
+      ...session,
+      turns: session.turns.sort((left, right) => left.createdAt.localeCompare(right.createdAt)),
+    }))
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
 }
 
 function sessionListItems() {
@@ -677,7 +697,7 @@ function renderHistory() {
       <div class="history-date">${date}</div>
       <div class="history-group-list">
         ${groups[date].map((item) => `
-          <article class="history-item ${item.source === "live" ? "is-live" : ""}" data-session-id="${item.id}" data-agent-id="${item.agentId || ""}">
+          <article class="history-item ${item.source === "live" ? "is-live" : "is-archive"}" data-session-id="${item.id}" data-agent-id="${item.agentId || ""}">
             <div class="history-item-top">
               <strong>${item.providerName}</strong>
               <span>${formatTime(item.updatedAt)}</span>
@@ -705,6 +725,56 @@ function bindSessionListActions() {
       setAppNotice("已切换到当前会话。");
     });
   });
+  historyList.querySelectorAll(".history-item.is-archive").forEach((item) => {
+    item.addEventListener("click", () => {
+      restoreArchivedSession(item.dataset.sessionId);
+    });
+  });
+}
+
+function ensureArchivedAgent(archived) {
+  const provider = providerById(archived.providerId) || providers[0];
+  let agent = agentById(archived.agentId);
+  if (!agent) {
+    agent = {
+      id: archived.agentId,
+      providerId: provider.id,
+      name: archived.agentName.split(" / ").at(-1) || "历史会话",
+      subtitle: "历史归档",
+      note: "从历史归档恢复的只读会话。",
+      state: 5,
+    };
+    provider.agents.push(agent);
+  }
+  return agent;
+}
+
+function restoreArchivedSession(sessionId) {
+  if (!sessionId) return;
+  const archived = archivedSessionsFromHistory(historyEntries).find((item) => item.id === sessionId);
+  if (!archived) return;
+  const existing = sessions.find((item) => item.id === archived.id);
+  const restored = existing || {
+    id: archived.id,
+    providerId: archived.providerId,
+    providerName: archived.providerName,
+    agentId: archived.agentId,
+    agentName: archived.agentName,
+    task: archived.title,
+    state: 5,
+    turns: archived.turns,
+    createdAt: archived.createdAt,
+    fullscreen: false,
+    archived: true,
+  };
+  ensureArchivedAgent(archived);
+  if (!existing) sessions = [restored, ...sessions];
+  saveMainAgent(restored.agentId);
+  activeSessionIds[restored.agentId] = restored.id;
+  renderProviders();
+  renderWorkspace();
+  renderHistory();
+  setAppNotice("已从历史归档恢复会话。当前为只读 transcript，尚未恢复运行时。");
 }
 
 async function loadHistory() {
@@ -731,6 +801,7 @@ async function saveTurnToHistory(session, turn) {
       task: turn.task,
       status: stateNames[turn.state] || "UNKNOWN",
       summary: turn.finalResponse || turn.outputs.at(-1) || turn.logs.at(0) || "消息已结束。",
+      turn,
     },
   });
   historyEntries = [entry, ...historyEntries];
