@@ -36,30 +36,33 @@ body {
 
 .app-shell {
   height: 100vh;
-  padding: 14px 16px 12px;
+  padding: 12px 16px 12px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .topbar {
   display: flex;
   justify-content: space-between;
-  align-items: flex-end;
-  gap: 18px;
+  align-items: center;
+  gap: 16px;
   flex: 0 0 auto;
 }
 
 .brand {
-  max-width: 980px;
+  display: flex;
+  align-items: center;
+  min-width: 0;
 }
 
-.brand h1 {
-  font-size: clamp(2rem, 3.1vw, 2.8rem);
-  line-height: 1.08;
+.brandline {
+  margin: 0;
+  font-size: 0.98rem;
+  color: var(--muted);
+  font-weight: 500;
 }
 
-.topbar h1,
 .panel-header h2,
 .hero-card h3,
 .stream-header h3 {
@@ -71,14 +74,6 @@ body {
   color: var(--muted);
   margin: 0 0 3px;
   font-size: 0.88rem;
-}
-
-.subline {
-  margin: 6px 0 0;
-  color: var(--muted);
-  max-width: 920px;
-  line-height: 1.42;
-  font-size: 0.98rem;
 }
 
 .actions {
@@ -159,6 +154,10 @@ button.compact {
   min-height: 0;
 }
 
+.session-panel {
+  gap: 12px;
+}
+
 .agent-list {
   display: flex;
   flex-direction: column;
@@ -221,8 +220,7 @@ button.compact {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  overflow: auto;
-  padding-right: 6px;
+  overflow: hidden;
   min-height: 0;
   flex: 1 1 auto;
 }
@@ -247,8 +245,8 @@ button.compact {
   display: grid;
   grid-template-columns: 1.45fr 0.95fr;
   gap: 14px;
-  min-height: 420px;
   flex: 1 1 auto;
+  min-height: 0;
   min-width: 0;
 }
 
@@ -336,7 +334,6 @@ button.compact {
   flex-direction: column;
   gap: 10px;
   flex: 0 0 auto;
-  margin-top: 14px;
 }
 
 .composer-row {
