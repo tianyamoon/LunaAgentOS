@@ -114,6 +114,32 @@ pub fn load_claude_acp_session(
     Ok(events)
 }
 
+pub fn shutdown_claude_acp_session(runtime_session_id: String) -> Result<bool, String> {
+    let sessions = CLAUDE_SESSIONS.get_or_init(|| Mutex::new(HashMap::new()));
+    let mut sessions = sessions.lock().map_err(|error| error.to_string())?;
+    let Some(mut session) = sessions.remove(&runtime_session_id) else {
+        return Ok(false);
+    };
+    let _ = session.stdin.flush();
+    drop(session.stdin);
+    let _ = session.child.kill();
+    let _ = session.child.wait();
+    Ok(true)
+}
+
+pub fn shutdown_all_claude_acp_sessions() -> Result<usize, String> {
+    let sessions = CLAUDE_SESSIONS.get_or_init(|| Mutex::new(HashMap::new()));
+    let mut sessions = sessions.lock().map_err(|error| error.to_string())?;
+    let count = sessions.len();
+    for (_id, mut session) in sessions.drain() {
+        let _ = session.stdin.flush();
+        drop(session.stdin);
+        let _ = session.child.kill();
+        let _ = session.child.wait();
+    }
+    Ok(count)
+}
+
 fn start_acp_session(
     cwd: &PathBuf,
     mut events: &mut Vec<Value>,

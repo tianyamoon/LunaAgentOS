@@ -326,6 +326,15 @@ async fn runtime_acp_claude_resume(
 }
 
 #[tauri::command]
+async fn runtime_acp_claude_shutdown(runtime_session_id: String) -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        acp_runtime::shutdown_claude_acp_session(runtime_session_id)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
 async fn runtime_acp_claude_load(
     runtime_session_id: String,
     acp_session_id: String,
@@ -349,8 +358,14 @@ pub fn run() {
             run_claude_stream,
             runtime_acp_claude_prompt,
             runtime_acp_claude_resume,
-            runtime_acp_claude_load
+            runtime_acp_claude_load,
+            runtime_acp_claude_shutdown
         ])
+        .on_window_event(|_window, event| {
+            if matches!(event, tauri::WindowEvent::Destroyed) {
+                let _ = acp_runtime::shutdown_all_claude_acp_sessions();
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

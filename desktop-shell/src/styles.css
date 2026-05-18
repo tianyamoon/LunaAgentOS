@@ -217,7 +217,12 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.session-card-actions {
+  display: flex;
   gap: 8px;
+  align-items: center;
 }
 
 .provider-header {

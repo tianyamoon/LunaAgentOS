@@ -545,9 +545,12 @@ function renderSessionCard(session) {
           </div>
           <div class="caption session-task">${session.task}</div>
         </div>
-        <button type="button" class="mini-btn ghost-btn session-fullscreen-btn" data-session-id="${session.id}">
-          ${session.fullscreen ? "退出全屏" : "全屏"}
-        </button>
+        <div class="session-card-actions">
+          ${runtimeState === "live" ? `<button type="button" class="mini-btn ghost-btn session-archive-btn" data-session-id="${session.id}">归档</button>` : ""}
+          <button type="button" class="mini-btn ghost-btn session-fullscreen-btn" data-session-id="${session.id}">
+            ${session.fullscreen ? "退出全屏" : "全屏"}
+          </button>
+        </div>
       </div>
       <div class="session-card-body">
         ${session.turns.length
@@ -568,6 +571,26 @@ function bindSessionActions() {
       renderWorkspace();
     });
   });
+  sessionDeck.querySelectorAll(".session-archive-btn").forEach((button) => {
+    button.addEventListener("click", () => archiveLiveSession(button.dataset.sessionId));
+  });
+}
+
+async function archiveLiveSession(sessionId) {
+  const session = sessions.find((item) => item.id === sessionId);
+  if (!session) return;
+  try {
+    await invoke("runtime_acp_claude_shutdown", { runtimeSessionId: session.id });
+  } catch (error) {
+    console.error(error);
+  }
+  session.runtimeState = "archived";
+  if (activeSessionIds[session.agentId] === session.id) {
+    delete activeSessionIds[session.agentId];
+  }
+  renderWorkspace();
+  renderHistory();
+  setAppNotice(`${session.agentName} 已归档，ACP runtime 已释放。`);
 }
 
 function renderWorkspace() {
