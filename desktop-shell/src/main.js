@@ -109,6 +109,7 @@ const workspaceStatus = document.getElementById("workspaceStatus");
 const workspaceEmpty = document.getElementById("workspaceEmpty");
 const sessionDeck = document.getElementById("sessionDeck");
 const historyList = document.getElementById("historyList");
+const appNotice = document.getElementById("appNotice");
 const promptBox = document.getElementById("promptBox");
 const refreshBtn = document.getElementById("refreshBtn");
 const runBtn = document.getElementById("runBtn");
@@ -118,6 +119,9 @@ let mainAgentId = localStorage.getItem(MAIN_AGENT_KEY) || "claude-main";
 let sessions = [];
 let historyEntries = [];
 let sessionSeq = 0;
+let runningSessions = 0;
+let isRefreshingRuntimes = false;
+let isHistoryLoading = true;
 
 function allAgents() {
   return providers.flatMap((provider) => provider.agents);
@@ -176,18 +180,36 @@ function formatSessionStatus(session) {
   return stateNames[session.state] || "UNKNOWN";
 }
 
+function setAppNotice(message, tone = "muted") {
+  if (!appNotice) return;
+  appNotice.textContent = message;
+  appNotice.classList.toggle("is-busy", tone === "busy");
+  appNotice.classList.toggle("is-error", tone === "error");
+}
+
+function updateActionLabels() {
+  refreshBtn.disabled = isRefreshingRuntimes;
+  refreshBtn.textContent = isRefreshingRuntimes ? "刷新中..." : "刷新状态";
+
+  const sending = runningSessions > 0;
+  const runText = sending ? `发给主 Agent (${runningSessions})` : "发给主 Agent";
+  const sendText = sending ? `发送中 (${runningSessions})` : "发送";
+  runBtn.textContent = runText;
+  sendBtn.textContent = sendText;
+}
+
 function saveMainAgent(agentId) {
   mainAgentId = agentId;
   localStorage.setItem(MAIN_AGENT_KEY, agentId);
 }
 
 function openProviderManager() {
-  window.alert("Provider 管理器入口已预留，后续再接入。");
+  setAppNotice("Provider 管理器入口已预留，当前阶段先稳住主 Agent 工作台。");
 }
 
 function showProviderAgents(provider) {
   const names = provider.agents.map((agent) => agent.name).join("、");
-  window.alert(`${provider.name} 当前 agent：${names}`);
+  setAppNotice(`${provider.name} 当前已登记的 Agent：${names}。`);
 }
 
 function setMainAgent(agentId) {
@@ -196,6 +218,7 @@ function setMainAgent(agentId) {
   const provider = currentMainProvider();
   if (agent && provider) {
     workspaceStatus.textContent = `当前主 Agent：${provider.name} / ${agent.name}`;
+    setAppNotice(`主 Agent 已切换到 ${provider.name} / ${agent.name}。`);
   }
   renderProviders();
 }
@@ -356,6 +379,7 @@ function appendErrorToSession(sessionId, message) {
   session.state = 9;
   session.logs = [message, ...session.logs];
   renderWorkspace();
+  setAppNotice(`会话 ${session.agentName} 执行失败：${message}`, "error");
 }
 
 function renderWorkspaceStatus() {
@@ -449,6 +473,16 @@ function groupHistory(entries) {
 }
 
 function renderHistory() {
+  if (isHistoryLoading) {
+    historyList.innerHTML = `
+      <div class="history-empty">
+        <strong>历史任务加载中</strong>
+        <p>首屏先起工作台，历史记录会在后台补齐。</p>
+      </div>
+    `;
+    return;
+  }
+
   if (!historyEntries.length) {
     historyList.innerHTML = `
       <div class="history-empty">
@@ -487,6 +521,9 @@ async function loadHistory() {
   } catch (error) {
     console.error(error);
     historyEntries = [];
+    setAppNotice("历史任务读取失败，已回退为空列表。", "error");
+  } finally {
+    isHistoryLoading = false;
   }
   renderHistory();
 }
@@ -508,27 +545,51 @@ async function saveSessionToHistory(session) {
 }
 
 async function refreshRuntimeStatus() {
+  if (isRefreshingRuntimes) return;
+  isRefreshingRuntimes = true;
+  updateActionLabels();
+  setAppNotice("正在后台刷新运行时状态...", "busy");
   try {
+    await new Promise((resolve) => requestAnimationFrame(resolve));
     const statuses = await invoke("probe_runtimes");
     providers.forEach((provider) => {
       provider.runtimeStatus = formatStatusText(statuses[provider.id]);
     });
     renderProviders();
+    setAppNotice("运行时状态已刷新。");
   } catch (error) {
     console.error(error);
+    setAppNotice(`刷新运行时状态失败：${String(error)}`, "error");
+  } finally {
+    isRefreshingRuntimes = false;
+    updateActionLabels();
   }
 }
 
 async function startFallbackSession(session, providerId) {
   const fallback = fallbackSessions[providerId];
   if (!fallback) return;
-  const saved = updateSessionFromEvents(session.id, fallback.events);
-  if (saved) {
-    await saveSessionToHistory(saved);
+  runningSessions += 1;
+  updateActionLabels();
+  setAppNotice(`已将任务送入 ${session.agentName}，正在等待返回内容...`, "busy");
+  try {
+    const saved = updateSessionFromEvents(session.id, fallback.events);
+    if (saved) {
+      await saveSessionToHistory(saved);
+      setAppNotice(`${session.agentName} 会话已完成并写入历史。`);
+    }
+  } catch (error) {
+    appendErrorToSession(session.id, String(error));
+  } finally {
+    runningSessions = Math.max(0, runningSessions - 1);
+    updateActionLabels();
   }
 }
 
 async function startClaudeSession(session) {
+  runningSessions += 1;
+  updateActionLabels();
+  setAppNotice(`已将任务送入 ${session.agentName}，正在等待返回内容...`, "busy");
   try {
     await new Promise((resolve) => requestAnimationFrame(resolve));
     const events = await invoke("run_claude_stream", { prompt: session.task });
@@ -540,6 +601,7 @@ async function startClaudeSession(session) {
       }
       renderProviders();
       await saveSessionToHistory(saved);
+      setAppNotice(`${session.agentName} 会话已完成并写入历史。`);
     }
   } catch (error) {
     appendErrorToSession(session.id, String(error));
@@ -547,10 +609,13 @@ async function startClaudeSession(session) {
     if (failed) {
       await saveSessionToHistory(failed);
     }
+  } finally {
+    runningSessions = Math.max(0, runningSessions - 1);
+    updateActionLabels();
   }
 }
 
-async function startSessionFromPrompt() {
+function startSessionFromPrompt() {
   const task = promptBox.value.trim();
   if (!task) {
     promptBox.focus();
@@ -560,37 +625,42 @@ async function startSessionFromPrompt() {
   const agent = currentMainAgent();
   const provider = currentMainProvider();
   if (!agent || !provider) {
-    window.alert("请先在左侧设定主 Agent。");
+    setAppNotice("请先在左侧设定主 Agent，再发送任务。", "error");
     return;
   }
 
   const session = createSession(task);
   if (!session) return;
+  promptBox.value = "";
 
   if (provider.id === "claude") {
-    await startClaudeSession(session);
+    void startClaudeSession(session);
     return;
   }
 
-  await startFallbackSession(session, provider.id);
+  void startFallbackSession(session, provider.id);
 }
 
 providerManagerBtn?.addEventListener("click", () => {
   openProviderManager();
 });
 
-refreshBtn.addEventListener("click", async () => {
-  await refreshRuntimeStatus();
+refreshBtn.addEventListener("click", () => {
+  void refreshRuntimeStatus();
 });
 
-runBtn.addEventListener("click", async () => {
-  await startSessionFromPrompt();
+runBtn.addEventListener("click", () => {
+  startSessionFromPrompt();
 });
 
-sendBtn.addEventListener("click", async () => {
-  await startSessionFromPrompt();
+sendBtn.addEventListener("click", () => {
+  startSessionFromPrompt();
 });
 
 renderProviders();
 renderWorkspace();
-loadHistory();
+renderHistory();
+updateActionLabels();
+setTimeout(() => {
+  void loadHistory();
+}, 0);
