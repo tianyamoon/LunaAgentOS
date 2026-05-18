@@ -118,6 +118,15 @@ button.compact {
   align-self: end;
 }
 
+.mini-btn {
+  padding: 6px 12px;
+  font-size: 0.82rem;
+}
+
+.ghost-btn {
+  background: rgba(255, 255, 255, 0.56);
+}
+
 .layout {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr) 320px;
@@ -167,33 +176,71 @@ button.compact {
   min-height: 0;
 }
 
-.agent-card {
+.provider-group {
   padding: 14px;
   border-radius: 18px;
-  border: 1px solid transparent;
+  border: 1px solid rgba(82, 61, 38, 0.1);
   background: var(--panel-strong);
-  cursor: pointer;
-  transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
-  text-align: left;
-}
-
-.agent-card:hover,
-.agent-card.active {
-  transform: translateY(-1px);
-  border-color: rgba(217, 108, 58, 0.35);
-  box-shadow: 0 12px 24px rgba(56, 32, 13, 0.08);
-}
-
-.agent-topline {
   display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 10px;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.agent-role {
+.provider-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.provider-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.provider-lane,
+.agent-entry-sub {
   color: var(--muted);
   font-size: 0.88rem;
+}
+
+.provider-note {
+  line-height: 1.45;
+}
+
+.provider-agents {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.agent-entry {
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(82, 61, 38, 0.08);
+  background: rgba(255, 255, 255, 0.72);
+  text-align: left;
+  transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.agent-entry:hover,
+.agent-entry.active {
+  transform: translateY(-1px);
+  border-color: rgba(217, 108, 58, 0.35);
+  box-shadow: 0 10px 20px rgba(56, 32, 13, 0.08);
+}
+
+.agent-entry-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.add-agent-btn {
+  align-self: flex-start;
 }
 
 .state-pill,

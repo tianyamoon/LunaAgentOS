@@ -41,37 +41,65 @@ const fallbackSessions = {
   },
 };
 
-const agents = [
+const providers = [
   {
     id: "claude",
     name: "Claude Code",
-    role: "强大样板",
+    lane: "强大入口",
     note: "优先承接真实高价值 CLI 运行时。",
-    task: "请检查当前工作目录，确认 LunaAgentOS 已有哪些可验证产物，并给出下一步最应该接入的真实 Agent。",
-    state: 1,
     runtimeStatus: "未探测",
+    agents: [
+      {
+        id: "claude-main",
+        providerId: "claude",
+        name: "主会话",
+        subtitle: "Windows CLI",
+        task: "请检查当前工作目录，确认 LunaAgentOS 已有哪些可验证产物，并给出下一步最应该接入的真实 Agent。",
+        note: "优先承接真实高价值 CLI 运行时。",
+        state: 1,
+      },
+    ],
   },
   {
     id: "hermes",
     name: "Hermes",
-    role: "通用样板",
+    lane: "通用入口",
     note: "适合作为现实世界里最稳的通用接入目标。",
-    task: "总结当前适配器验证状态，并整理接入 WSL Hermes 前的准备项。",
-    state: 1,
     runtimeStatus: "未探测",
+    agents: [
+      {
+        id: "hermes-main",
+        providerId: "hermes",
+        name: "主会话",
+        subtitle: "WSL Runtime",
+        task: "总结当前适配器验证状态，并整理接入 WSL Hermes 前的准备项。",
+        note: "适合作为现实世界里最稳的通用接入目标。",
+        state: 1,
+      },
+    ],
   },
   {
     id: "trae",
     name: "Trae IDE",
-    role: "免费样板",
+    lane: "免费入口",
     note: "产品必须纳入，但当前仍按 Bridge 路线推进。",
-    task: "梳理最轻的 IDE Bridge 方案。",
-    state: 1,
     runtimeStatus: "Bridge 待实现",
+    agents: [
+      {
+        id: "trae-main",
+        providerId: "trae",
+        name: "主会话",
+        subtitle: "IDE Bridge",
+        task: "梳理最轻的 IDE Bridge 方案。",
+        note: "产品必须纳入，但当前仍按 Bridge 路线推进。",
+        state: 1,
+      },
+    ],
   },
 ];
 
 const agentList = document.getElementById("agentList");
+const providerManagerBtn = document.getElementById("providerManagerBtn");
 const sessionTitle = document.getElementById("sessionTitle");
 const sessionSubtitle = document.getElementById("sessionSubtitle");
 const stateBadge = document.getElementById("stateBadge");
@@ -87,8 +115,40 @@ const refreshBtn = document.getElementById("refreshBtn");
 const runBtn = document.getElementById("runBtn");
 const sendBtn = document.getElementById("sendBtn");
 
-let currentAgentId = "claude";
+let currentAgentId = "claude-main";
 let currentEvents = [];
+
+function allAgents() {
+  return providers.flatMap((provider) => provider.agents);
+}
+
+function providerById(id) {
+  return providers.find((provider) => provider.id === id);
+}
+
+function agentById(id) {
+  return allAgents().find((agent) => agent.id === id);
+}
+
+function providerForAgent(agentId) {
+  const agent = agentById(agentId);
+  return agent ? providerById(agent.providerId) : null;
+}
+
+function providerState(provider) {
+  const states = provider.agents.map((agent) => agent.state);
+  return states.includes(3)
+    ? 3
+    : states.includes(2)
+      ? 2
+      : states.includes(4)
+        ? 4
+        : states.includes(5)
+          ? 5
+          : states.includes(9)
+            ? 9
+            : states[0] ?? 1;
+}
 
 function renderLegend() {
   stateLegend.innerHTML = "";
@@ -100,38 +160,86 @@ function renderLegend() {
   });
 }
 
-function agentById(id) {
-  return agents.find((item) => item.id === id);
-}
-
 function formatStatusText(status) {
   if (!status) return "未探测";
   if (status.available) return `已连接 · ${status.detail || status.version || "可用"}`;
   return `未连接 · ${status.detail || "未就绪"}`;
 }
 
-function renderAgents() {
+function listProviderAgents(provider) {
+  const names = provider.agents.map((agent) => agent.name).join("、");
+  window.alert(`${provider.name} 当前 agent：${names}`);
+}
+
+function openProviderManager() {
+  window.alert("Provider 管理器稍后接入。当前先保留入口。");
+}
+
+function renderProviders() {
   agentList.innerHTML = "";
-  agents.forEach((agent) => {
-    const card = document.createElement("button");
-    card.type = "button";
-    card.className = `agent-card ${agent.id === currentAgentId ? "active" : ""}`;
-    card.innerHTML = `
-      <div class="agent-topline">
-        <strong>${agent.name}</strong>
-        <span class="state-pill ${stateClasses[agent.state] || "state-idle"}">${stateNames[agent.state]}</span>
+
+  providers.forEach((provider) => {
+    const group = document.createElement("section");
+    group.className = "provider-group";
+
+    const aggregateState = providerState(provider);
+    const isActiveProvider = provider.agents.some((agent) => agent.id === currentAgentId);
+
+    group.innerHTML = `
+      <div class="provider-header">
+        <div>
+          <div class="provider-title-row">
+            <strong>${provider.name}</strong>
+            <span class="state-pill ${stateClasses[aggregateState] || "state-idle"}">${stateNames[aggregateState]}</span>
+          </div>
+          <div class="provider-lane">${provider.lane}</div>
+        </div>
+        <div class="provider-actions">
+          <button type="button" class="mini-btn ghost-btn provider-manage-btn" data-provider-id="${provider.id}">维护</button>
+        </div>
       </div>
-      <div class="agent-role">${agent.role}</div>
-      <p class="caption">${agent.note}</p>
-      <div class="runtime-status"><strong>运行时</strong> ${agent.runtimeStatus}</div>
+      <p class="caption provider-note">${provider.note}</p>
+      <div class="runtime-status"><strong>运行时</strong> ${provider.runtimeStatus}</div>
+      <div class="provider-agents ${isActiveProvider ? "provider-agents-active" : ""}">
+        ${provider.agents.map((agent) => `
+          <button type="button" class="agent-entry ${agent.id === currentAgentId ? "active" : ""}" data-agent-id="${agent.id}">
+            <div class="agent-entry-top">
+              <strong>${agent.name}</strong>
+              <span class="state-pill ${stateClasses[agent.state] || "state-idle"}">${stateNames[agent.state]}</span>
+            </div>
+            <div class="agent-entry-sub">${agent.subtitle}</div>
+          </button>
+        `).join("")}
+      </div>
+      <button type="button" class="mini-btn add-agent-btn" data-provider-id="${provider.id}">+ 新增 Agent</button>
     `;
-    card.addEventListener("click", () => {
-      currentAgentId = agent.id;
-      renderAgents();
-      renderCurrentSession();
-      renderSessionEvents(currentEvents);
+
+    agentList.appendChild(group);
+  });
+
+  agentList.querySelectorAll(".agent-entry").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const agentId = button.dataset.agentId;
+      if (!agentId) return;
+      await openAgent(agentId);
     });
-    agentList.appendChild(card);
+  });
+
+  agentList.querySelectorAll(".provider-manage-btn").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      openProviderManager();
+    });
+  });
+
+  agentList.querySelectorAll(".add-agent-btn").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const providerId = button.dataset.providerId;
+      const provider = providerById(providerId);
+      if (!provider) return;
+      listProviderAgents(provider);
+    });
   });
 }
 
@@ -144,9 +252,11 @@ function resetSessionView() {
 
 function renderCurrentSession() {
   const agent = agentById(currentAgentId);
-  if (!agent) return;
-  sessionTitle.textContent = agent.name;
-  sessionSubtitle.textContent = agent.role;
+  const provider = providerForAgent(currentAgentId);
+  if (!agent || !provider) return;
+
+  sessionTitle.textContent = provider.name;
+  sessionSubtitle.textContent = `${provider.lane} · ${agent.name}`;
   heroTask.textContent = agent.task;
   heroSummary.textContent = agent.note;
   updateStateBadge(agent.state);
@@ -210,7 +320,10 @@ function renderSessionEvents(events) {
   currentEvents = events;
   events.forEach((event) => {
     appendMessage(event);
-    appendTimelineItem(event, new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+    appendTimelineItem(
+      event,
+      new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+    );
     if (event.type === "tool_request") {
       renderTool(event);
     }
@@ -219,23 +332,23 @@ function renderSessionEvents(events) {
 
 async function refreshRuntimeStatus() {
   const statuses = await invoke("probe_runtimes");
-  agents.forEach((agent) => {
-    const status = statuses[agent.id];
-    agent.runtimeStatus = formatStatusText(status);
+  providers.forEach((provider) => {
+    const status = statuses[provider.id];
+    provider.runtimeStatus = formatStatusText(status);
   });
-  renderAgents();
+  renderProviders();
 }
 
 async function runClaudeTask() {
   const prompt = promptBox.value.trim();
   const events = await invoke("run_claude_stream", { prompt });
-  applyAgentState("claude", events);
-  currentAgentId = "claude";
-  const claude = agentById("claude");
+  applyAgentState("claude-main", events);
+  currentAgentId = "claude-main";
+  const claude = agentById("claude-main");
   claude.task = prompt;
   claude.note = "真实 Claude Code CLI 会话已完成一轮任务。";
   heroSummary.textContent = "Claude Code 真实运行时已返回结构化事件流。";
-  renderAgents();
+  renderProviders();
   renderCurrentSession();
   renderSessionEvents(events);
 }
@@ -243,18 +356,21 @@ async function runClaudeTask() {
 async function openAgent(agentId) {
   currentAgentId = agentId;
   const agent = agentById(agentId);
-  renderAgents();
+  const provider = providerForAgent(agentId);
+  if (!agent || !provider) return;
+
+  renderProviders();
   renderCurrentSession();
 
-  if (agentId === "claude") {
+  if (provider.id === "claude") {
     try {
       const statuses = await invoke("probe_runtimes");
       const status = statuses.claude;
-      agent.runtimeStatus = formatStatusText(status);
+      provider.runtimeStatus = formatStatusText(status);
       if (status?.available) {
         const events = await invoke("probe_claude_session");
-        applyAgentState("claude", events);
-        renderAgents();
+        applyAgentState("claude-main", events);
+        renderProviders();
         renderCurrentSession();
         renderSessionEvents(events);
         return;
@@ -264,12 +380,12 @@ async function openAgent(agentId) {
     }
   }
 
-  const fallback = fallbackSessions[agentId];
+  const fallback = fallbackSessions[provider.id];
   if (fallback) {
     agent.state = fallback.state;
     agent.task = fallback.task;
     agent.note = fallback.summary;
-    renderAgents();
+    renderProviders();
     renderCurrentSession();
     renderSessionEvents(fallback.events);
   } else {
@@ -277,13 +393,18 @@ async function openAgent(agentId) {
   }
 }
 
+providerManagerBtn?.addEventListener("click", () => {
+  openProviderManager();
+});
+
 refreshBtn.addEventListener("click", async () => {
   await refreshRuntimeStatus();
   await openAgent(currentAgentId);
 });
 
 runBtn.addEventListener("click", async () => {
-  if (currentAgentId === "claude") {
+  const provider = providerForAgent(currentAgentId);
+  if (provider?.id === "claude") {
     await runClaudeTask();
     return;
   }
@@ -291,8 +412,11 @@ runBtn.addEventListener("click", async () => {
 });
 
 sendBtn.addEventListener("click", async () => {
-  heroTask.textContent = promptBox.value.trim() || "空任务";
-  if (currentAgentId === "claude") {
+  const agent = agentById(currentAgentId);
+  if (agent) {
+    agent.task = promptBox.value.trim() || "空任务";
+  }
+  if (providerForAgent(currentAgentId)?.id === "claude") {
     await runClaudeTask();
   } else {
     await openAgent(currentAgentId);
@@ -300,6 +424,6 @@ sendBtn.addEventListener("click", async () => {
 });
 
 renderLegend();
-renderAgents();
+renderProviders();
 renderCurrentSession();
 refreshRuntimeStatus().then(() => openAgent(currentAgentId));
