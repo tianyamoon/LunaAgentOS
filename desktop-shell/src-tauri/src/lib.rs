@@ -25,6 +25,7 @@ struct HistoryEntry {
     agent_id: String,
     agent_name: String,
     session_id: Option<String>,
+    acp_session_id: Option<String>,
     task: String,
     status: String,
     summary: String,
@@ -39,6 +40,7 @@ struct HistoryEntryInput {
     agent_id: String,
     agent_name: String,
     session_id: Option<String>,
+    acp_session_id: Option<String>,
     task: String,
     status: String,
     summary: String,
@@ -132,6 +134,7 @@ fn append_history_entry(app: AppHandle, entry: HistoryEntryInput) -> Result<Hist
         agent_id: entry.agent_id,
         agent_name: entry.agent_name,
         session_id: entry.session_id,
+        acp_session_id: entry.acp_session_id,
         task: entry.task,
         status: entry.status,
         summary: entry.summary,
@@ -304,6 +307,19 @@ async fn runtime_acp_claude_prompt(
     .map_err(|error| error.to_string())?
 }
 
+#[tauri::command]
+async fn runtime_acp_claude_resume(
+    runtime_session_id: String,
+    acp_session_id: String,
+    cwd: Option<String>,
+) -> Result<Vec<Value>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        acp_runtime::resume_claude_acp_session(runtime_session_id, acp_session_id, cwd)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -313,7 +329,8 @@ pub fn run() {
             append_history_entry,
             probe_runtimes,
             run_claude_stream,
-            runtime_acp_claude_prompt
+            runtime_acp_claude_prompt,
+            runtime_acp_claude_resume
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

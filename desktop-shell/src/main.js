@@ -456,12 +456,14 @@ function updateTurnFromEvents(sessionId, turnId, events) {
 
   const sections = sessionSectionsFromEvents(events);
   const lastState = [...events].reverse().find((event) => typeof event.state === "number");
+  const acpSessionEvent = [...events].reverse().find((event) => event.payload?.sessionId);
 
   turn.thoughts = sections.thoughts;
   turn.outputs = sections.outputs;
   turn.finalResponse = sections.finalResponse;
   turn.logs = sections.logs;
   turn.state = lastState ? lastState.state : turn.state;
+  if (acpSessionEvent?.payload?.sessionId) session.acpSessionId = acpSessionEvent.payload.sessionId;
   session.task = turn.task;
   session.state = turn.state;
   renderWorkspace();
@@ -621,6 +623,7 @@ function archivedSessionsFromHistory(entries) {
         providerName: entry.provider_name,
         agentId: entry.agent_id,
         agentName: entry.agent_name,
+        acpSessionId: entry.acp_session_id,
         title: entry.task,
         summary: entry.summary,
         turnCount: 1,
@@ -749,7 +752,7 @@ function ensureArchivedAgent(archived) {
   return agent;
 }
 
-function restoreArchivedSession(sessionId) {
+async function restoreArchivedSession(sessionId) {
   if (!sessionId) return;
   const archived = archivedSessionsFromHistory(historyEntries).find((item) => item.id === sessionId);
   if (!archived) return;
@@ -765,6 +768,7 @@ function restoreArchivedSession(sessionId) {
     turns: archived.turns,
     createdAt: archived.createdAt,
     fullscreen: false,
+    acpSessionId: archived.acpSessionId,
     archived: true,
   };
   ensureArchivedAgent(archived);
@@ -774,7 +778,27 @@ function restoreArchivedSession(sessionId) {
   renderProviders();
   renderWorkspace();
   renderHistory();
-  setAppNotice("已从历史归档恢复会话。当前为只读 transcript，尚未恢复运行时。");
+  if (!restored.acpSessionId) {
+    setAppNotice("已从历史归档恢复会话。缺少 ACP sessionId，当前为只读 transcript。");
+    return;
+  }
+  setAppNotice("已恢复历史 transcript，正在尝试恢复 ACP runtime...", "busy");
+  try {
+    await invoke("runtime_acp_claude_resume", {
+      runtimeSessionId: restored.id,
+      acpSessionId: restored.acpSessionId,
+      cwd: null,
+    });
+    restored.archived = false;
+    renderWorkspace();
+    renderHistory();
+    setAppNotice("历史 session 已恢复为可继续对话的 ACP runtime。");
+  } catch (error) {
+    restored.archived = true;
+    renderWorkspace();
+    renderHistory();
+    setAppNotice(`ACP runtime 恢复失败，保留只读 transcript：${String(error)}`, "error");
+  }
 }
 
 async function loadHistory() {
@@ -798,6 +822,7 @@ async function saveTurnToHistory(session, turn) {
       agentId: session.agentId,
       agentName: session.agentName,
       sessionId: session.id,
+      acpSessionId: session.acpSessionId || null,
       task: turn.task,
       status: stateNames[turn.state] || "UNKNOWN",
       summary: turn.finalResponse || turn.outputs.at(-1) || turn.logs.at(0) || "消息已结束。",
