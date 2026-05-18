@@ -1002,3 +1002,30 @@ updateActionLabels();
 setTimeout(() => {
   void loadHistory();
 }, 0);
+
+async function syncRuntimeAliveStates() {
+  try {
+    const aliveIds = new Set(await invoke("runtime_acp_claude_alive_ids"));
+    let mutated = false;
+    sessions.forEach((session) => {
+      const declaredLive = sessionRuntimeState(session) === "live";
+      const hasStartedRuntime = Boolean(session.acpSessionId);
+      if (declaredLive && hasStartedRuntime && !aliveIds.has(session.id)) {
+        session.runtimeState = "resume_failed";
+        if (activeSessionIds[session.agentId] === session.id) {
+          delete activeSessionIds[session.agentId];
+        }
+        mutated = true;
+      }
+    });
+    if (mutated) {
+      renderWorkspace();
+      renderHistory();
+      setAppNotice("检测到 ACP runtime 已退出，相关会话已转为只读。", "error");
+    }
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+setInterval(() => { void syncRuntimeAliveStates(); }, 15000);

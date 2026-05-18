@@ -326,6 +326,13 @@ async fn runtime_acp_claude_resume(
 }
 
 #[tauri::command]
+async fn runtime_acp_claude_alive_ids() -> Result<Vec<String>, String> {
+    tauri::async_runtime::spawn_blocking(|| acp_runtime::list_live_claude_acp_sessions())
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
 async fn runtime_acp_claude_shutdown(runtime_session_id: String) -> Result<bool, String> {
     tauri::async_runtime::spawn_blocking(move || {
         acp_runtime::shutdown_claude_acp_session(runtime_session_id)
@@ -359,7 +366,8 @@ pub fn run() {
             runtime_acp_claude_prompt,
             runtime_acp_claude_resume,
             runtime_acp_claude_load,
-            runtime_acp_claude_shutdown
+            runtime_acp_claude_shutdown,
+            runtime_acp_claude_alive_ids
         ])
         .on_window_event(|_window, event| {
             if matches!(event, tauri::WindowEvent::Destroyed) {

@@ -114,6 +114,25 @@ pub fn load_claude_acp_session(
     Ok(events)
 }
 
+pub fn list_live_claude_acp_sessions() -> Result<Vec<String>, String> {
+    let sessions = CLAUDE_SESSIONS.get_or_init(|| Mutex::new(HashMap::new()));
+    let mut sessions = sessions.lock().map_err(|error| error.to_string())?;
+    let mut alive = Vec::new();
+    let mut dead = Vec::new();
+    for (id, session) in sessions.iter_mut() {
+        match session.child.try_wait() {
+            Ok(None) => alive.push(id.clone()),
+            _ => dead.push(id.clone()),
+        }
+    }
+    for id in dead {
+        if let Some(mut session) = sessions.remove(&id) {
+            let _ = session.child.wait();
+        }
+    }
+    Ok(alive)
+}
+
 pub fn shutdown_claude_acp_session(runtime_session_id: String) -> Result<bool, String> {
     let sessions = CLAUDE_SESSIONS.get_or_init(|| Mutex::new(HashMap::new()));
     let mut sessions = sessions.lock().map_err(|error| error.to_string())?;
