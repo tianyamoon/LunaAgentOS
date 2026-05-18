@@ -511,6 +511,16 @@ textarea {
   border: 1px solid rgba(99, 82, 63, 0.1);
 }
 
+.history-item.is-live {
+  cursor: pointer;
+  border-color: rgba(217, 108, 58, 0.18);
+  background: rgba(255, 247, 239, 0.82);
+}
+
+.history-item.is-live:hover {
+  box-shadow: 0 10px 22px rgba(52, 37, 18, 0.08);
+}
+
 .history-item p {
   margin: 8px 0 0;
   line-height: 1.45;

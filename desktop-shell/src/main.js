@@ -417,6 +417,7 @@ function createSession(firstTask) {
   sessions = [session, ...sessions];
   activeSessionIds[agent.id] = session.id;
   renderWorkspace();
+  renderHistory();
   return session;
 }
 
@@ -464,6 +465,7 @@ function updateTurnFromEvents(sessionId, turnId, events) {
   session.task = turn.task;
   session.state = turn.state;
   renderWorkspace();
+  renderHistory();
   return turn;
 }
 
@@ -593,47 +595,116 @@ function groupHistory(entries) {
   }, {});
 }
 
+function archivedSessionsFromHistory(entries) {
+  const bySession = new Map();
+  entries.forEach((entry) => {
+    const key = entry.session_id || entry.id;
+    const current = bySession.get(key);
+    if (!current) {
+      bySession.set(key, {
+        id: key,
+        date: entry.date,
+        createdAt: entry.created_at,
+        updatedAt: entry.created_at,
+        providerName: entry.provider_name,
+        agentName: entry.agent_name,
+        title: entry.task,
+        summary: entry.summary,
+        turnCount: 1,
+        source: "archive",
+      });
+      return;
+    }
+    current.updatedAt = current.updatedAt > entry.created_at ? current.updatedAt : entry.created_at;
+    current.summary = entry.summary || current.summary;
+    current.turnCount += 1;
+  });
+  return [...bySession.values()].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+}
+
+function sessionListItems() {
+  const liveItems = sessions.map((session) => {
+    const lastTurn = session.turns.at(-1);
+    return {
+      id: session.id,
+      date: session.createdAt.slice(0, 10),
+      createdAt: session.createdAt,
+      updatedAt: lastTurn?.createdAt || session.createdAt,
+      providerName: session.providerName,
+      agentName: session.agentName,
+      title: session.task || "新会话",
+      summary: lastTurn?.finalResponse || lastTurn?.outputs.at(-1) || lastTurn?.logs.at(-1) || "当前会话",
+      turnCount: session.turns.length,
+      source: "live",
+      agentId: session.agentId,
+    };
+  });
+  const liveIds = new Set(liveItems.map((item) => item.id));
+  const archivedItems = archivedSessionsFromHistory(historyEntries).filter((item) => !liveIds.has(item.id));
+  return [...liveItems, ...archivedItems].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+}
+
 function renderHistory() {
   if (isHistoryLoading) {
     historyList.innerHTML = `
       <div class="history-empty">
-        <strong>历史任务加载中</strong>
-        <p>首屏先起工作台，历史记录会在后台补齐。</p>
+        <strong>会话列表加载中</strong>
+        <p>首屏先起工作台，会话归档会在后台补齐。</p>
       </div>
     `;
     return;
   }
 
-  if (!historyEntries.length) {
+  const sessionItems = sessionListItems();
+  if (!sessionItems.length) {
     historyList.innerHTML = `
       <div class="history-empty">
-        <strong>暂无历史任务</strong>
-        <p>第一次发送给主 Agent 后，这里会按日期记录任务摘要。历史只读归档，不会自动注入当前会话。</p>
+        <strong>暂无会话</strong>
+        <p>第一次发送给主 Agent 后，这里会记录 Agent 会话，而不是每条对话详情。</p>
       </div>
     `;
     return;
   }
 
-  const groups = groupHistory(historyEntries);
+  const groups = groupHistory(sessionItems.map((item) => ({
+    ...item,
+    date: item.date || item.updatedAt.slice(0, 10),
+  })));
   const dates = Object.keys(groups).sort((left, right) => right.localeCompare(left));
 
   historyList.innerHTML = dates.map((date) => `
     <section class="history-group">
       <div class="history-date">${date}</div>
       <div class="history-group-list">
-        ${groups[date].map((entry) => `
-          <article class="history-item">
+        ${groups[date].map((item) => `
+          <article class="history-item ${item.source === "live" ? "is-live" : ""}" data-session-id="${item.id}" data-agent-id="${item.agentId || ""}">
             <div class="history-item-top">
-              <strong>${entry.provider_name}</strong>
-              <span>${formatTime(entry.created_at)}</span>
+              <strong>${item.providerName}</strong>
+              <span>${formatTime(item.updatedAt)}</span>
             </div>
-            <div class="caption">${entry.agent_name}</div>
-            <p>${entry.summary}</p>
+            <div class="caption">${item.agentName} · ${item.turnCount} 轮 · ${item.source === "live" ? "当前" : "归档"}</div>
+            <p>${item.title}</p>
+            <p class="caption">${item.summary}</p>
           </article>
         `).join("")}
       </div>
     </section>
   `).join("");
+  bindSessionListActions();
+}
+
+function bindSessionListActions() {
+  historyList.querySelectorAll(".history-item.is-live").forEach((item) => {
+    item.addEventListener("click", () => {
+      const agentId = item.dataset.agentId;
+      const sessionId = item.dataset.sessionId;
+      if (agentId) saveMainAgent(agentId);
+      if (agentId && sessionId) activeSessionIds[agentId] = sessionId;
+      renderProviders();
+      renderWorkspace();
+      setAppNotice("已切换到当前会话。");
+    });
+  });
 }
 
 async function loadHistory() {
@@ -656,6 +727,7 @@ async function saveTurnToHistory(session, turn) {
       providerName: session.providerName,
       agentId: session.agentId,
       agentName: session.agentName,
+      sessionId: session.id,
       task: turn.task,
       status: stateNames[turn.state] || "UNKNOWN",
       summary: turn.finalResponse || turn.outputs.at(-1) || turn.logs.at(0) || "消息已结束。",
