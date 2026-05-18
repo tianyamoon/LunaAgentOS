@@ -270,17 +270,6 @@ button:disabled {
   justify-content: flex-start;
 }
 
-.main-agent-badge {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  padding: 6px 12px;
-  background: rgba(217, 108, 58, 0.14);
-  color: var(--accent);
-  font-size: 0.82rem;
-  font-weight: 600;
-}
-
 .add-agent-btn {
   align-self: flex-start;
 }

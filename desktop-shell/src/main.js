@@ -287,7 +287,7 @@ function renderProviders() {
             <div class="agent-entry-sub">${agent.subtitle}</div>
             <div class="agent-entry-actions">
               ${agent.id === mainAgentId
-                ? `<span class="main-agent-badge">当前主入口</span>`
+                ? ""
                 : `<button type="button" class="mini-btn set-main-btn" data-agent-id="${agent.id}">设为主 Agent</button>`}
             </div>
           </div>
