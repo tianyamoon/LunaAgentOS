@@ -286,8 +286,16 @@ fn run_claude_stream(prompt: String) -> Result<Vec<Value>, String> {
 }
 
 #[tauri::command]
-fn runtime_acp_claude_prompt(prompt: String, cwd: Option<String>) -> Result<Vec<Value>, String> {
-    acp_runtime::run_claude_acp_prompt(prompt, cwd)
+async fn runtime_acp_claude_prompt(
+    runtime_session_id: String,
+    prompt: String,
+    cwd: Option<String>,
+) -> Result<Vec<Value>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        acp_runtime::run_claude_acp_prompt(runtime_session_id, prompt, cwd)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

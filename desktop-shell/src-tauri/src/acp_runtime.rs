@@ -4,8 +4,9 @@ use std::env;
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
-use std::process::{Command, Stdio};
+use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::{Arc, Mutex};
+use std::sync::OnceLock;
 use std::thread;
 
 #[cfg(windows)]
@@ -14,12 +15,44 @@ use std::os::windows::process::CommandExt;
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
-pub fn run_claude_acp_prompt(prompt: String, cwd: Option<String>) -> Result<Vec<Value>, String> {
+static CLAUDE_SESSIONS: OnceLock<Mutex<HashMap<String, AcpSession>>> = OnceLock::new();
+
+struct AcpSession {
+    child: Child,
+    stdin: ChildStdin,
+    reader: BufReader<ChildStdout>,
+    next_id: i64,
+    session_id: String,
+}
+
+pub fn run_claude_acp_prompt(
+    runtime_session_id: String,
+    prompt: String,
+    cwd: Option<String>,
+) -> Result<Vec<Value>, String> {
     let cwd = match cwd {
         Some(value) if !value.trim().is_empty() => PathBuf::from(value),
-        _ => env::current_dir().map_err(|error| error.to_string())?,
+        _ => isolated_runtime_cwd(&runtime_session_id)?,
+    };
+    let mut events = Vec::new();
+    let sessions = CLAUDE_SESSIONS.get_or_init(|| Mutex::new(HashMap::new()));
+    let mut sessions = sessions.lock().map_err(|error| error.to_string())?;
+    let session = match sessions.get_mut(&runtime_session_id) {
+        Some(session) => session,
+        None => {
+            let session = start_acp_session(&cwd, &mut events)?;
+            sessions.insert(runtime_session_id.clone(), session);
+            sessions
+                .get_mut(&runtime_session_id)
+                .ok_or_else(|| "Claude ACP 会话缓存失败。".to_string())?
+        }
     };
 
+    send_prompt(session, prompt, &mut events)?;
+    Ok(events)
+}
+
+fn start_acp_session(cwd: &PathBuf, mut events: &mut Vec<Value>) -> Result<AcpSession, String> {
     let mut child = build_acp_command(&cwd)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -53,7 +86,6 @@ pub fn run_claude_acp_prompt(prompt: String, cwd: Option<String>) -> Result<Vec<
         .ok_or_else(|| "Claude ACP adapter stdout 不可用。".to_string())?;
     let mut reader = BufReader::new(stdout);
     let mut next_id: i64 = 0;
-    let mut events = Vec::new();
 
     let init = json!({
         "jsonrpc": "2.0",
@@ -113,24 +145,34 @@ pub fn run_claude_acp_prompt(prompt: String, cwd: Option<String>) -> Result<Vec<
         }
     }));
 
+    Ok(AcpSession {
+        child,
+        stdin,
+        reader,
+        next_id,
+        session_id,
+    })
+}
+
+fn send_prompt(session: &mut AcpSession, prompt: String, events: &mut Vec<Value>) -> Result<(), String> {
     let prompt_request = json!({
         "jsonrpc": "2.0",
-        "id": next_request_id(&mut next_id),
+        "id": next_request_id(&mut session.next_id),
         "method": "session/prompt",
         "params": {
-            "sessionId": session_id,
+            "sessionId": session.session_id,
             "prompt": [{
                 "type": "text",
                 "text": prompt
             }]
         }
     });
-    write_message(&mut stdin, &prompt_request)?;
+    write_message(&mut session.stdin, &prompt_request)?;
     let prompt_result = read_response(
-        &mut reader,
-        &mut stdin,
+        &mut session.reader,
+        &mut session.stdin,
         prompt_request["id"].as_i64().unwrap(),
-        &mut events,
+        events,
     )?;
 
     events.push(json!({
@@ -138,25 +180,17 @@ pub fn run_claude_acp_prompt(prompt: String, cwd: Option<String>) -> Result<Vec<
         "state": 5,
         "payload": {
             "content": "Claude ACP 回合完成。",
-            "sessionId": session_id,
+            "sessionId": session.session_id,
             "stopReason": prompt_result.get("stopReason").cloned().unwrap_or(Value::Null)
         }
     }));
 
-    let _ = stdin.flush();
-    let _ = child.kill();
-    let _ = child.wait();
-
     if events.is_empty() {
-        let stderr = stderr_log.lock().map(|log| log.clone()).unwrap_or_default();
-        return Err(if stderr.trim().is_empty() {
-            "Claude ACP 未返回可解析事件。".to_string()
-        } else {
-            stderr.trim().to_string()
-        });
+        return Err("Claude ACP 未返回可解析事件。".to_string());
     }
 
-    Ok(events)
+    let _ = session.child.id();
+    Ok(())
 }
 
 fn build_acp_command(cwd: &PathBuf) -> Command {
@@ -175,6 +209,28 @@ fn build_acp_command(cwd: &PathBuf) -> Command {
         .envs(load_claude_user_env());
 
     command
+}
+
+fn isolated_runtime_cwd(runtime_session_id: &str) -> Result<PathBuf, String> {
+    let base = env::var_os("LOCALAPPDATA")
+        .map(PathBuf::from)
+        .or_else(|| env::var_os("TEMP").map(PathBuf::from))
+        .unwrap_or_else(env::temp_dir)
+        .join("LunaAgentOS")
+        .join("runtime-sessions");
+    let safe_id: String = runtime_session_id
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' {
+                ch
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    let cwd = base.join(safe_id);
+    fs::create_dir_all(&cwd).map_err(|error| error.to_string())?;
+    Ok(cwd)
 }
 
 fn load_claude_user_env() -> HashMap<String, String> {

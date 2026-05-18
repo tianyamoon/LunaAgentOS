@@ -122,6 +122,7 @@ let activeSessionIds = {};
 let historyEntries = [];
 let sessionSeq = 0;
 let turnSeq = 0;
+let customAgentSeq = 0;
 let runningSessions = 0;
 let isRefreshingRuntimes = false;
 let isHistoryLoading = true;
@@ -218,6 +219,26 @@ function showProviderAgents(provider) {
   setAppNotice(`${provider.name} 当前已登记的 Agent：${names}。`);
 }
 
+function createAgentForProvider(providerId) {
+  const provider = providerById(providerId);
+  if (!provider) return;
+  customAgentSeq += 1;
+  const agent = {
+    id: `${provider.id}-custom-${Date.now()}-${customAgentSeq}`,
+    providerId: provider.id,
+    name: `会话 ${provider.agents.length + 1}`,
+    subtitle: "独立 RuntimeSession",
+    note: "新建 Agent 不继承其他 Agent 的当前会话；历史任务只作为归档展示。",
+    state: 1,
+  };
+  provider.agents.push(agent);
+  saveMainAgent(agent.id);
+  delete activeSessionIds[agent.id];
+  renderProviders();
+  renderWorkspace();
+  setAppNotice(`已新建 ${provider.name} / ${agent.name}，下一条消息会开启全新的运行时会话。`);
+}
+
 function setMainAgent(agentId) {
   saveMainAgent(agentId);
   const agent = currentMainAgent();
@@ -227,6 +248,7 @@ function setMainAgent(agentId) {
     setAppNotice(`主 Agent 已切换到 ${provider.name} / ${agent.name}。`);
   }
   renderProviders();
+  renderWorkspace();
 }
 
 function renderProviders() {
@@ -292,9 +314,7 @@ function renderProviders() {
     button.addEventListener("click", (event) => {
       event.stopPropagation();
       const providerId = button.dataset.providerId;
-      const provider = providerById(providerId);
-      if (!provider) return;
-      showProviderAgents(provider);
+      createAgentForProvider(providerId);
     });
   });
 }
@@ -306,19 +326,21 @@ function sessionSectionsFromEvents(events) {
     finalResponse: "",
     logs: [],
   };
+  let thoughtText = "";
+  let outputText = "";
 
   events.forEach((event) => {
-    const content = event.payload?.content || "";
+    const content = eventContentText(event);
     if (!content) return;
 
     if (event.type === "thought") {
-      sections.thoughts.push(content);
+      thoughtText += content;
       return;
     }
 
     if (event.type === "response") {
-      sections.outputs.push(content);
-      sections.finalResponse = content;
+      outputText += content;
+      sections.finalResponse = outputText;
       return;
     }
 
@@ -336,7 +358,42 @@ function sessionSectionsFromEvents(events) {
     sections.logs.push(content);
   });
 
+  if (thoughtText.trim()) {
+    sections.thoughts.push(thoughtText.trim());
+  }
+  if (outputText.trim()) {
+    sections.outputs.push(outputText.trim());
+    sections.finalResponse = outputText.trim();
+  }
+
   return sections;
+}
+
+function eventContentText(event) {
+  const content = event.payload?.content;
+  if (typeof content === "string") return content;
+  if (!content) return eventLogText(event);
+  if (Array.isArray(content)) {
+    return content
+      .map((item) => typeof item === "string" ? item : item?.text || item?.content || "")
+      .filter(Boolean)
+      .join("\n");
+  }
+  if (typeof content === "object") {
+    return content.text || content.content || eventLogText(event);
+  }
+  return String(content);
+}
+
+function eventLogText(event) {
+  if (event.type === "tool") {
+    const title = event.payload?.title || event.payload?.kind || event.payload?.id || "工具调用";
+    const status = event.payload?.status ? `：${event.payload.status}` : "";
+    return `${title}${status}`;
+  }
+  if (event.type === "plan") return "Claude 更新了执行计划。";
+  if (event.type === "usage") return "";
+  return "";
 }
 
 function createSession(firstTask) {
@@ -439,40 +496,28 @@ function renderTurn(turn, index) {
         <strong>第 ${index + 1} 轮</strong>
         <span class="state-pill ${stateClasses[turn.state] || "state-idle"}">${stateNames[turn.state] || "UNKNOWN"}</span>
       </div>
-      <div class="user-message">
-        <div class="flow-title">用户输入</div>
+      <div class="terminal-message user-message">
+        <div class="terminal-label">user</div>
         <p>${turn.task}</p>
       </div>
-      <section class="flow-block">
-        <div class="flow-title">思考流</div>
-        <div class="flow-content">
-          ${turn.thoughts.length
-            ? turn.thoughts.map((item) => `<p>${item}</p>`).join("")
-            : "<p class='flow-empty'>当前没有思考流内容。</p>"}
-        </div>
-      </section>
-      <section class="flow-block">
-        <div class="flow-title">输出流</div>
-        <div class="flow-content">
-          ${turn.outputs.length
-            ? turn.outputs.map((item) => `<p>${item}</p>`).join("")
-            : "<p class='flow-empty'>当前没有输出流内容。</p>"}
-        </div>
-      </section>
-      <section class="flow-block final-block">
-        <div class="flow-title">最终响应</div>
-        <div class="flow-content">
-          <p>${turn.finalResponse || "最终响应尚未返回。"}</p>
-        </div>
-      </section>
+      ${turn.thoughts.length
+        ? `
+          <details class="terminal-detail">
+            <summary>thinking</summary>
+            <div class="terminal-pre">${turn.thoughts.join("\n\n")}</div>
+          </details>
+        `
+        : ""}
+      <div class="terminal-message assistant-message">
+        <div class="terminal-label">assistant</div>
+        <p>${turn.finalResponse || turn.outputs.join("\n\n") || "等待响应..."}</p>
+      </div>
       ${turn.logs.length
         ? `
-          <section class="flow-block log-block">
-            <div class="flow-title">状态记录</div>
-            <div class="flow-content">
-              ${turn.logs.map((item) => `<p>${item}</p>`).join("")}
-            </div>
-          </section>
+          <details class="terminal-detail log-block">
+            <summary>runtime</summary>
+            <div class="terminal-pre">${turn.logs.join("\n")}</div>
+          </details>
         `
         : ""}
     </section>
@@ -516,10 +561,28 @@ function bindSessionActions() {
 }
 
 function renderWorkspace() {
+  const activeBodies = [...sessionDeck.querySelectorAll(".session-card-body")].map((body) => ({
+    sessionId: body.closest(".session-card")?.dataset.sessionId,
+    shouldStickToBottom: body.scrollTop + body.clientHeight >= body.scrollHeight - 24,
+  }));
+  const visibleSessions = sessions.filter((session) => session.agentId === mainAgentId);
   renderWorkspaceStatus();
-  workspaceEmpty.style.display = sessions.length ? "none" : "flex";
-  sessionDeck.innerHTML = sessions.map(renderSessionCard).join("");
+  workspaceEmpty.style.display = visibleSessions.length ? "none" : "flex";
+  sessionDeck.innerHTML = visibleSessions.map(renderSessionCard).join("");
   bindSessionActions();
+  requestAnimationFrame(() => {
+    if (!activeBodies.length) {
+      sessionDeck.querySelectorAll(".session-card-body").forEach((body) => {
+        body.scrollTop = body.scrollHeight;
+      });
+      return;
+    }
+    activeBodies.forEach(({ sessionId, shouldStickToBottom }) => {
+      if (!shouldStickToBottom) return;
+      const body = sessionDeck.querySelector(`.session-card[data-session-id="${sessionId}"] .session-card-body`);
+      if (body) body.scrollTop = body.scrollHeight;
+    });
+  });
 }
 
 function groupHistory(entries) {
@@ -545,7 +608,7 @@ function renderHistory() {
     historyList.innerHTML = `
       <div class="history-empty">
         <strong>暂无历史任务</strong>
-        <p>第一次发送给主 Agent 后，这里会按日期记录任务摘要。</p>
+        <p>第一次发送给主 Agent 后，这里会按日期记录任务摘要。历史只读归档，不会自动注入当前会话。</p>
       </div>
     `;
     return;
@@ -650,7 +713,11 @@ async function startClaudeSession(session, turn) {
   setAppNotice(`已将任务送入 ${session.agentName}，正在等待返回内容...`, "busy");
   try {
     await new Promise((resolve) => requestAnimationFrame(resolve));
-    const events = await invoke("runtime_acp_claude_prompt", { prompt: turn.task, cwd: null });
+    const events = await invoke("runtime_acp_claude_prompt", {
+      runtimeSessionId: session.id,
+      prompt: turn.task,
+      cwd: null,
+    });
     const saved = updateTurnFromEvents(session.id, turn.id, events);
     if (saved) {
       const agent = agentById(session.agentId);

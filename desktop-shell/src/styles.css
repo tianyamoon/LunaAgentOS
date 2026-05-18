@@ -344,7 +344,7 @@ button:disabled {
 .session-card-body {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 8px;
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
@@ -354,11 +354,9 @@ button:disabled {
 .turn-block {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.48);
-  border: 1px solid rgba(99, 82, 63, 0.1);
+  gap: 8px;
+  padding: 10px 0 14px;
+  border-bottom: 1px solid rgba(99, 82, 63, 0.1);
 }
 
 .turn-header {
@@ -369,15 +367,54 @@ button:disabled {
 }
 
 .user-message {
-  padding: 12px;
-  border-radius: 16px;
-  background: rgba(217, 108, 58, 0.09);
-  border: 1px solid rgba(217, 108, 58, 0.12);
+  background: rgba(217, 108, 58, 0.08);
 }
 
+.terminal-message p,
 .user-message p {
   margin: 0;
   line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.terminal-message {
+  padding: 10px 12px;
+  border-radius: 14px;
+}
+
+.assistant-message {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.terminal-label {
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.terminal-detail {
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(250, 248, 244, 0.66);
+  color: var(--muted);
+}
+
+.terminal-detail summary {
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.terminal-pre {
+  margin-top: 8px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+  color: var(--text);
 }
 
 .flow-block {
@@ -402,6 +439,8 @@ button:disabled {
 
 .flow-content p {
   margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .flow-empty {
