@@ -526,20 +526,17 @@ textarea {
   line-height: 1.45;
 }
 
-.runtime-status {
-  padding: 10px 12px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(99, 82, 63, 0.08);
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-.runtime-status strong {
-  color: var(--text);
-}
-
 @media (max-width: 1280px) {
+  .composer {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 0 0 auto;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.58);
+  }
   html, body, .app-shell {
     overflow: auto;
     height: auto;

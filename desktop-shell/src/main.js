@@ -45,7 +45,6 @@ const providers = [
     name: "Claude Code",
     lane: "强大入口",
     note: "当前唯一接通真实 CLI 任务执行链路的主入口。",
-    runtimeStatus: "等待刷新",
     agents: [
       {
         id: "claude-main",
@@ -70,7 +69,6 @@ const providers = [
     name: "Hermes",
     lane: "通用入口",
     note: "已探测到 WSL 运行时，等待主链路接通。",
-    runtimeStatus: "等待刷新",
     agents: [
       {
         id: "hermes-main",
@@ -87,7 +85,6 @@ const providers = [
     name: "Trae IDE",
     lane: "免费入口",
     note: "产品必须纳入，但当前坚持走 Bridge 路线。",
-    runtimeStatus: "等待刷新",
     agents: [
       {
         id: "trae-main",
@@ -111,7 +108,6 @@ const sessionDeck = document.getElementById("sessionDeck");
 const historyList = document.getElementById("historyList");
 const appNotice = document.getElementById("appNotice");
 const promptBox = document.getElementById("promptBox");
-const refreshBtn = document.getElementById("refreshBtn");
 const runBtn = document.getElementById("runBtn");
 const sendBtn = document.getElementById("sendBtn");
 const newSessionBtn = document.getElementById("newSessionBtn");
@@ -124,7 +120,6 @@ let sessionSeq = 0;
 let turnSeq = 0;
 let customAgentSeq = 0;
 let runningSessions = 0;
-let isRefreshingRuntimes = false;
 let isHistoryLoading = true;
 
 function allAgents() {
@@ -167,12 +162,6 @@ function providerState(provider) {
             : states[0] ?? 1;
 }
 
-function formatStatusText(status) {
-  if (!status) return "等待刷新";
-  if (status.available) return `已连接 · ${status.detail || status.version || "可用"}`;
-  return `未连接 · ${status.detail || "未就绪"}`;
-}
-
 function formatTime(value) {
   return new Date(value).toLocaleTimeString("zh-CN", {
     hour: "2-digit",
@@ -192,9 +181,6 @@ function setAppNotice(message, tone = "muted") {
 }
 
 function updateActionLabels() {
-  refreshBtn.disabled = isRefreshingRuntimes;
-  refreshBtn.textContent = isRefreshingRuntimes ? "刷新中..." : "刷新状态";
-
   const sending = runningSessions > 0;
   const runText = sending ? `发给主 Agent (${runningSessions})` : "发给主 Agent";
   const sendText = sending ? `发送中 (${runningSessions})` : "发送";
@@ -271,7 +257,6 @@ function renderProviders() {
         <button type="button" class="mini-btn ghost-btn provider-manage-btn" data-provider-id="${provider.id}">维护</button>
       </div>
       <p class="caption provider-note">${provider.note}</p>
-      <div class="runtime-status"><strong>运行时</strong> ${provider.runtimeStatus}</div>
       <div class="provider-agents">
         ${provider.agents.map((agent) => `
           <div class="agent-entry">
@@ -833,29 +818,8 @@ async function saveTurnToHistory(session, turn) {
   renderHistory();
 }
 
-async function refreshRuntimeStatus() {
-  if (isRefreshingRuntimes) return;
-  isRefreshingRuntimes = true;
-  updateActionLabels();
-  setAppNotice("正在后台刷新运行时状态...", "busy");
-  try {
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    const statuses = await invoke("probe_runtimes");
-    providers.forEach((provider) => {
-      provider.runtimeStatus = formatStatusText(statuses[provider.id]);
-    });
-    renderProviders();
-    setAppNotice("运行时状态已刷新。");
-  } catch (error) {
-    console.error(error);
-    setAppNotice(`刷新运行时状态失败：${String(error)}`, "error");
-  } finally {
-    isRefreshingRuntimes = false;
-    updateActionLabels();
-  }
-}
-
-async function startFallbackSession(session, turn, providerId) {
+async function runFallbackSession(session, turn) {
+  const providerId = session.providerId;
   const fallback = fallbackSessions[providerId];
   if (!fallback) return;
   runningSessions += 1;
@@ -934,10 +898,6 @@ function startSessionFromPrompt(forceNewSession = false) {
 
 providerManagerBtn?.addEventListener("click", () => {
   openProviderManager();
-});
-
-refreshBtn.addEventListener("click", () => {
-  void refreshRuntimeStatus();
 });
 
 runBtn.addEventListener("click", () => {
