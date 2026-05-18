@@ -539,11 +539,11 @@ function renderSessionCard(session) {
   const isActiveReceiver = activeSessionIds[session.agentId] === session.id && canSendToSession(session);
   return `
     <article class="session-card ${session.fullscreen ? "fullscreen" : ""} ${isActiveReceiver ? "is-active-receiver" : ""}" data-session-id="${session.id}">
+      ${isActiveReceiver ? `<div class="active-receiver-banner">当前接收任务</div>` : ""}
       <div class="session-card-header">
         <div>
           <div class="session-card-title-row">
             <strong>${session.agentName}</strong>
-            ${isActiveReceiver ? `<span class="active-receiver-pill">当前接收</span>` : ""}
             <span class="state-pill ${stateClasses[session.state] || "state-idle"}">${formatSessionStatus(session)}</span>
             <span class="runtime-pill ${runtimeStateClasses[runtimeState] || "runtime-archived"}">${runtimeStateLabels[runtimeState] || runtimeState}</span>
           </div>
