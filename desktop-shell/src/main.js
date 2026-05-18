@@ -543,6 +543,7 @@ function renderSessionCard(session) {
         <div>
           <div class="session-card-title-row">
             <strong>${session.agentName}</strong>
+            ${isActiveReceiver ? `<span class="active-receiver-pill">当前接收</span>` : ""}
             <span class="state-pill ${stateClasses[session.state] || "state-idle"}">${formatSessionStatus(session)}</span>
             <span class="runtime-pill ${runtimeStateClasses[runtimeState] || "runtime-archived"}">${runtimeStateLabels[runtimeState] || runtimeState}</span>
           </div>

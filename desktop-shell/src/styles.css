@@ -345,6 +345,7 @@ button:disabled {
 }
 
 .session-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -356,8 +357,29 @@ button:disabled {
 }
 
 .session-card.is-active-receiver {
-  border-color: rgba(217, 108, 58, 0.56);
-  box-shadow: 0 0 0 2px rgba(217, 108, 58, 0.12), 0 18px 34px rgba(52, 37, 18, 0.1);
+  border-color: rgba(217, 108, 58, 0.78);
+  background: linear-gradient(90deg, rgba(217, 108, 58, 0.13), rgba(255, 255, 255, 0.74) 18%);
+  box-shadow: 0 0 0 3px rgba(217, 108, 58, 0.18), 0 18px 34px rgba(52, 37, 18, 0.14);
+}
+
+.session-card.is-active-receiver::before {
+  content: "";
+  position: absolute;
+  inset: 14px auto 14px 10px;
+  width: 5px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.active-receiver-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 9px;
+  background: var(--accent);
+  color: white;
+  font-size: 0.72rem;
+  font-weight: 700;
 }
 
 .session-card.fullscreen {
