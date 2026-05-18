@@ -1,6 +1,7 @@
 use chrono::Local;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::HashSet;
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
@@ -127,6 +128,43 @@ fn load_history_entries(app: AppHandle) -> Result<Vec<HistoryEntry>, String> {
 
     entries.sort_by(|left, right| right.created_at.cmp(&left.created_at));
     Ok(entries)
+}
+
+#[tauri::command]
+fn compact_history_entries(app: AppHandle) -> Result<usize, String> {
+    let directory = history_dir(&app)?;
+    let mut removed_count = 0;
+
+    for item in fs::read_dir(&directory).map_err(|error| error.to_string())? {
+        let item = item.map_err(|error| error.to_string())?;
+        let path = item.path();
+        if path.extension().and_then(|value| value.to_str()) != Some("json") {
+            continue;
+        }
+        let entries = load_history_file(&path)?;
+        let original_len = entries.len();
+        let mut seen = HashSet::new();
+        let mut compacted = Vec::new();
+
+        for mut entry in entries.into_iter().rev() {
+            entry.schema_version = HISTORY_SCHEMA_VERSION;
+            let key = format!(
+                "{}:{}",
+                history_entry_session_key(&entry).unwrap_or_else(|| entry.id.clone()),
+                history_entry_turn_id(&entry).unwrap_or_else(|| entry.id.clone())
+            );
+            if seen.insert(key) {
+                compacted.push(entry);
+            }
+        }
+
+        compacted.reverse();
+        removed_count += original_len.saturating_sub(compacted.len());
+        let json = serde_json::to_string_pretty(&compacted).map_err(|error| error.to_string())?;
+        fs::write(path, json).map_err(|error| error.to_string())?;
+    }
+
+    Ok(removed_count)
 }
 
 #[tauri::command]
@@ -306,6 +344,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             load_history_entries,
+            compact_history_entries,
             append_history_entry,
             run_claude_stream,
             runtime_acp_claude_prompt,

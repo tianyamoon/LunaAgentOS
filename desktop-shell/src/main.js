@@ -839,6 +839,7 @@ async function restoreArchivedSession(sessionId) {
 
 async function loadHistory() {
   try {
+    await invoke("compact_history_entries");
     historyEntries = await invoke("load_history_entries");
   } catch (error) {
     console.error(error);
