@@ -36,22 +36,27 @@ body {
 
 .app-shell {
   height: 100vh;
-  padding: 18px 18px 14px;
+  padding: 14px 16px 12px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .topbar {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: 24px;
+  align-items: flex-end;
+  gap: 18px;
   flex: 0 0 auto;
 }
 
 .brand {
   max-width: 980px;
+}
+
+.brand h1 {
+  font-size: clamp(2rem, 3.1vw, 2.8rem);
+  line-height: 1.08;
 }
 
 .topbar h1,
@@ -64,20 +69,21 @@ body {
 .eyebrow,
 .caption {
   color: var(--muted);
-  margin: 0 0 4px;
-  font-size: 0.92rem;
+  margin: 0 0 3px;
+  font-size: 0.88rem;
 }
 
 .subline {
-  margin: 10px 0 0;
+  margin: 6px 0 0;
   color: var(--muted);
   max-width: 920px;
-  line-height: 1.5;
+  line-height: 1.42;
+  font-size: 0.98rem;
 }
 
 .actions {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   flex: 0 0 auto;
 }
 
@@ -91,7 +97,7 @@ button {
   background: rgba(255, 255, 255, 0.82);
   color: var(--text);
   border-radius: 999px;
-  padding: 10px 16px;
+  padding: 9px 15px;
   cursor: pointer;
   transition: transform 120ms ease, box-shadow 120ms ease;
 }
@@ -120,7 +126,7 @@ button.compact {
 .layout {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr) 320px;
-  gap: 18px;
+  gap: 16px;
   flex: 1 1 auto;
   min-height: 0;
 }
@@ -131,7 +137,7 @@ button.compact {
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   backdrop-filter: blur(14px);
-  padding: 18px;
+  padding: 16px;
   min-height: 0;
   overflow: hidden;
 }
@@ -141,7 +147,7 @@ button.compact {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
   flex: 0 0 auto;
 }
 
@@ -211,17 +217,18 @@ button.compact {
 .state-done { background: rgba(33, 122, 76, 0.14); color: var(--done); }
 .state-error { background: rgba(192, 58, 58, 0.14); color: var(--error); }
 
-.session-scroll {
+.session-body {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
   overflow: auto;
   padding-right: 6px;
   min-height: 0;
+  flex: 1 1 auto;
 }
 
 .hero-card {
-  padding: 18px 20px;
+  padding: 16px 18px;
   border-radius: 22px;
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.82), rgba(255, 247, 239, 0.94)),
@@ -231,23 +238,24 @@ button.compact {
 }
 
 .hero-summary {
-  margin: 10px 0 0;
+  margin: 8px 0 0;
   color: var(--muted);
-  line-height: 1.55;
+  line-height: 1.5;
 }
 
 .stream-layout {
   display: grid;
   grid-template-columns: 1.45fr 0.95fr;
-  gap: 16px;
+  gap: 14px;
   min-height: 420px;
   flex: 1 1 auto;
+  min-width: 0;
 }
 
 .stream-card,
 .tool-card,
 .composer {
-  padding: 16px;
+  padding: 14px;
   border: 1px solid var(--border);
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.58);
@@ -326,8 +334,9 @@ button.compact {
 .composer {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   flex: 0 0 auto;
+  margin-top: 14px;
 }
 
 .composer-row {
@@ -340,9 +349,9 @@ button.compact {
 textarea {
   border-radius: 18px;
   border: 1px solid rgba(87, 70, 50, 0.16);
-  padding: 14px;
+  padding: 12px 14px;
   resize: none;
-  min-height: 108px;
+  min-height: 92px;
   background: rgba(255, 255, 255, 0.8);
 }
 
