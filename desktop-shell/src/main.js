@@ -489,11 +489,13 @@ function appendErrorToTurn(sessionId, turnId, message) {
 function renderWorkspaceStatus() {
   const agent = currentMainAgent();
   const provider = currentMainProvider();
+  const liveCount = sessions.filter((session) => sessionRuntimeState(session) === "live").length;
+  const liveSuffix = liveCount > 0 ? `　·　运行中 ACP runtime：${liveCount}` : "";
   if (!agent || !provider) {
-    workspaceStatus.textContent = "请先设置主 Agent。";
+    workspaceStatus.textContent = `请先设置主 Agent。${liveSuffix}`;
     return;
   }
-  workspaceStatus.textContent = `当前主 Agent：${provider.name} / ${agent.name}`;
+  workspaceStatus.textContent = `当前主 Agent：${provider.name} / ${agent.name}${liveSuffix}`;
 }
 
 function renderTurn(turn, index) {
