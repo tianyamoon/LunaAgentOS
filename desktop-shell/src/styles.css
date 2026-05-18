@@ -283,6 +283,12 @@ button:disabled {
   font-size: 0.72rem;
 }
 
+.session-card-title-row .runtime-pill {
+  background: transparent;
+  border: 1px solid rgba(99, 82, 63, 0.1);
+  color: var(--muted);
+}
+
 .state-idle { background: rgba(116, 100, 83, 0.12); color: var(--muted); }
 .state-init { background: rgba(69, 115, 214, 0.14); color: #2a5aa8; }
 .state-think { background: rgba(178, 107, 0, 0.14); color: var(--thinking); }
@@ -354,8 +360,8 @@ button:disabled {
   flex-direction: column;
   min-height: 0;
   height: 520px;
-  padding: 14px;
-  border-radius: 20px;
+  padding: 16px;
+  border-radius: 22px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.62);
 }
@@ -376,11 +382,12 @@ button:disabled {
 }
 
 .active-receiver-banner {
-  margin: -2px 0 10px 10px;
+  margin: -4px 0 8px 10px;
   color: var(--accent);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .session-card.fullscreen {
@@ -583,8 +590,10 @@ textarea {
 }
 
 .history-item p {
-  margin: 8px 0 0;
-  line-height: 1.45;
+  margin: 6px 0 0;
+  line-height: 1.4;
+  color: var(--muted);
+  font-size: 0.86rem;
 }
 
 @media (max-width: 1280px) {

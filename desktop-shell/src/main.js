@@ -544,7 +544,6 @@ function renderSessionCard(session) {
         <div>
           <div class="session-card-title-row">
             <strong>${session.agentName}</strong>
-            <span class="state-pill ${stateClasses[session.state] || "state-idle"}">${formatSessionStatus(session)}</span>
             <span class="runtime-pill ${runtimeStateClasses[runtimeState] || "runtime-archived"}">${runtimeStateLabels[runtimeState] || runtimeState}</span>
           </div>
           <div class="caption session-task">${session.task}</div>
