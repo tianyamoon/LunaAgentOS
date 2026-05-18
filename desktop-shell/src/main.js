@@ -1015,6 +1015,10 @@ setTimeout(() => {
 }, 0);
 
 async function syncRuntimeAliveStates() {
+  const liveSessionsExist = sessions.some(
+    (session) => sessionRuntimeState(session) === "live" && session.acpSessionId,
+  );
+  if (!liveSessionsExist) return;
   try {
     const aliveIds = new Set(await invoke("runtime_acp_claude_alive_ids"));
     let mutated = false;
