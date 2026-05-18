@@ -93,6 +93,23 @@ fn load_history_file(path: &PathBuf) -> Result<Vec<HistoryEntry>, String> {
     serde_json::from_str::<Vec<HistoryEntry>>(&raw).map_err(|error| error.to_string())
 }
 
+fn history_entry_turn_id(entry: &HistoryEntry) -> Option<String> {
+    entry
+        .turn
+        .as_ref()
+        .and_then(|turn| turn.get("id"))
+        .and_then(|id| id.as_str())
+        .map(ToString::to_string)
+}
+
+fn history_entry_session_key(entry: &HistoryEntry) -> Option<String> {
+    entry
+        .session_id
+        .as_ref()
+        .or(entry.acp_session_id.as_ref())
+        .map(ToString::to_string)
+}
+
 #[tauri::command]
 fn load_history_entries(app: AppHandle) -> Result<Vec<HistoryEntry>, String> {
     let directory = history_dir(&app)?;
@@ -132,7 +149,17 @@ fn append_history_entry(app: AppHandle, entry: HistoryEntryInput) -> Result<Hist
         summary: entry.summary,
         turn: entry.turn,
     };
-    entries.push(saved.clone());
+    let saved_turn_id = history_entry_turn_id(&saved);
+    let saved_session_key = history_entry_session_key(&saved);
+    if let Some(index) = entries.iter().position(|item| {
+        history_entry_session_key(item) == saved_session_key
+            && saved_turn_id.is_some()
+            && history_entry_turn_id(item) == saved_turn_id
+    }) {
+        entries[index] = saved.clone();
+    } else {
+        entries.push(saved.clone());
+    }
     let json = serde_json::to_string_pretty(&entries).map_err(|error| error.to_string())?;
     fs::write(path, json).map_err(|error| error.to_string())?;
     Ok(saved)

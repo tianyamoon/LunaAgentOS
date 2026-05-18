@@ -612,6 +612,10 @@ function historySessionKey(entry) {
   return entry.session_id || entry.acp_session_id || entry.id;
 }
 
+function historyTurnKey(entry) {
+  return `${historySessionKey(entry)}:${entry.turn?.id || entry.id}`;
+}
+
 function archivedSessionsFromHistory(entries) {
   const bySession = new Map();
   entries.forEach((entry) => {
@@ -862,7 +866,13 @@ async function saveTurnToHistory(session, turn) {
       turn,
     },
   });
-  historyEntries = [entry, ...historyEntries];
+  const key = historyTurnKey(entry);
+  const existingIndex = historyEntries.findIndex((item) => historyTurnKey(item) === key);
+  if (existingIndex >= 0) {
+    historyEntries = historyEntries.map((item, index) => (index === existingIndex ? entry : item));
+  } else {
+    historyEntries = [entry, ...historyEntries];
+  }
   renderHistory();
 }
 
