@@ -357,6 +357,10 @@ function sessionSectionsFromEvents(events) {
       return;
     }
 
+    if (event.type === "state" && (event.state === 0 || event.state === 1 || event.state === 2)) {
+      return;
+    }
+
     sections.logs.push(content);
   });
 
