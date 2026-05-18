@@ -113,6 +113,7 @@ const providers = [
 ];
 
 const MAIN_AGENT_KEY = "lunaagentos.mainAgentId";
+const HISTORY_SCHEMA_VERSION = 2;
 
 const agentList = document.getElementById("agentList");
 const providerManagerBtn = document.getElementById("providerManagerBtn");
@@ -607,10 +608,14 @@ function groupHistory(entries) {
   }, {});
 }
 
+function historySessionKey(entry) {
+  return entry.session_id || entry.acp_session_id || entry.id;
+}
+
 function archivedSessionsFromHistory(entries) {
   const bySession = new Map();
   entries.forEach((entry) => {
-    const key = entry.session_id || entry.id;
+    const key = historySessionKey(entry);
     const turn = entry.turn || {
       id: entry.id,
       task: entry.task,
@@ -797,9 +802,9 @@ async function restoreArchivedSession(sessionId) {
   restored.runtimeState = "restoring";
   renderWorkspace();
   renderHistory();
-  setAppNotice("已恢复历史 transcript，正在尝试恢复 ACP runtime...", "busy");
+  setAppNotice("已恢复历史 transcript，正在尝试加载 ACP runtime...", "busy");
   try {
-    await invoke("runtime_acp_claude_resume", {
+    await invoke("runtime_acp_claude_load", {
       runtimeSessionId: restored.id,
       acpSessionId: restored.acpSessionId,
       cwd: null,
@@ -807,12 +812,24 @@ async function restoreArchivedSession(sessionId) {
     restored.runtimeState = "live";
     renderWorkspace();
     renderHistory();
-    setAppNotice("历史 session 已恢复为可继续对话的 ACP runtime。");
-  } catch (error) {
-    restored.runtimeState = "resume_failed";
-    renderWorkspace();
-    renderHistory();
-    setAppNotice(`ACP runtime 恢复失败，保留只读 transcript：${String(error)}`, "error");
+    setAppNotice("历史 session 已加载为可继续对话的 ACP runtime。");
+  } catch (loadError) {
+    try {
+      await invoke("runtime_acp_claude_resume", {
+        runtimeSessionId: restored.id,
+        acpSessionId: restored.acpSessionId,
+        cwd: null,
+      });
+      restored.runtimeState = "live";
+      renderWorkspace();
+      renderHistory();
+      setAppNotice("ACP load 失败，已通过 resume 恢复为可继续对话的 runtime。");
+    } catch (resumeError) {
+      restored.runtimeState = "resume_failed";
+      renderWorkspace();
+      renderHistory();
+      setAppNotice(`ACP runtime 恢复失败，保留只读 transcript：${String(resumeError || loadError)}`, "error");
+    }
   }
 }
 
@@ -832,6 +849,7 @@ async function loadHistory() {
 async function saveTurnToHistory(session, turn) {
   const entry = await invoke("append_history_entry", {
     entry: {
+      schemaVersion: HISTORY_SCHEMA_VERSION,
       providerId: session.providerId,
       providerName: session.providerName,
       agentId: session.agentId,

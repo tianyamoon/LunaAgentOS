@@ -17,6 +17,12 @@ const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 static CLAUDE_SESSIONS: OnceLock<Mutex<HashMap<String, AcpSession>>> = OnceLock::new();
 
+enum SessionStartMode {
+    New,
+    Resume(String),
+    Load(String),
+}
+
 struct AcpSession {
     child: Child,
     stdin: ChildStdin,
@@ -40,7 +46,7 @@ pub fn run_claude_acp_prompt(
     let session = match sessions.get_mut(&runtime_session_id) {
         Some(session) => session,
         None => {
-            let session = start_acp_session(&cwd, &mut events, None)?;
+            let session = start_acp_session(&cwd, &mut events, SessionStartMode::New)?;
             sessions.insert(runtime_session_id.clone(), session);
             sessions
                 .get_mut(&runtime_session_id)
@@ -75,7 +81,35 @@ pub fn resume_claude_acp_session(
         }));
         return Ok(events);
     }
-    let session = start_acp_session(&cwd, &mut events, Some(acp_session_id.clone()))?;
+    let session = start_acp_session(&cwd, &mut events, SessionStartMode::Resume(acp_session_id.clone()))?;
+    sessions.insert(runtime_session_id, session);
+    Ok(events)
+}
+
+pub fn load_claude_acp_session(
+    runtime_session_id: String,
+    acp_session_id: String,
+    cwd: Option<String>,
+) -> Result<Vec<Value>, String> {
+    let cwd = match cwd {
+        Some(value) if !value.trim().is_empty() => PathBuf::from(value),
+        _ => isolated_runtime_cwd(&runtime_session_id)?,
+    };
+    let mut events = Vec::new();
+    let sessions = CLAUDE_SESSIONS.get_or_init(|| Mutex::new(HashMap::new()));
+    let mut sessions = sessions.lock().map_err(|error| error.to_string())?;
+    if sessions.contains_key(&runtime_session_id) {
+        events.push(json!({
+            "type": "state",
+            "state": 1,
+            "payload": {
+                "content": "Claude ACP runtime 已在内存中。",
+                "sessionId": acp_session_id
+            }
+        }));
+        return Ok(events);
+    }
+    let session = start_acp_session(&cwd, &mut events, SessionStartMode::Load(acp_session_id.clone()))?;
     sessions.insert(runtime_session_id, session);
     Ok(events)
 }
@@ -83,7 +117,7 @@ pub fn resume_claude_acp_session(
 fn start_acp_session(
     cwd: &PathBuf,
     mut events: &mut Vec<Value>,
-    resume_session_id: Option<String>,
+    mode: SessionStartMode,
 ) -> Result<AcpSession, String> {
     let mut child = build_acp_command(&cwd)
         .stdin(Stdio::piped())
@@ -151,8 +185,8 @@ fn start_acp_session(
         }
     }));
 
-    let session_request = if let Some(session_id) = resume_session_id {
-        json!({
+    let session_request = match mode {
+        SessionStartMode::Resume(session_id) => json!({
             "jsonrpc": "2.0",
             "id": next_request_id(&mut next_id),
             "method": "session/resume",
@@ -161,19 +195,28 @@ fn start_acp_session(
                 "cwd": cwd.to_string_lossy().to_string(),
                 "mcpServers": []
             }
-        })
-    } else {
-        json!({
-        "jsonrpc": "2.0",
-        "id": next_request_id(&mut next_id),
-        "method": "session/new",
-        "params": {
-            "cwd": cwd.to_string_lossy().to_string(),
-            "mcpServers": []
-        }
-        })
+        }),
+        SessionStartMode::Load(session_id) => json!({
+            "jsonrpc": "2.0",
+            "id": next_request_id(&mut next_id),
+            "method": "session/load",
+            "params": {
+                "sessionId": session_id,
+                "cwd": cwd.to_string_lossy().to_string(),
+                "mcpServers": []
+            }
+        }),
+        SessionStartMode::New => json!({
+            "jsonrpc": "2.0",
+            "id": next_request_id(&mut next_id),
+            "method": "session/new",
+            "params": {
+                "cwd": cwd.to_string_lossy().to_string(),
+                "mcpServers": []
+            }
+        }),
     };
-    let is_resume = session_request["method"].as_str() == Some("session/resume");
+    let method = session_request["method"].as_str().unwrap_or("session/new");
     write_message(&mut stdin, &session_request)?;
     let session_result = read_response(&mut reader, &mut stdin, session_request["id"].as_i64().unwrap(), &mut events)?;
     let session_id = session_request["params"]["sessionId"]
@@ -189,7 +232,11 @@ fn start_acp_session(
         "type": "state",
         "state": 1,
         "payload": {
-            "content": if is_resume { "Claude ACP 会话已恢复。" } else { "Claude ACP 会话已创建。" },
+            "content": match method {
+                "session/resume" => "Claude ACP 会话已恢复。",
+                "session/load" => "Claude ACP 会话已加载。",
+                _ => "Claude ACP 会话已创建。",
+            },
             "sessionId": session_id
         }
     }));

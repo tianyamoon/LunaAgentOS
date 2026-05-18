@@ -15,8 +15,16 @@ use std::os::windows::process::CommandExt;
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
+const HISTORY_SCHEMA_VERSION: u32 = 2;
+
+fn history_schema_version() -> u32 {
+    HISTORY_SCHEMA_VERSION
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct HistoryEntry {
+    #[serde(default = "history_schema_version")]
+    schema_version: u32,
     id: String,
     date: String,
     created_at: String,
@@ -35,6 +43,7 @@ struct HistoryEntry {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct HistoryEntryInput {
+    schema_version: Option<u32>,
     provider_id: String,
     provider_name: String,
     agent_id: String,
@@ -108,6 +117,7 @@ fn append_history_entry(app: AppHandle, entry: HistoryEntryInput) -> Result<Hist
     let (path, date, timestamp) = history_file_for_today(&app)?;
     let mut entries = load_history_file(&path)?;
     let saved = HistoryEntry {
+        schema_version: entry.schema_version.unwrap_or(HISTORY_SCHEMA_VERSION),
         id: format!("{}-{}", date, timestamp.replace([':', '+'], "-")),
         date,
         created_at: timestamp,
@@ -250,6 +260,19 @@ async fn runtime_acp_claude_resume(
     .map_err(|error| error.to_string())?
 }
 
+#[tauri::command]
+async fn runtime_acp_claude_load(
+    runtime_session_id: String,
+    acp_session_id: String,
+    cwd: Option<String>,
+) -> Result<Vec<Value>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        acp_runtime::load_claude_acp_session(runtime_session_id, acp_session_id, cwd)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -259,7 +282,8 @@ pub fn run() {
             append_history_entry,
             run_claude_stream,
             runtime_acp_claude_prompt,
-            runtime_acp_claude_resume
+            runtime_acp_claude_resume,
+            runtime_acp_claude_load
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
