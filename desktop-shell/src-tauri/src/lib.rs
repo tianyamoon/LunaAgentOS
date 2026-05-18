@@ -56,24 +56,6 @@ fn build_command(program: &str) -> Command {
     command
 }
 
-fn run_shell(shell: &str, args: &[&str]) -> Result<String, String> {
-    let output = build_command(shell)
-        .args(args)
-        .output()
-        .map_err(|error| error.to_string())?;
-
-    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-
-    if output.status.success() {
-        Ok(stdout)
-    } else if !stderr.is_empty() {
-        Err(stderr)
-    } else {
-        Err(stdout)
-    }
-}
-
 fn history_dir(app: &AppHandle) -> Result<PathBuf, String> {
     let base_dir = app
         .path()
@@ -144,58 +126,6 @@ fn append_history_entry(app: AppHandle, entry: HistoryEntryInput) -> Result<Hist
     let json = serde_json::to_string_pretty(&entries).map_err(|error| error.to_string())?;
     fs::write(path, json).map_err(|error| error.to_string())?;
     Ok(saved)
-}
-
-#[tauri::command]
-fn probe_runtimes() -> serde_json::Value {
-    let claude = match run_shell("cmd", &["/c", "claude --version"]) {
-        Ok(stdout) => serde_json::json!({
-            "available": true,
-            "version": stdout,
-            "detail": "Windows CLI 已可调用"
-        }),
-        Err(error) => serde_json::json!({
-            "available": false,
-            "version": "",
-            "detail": error
-        }),
-    };
-
-    let hermes = match run_shell(
-        "wsl.exe",
-        &["-e", "bash", "-lc", "command -v hermes && hermes --version"],
-    ) {
-        Ok(stdout) => {
-            let version_line = stdout
-                .lines()
-                .last()
-                .unwrap_or(stdout.as_str())
-                .trim()
-                .to_string();
-            serde_json::json!({
-                "available": true,
-                "version": version_line,
-                "detail": "WSL 运行时已可见"
-            })
-        }
-        Err(error) => serde_json::json!({
-            "available": false,
-            "version": "",
-            "detail": error
-        }),
-    };
-
-    let trae = serde_json::json!({
-        "available": false,
-        "version": "",
-        "detail": "等待 IDE Bridge"
-    });
-
-    serde_json::json!({
-        "claude": claude,
-        "hermes": hermes,
-        "trae": trae
-    })
 }
 
 fn parse_claude_stream(raw: &str) -> Vec<Value> {
@@ -327,7 +257,6 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             load_history_entries,
             append_history_entry,
-            probe_runtimes,
             run_claude_stream,
             runtime_acp_claude_prompt,
             runtime_acp_claude_resume

@@ -108,7 +108,6 @@ const sessionDeck = document.getElementById("sessionDeck");
 const historyList = document.getElementById("historyList");
 const appNotice = document.getElementById("appNotice");
 const promptBox = document.getElementById("promptBox");
-const runBtn = document.getElementById("runBtn");
 const sendBtn = document.getElementById("sendBtn");
 const newSessionBtn = document.getElementById("newSessionBtn");
 
@@ -182,11 +181,8 @@ function setAppNotice(message, tone = "muted") {
 
 function updateActionLabels() {
   const sending = runningSessions > 0;
-  const runText = sending ? `发给主 Agent (${runningSessions})` : "发给主 Agent";
   const sendText = sending ? `发送中 (${runningSessions})` : "发送";
-  runBtn.textContent = runText;
   sendBtn.textContent = sendText;
-  runBtn.disabled = sending;
   sendBtn.disabled = sending;
   newSessionBtn.disabled = sending;
 }
@@ -898,10 +894,6 @@ function startSessionFromPrompt(forceNewSession = false) {
 
 providerManagerBtn?.addEventListener("click", () => {
   openProviderManager();
-});
-
-runBtn.addEventListener("click", () => {
-  startSessionFromPrompt();
 });
 
 sendBtn.addEventListener("click", () => {
