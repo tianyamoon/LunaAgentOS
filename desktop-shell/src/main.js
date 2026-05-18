@@ -20,6 +20,20 @@ const stateClasses = {
   9: "state-error",
 };
 
+const runtimeStateLabels = {
+  live: "LIVE",
+  archived: "ARCHIVE",
+  restoring: "RESTORING",
+  resume_failed: "RESUME FAILED",
+};
+
+const runtimeStateClasses = {
+  live: "runtime-live",
+  archived: "runtime-archived",
+  restoring: "runtime-restoring",
+  resume_failed: "runtime-failed",
+};
+
 const fallbackSessions = {
   hermes: {
     events: [
@@ -170,6 +184,14 @@ function formatTime(value) {
 
 function formatSessionStatus(session) {
   return stateNames[session.state] || "UNKNOWN";
+}
+
+function sessionRuntimeState(session) {
+  return session.runtimeState || "live";
+}
+
+function canSendToSession(session) {
+  return sessionRuntimeState(session) === "live";
 }
 
 function setAppNotice(message, tone = "muted") {
@@ -391,6 +413,7 @@ function createSession(firstTask) {
     agentName: `${provider.name} / ${agent.name}`,
     task: firstTask,
     state: 0,
+    runtimeState: "live",
     turns: [],
     createdAt: new Date().toISOString(),
     fullscreen: false,
@@ -426,7 +449,7 @@ function getOrCreateActiveSession(task, forceNew = false) {
   if (!agent) return null;
   const activeSessionId = activeSessionIds[agent.id];
   const existing = !forceNew ? sessions.find((item) => item.id === activeSessionId) : null;
-  return existing && !existing.archived ? existing : createSession(task);
+  return existing && canSendToSession(existing) ? existing : createSession(task);
 }
 
 function updateTurnFromEvents(sessionId, turnId, events) {
@@ -510,6 +533,7 @@ function renderTurn(turn, index) {
 }
 
 function renderSessionCard(session) {
+  const runtimeState = sessionRuntimeState(session);
   return `
     <article class="session-card ${session.fullscreen ? "fullscreen" : ""}" data-session-id="${session.id}">
       <div class="session-card-header">
@@ -517,7 +541,7 @@ function renderSessionCard(session) {
           <div class="session-card-title-row">
             <strong>${session.agentName}</strong>
             <span class="state-pill ${stateClasses[session.state] || "state-idle"}">${formatSessionStatus(session)}</span>
-            ${session.archived ? `<span class="state-pill state-idle">ARCHIVE</span>` : ""}
+            <span class="runtime-pill ${runtimeStateClasses[runtimeState] || "runtime-archived"}">${runtimeStateLabels[runtimeState] || runtimeState}</span>
           </div>
           <div class="caption session-task">${session.task}</div>
         </div>
@@ -609,7 +633,7 @@ function archivedSessionsFromHistory(entries) {
         summary: entry.summary,
         turnCount: 1,
         turns: [turn],
-        source: "archive",
+        runtimeState: "archived",
       });
       return;
     }
@@ -639,7 +663,7 @@ function sessionListItems() {
       title: session.task || "新会话",
       summary: lastTurn?.finalResponse || lastTurn?.outputs.at(-1) || lastTurn?.logs.at(-1) || "当前会话",
       turnCount: session.turns.length,
-      source: "live",
+      runtimeState: sessionRuntimeState(session),
       agentId: session.agentId,
     };
   });
@@ -681,12 +705,12 @@ function renderHistory() {
       <div class="history-date">${date}</div>
       <div class="history-group-list">
         ${groups[date].map((item) => `
-          <article class="history-item ${item.source === "live" ? "is-live" : "is-archive"}" data-session-id="${item.id}" data-agent-id="${item.agentId || ""}">
+          <article class="history-item ${item.runtimeState === "live" ? "is-live" : "is-archive"}" data-session-id="${item.id}" data-agent-id="${item.agentId || ""}">
             <div class="history-item-top">
               <strong>${item.providerName}</strong>
               <span>${formatTime(item.updatedAt)}</span>
             </div>
-            <div class="caption">${item.agentName} · ${item.turnCount} 轮 · ${item.source === "live" ? "当前" : "归档"}</div>
+            <div class="caption">${item.agentName} · ${item.turnCount} 轮 · ${runtimeStateLabels[item.runtimeState] || item.runtimeState}</div>
             <p>${item.title}</p>
             <p class="caption">${item.summary}</p>
           </article>
@@ -750,7 +774,7 @@ async function restoreArchivedSession(sessionId) {
     createdAt: archived.createdAt,
     fullscreen: false,
     acpSessionId: archived.acpSessionId,
-    archived: true,
+    runtimeState: "archived",
   };
   ensureArchivedAgent(archived);
   if (!existing) sessions = [restored, ...sessions];
@@ -760,9 +784,15 @@ async function restoreArchivedSession(sessionId) {
   renderWorkspace();
   renderHistory();
   if (!restored.acpSessionId) {
+    restored.runtimeState = "archived";
+    renderWorkspace();
+    renderHistory();
     setAppNotice("已从历史归档恢复会话。缺少 ACP sessionId，当前为只读 transcript。");
     return;
   }
+  restored.runtimeState = "restoring";
+  renderWorkspace();
+  renderHistory();
   setAppNotice("已恢复历史 transcript，正在尝试恢复 ACP runtime...", "busy");
   try {
     await invoke("runtime_acp_claude_resume", {
@@ -770,12 +800,12 @@ async function restoreArchivedSession(sessionId) {
       acpSessionId: restored.acpSessionId,
       cwd: null,
     });
-    restored.archived = false;
+    restored.runtimeState = "live";
     renderWorkspace();
     renderHistory();
     setAppNotice("历史 session 已恢复为可继续对话的 ACP runtime。");
   } catch (error) {
-    restored.archived = true;
+    restored.runtimeState = "resume_failed";
     renderWorkspace();
     renderHistory();
     setAppNotice(`ACP runtime 恢复失败，保留只读 transcript：${String(error)}`, "error");
