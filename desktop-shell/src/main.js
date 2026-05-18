@@ -123,7 +123,6 @@ const historyList = document.getElementById("historyList");
 const appNotice = document.getElementById("appNotice");
 const promptBox = document.getElementById("promptBox");
 const sendBtn = document.getElementById("sendBtn");
-const newSessionBtn = document.getElementById("newSessionBtn");
 
 let mainAgentId = localStorage.getItem(MAIN_AGENT_KEY) || "claude-main";
 let sessions = [];
@@ -206,7 +205,6 @@ function updateActionLabels() {
   const sendText = sending ? `发送中 (${runningSessions})` : "发送";
   sendBtn.textContent = sendText;
   sendBtn.disabled = sending;
-  newSessionBtn.disabled = sending;
 }
 
 function saveMainAgent(agentId) {
@@ -928,10 +926,6 @@ providerManagerBtn?.addEventListener("click", () => {
 
 sendBtn.addEventListener("click", () => {
   startSessionFromPrompt();
-});
-
-newSessionBtn.addEventListener("click", () => {
-  startSessionFromPrompt(true);
 });
 
 renderProviders();
