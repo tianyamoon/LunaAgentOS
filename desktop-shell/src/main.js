@@ -580,11 +580,16 @@ function renderWorkspace() {
     shouldStickToBottom: body.scrollTop + body.clientHeight >= body.scrollHeight - 24,
   }));
   const visibleSessions = sessions.filter((session) => session.agentId === mainAgentId);
+  const activeSessionId = activeSessionIds[mainAgentId];
   renderWorkspaceStatus();
   workspaceEmpty.style.display = visibleSessions.length ? "none" : "flex";
   sessionDeck.innerHTML = visibleSessions.map(renderSessionCard).join("");
   bindSessionActions();
   requestAnimationFrame(() => {
+    const activeCard = activeSessionId
+      ? sessionDeck.querySelector(`.session-card[data-session-id="${activeSessionId}"]`)
+      : null;
+    activeCard?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
     if (!activeBodies.length) {
       sessionDeck.querySelectorAll(".session-card-body").forEach((body) => {
         body.scrollTop = body.scrollHeight;
