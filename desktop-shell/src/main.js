@@ -549,6 +549,7 @@ function renderSessionCard(session) {
         </div>
         <div class="session-card-actions">
           ${runtimeState === "live" ? `<button type="button" class="mini-btn ghost-btn session-archive-btn" data-session-id="${session.id}">归档</button>` : ""}
+          ${runtimeState === "resume_failed" || runtimeState === "archived" ? `<button type="button" class="mini-btn ghost-btn session-retry-btn" data-session-id="${session.id}">重试恢复</button>` : ""}
           <button type="button" class="mini-btn ghost-btn session-fullscreen-btn" data-session-id="${session.id}">
             ${session.fullscreen ? "退出全屏" : "全屏"}
           </button>
@@ -575,6 +576,9 @@ function bindSessionActions() {
   });
   sessionDeck.querySelectorAll(".session-archive-btn").forEach((button) => {
     button.addEventListener("click", () => archiveLiveSession(button.dataset.sessionId));
+  });
+  sessionDeck.querySelectorAll(".session-retry-btn").forEach((button) => {
+    button.addEventListener("click", () => restoreArchivedSession(button.dataset.sessionId));
   });
 }
 
