@@ -344,11 +344,40 @@ button:disabled {
 .session-card-body {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
   padding-right: 4px;
+}
+
+.turn-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.48);
+  border: 1px solid rgba(99, 82, 63, 0.1);
+}
+
+.turn-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.user-message {
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(217, 108, 58, 0.09);
+  border: 1px solid rgba(217, 108, 58, 0.12);
+}
+
+.user-message p {
+  margin: 0;
+  line-height: 1.5;
 }
 
 .flow-block {
