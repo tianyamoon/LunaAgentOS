@@ -242,10 +242,26 @@ button:disabled {
 }
 
 .agent-entry {
+  position: relative;
   padding: 12px;
   border-radius: 16px;
   border: 1px solid rgba(82, 61, 38, 0.08);
   background: rgba(255, 255, 255, 0.72);
+}
+
+.agent-entry.is-main-agent {
+  border-color: rgba(217, 108, 58, 0.56);
+  background: linear-gradient(90deg, rgba(217, 108, 58, 0.13), rgba(255, 255, 255, 0.82) 28%);
+  box-shadow: 0 0 0 2px rgba(217, 108, 58, 0.12);
+}
+
+.agent-entry.is-main-agent::before {
+  content: "";
+  position: absolute;
+  inset: 10px auto 10px 8px;
+  width: 4px;
+  border-radius: 999px;
+  background: var(--accent);
 }
 
 .agent-entry-actions {
