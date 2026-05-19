@@ -57,6 +57,13 @@ struct HistoryEntryInput {
     turn: Option<Value>,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct HistoryCompactResult {
+    removed_count: usize,
+    upgraded_count: usize,
+}
+
 fn build_command(program: &str) -> Command {
     let mut command = Command::new(program);
     #[cfg(windows)]
@@ -131,9 +138,10 @@ fn load_history_entries(app: AppHandle) -> Result<Vec<HistoryEntry>, String> {
 }
 
 #[tauri::command]
-fn compact_history_entries(app: AppHandle) -> Result<usize, String> {
+fn compact_history_entries(app: AppHandle) -> Result<HistoryCompactResult, String> {
     let directory = history_dir(&app)?;
     let mut removed_count = 0;
+    let mut upgraded_count = 0;
 
     for item in fs::read_dir(&directory).map_err(|error| error.to_string())? {
         let item = item.map_err(|error| error.to_string())?;
@@ -145,9 +153,14 @@ fn compact_history_entries(app: AppHandle) -> Result<usize, String> {
         let original_len = entries.len();
         let mut seen = HashSet::new();
         let mut compacted = Vec::new();
+        let mut upgraded = false;
 
         for mut entry in entries.into_iter().rev() {
-            entry.schema_version = HISTORY_SCHEMA_VERSION;
+            if entry.schema_version != HISTORY_SCHEMA_VERSION {
+                entry.schema_version = HISTORY_SCHEMA_VERSION;
+                upgraded = true;
+                upgraded_count += 1;
+            }
             let key = format!(
                 "{}:{}",
                 history_entry_session_key(&entry).unwrap_or_else(|| entry.id.clone()),
@@ -159,12 +172,18 @@ fn compact_history_entries(app: AppHandle) -> Result<usize, String> {
         }
 
         compacted.reverse();
-        removed_count += original_len.saturating_sub(compacted.len());
-        let json = serde_json::to_string_pretty(&compacted).map_err(|error| error.to_string())?;
-        fs::write(path, json).map_err(|error| error.to_string())?;
+        let removed_for_file = original_len.saturating_sub(compacted.len());
+        removed_count += removed_for_file;
+        if removed_for_file > 0 || upgraded {
+            let json = serde_json::to_string_pretty(&compacted).map_err(|error| error.to_string())?;
+            fs::write(path, json).map_err(|error| error.to_string())?;
+        }
     }
 
-    Ok(removed_count)
+    Ok(HistoryCompactResult {
+        removed_count,
+        upgraded_count,
+    })
 }
 
 #[tauri::command]
