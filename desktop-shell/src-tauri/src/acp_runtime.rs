@@ -16,6 +16,22 @@ use std::os::windows::process::CommandExt;
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 static CLAUDE_SESSIONS: OnceLock<Mutex<HashMap<String, AcpSession>>> = OnceLock::new();
+static HERMES_SESSIONS: OnceLock<Mutex<HashMap<String, AcpSession>>> = OnceLock::new();
+
+#[derive(Clone, Copy)]
+enum AcpRuntime {
+    Claude,
+    Hermes,
+}
+
+impl AcpRuntime {
+    fn display(self) -> &'static str {
+        match self {
+            AcpRuntime::Claude => "Claude ACP",
+            AcpRuntime::Hermes => "Hermes ACP",
+        }
+    }
+}
 
 enum SessionStartMode {
     New,
@@ -36,25 +52,56 @@ pub fn run_claude_acp_prompt(
     prompt: String,
     cwd: Option<String>,
 ) -> Result<Vec<Value>, String> {
+    run_acp_prompt(AcpRuntime::Claude, runtime_session_id, prompt, cwd, None)
+}
+
+pub fn run_hermes_acp_prompt(
+    runtime_session_id: String,
+    prompt: String,
+    cwd: Option<String>,
+    profile_command: Option<String>,
+) -> Result<Vec<Value>, String> {
+    run_acp_prompt(
+        AcpRuntime::Hermes,
+        runtime_session_id,
+        prompt,
+        cwd,
+        profile_command,
+    )
+}
+
+fn run_acp_prompt(
+    runtime: AcpRuntime,
+    runtime_session_id: String,
+    prompt: String,
+    cwd: Option<String>,
+    profile_command: Option<String>,
+) -> Result<Vec<Value>, String> {
     let cwd = match cwd {
         Some(value) if !value.trim().is_empty() => PathBuf::from(value),
         _ => isolated_runtime_cwd(&runtime_session_id)?,
     };
     let mut events = Vec::new();
-    let sessions = CLAUDE_SESSIONS.get_or_init(|| Mutex::new(HashMap::new()));
+    let sessions = session_store(runtime);
     let mut sessions = sessions.lock().map_err(|error| error.to_string())?;
     let session = match sessions.get_mut(&runtime_session_id) {
         Some(session) => session,
         None => {
-            let session = start_acp_session(&cwd, &mut events, SessionStartMode::New)?;
+            let session = start_acp_session(
+                runtime,
+                &cwd,
+                &mut events,
+                SessionStartMode::New,
+                profile_command.as_deref(),
+            )?;
             sessions.insert(runtime_session_id.clone(), session);
             sessions
                 .get_mut(&runtime_session_id)
-                .ok_or_else(|| "Claude ACP 会话缓存失败。".to_string())?
+                .ok_or_else(|| format!("{} 会话缓存失败。", runtime.display()))?
         }
     };
 
-    match send_prompt(session, prompt, &mut events) {
+    match send_prompt(runtime, session, prompt, &mut events) {
         Ok(()) => Ok(events),
         Err(error) => {
             if let Some(mut broken) = sessions.remove(&runtime_session_id) {
@@ -71,25 +118,56 @@ pub fn resume_claude_acp_session(
     acp_session_id: String,
     cwd: Option<String>,
 ) -> Result<Vec<Value>, String> {
+    resume_acp_session(AcpRuntime::Claude, runtime_session_id, acp_session_id, cwd, None)
+}
+
+pub fn resume_hermes_acp_session(
+    runtime_session_id: String,
+    acp_session_id: String,
+    cwd: Option<String>,
+    profile_command: Option<String>,
+) -> Result<Vec<Value>, String> {
+    resume_acp_session(
+        AcpRuntime::Hermes,
+        runtime_session_id,
+        acp_session_id,
+        cwd,
+        profile_command,
+    )
+}
+
+fn resume_acp_session(
+    runtime: AcpRuntime,
+    runtime_session_id: String,
+    acp_session_id: String,
+    cwd: Option<String>,
+    profile_command: Option<String>,
+) -> Result<Vec<Value>, String> {
     let cwd = match cwd {
         Some(value) if !value.trim().is_empty() => PathBuf::from(value),
         _ => isolated_runtime_cwd(&runtime_session_id)?,
     };
     let mut events = Vec::new();
-    let sessions = CLAUDE_SESSIONS.get_or_init(|| Mutex::new(HashMap::new()));
+    let sessions = session_store(runtime);
     let mut sessions = sessions.lock().map_err(|error| error.to_string())?;
     if sessions.contains_key(&runtime_session_id) {
         events.push(json!({
             "type": "state",
             "state": 1,
             "payload": {
-                "content": "Claude ACP runtime 已在内存中。",
+                "content": format!("{} runtime 已在内存中。", runtime.display()),
                 "sessionId": acp_session_id
             }
         }));
         return Ok(events);
     }
-    let session = start_acp_session(&cwd, &mut events, SessionStartMode::Resume(acp_session_id.clone()))?;
+    let session = start_acp_session(
+        runtime,
+        &cwd,
+        &mut events,
+        SessionStartMode::Resume(acp_session_id.clone()),
+        profile_command.as_deref(),
+    )?;
     sessions.insert(runtime_session_id, session);
     Ok(events)
 }
@@ -99,31 +177,70 @@ pub fn load_claude_acp_session(
     acp_session_id: String,
     cwd: Option<String>,
 ) -> Result<Vec<Value>, String> {
+    load_acp_session(AcpRuntime::Claude, runtime_session_id, acp_session_id, cwd, None)
+}
+
+pub fn load_hermes_acp_session(
+    runtime_session_id: String,
+    acp_session_id: String,
+    cwd: Option<String>,
+    profile_command: Option<String>,
+) -> Result<Vec<Value>, String> {
+    load_acp_session(
+        AcpRuntime::Hermes,
+        runtime_session_id,
+        acp_session_id,
+        cwd,
+        profile_command,
+    )
+}
+
+fn load_acp_session(
+    runtime: AcpRuntime,
+    runtime_session_id: String,
+    acp_session_id: String,
+    cwd: Option<String>,
+    profile_command: Option<String>,
+) -> Result<Vec<Value>, String> {
     let cwd = match cwd {
         Some(value) if !value.trim().is_empty() => PathBuf::from(value),
         _ => isolated_runtime_cwd(&runtime_session_id)?,
     };
     let mut events = Vec::new();
-    let sessions = CLAUDE_SESSIONS.get_or_init(|| Mutex::new(HashMap::new()));
+    let sessions = session_store(runtime);
     let mut sessions = sessions.lock().map_err(|error| error.to_string())?;
     if sessions.contains_key(&runtime_session_id) {
         events.push(json!({
             "type": "state",
             "state": 1,
             "payload": {
-                "content": "Claude ACP runtime 已在内存中。",
+                "content": format!("{} runtime 已在内存中。", runtime.display()),
                 "sessionId": acp_session_id
             }
         }));
         return Ok(events);
     }
-    let session = start_acp_session(&cwd, &mut events, SessionStartMode::Load(acp_session_id.clone()))?;
+    let session = start_acp_session(
+        runtime,
+        &cwd,
+        &mut events,
+        SessionStartMode::Load(acp_session_id.clone()),
+        profile_command.as_deref(),
+    )?;
     sessions.insert(runtime_session_id, session);
     Ok(events)
 }
 
 pub fn list_live_claude_acp_sessions() -> Result<Vec<String>, String> {
-    let sessions = CLAUDE_SESSIONS.get_or_init(|| Mutex::new(HashMap::new()));
+    list_live_acp_sessions(AcpRuntime::Claude)
+}
+
+pub fn list_live_hermes_acp_sessions() -> Result<Vec<String>, String> {
+    list_live_acp_sessions(AcpRuntime::Hermes)
+}
+
+fn list_live_acp_sessions(runtime: AcpRuntime) -> Result<Vec<String>, String> {
+    let sessions = session_store(runtime);
     let mut sessions = sessions.lock().map_err(|error| error.to_string())?;
     let mut alive = Vec::new();
     let mut dead = Vec::new();
@@ -142,7 +259,15 @@ pub fn list_live_claude_acp_sessions() -> Result<Vec<String>, String> {
 }
 
 pub fn shutdown_claude_acp_session(runtime_session_id: String) -> Result<bool, String> {
-    let sessions = CLAUDE_SESSIONS.get_or_init(|| Mutex::new(HashMap::new()));
+    shutdown_acp_session(AcpRuntime::Claude, runtime_session_id)
+}
+
+pub fn shutdown_hermes_acp_session(runtime_session_id: String) -> Result<bool, String> {
+    shutdown_acp_session(AcpRuntime::Hermes, runtime_session_id)
+}
+
+fn shutdown_acp_session(runtime: AcpRuntime, runtime_session_id: String) -> Result<bool, String> {
+    let sessions = session_store(runtime);
     let mut sessions = sessions.lock().map_err(|error| error.to_string())?;
     let Some(mut session) = sessions.remove(&runtime_session_id) else {
         return Ok(false);
@@ -155,7 +280,15 @@ pub fn shutdown_claude_acp_session(runtime_session_id: String) -> Result<bool, S
 }
 
 pub fn shutdown_all_claude_acp_sessions() -> Result<usize, String> {
-    let sessions = CLAUDE_SESSIONS.get_or_init(|| Mutex::new(HashMap::new()));
+    shutdown_all_acp_sessions(AcpRuntime::Claude)
+}
+
+pub fn shutdown_all_hermes_acp_sessions() -> Result<usize, String> {
+    shutdown_all_acp_sessions(AcpRuntime::Hermes)
+}
+
+fn shutdown_all_acp_sessions(runtime: AcpRuntime) -> Result<usize, String> {
+    let sessions = session_store(runtime);
     let mut sessions = sessions.lock().map_err(|error| error.to_string())?;
     let count = sessions.len();
     for (_id, mut session) in sessions.drain() {
@@ -167,17 +300,26 @@ pub fn shutdown_all_claude_acp_sessions() -> Result<usize, String> {
     Ok(count)
 }
 
+fn session_store(runtime: AcpRuntime) -> &'static Mutex<HashMap<String, AcpSession>> {
+    match runtime {
+        AcpRuntime::Claude => CLAUDE_SESSIONS.get_or_init(|| Mutex::new(HashMap::new())),
+        AcpRuntime::Hermes => HERMES_SESSIONS.get_or_init(|| Mutex::new(HashMap::new())),
+    }
+}
+
 fn start_acp_session(
+    runtime: AcpRuntime,
     cwd: &PathBuf,
     mut events: &mut Vec<Value>,
     mode: SessionStartMode,
+    profile_command: Option<&str>,
 ) -> Result<AcpSession, String> {
-    let mut child = build_acp_command(&cwd)
+    let mut child = build_acp_command(runtime, cwd, profile_command)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|error| format!("启动 Claude ACP adapter 失败：{error}"))?;
+        .map_err(|error| format!("启动 {} adapter 失败：{error}", runtime.display()))?;
 
     let stderr = child.stderr.take();
     let stderr_log = Arc::new(Mutex::new(String::new()));
@@ -198,11 +340,11 @@ fn start_acp_session(
     let mut stdin = child
         .stdin
         .take()
-        .ok_or_else(|| "Claude ACP adapter stdin 不可用。".to_string())?;
+        .ok_or_else(|| format!("{} adapter stdin 不可用。", runtime.display()))?;
     let stdout = child
         .stdout
         .take()
-        .ok_or_else(|| "Claude ACP adapter stdout 不可用。".to_string())?;
+        .ok_or_else(|| format!("{} adapter stdout 不可用。", runtime.display()))?;
     let mut reader = BufReader::new(stdout);
     let mut next_id: i64 = 0;
 
@@ -226,12 +368,12 @@ fn start_acp_session(
         }
     });
     write_message(&mut stdin, &init)?;
-    let init_result = read_response(&mut reader, &mut stdin, init["id"].as_i64().unwrap(), &mut events)?;
+    let init_result = read_response(runtime, &mut reader, &mut stdin, init["id"].as_i64().unwrap(), &mut events)?;
     events.push(json!({
         "type": "state",
         "state": 0,
         "payload": {
-            "content": "Claude ACP 已初始化。",
+            "content": format!("{} 已初始化。", runtime.display()),
             "protocolVersion": init_result.get("protocolVersion").cloned().unwrap_or(Value::Null),
             "agent": init_result.get("agentInfo").cloned().unwrap_or(Value::Null),
             "capabilities": init_result.get("agentCapabilities").cloned().unwrap_or(Value::Null)
@@ -271,7 +413,7 @@ fn start_acp_session(
     };
     let method = session_request["method"].as_str().unwrap_or("session/new");
     write_message(&mut stdin, &session_request)?;
-    let session_result = read_response(&mut reader, &mut stdin, session_request["id"].as_i64().unwrap(), &mut events)?;
+    let session_result = read_response(runtime, &mut reader, &mut stdin, session_request["id"].as_i64().unwrap(), &mut events)?;
     let session_id = session_request["params"]["sessionId"]
         .as_str()
         .map(ToString::to_string)
@@ -279,17 +421,19 @@ fn start_acp_session(
         .get("sessionId")
         .and_then(|value| value.as_str())
         .map(ToString::to_string))
-        .ok_or_else(|| "Claude ACP 未返回 sessionId。".to_string())?;
+        .ok_or_else(|| format!("{} 未返回 sessionId。", runtime.display()))?;
+
+    let content = match method {
+        "session/resume" => format!("{} 会话已恢复。", runtime.display()),
+        "session/load" => format!("{} 会话已加载。", runtime.display()),
+        _ => format!("{} 会话已创建。", runtime.display()),
+    };
 
     events.push(json!({
         "type": "state",
         "state": 1,
         "payload": {
-            "content": match method {
-                "session/resume" => "Claude ACP 会话已恢复。",
-                "session/load" => "Claude ACP 会话已加载。",
-                _ => "Claude ACP 会话已创建。",
-            },
+            "content": content,
             "sessionId": session_id
         }
     }));
@@ -303,7 +447,7 @@ fn start_acp_session(
     })
 }
 
-fn send_prompt(session: &mut AcpSession, prompt: String, events: &mut Vec<Value>) -> Result<(), String> {
+fn send_prompt(runtime: AcpRuntime, session: &mut AcpSession, prompt: String, events: &mut Vec<Value>) -> Result<(), String> {
     let prompt_request = json!({
         "jsonrpc": "2.0",
         "id": next_request_id(&mut session.next_id),
@@ -318,6 +462,7 @@ fn send_prompt(session: &mut AcpSession, prompt: String, events: &mut Vec<Value>
     });
     write_message(&mut session.stdin, &prompt_request)?;
     let prompt_result = read_response(
+        runtime,
         &mut session.reader,
         &mut session.stdin,
         prompt_request["id"].as_i64().unwrap(),
@@ -328,34 +473,53 @@ fn send_prompt(session: &mut AcpSession, prompt: String, events: &mut Vec<Value>
         "type": "state",
         "state": 5,
         "payload": {
-            "content": "Claude ACP 回合完成。",
+            "content": format!("{} 回合完成。", runtime.display()),
             "sessionId": session.session_id,
             "stopReason": prompt_result.get("stopReason").cloned().unwrap_or(Value::Null)
         }
     }));
 
     if events.is_empty() {
-        return Err("Claude ACP 未返回可解析事件。".to_string());
+        return Err(format!("{} 未返回可解析事件。", runtime.display()));
     }
 
     let _ = session.child.id();
     Ok(())
 }
 
-fn build_acp_command(cwd: &PathBuf) -> Command {
-    let mut command = if cfg!(windows) {
-        let mut command = Command::new("npx.cmd");
-        #[cfg(windows)]
-        command.creation_flags(CREATE_NO_WINDOW);
-        command
-    } else {
-        Command::new("npx")
+fn build_acp_command(runtime: AcpRuntime, cwd: &PathBuf, profile_command: Option<&str>) -> Command {
+    let mut command = match runtime {
+        AcpRuntime::Claude if cfg!(windows) => Command::new("npx.cmd"),
+        AcpRuntime::Claude => Command::new("npx"),
+        AcpRuntime::Hermes if cfg!(windows) => Command::new("wsl.exe"),
+        AcpRuntime::Hermes => Command::new("hermes"),
     };
 
-    command
-        .args(["-y", "@agentclientprotocol/claude-agent-acp"])
-        .current_dir(cwd)
-        .envs(load_claude_user_env());
+    #[cfg(windows)]
+    {
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    match runtime {
+        AcpRuntime::Claude => {
+            command
+                .args(["-y", "@agentclientprotocol/claude-agent-acp"])
+                .current_dir(cwd)
+                .envs(load_claude_user_env());
+        }
+        AcpRuntime::Hermes => {
+            let executable = profile_command
+                .filter(|value| !value.trim().is_empty())
+                .unwrap_or("hermes");
+            if cfg!(windows) {
+                command.args(["--", executable, "acp", "--accept-hooks"]);
+            } else {
+                command.arg(executable);
+                command.args(["acp", "--accept-hooks"]);
+            }
+            command.current_dir(cwd);
+        }
+    }
 
     command
 }
@@ -438,6 +602,7 @@ fn write_message(stdin: &mut impl Write, message: &Value) -> Result<(), String> 
 }
 
 fn read_response(
+    runtime: AcpRuntime,
     reader: &mut impl BufRead,
     stdin: &mut impl Write,
     target_id: i64,
@@ -448,7 +613,7 @@ fn read_response(
         line.clear();
         let bytes = reader.read_line(&mut line).map_err(|error| error.to_string())?;
         if bytes == 0 {
-            return Err("Claude ACP adapter 已关闭 stdout。".to_string());
+            return Err(format!("{} adapter 已关闭 stdout。", runtime.display()));
         }
 
         let Ok(message) = serde_json::from_str::<Value>(line.trim()) else {

@@ -81,6 +81,25 @@ struct HistoryEntryInput {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+struct HermesProfileMeta {
+    id: String,
+    profile_name: String,
+    display_name: String,
+    subtitle: String,
+    note: String,
+    state: u8,
+    model: String,
+    gateway: String,
+    alias: Option<String>,
+    path: String,
+    skill_count: Option<u32>,
+    has_env: bool,
+    has_soul: bool,
+    is_default: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct HistoryCompactResult {
     removed_count: usize,
     upgraded_count: usize,
@@ -94,6 +113,157 @@ fn build_command(program: &str) -> Command {
         command.creation_flags(CREATE_NO_WINDOW);
     }
     command
+}
+
+fn run_shell(shell: &str, args: &[&str]) -> Result<String, String> {
+    let output = build_command(shell)
+        .args(args)
+        .output()
+        .map_err(|error| error.to_string())?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+
+    if output.status.success() {
+        Ok(stdout)
+    } else if !stderr.is_empty() {
+        Err(stderr)
+    } else {
+        Err(stdout)
+    }
+}
+
+fn clean_hermes_output(raw: &str) -> Vec<String> {
+    raw.lines()
+        .map(|line| line.replace('\u{0000}', "").trim().to_string())
+        .filter(|line| {
+            !line.is_empty()
+                && !line.starts_with("wsl:")
+                && !line.contains("localhost")
+                && !line.contains("WSL")
+                && !line.chars().all(|ch| matches!(ch, 'в' | '”' | 'Ђ' | '—' | '†' | ' '))
+        })
+        .collect()
+}
+
+fn parse_hermes_profile_list(raw: &str) -> Vec<(String, String, String, Option<String>, bool)> {
+    let mut rows: std::collections::HashMap<String, (String, String, Option<String>, bool)> =
+        std::collections::HashMap::new();
+    for line in clean_hermes_output(raw) {
+        if line.starts_with("Profile") {
+            continue;
+        }
+        if !line.contains("running") && !line.contains("stopped") {
+            continue;
+        }
+        let gateway = if line.contains("running") {
+            "running"
+        } else {
+            "stopped"
+        };
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        let Some(gateway_index) = parts.iter().position(|part| *part == gateway) else {
+            continue;
+        };
+        if gateway_index < 2 {
+            continue;
+        }
+
+        let raw_profile = parts[0];
+        let is_default = raw_profile.contains("default");
+        let profile_name = if is_default { "default" } else { raw_profile }.to_string();
+        let model = parts[1..gateway_index].join(" ");
+        let alias_raw = parts.get(gateway_index + 1).copied().unwrap_or("");
+        let alias = if alias_raw.is_empty() || alias_raw.contains('в') || alias_raw == "—" {
+            None
+        } else {
+            Some(alias_raw.to_string())
+        };
+        let should_replace = match rows.get(&profile_name) {
+            Some((_, existing_gateway, _, _)) => existing_gateway != "running" && gateway == "running",
+            None => true,
+        };
+        if should_replace {
+            rows.insert(
+                profile_name,
+                (model, gateway.to_string(), alias, is_default),
+            );
+        }
+    }
+    rows.into_iter()
+        .map(|(profile_name, (model, gateway, alias, is_default))| {
+            (profile_name, model, gateway, alias, is_default)
+        })
+        .collect()
+}
+
+fn parse_hermes_profile_show(raw: &str) -> std::collections::HashMap<String, String> {
+    let mut details = std::collections::HashMap::new();
+    for line in clean_hermes_output(raw) {
+        if let Some((key, value)) = line.split_once(':') {
+            details.insert(key.trim().to_lowercase(), value.trim().to_string());
+        }
+    }
+    details
+}
+
+#[tauri::command]
+fn runtime_hermes_profiles() -> Result<Vec<HermesProfileMeta>, String> {
+    let list_raw = run_shell("wsl.exe", &["-e", "bash", "-lc", "hermes profile list"])?;
+    let list_rows = parse_hermes_profile_list(&list_raw);
+    if list_rows.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let mut profiles = Vec::new();
+    for (profile_name, model, gateway, alias, is_default) in list_rows {
+        let show_cmd = format!("hermes profile show {}", profile_name);
+        let show_raw = run_shell("wsl.exe", &["-e", "bash", "-lc", &show_cmd]).unwrap_or_default();
+        let details = parse_hermes_profile_show(&show_raw);
+        let path = details.get("path").cloned().unwrap_or_default();
+        let skill_count = details
+            .get("skills")
+            .and_then(|value| value.parse::<u32>().ok());
+        let has_env = details
+            .get(".env")
+            .map(|value| value.eq_ignore_ascii_case("exists"))
+            .unwrap_or(false);
+        let has_soul = details
+            .get("soul.md")
+            .map(|value| value.eq_ignore_ascii_case("exists"))
+            .unwrap_or(false);
+        let alias_path = details.get("alias").cloned().or(alias.clone());
+        let subtitle = format!("WSL Profile · {}", if gateway == "running" { "Gateway 运行中" } else { "Gateway 已停止" });
+        let note = format!(
+            "模型：{} · Skills：{}{}{}",
+            if model.is_empty() { "未配置" } else { &model },
+            skill_count.map(|count| count.to_string()).unwrap_or_else(|| "未知".to_string()),
+            if has_env { " · .env" } else { "" },
+            if has_soul { " · SOUL.md" } else { "" }
+        );
+        profiles.push(HermesProfileMeta {
+            id: format!("hermes-profile-{}", profile_name),
+            profile_name: profile_name.clone(),
+            display_name: if is_default {
+                "default".to_string()
+            } else {
+                profile_name.clone()
+            },
+            subtitle,
+            note,
+            state: if gateway == "running" { 1 } else { 9 },
+            model,
+            gateway,
+            alias: alias_path,
+            path,
+            skill_count,
+            has_env,
+            has_soul,
+            is_default,
+        });
+    }
+
+    Ok(profiles)
 }
 
 fn history_dir(app: &AppHandle) -> Result<PathBuf, String> {
@@ -374,6 +544,21 @@ async fn runtime_acp_claude_prompt(
 }
 
 #[tauri::command]
+async fn runtime_acp_hermes_prompt(
+    runtime_session_id: String,
+    prompt: String,
+    cwd: Option<String>,
+    profile_command: Option<String>,
+) -> Result<Vec<Value>, String> {
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        acp_runtime::run_hermes_acp_prompt(runtime_session_id, prompt, cwd, profile_command)
+    })
+    .await
+    .map_err(|error| classify_backend_error(error.to_string()))?;
+    result.map_err(classify_backend_error)
+}
+
+#[tauri::command]
 async fn runtime_acp_claude_resume(
     runtime_session_id: String,
     acp_session_id: String,
@@ -381,6 +566,26 @@ async fn runtime_acp_claude_resume(
 ) -> Result<Vec<Value>, String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
         acp_runtime::resume_claude_acp_session(runtime_session_id, acp_session_id, cwd)
+    })
+    .await
+    .map_err(|error| classify_backend_error(error.to_string()))?;
+    result.map_err(classify_backend_error)
+}
+
+#[tauri::command]
+async fn runtime_acp_hermes_resume(
+    runtime_session_id: String,
+    acp_session_id: String,
+    cwd: Option<String>,
+    profile_command: Option<String>,
+) -> Result<Vec<Value>, String> {
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        acp_runtime::resume_hermes_acp_session(
+            runtime_session_id,
+            acp_session_id,
+            cwd,
+            profile_command,
+        )
     })
     .await
     .map_err(|error| classify_backend_error(error.to_string()))?;
@@ -396,9 +601,27 @@ async fn runtime_acp_claude_alive_ids() -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
+async fn runtime_acp_hermes_alive_ids() -> Result<Vec<String>, String> {
+    tauri::async_runtime::spawn_blocking(|| acp_runtime::list_live_hermes_acp_sessions())
+        .await
+        .map_err(|error| classify_backend_error(error.to_string()))?
+        .map_err(classify_backend_error)
+}
+
+#[tauri::command]
 async fn runtime_acp_claude_shutdown(runtime_session_id: String) -> Result<bool, String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
         acp_runtime::shutdown_claude_acp_session(runtime_session_id)
+    })
+    .await
+    .map_err(|error| classify_backend_error(error.to_string()))?;
+    result.map_err(classify_backend_error)
+}
+
+#[tauri::command]
+async fn runtime_acp_hermes_shutdown(runtime_session_id: String) -> Result<bool, String> {
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        acp_runtime::shutdown_hermes_acp_session(runtime_session_id)
     })
     .await
     .map_err(|error| classify_backend_error(error.to_string()))?;
@@ -419,6 +642,26 @@ async fn runtime_acp_claude_load(
     result.map_err(classify_backend_error)
 }
 
+#[tauri::command]
+async fn runtime_acp_hermes_load(
+    runtime_session_id: String,
+    acp_session_id: String,
+    cwd: Option<String>,
+    profile_command: Option<String>,
+) -> Result<Vec<Value>, String> {
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        acp_runtime::load_hermes_acp_session(
+            runtime_session_id,
+            acp_session_id,
+            cwd,
+            profile_command,
+        )
+    })
+    .await
+    .map_err(|error| classify_backend_error(error.to_string()))?;
+    result.map_err(classify_backend_error)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -427,16 +670,23 @@ pub fn run() {
             load_history_entries,
             compact_history_entries,
             append_history_entry,
+            runtime_hermes_profiles,
             run_claude_stream,
             runtime_acp_claude_prompt,
+            runtime_acp_hermes_prompt,
             runtime_acp_claude_resume,
+            runtime_acp_hermes_resume,
             runtime_acp_claude_load,
+            runtime_acp_hermes_load,
             runtime_acp_claude_shutdown,
-            runtime_acp_claude_alive_ids
+            runtime_acp_hermes_shutdown,
+            runtime_acp_claude_alive_ids,
+            runtime_acp_hermes_alive_ids
         ])
         .on_window_event(|_window, event| {
             if matches!(event, tauri::WindowEvent::Destroyed) {
                 let _ = acp_runtime::shutdown_all_claude_acp_sessions();
+                let _ = acp_runtime::shutdown_all_hermes_acp_sessions();
             }
         })
         .run(tauri::generate_context!())

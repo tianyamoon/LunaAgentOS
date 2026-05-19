@@ -563,10 +563,41 @@ button:disabled {
   justify-content: stretch;
 }
 
-.composer-row .secondary.is-active {
-  border-color: rgba(217, 108, 58, 0.35);
-  background: rgba(255, 247, 239, 0.96);
+.session-option-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 34px;
+  min-width: 104px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  color: var(--muted);
+  background: transparent;
+}
+
+.session-option-toggle:hover {
+  box-shadow: none;
+}
+
+.session-option-toggle .toggle-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(99, 82, 63, 0.28);
+  background: transparent;
+}
+
+.session-option-toggle.is-active {
+  border-color: rgba(217, 108, 58, 0.24);
   color: var(--accent);
+  background: rgba(255, 247, 239, 0.58);
+}
+
+.session-option-toggle.is-active .toggle-dot {
+  border-color: var(--accent);
+  background: var(--accent);
 }
 
 textarea {

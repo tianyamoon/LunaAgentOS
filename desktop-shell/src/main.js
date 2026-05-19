@@ -34,6 +34,23 @@ const runtimeStateClasses = {
   resume_failed: "runtime-failed",
 };
 
+const acpRuntimeCommands = {
+  claude: {
+    prompt: "runtime_acp_claude_prompt",
+    load: "runtime_acp_claude_load",
+    resume: "runtime_acp_claude_resume",
+    shutdown: "runtime_acp_claude_shutdown",
+    aliveIds: "runtime_acp_claude_alive_ids",
+  },
+  hermes: {
+    prompt: "runtime_acp_hermes_prompt",
+    load: "runtime_acp_hermes_load",
+    resume: "runtime_acp_hermes_resume",
+    shutdown: "runtime_acp_hermes_shutdown",
+    aliveIds: "runtime_acp_hermes_alive_ids",
+  },
+};
+
 const fallbackSessions = {
   hermes: {
     events: [
@@ -68,21 +85,13 @@ const providers = [
         note: "适合承接高价值任务与真实产品演示。",
         state: 1,
       },
-      {
-        id: "claude-review",
-        providerId: "claude",
-        name: "代码审阅",
-        subtitle: "预留",
-        note: "用于后续拆分同一 provider 下的多 agent 角色。",
-        state: 1,
-      },
     ],
   },
   {
     id: "hermes",
     name: "Hermes",
     lane: "通用入口",
-    note: "已探测到 WSL 运行时，等待主链路接通。",
+    note: "通过 WSL ACP 接入官方会话协议。",
     agents: [
       {
         id: "hermes-main",
@@ -114,6 +123,7 @@ const providers = [
 
 const MAIN_AGENT_KEY = "lunaagentos.mainAgentId";
 const HISTORY_SCHEMA_VERSION = 2;
+const DEFAULT_HERMES_AGENT_ID = "hermes-profile-default";
 
 const agentList = document.getElementById("agentList");
 const providerManagerBtn = document.getElementById("providerManagerBtn");
@@ -145,6 +155,20 @@ function providerById(id) {
   return providers.find((provider) => provider.id === id);
 }
 
+function ensureMainAgentExists() {
+  if (agentById(mainAgentId)) return;
+  if (agentById(DEFAULT_HERMES_AGENT_ID)) {
+    saveMainAgent(DEFAULT_HERMES_AGENT_ID);
+    return;
+  }
+  if (agentById("claude-main")) {
+    saveMainAgent("claude-main");
+    return;
+  }
+  const fallbackAgent = allAgents()[0];
+  if (fallbackAgent) saveMainAgent(fallbackAgent.id);
+}
+
 function agentById(id) {
   return allAgents().find((agent) => agent.id === id);
 }
@@ -160,6 +184,10 @@ function currentMainAgent() {
 
 function currentMainProvider() {
   return providerForAgent(mainAgentId);
+}
+
+function acpCommandsForProvider(providerId) {
+  return acpRuntimeCommands[providerId] || null;
 }
 
 function providerState(provider) {
@@ -230,6 +258,7 @@ function updateActionLabels() {
   sendBtn.disabled = sending;
   newSessionToggle.disabled = sending;
   newSessionToggle.classList.toggle("is-active", sendAsNewSession);
+  newSessionToggle.setAttribute("aria-pressed", String(sendAsNewSession));
 }
 
 function saveMainAgent(agentId) {
@@ -279,6 +308,7 @@ function setMainAgent(agentId) {
 }
 
 function renderProviders() {
+  ensureMainAgentExists();
   agentList.innerHTML = "";
 
   providers.forEach((provider) => {
@@ -339,6 +369,47 @@ function renderProviders() {
       createAgentForProvider(providerId);
     });
   });
+}
+
+function applyHermesProfiles(profiles) {
+  const hermesProvider = providerById("hermes");
+  if (!hermesProvider || !Array.isArray(profiles) || !profiles.length) return;
+  hermesProvider.agents = profiles.map((profile) => ({
+    id: profile.id,
+    providerId: "hermes",
+    name: profile.displayName,
+    subtitle: profile.subtitle || "WSL Profile",
+    note: profile.note || "Hermes profile",
+    state: typeof profile.state === "number" ? profile.state : 1,
+    profileName: profile.profileName,
+    model: profile.model,
+    gateway: profile.gateway,
+    alias: profile.alias,
+    path: profile.path,
+    skillCount: profile.skillCount,
+    hasEnv: profile.hasEnv,
+    hasSoul: profile.hasSoul,
+    isDefault: Boolean(profile.isDefault),
+  }));
+  hermesProvider.note = `已载入 ${profiles.length} 个 Hermes profile。`;
+  ensureMainAgentExists();
+  renderProviders();
+  renderWorkspace();
+  setAppNotice(`已载入 ${profiles.length} 个 Hermes profile。`);
+}
+
+async function loadHermesProfiles() {
+  try {
+    const profiles = await invoke("runtime_hermes_profiles");
+    if (Array.isArray(profiles) && profiles.length) {
+      applyHermesProfiles(profiles);
+      return;
+    }
+    setAppNotice("未探测到可用的 Hermes profile，暂时保留默认入口。");
+  } catch (error) {
+    console.error(error);
+    setAppNotice(`读取 Hermes profile 失败：${formatBackendError(error)}`, "error");
+  }
 }
 
 function sessionSectionsFromEvents(events) {
@@ -440,6 +511,8 @@ function createSession(firstTask) {
     turns: [],
     createdAt: new Date().toISOString(),
     fullscreen: false,
+    profileName: agent.profileName || null,
+    profileCommand: agent.alias || null,
   };
   sessions = [session, ...sessions];
   activeSessionIds[agent.id] = session.id;
@@ -634,8 +707,9 @@ function activateWorkspaceSession(sessionId) {
 async function archiveLiveSession(sessionId) {
   const session = sessions.find((item) => item.id === sessionId);
   if (!session) return;
+  const commands = acpCommandsForProvider(session.providerId);
   try {
-    await invoke("runtime_acp_claude_shutdown", { runtimeSessionId: session.id });
+    if (commands) await invoke(commands.shutdown, { runtimeSessionId: session.id });
   } catch (error) {
     console.error(error);
   }
@@ -850,6 +924,13 @@ function ensureArchivedAgent(archived) {
     };
     provider.agents.push(agent);
   }
+  if (provider.id === "hermes") {
+    const liveAgent = provider.agents.find((entry) => entry.id === archived.agentId);
+    if (liveAgent) {
+      agent.profileName = liveAgent.profileName || agent.profileName || null;
+      agent.alias = liveAgent.alias || agent.alias || null;
+    }
+  }
   return agent;
 }
 
@@ -875,8 +956,12 @@ async function restoreArchivedSession(sessionId) {
     fullscreen: false,
     acpSessionId: archived.acpSessionId,
     runtimeState: "archived",
+    profileName: null,
+    profileCommand: null,
   };
-  ensureArchivedAgent(archived);
+  const restoredAgent = ensureArchivedAgent(archived);
+  restored.profileName = restored.profileName || restoredAgent.profileName || null;
+  restored.profileCommand = restored.profileCommand || restoredAgent.alias || null;
   if (!existing) sessions = [restored, ...sessions];
   saveMainAgent(restored.agentId);
   renderProviders();
@@ -893,11 +978,20 @@ async function restoreArchivedSession(sessionId) {
   renderWorkspace();
   renderHistory();
   setAppNotice("已恢复历史 transcript，正在尝试加载 ACP runtime...", "busy");
+  const commands = acpCommandsForProvider(restored.providerId);
+  if (!commands) {
+    restored.runtimeState = "archived";
+    renderWorkspace();
+    renderHistory();
+    setAppNotice("该 provider 暂不支持 ACP runtime 恢复，当前为只读 transcript。");
+    return;
+  }
   try {
-    await invoke("runtime_acp_claude_load", {
+    await invoke(commands.load, {
       runtimeSessionId: restored.id,
       acpSessionId: restored.acpSessionId,
       cwd: null,
+      profileCommand: restored.profileCommand || null,
     });
     restored.runtimeState = "live";
     activeSessionIds[restored.agentId] = restored.id;
@@ -906,10 +1000,11 @@ async function restoreArchivedSession(sessionId) {
     setAppNotice("历史 session 已加载为可继续对话的 ACP runtime。");
   } catch (loadError) {
     try {
-      await invoke("runtime_acp_claude_resume", {
+      await invoke(commands.resume, {
         runtimeSessionId: restored.id,
         acpSessionId: restored.acpSessionId,
         cwd: null,
+        profileCommand: restored.profileCommand || null,
       });
       restored.runtimeState = "live";
       activeSessionIds[restored.agentId] = restored.id;
@@ -993,16 +1088,22 @@ async function runFallbackSession(session, turn) {
   }
 }
 
-async function startClaudeSession(session, turn) {
+async function startAcpSession(session, turn) {
+  const commands = acpCommandsForProvider(session.providerId);
+  if (!commands) {
+    void runFallbackSession(session, turn);
+    return;
+  }
   runningSessions += 1;
   updateActionLabels();
   setAppNotice(`已将任务送入 ${session.agentName}，正在等待返回内容...`, "busy");
   try {
     await new Promise((resolve) => requestAnimationFrame(resolve));
-    const events = await invoke("runtime_acp_claude_prompt", {
+    const events = await invoke(commands.prompt, {
       runtimeSessionId: session.id,
       prompt: turn.task,
       cwd: null,
+      profileCommand: session.profileCommand || null,
     });
     const saved = updateTurnFromEvents(session.id, turn.id, events);
     if (saved) {
@@ -1044,8 +1145,9 @@ function startSessionFromPrompt(forceNewSession = false) {
   sendAsNewSession = false;
   updateActionLabels();
 
-  if (provider.id === "claude") {
-    void startClaudeSession(session, turn);
+  const commands = acpCommandsForProvider(provider.id);
+  if (commands) {
+    void startAcpSession(session, turn);
     return;
   }
 
@@ -1072,6 +1174,9 @@ updateActionLabels();
 setTimeout(() => {
   void loadHistory();
 }, 0);
+setTimeout(() => {
+  void loadHermesProfiles();
+}, 0);
 
 async function syncRuntimeAliveStates() {
   const liveSessionsExist = sessions.some(
@@ -1079,12 +1184,20 @@ async function syncRuntimeAliveStates() {
   );
   if (!liveSessionsExist) return;
   try {
-    const aliveIds = new Set(await invoke("runtime_acp_claude_alive_ids"));
+    const providerIds = [...new Set(sessions
+      .filter((session) => sessionRuntimeState(session) === "live" && session.acpSessionId)
+      .map((session) => session.providerId))];
+    const aliveByProvider = {};
+    for (const providerId of providerIds) {
+      const commands = acpCommandsForProvider(providerId);
+      if (commands) aliveByProvider[providerId] = new Set(await invoke(commands.aliveIds));
+    }
     let mutated = false;
     sessions.forEach((session) => {
       const declaredLive = sessionRuntimeState(session) === "live";
       const hasStartedRuntime = Boolean(session.acpSessionId);
-      if (declaredLive && hasStartedRuntime && !aliveIds.has(session.id)) {
+      const aliveIds = aliveByProvider[session.providerId];
+      if (declaredLive && hasStartedRuntime && aliveIds && !aliveIds.has(session.id)) {
         session.runtimeState = "resume_failed";
         if (activeSessionIds[session.agentId] === session.id) {
           delete activeSessionIds[session.agentId];
