@@ -196,6 +196,22 @@ function canSendToSession(session) {
   return sessionRuntimeState(session) === "live";
 }
 
+function formatBackendError(error) {
+  const raw = String(error);
+  const match = raw.match(/^\[([A-Z_]+)\]\s*(.*)$/);
+  if (!match) return raw;
+  const [, code, message] = match;
+  const labels = {
+    RUNTIME_NOT_FOUND: "未找到运行时，请确认 Claude/ACP adapter 可用",
+    PERMISSION_DENIED: "权限被拒绝，请检查授权或目录权限",
+    SESSION_NOT_FOUND: "远端 session 不存在或已失效",
+    PROTOCOL_PARSE_FAILED: "协议响应解析失败",
+    RUNTIME_EXITED: "运行时进程已退出",
+    UNKNOWN: "未知运行时错误",
+  };
+  return `${labels[code] || code}：${message}`;
+}
+
 function setAppNotice(message, tone = "muted") {
   if (!appNotice) return;
   appNotice.textContent = message;
@@ -872,7 +888,7 @@ async function restoreArchivedSession(sessionId) {
       restored.runtimeState = "resume_failed";
       renderWorkspace();
       renderHistory();
-      setAppNotice(`ACP runtime 恢复失败，保留只读 transcript：${String(resumeError || loadError)}`, "error");
+      setAppNotice(`ACP runtime 恢复失败，保留只读 transcript：${formatBackendError(resumeError || loadError)}`, "error");
     }
   }
 }
@@ -937,7 +953,7 @@ async function runFallbackSession(session, turn) {
       setAppNotice(`${session.agentName} 会话已完成并写入历史。`);
     }
   } catch (error) {
-    appendErrorToTurn(session.id, turn.id, String(error));
+    appendErrorToTurn(session.id, turn.id, formatBackendError(error));
   } finally {
     runningSessions = Math.max(0, runningSessions - 1);
     updateActionLabels();
@@ -966,7 +982,7 @@ async function startClaudeSession(session, turn) {
       setAppNotice(`${session.agentName} 会话已完成并写入历史。`);
     }
   } catch (error) {
-    appendErrorToTurn(session.id, turn.id, String(error));
+    appendErrorToTurn(session.id, turn.id, formatBackendError(error));
     await saveTurnToHistory(session, turn);
   } finally {
     runningSessions = Math.max(0, runningSessions - 1);

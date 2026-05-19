@@ -22,6 +22,28 @@ fn history_schema_version() -> u32 {
     HISTORY_SCHEMA_VERSION
 }
 
+fn classify_backend_error(error: String) -> String {
+    let lower = error.to_lowercase();
+    let code = if lower.contains("启动 claude acp adapter 失败")
+        || lower.contains("not recognized")
+        || lower.contains("not found")
+        || lower.contains("找不到")
+    {
+        "RUNTIME_NOT_FOUND"
+    } else if lower.contains("permission") || lower.contains("denied") || lower.contains("权限") {
+        "PERMISSION_DENIED"
+    } else if lower.contains("session") && (lower.contains("not found") || lower.contains("不存在")) {
+        "SESSION_NOT_FOUND"
+    } else if lower.contains("json") || lower.contains("parse") || lower.contains("解析") {
+        "PROTOCOL_PARSE_FAILED"
+    } else if lower.contains("broken pipe") || lower.contains("child") || lower.contains("进程") {
+        "RUNTIME_EXITED"
+    } else {
+        "UNKNOWN"
+    };
+    format!("[{code}] {error}")
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct HistoryEntry {
     #[serde(default = "history_schema_version")]
@@ -312,25 +334,27 @@ fn run_claude_stream(prompt: String) -> Result<Vec<Value>, String> {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| classify_backend_error(error.to_string()))?;
 
     if let Some(stdin) = child.stdin.as_mut() {
         stdin
             .write_all(prompt.as_bytes())
-            .map_err(|error| error.to_string())?;
+            .map_err(|error| classify_backend_error(error.to_string()))?;
     }
 
-    let output = child.wait_with_output().map_err(|error| error.to_string())?;
+    let output = child
+        .wait_with_output()
+        .map_err(|error| classify_backend_error(error.to_string()))?;
     let raw = if output.status.success() {
         String::from_utf8_lossy(&output.stdout).to_string()
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
         let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        return Err(if !stderr.is_empty() { stderr } else { stdout });
+        return Err(classify_backend_error(if !stderr.is_empty() { stderr } else { stdout }));
     };
     let events = parse_claude_stream(&raw);
     if events.is_empty() {
-        return Err("Claude Code 未返回可解析事件。".to_string());
+        return Err(classify_backend_error("Claude Code 未返回可解析事件。".to_string()));
     }
     Ok(events)
 }
@@ -341,11 +365,12 @@ async fn runtime_acp_claude_prompt(
     prompt: String,
     cwd: Option<String>,
 ) -> Result<Vec<Value>, String> {
-    tauri::async_runtime::spawn_blocking(move || {
+    let result = tauri::async_runtime::spawn_blocking(move || {
         acp_runtime::run_claude_acp_prompt(runtime_session_id, prompt, cwd)
     })
     .await
-    .map_err(|error| error.to_string())?
+    .map_err(|error| classify_backend_error(error.to_string()))?;
+    result.map_err(classify_backend_error)
 }
 
 #[tauri::command]
@@ -354,27 +379,30 @@ async fn runtime_acp_claude_resume(
     acp_session_id: String,
     cwd: Option<String>,
 ) -> Result<Vec<Value>, String> {
-    tauri::async_runtime::spawn_blocking(move || {
+    let result = tauri::async_runtime::spawn_blocking(move || {
         acp_runtime::resume_claude_acp_session(runtime_session_id, acp_session_id, cwd)
     })
     .await
-    .map_err(|error| error.to_string())?
+    .map_err(|error| classify_backend_error(error.to_string()))?;
+    result.map_err(classify_backend_error)
 }
 
 #[tauri::command]
 async fn runtime_acp_claude_alive_ids() -> Result<Vec<String>, String> {
     tauri::async_runtime::spawn_blocking(|| acp_runtime::list_live_claude_acp_sessions())
         .await
-        .map_err(|error| error.to_string())?
+        .map_err(|error| classify_backend_error(error.to_string()))?
+        .map_err(classify_backend_error)
 }
 
 #[tauri::command]
 async fn runtime_acp_claude_shutdown(runtime_session_id: String) -> Result<bool, String> {
-    tauri::async_runtime::spawn_blocking(move || {
+    let result = tauri::async_runtime::spawn_blocking(move || {
         acp_runtime::shutdown_claude_acp_session(runtime_session_id)
     })
     .await
-    .map_err(|error| error.to_string())?
+    .map_err(|error| classify_backend_error(error.to_string()))?;
+    result.map_err(classify_backend_error)
 }
 
 #[tauri::command]
@@ -383,11 +411,12 @@ async fn runtime_acp_claude_load(
     acp_session_id: String,
     cwd: Option<String>,
 ) -> Result<Vec<Value>, String> {
-    tauri::async_runtime::spawn_blocking(move || {
+    let result = tauri::async_runtime::spawn_blocking(move || {
         acp_runtime::load_claude_acp_session(runtime_session_id, acp_session_id, cwd)
     })
     .await
-    .map_err(|error| error.to_string())?
+    .map_err(|error| classify_backend_error(error.to_string()))?;
+    result.map_err(classify_backend_error)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
