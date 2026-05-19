@@ -21,10 +21,10 @@ const stateClasses = {
 };
 
 const runtimeStateLabels = {
-  live: "LIVE",
-  archived: "ARCHIVE",
-  restoring: "RESTORING",
-  resume_failed: "RESUME FAILED",
+  live: "可继续",
+  archived: "只读归档",
+  restoring: "恢复中",
+  resume_failed: "恢复失败",
 };
 
 const runtimeStateClasses = {
@@ -196,6 +196,11 @@ function canSendToSession(session) {
   return sessionRuntimeState(session) === "live";
 }
 
+function canRestoreSession(session) {
+  const state = sessionRuntimeState(session);
+  return state === "archived" || state === "resume_failed";
+}
+
 function formatBackendError(error) {
   const raw = String(error);
   const match = raw.match(/^\[([A-Z_]+)\]\s*(.*)$/);
@@ -221,8 +226,7 @@ function setAppNotice(message, tone = "muted") {
 
 function updateActionLabels() {
   const sending = runningSessions > 0;
-  const sendText = sending ? `发送中 (${runningSessions})` : "发送";
-  sendBtn.textContent = sendText;
+  sendBtn.textContent = sending ? "发送中" : "发送";
   sendBtn.disabled = sending;
   newSessionToggle.disabled = sending;
   newSessionToggle.classList.toggle("is-active", sendAsNewSession);
@@ -575,8 +579,8 @@ function renderSessionCard(session) {
           <div class="caption session-task">${session.task}</div>
         </div>
         <div class="session-card-actions">
-          ${runtimeState === "live" ? `<button type="button" class="mini-btn ghost-btn session-archive-btn" data-session-id="${session.id}">归档</button>` : ""}
-          ${runtimeState === "resume_failed" || runtimeState === "archived" ? `<button type="button" class="mini-btn ghost-btn session-retry-btn" data-session-id="${session.id}">重试恢复</button>` : ""}
+          ${runtimeState === "live" ? `<button type="button" class="mini-btn ghost-btn session-archive-btn" data-session-id="${session.id}">停止接收</button>` : ""}
+          ${canRestoreSession(session) ? `<button type="button" class="mini-btn ghost-btn session-retry-btn" data-session-id="${session.id}">重试恢复</button>` : ""}
           <button type="button" class="mini-btn ghost-btn session-fullscreen-btn" data-session-id="${session.id}">
             ${session.fullscreen ? "退出全屏" : "全屏"}
           </button>
@@ -592,6 +596,12 @@ function renderSessionCard(session) {
 }
 
 function bindSessionActions() {
+  sessionDeck.querySelectorAll(".session-card").forEach((card) => {
+    card.addEventListener("click", (event) => {
+      if (event.target.closest("button")) return;
+      activateWorkspaceSession(card.dataset.sessionId);
+    });
+  });
   sessionDeck.querySelectorAll(".session-fullscreen-btn").forEach((button) => {
     button.addEventListener("click", () => {
       const sessionId = button.dataset.sessionId;
@@ -607,6 +617,18 @@ function bindSessionActions() {
   sessionDeck.querySelectorAll(".session-retry-btn").forEach((button) => {
     button.addEventListener("click", () => restoreArchivedSession(button.dataset.sessionId));
   });
+}
+
+function activateWorkspaceSession(sessionId) {
+  const session = sessions.find((item) => item.id === sessionId);
+  if (!session) return;
+  if (!canSendToSession(session)) {
+    setAppNotice("该会话当前不是 live runtime，请先重试恢复后再继续发送。", "error");
+    return;
+  }
+  activeSessionIds[session.agentId] = session.id;
+  renderWorkspace();
+  setAppNotice(`当前工作 session 已切换到：${session.task}`);
 }
 
 async function archiveLiveSession(sessionId) {
@@ -795,6 +817,11 @@ function bindSessionListActions() {
     item.addEventListener("click", () => {
       const agentId = item.dataset.agentId;
       const sessionId = item.dataset.sessionId;
+      const session = sessions.find((entry) => entry.id === sessionId);
+      if (!session || !canSendToSession(session)) {
+        setAppNotice("该 session 当前不是可继续状态，请先恢复。", "error");
+        return;
+      }
       if (agentId) saveMainAgent(agentId);
       if (agentId && sessionId) activeSessionIds[agentId] = sessionId;
       renderProviders();
@@ -831,6 +858,10 @@ async function restoreArchivedSession(sessionId) {
   const archived = archivedSessionsFromHistory(historyEntries).find((item) => item.id === sessionId);
   if (!archived) return;
   const existing = sessions.find((item) => item.id === archived.id);
+  if (existing && sessionRuntimeState(existing) === "restoring") {
+    setAppNotice("该 session 正在恢复中，请稍等。", "busy");
+    return;
+  }
   const restored = existing || {
     id: archived.id,
     providerId: archived.providerId,
@@ -848,7 +879,6 @@ async function restoreArchivedSession(sessionId) {
   ensureArchivedAgent(archived);
   if (!existing) sessions = [restored, ...sessions];
   saveMainAgent(restored.agentId);
-  activeSessionIds[restored.agentId] = restored.id;
   renderProviders();
   renderWorkspace();
   renderHistory();
@@ -870,6 +900,7 @@ async function restoreArchivedSession(sessionId) {
       cwd: null,
     });
     restored.runtimeState = "live";
+    activeSessionIds[restored.agentId] = restored.id;
     renderWorkspace();
     renderHistory();
     setAppNotice("历史 session 已加载为可继续对话的 ACP runtime。");
@@ -881,6 +912,7 @@ async function restoreArchivedSession(sessionId) {
         cwd: null,
       });
       restored.runtimeState = "live";
+      activeSessionIds[restored.agentId] = restored.id;
       renderWorkspace();
       renderHistory();
       setAppNotice("ACP load 失败，已通过 resume 恢复为可继续对话的 runtime。");

@@ -10,7 +10,6 @@
     <div class="app-shell">
       <header class="topbar">
         <div class="brand">
-          <p class="brandline">LunaAgentOS</p>
           <p id="appNotice" class="app-notice">工作台准备就绪，等待主 Agent 接收任务。</p>
         </div>
       </header>
@@ -41,11 +40,12 @@
           </div>
 
           <div class="composer">
-            <label for="promptBox">任务输入</label>
             <div class="composer-row">
               <textarea id="promptBox" rows="4" placeholder="输入发送给主 Agent 的任务。"></textarea>
-              <button id="newSessionToggle" type="button" class="secondary compact">新会话</button>
-              <button id="sendBtn" class="primary compact">发送</button>
+              <div class="composer-actions">
+                <button id="sendBtn" class="primary compact">发送</button>
+                <button id="newSessionToggle" type="button" class="secondary compact">新会话</button>
+              </div>
             </div>
           </div>
         </section>
