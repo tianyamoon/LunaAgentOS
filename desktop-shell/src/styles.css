@@ -1,5 +1,6 @@
 :root {
   color-scheme: light;
+  --ui-scale: 1;
   --bg: #f3efe7;
   --panel: rgba(255, 251, 245, 0.95);
   --panel-strong: rgba(255, 253, 249, 0.98);
@@ -15,6 +16,7 @@
   --shadow: 0 18px 55px rgba(73, 49, 25, 0.08);
   --radius: 24px;
   font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: calc(15px * var(--ui-scale));
 }
 
 * {
@@ -51,6 +53,12 @@ body {
   align-items: center;
   gap: 16px;
   flex: 0 0 auto;
+}
+
+.topbar-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .brandline {
@@ -310,6 +318,11 @@ button:disabled {
   color: var(--muted);
 }
 
+.session-card.is-waiting {
+  border-color: rgba(178, 107, 0, 0.22);
+  box-shadow: 0 14px 34px rgba(178, 107, 0, 0.08);
+}
+
 .state-idle { background: rgba(116, 100, 83, 0.12); color: var(--muted); }
 .state-init { background: rgba(69, 115, 214, 0.14); color: #2a5aa8; }
 .state-think { background: rgba(178, 107, 0, 0.14); color: var(--thinking); }
@@ -472,6 +485,23 @@ button:disabled {
   background: rgba(255, 255, 255, 0.72);
 }
 
+.assistant-message.is-waiting {
+  position: relative;
+}
+
+.assistant-message.is-waiting::after {
+  content: "";
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--thinking);
+  box-shadow: 16px 0 0 rgba(178, 107, 0, 0.45), 32px 0 0 rgba(178, 107, 0, 0.22);
+  animation: waitingPulse 1.2s infinite ease-in-out;
+}
+
 .terminal-label {
   margin-bottom: 5px;
   color: var(--muted);
@@ -561,6 +591,10 @@ button:disabled {
   flex-direction: column;
   gap: 8px;
   justify-content: stretch;
+}
+
+.composer-actions .mini-btn {
+  height: 34px;
 }
 
 .session-option-toggle {
@@ -700,5 +734,16 @@ textarea {
 
   .composer-row {
     grid-template-columns: 1fr;
+  }
+}
+
+@keyframes waitingPulse {
+  0%, 100% {
+    opacity: 0.35;
+    transform: translateX(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateX(4px);
   }
 }

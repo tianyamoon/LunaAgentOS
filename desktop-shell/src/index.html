@@ -12,6 +12,9 @@
         <div class="brand">
           <p id="appNotice" class="app-notice">工作台准备就绪，等待发送目标接收任务。</p>
         </div>
+        <div class="topbar-tools">
+          <button id="fontScaleBtn" type="button" class="mini-btn ghost-btn">字体：标准</button>
+        </div>
       </header>
 
       <main class="layout">
@@ -44,6 +47,7 @@
               <textarea id="promptBox" rows="4" placeholder="输入发送给当前目标的任务。"></textarea>
               <div class="composer-actions">
                 <button id="sendBtn" class="primary compact">发送</button>
+                <button id="sendModeBtn" type="button" class="mini-btn ghost-btn">回车发送</button>
                 <button id="newSessionToggle" type="button" class="session-option-toggle" aria-pressed="false">
                   <span class="toggle-dot"></span>
                   <span>另开会话</span>

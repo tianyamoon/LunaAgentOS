@@ -123,8 +123,16 @@ const providers = [
 ];
 
 const MAIN_AGENT_KEY = "lunaagentos.mainAgentId";
+const SEND_MODE_KEY = "lunaagentos.sendMode";
+const FONT_SCALE_KEY = "lunaagentos.fontScale";
 const HISTORY_SCHEMA_VERSION = 2;
 const DEFAULT_HERMES_AGENT_ID = "hermes-profile-default";
+const SEND_MODE_OPTIONS = ["enter", "ctrlEnter"];
+const FONT_SCALE_OPTIONS = [
+  { id: "compact", label: "字体：紧凑", scale: 0.92 },
+  { id: "default", label: "字体：标准", scale: 1 },
+  { id: "comfortable", label: "字体：舒展", scale: 1.08 },
+];
 
 const agentList = document.getElementById("agentList");
 const providerManagerBtn = document.getElementById("providerManagerBtn");
@@ -136,6 +144,8 @@ const appNotice = document.getElementById("appNotice");
 const promptBox = document.getElementById("promptBox");
 const newSessionToggle = document.getElementById("newSessionToggle");
 const sendBtn = document.getElementById("sendBtn");
+const sendModeBtn = document.getElementById("sendModeBtn");
+const fontScaleBtn = document.getElementById("fontScaleBtn");
 
 let mainAgentId = localStorage.getItem(MAIN_AGENT_KEY) || "claude-main";
 let sessions = [];
@@ -147,6 +157,8 @@ let customAgentSeq = 0;
 let runningSessions = 0;
 let isHistoryLoading = true;
 let sendAsNewSession = false;
+let sendMode = localStorage.getItem(SEND_MODE_KEY) || "enter";
+let fontScaleId = localStorage.getItem(FONT_SCALE_KEY) || "default";
 
 function allAgents() {
   return providers.flatMap((provider) => provider.agents);
@@ -265,6 +277,36 @@ function updateActionLabels() {
 function saveMainAgent(agentId) {
   mainAgentId = agentId;
   localStorage.setItem(MAIN_AGENT_KEY, agentId);
+}
+
+function currentFontScaleOption() {
+  return FONT_SCALE_OPTIONS.find((item) => item.id === fontScaleId) || FONT_SCALE_OPTIONS[1];
+}
+
+function applyFontScale() {
+  const option = currentFontScaleOption();
+  document.documentElement.style.setProperty("--ui-scale", String(option.scale));
+  if (fontScaleBtn) fontScaleBtn.textContent = option.label;
+}
+
+function cycleFontScale() {
+  const index = FONT_SCALE_OPTIONS.findIndex((item) => item.id === fontScaleId);
+  const next = FONT_SCALE_OPTIONS[(index + 1) % FONT_SCALE_OPTIONS.length];
+  fontScaleId = next.id;
+  localStorage.setItem(FONT_SCALE_KEY, fontScaleId);
+  applyFontScale();
+}
+
+function updateSendModeLabel() {
+  if (!sendModeBtn) return;
+  sendModeBtn.textContent = sendMode === "enter" ? "回车发送" : "Ctrl+回车";
+}
+
+function toggleSendMode() {
+  const index = SEND_MODE_OPTIONS.indexOf(sendMode);
+  sendMode = SEND_MODE_OPTIONS[(index + 1) % SEND_MODE_OPTIONS.length];
+  localStorage.setItem(SEND_MODE_KEY, sendMode);
+  updateSendModeLabel();
 }
 
 function openProviderManager() {
@@ -656,6 +698,7 @@ function renderWorkspaceStatus() {
 }
 
 function renderTurn(turn, index) {
+  const waiting = turn.state === 2 && !turn.finalResponse;
   return `
     <section class="turn-block">
       <div class="turn-header">
@@ -669,19 +712,19 @@ function renderTurn(turn, index) {
       ${turn.thoughts.length
         ? `
           <details class="terminal-detail">
-            <summary>thinking</summary>
+            <summary>思考流</summary>
             <div class="terminal-pre">${turn.thoughts.join("\n\n")}</div>
           </details>
         `
         : ""}
-      <div class="terminal-message assistant-message">
+      <div class="terminal-message assistant-message ${waiting ? "is-waiting" : ""}">
         <div class="terminal-label">assistant</div>
         <p>${turn.finalResponse || turn.outputs.join("\n\n") || "等待响应..."}</p>
       </div>
       ${turn.logs.length
         ? `
           <details class="terminal-detail log-block">
-            <summary>runtime</summary>
+            <summary>运行流</summary>
             <div class="terminal-pre">${turn.logs.join("\n")}</div>
           </details>
         `
@@ -693,8 +736,9 @@ function renderTurn(turn, index) {
 function renderSessionCard(session) {
   const runtimeState = sessionRuntimeState(session);
   const isActiveReceiver = activeSessionIds[session.agentId] === session.id && canSendToSession(session);
+  const isWaiting = session.state === 2;
   return `
-    <article class="session-card ${session.fullscreen ? "fullscreen" : ""} ${isActiveReceiver ? "is-active-receiver" : ""}" data-session-id="${session.id}">
+    <article class="session-card ${session.fullscreen ? "fullscreen" : ""} ${isActiveReceiver ? "is-active-receiver" : ""} ${isWaiting ? "is-waiting" : ""}" data-session-id="${session.id}">
       ${isActiveReceiver ? `<div class="active-receiver-banner">当前接收任务</div>` : ""}
       <div class="session-card-header">
         <div>
@@ -782,12 +826,7 @@ function renderWorkspace() {
     sessionId: body.closest(".session-card")?.dataset.sessionId,
     shouldStickToBottom: body.scrollTop + body.clientHeight >= body.scrollHeight - 24,
   }));
-  const visibleSessions = [...sessions].sort((left, right) => {
-    const leftPinned = left.agentId === mainAgentId ? 1 : 0;
-    const rightPinned = right.agentId === mainAgentId ? 1 : 0;
-    if (leftPinned !== rightPinned) return rightPinned - leftPinned;
-    return right.createdAt.localeCompare(left.createdAt);
-  });
+  const visibleSessions = [...sessions].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
   const activeSessionId = activeSessionIds[mainAgentId];
   renderWorkspaceStatus();
   workspaceEmpty.style.display = visibleSessions.length ? "none" : "flex";
@@ -1240,6 +1279,24 @@ sendBtn.addEventListener("click", () => {
   startSessionFromPrompt(sendAsNewSession);
 });
 
+sendModeBtn?.addEventListener("click", () => {
+  toggleSendMode();
+});
+
+fontScaleBtn?.addEventListener("click", () => {
+  cycleFontScale();
+});
+
+promptBox.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" || event.isComposing) return;
+  const shouldSend = sendMode === "enter"
+    ? !event.ctrlKey && !event.shiftKey && !event.altKey
+    : event.ctrlKey && !event.shiftKey && !event.altKey;
+  if (!shouldSend) return;
+  event.preventDefault();
+  startSessionFromPrompt(sendAsNewSession);
+});
+
 newSessionToggle.addEventListener("click", () => {
   sendAsNewSession = !sendAsNewSession;
   updateActionLabels();
@@ -1257,6 +1314,8 @@ if (listenRuntimeEvent) {
 }
 
 renderProviders();
+applyFontScale();
+updateSendModeLabel();
 renderWorkspace();
 renderHistory();
 updateActionLabels();
