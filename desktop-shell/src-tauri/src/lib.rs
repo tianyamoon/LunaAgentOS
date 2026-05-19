@@ -62,6 +62,7 @@ struct HistoryEntryInput {
 struct HistoryCompactResult {
     removed_count: usize,
     upgraded_count: usize,
+    skipped_files: usize,
 }
 
 fn build_command(program: &str) -> Command {
@@ -101,6 +102,16 @@ fn load_history_file(path: &PathBuf) -> Result<Vec<HistoryEntry>, String> {
     serde_json::from_str::<Vec<HistoryEntry>>(&raw).map_err(|error| error.to_string())
 }
 
+fn try_load_history_file(path: &PathBuf) -> Option<Vec<HistoryEntry>> {
+    match load_history_file(path) {
+        Ok(entries) => Some(entries),
+        Err(error) => {
+            eprintln!("跳过损坏的历史文件 {}：{}", path.display(), error);
+            None
+        }
+    }
+}
+
 fn history_entry_turn_id(entry: &HistoryEntry) -> Option<String> {
     entry
         .turn
@@ -129,8 +140,9 @@ fn load_history_entries(app: AppHandle) -> Result<Vec<HistoryEntry>, String> {
         if path.extension().and_then(|value| value.to_str()) != Some("json") {
             continue;
         }
-        let mut day_entries = load_history_file(&path)?;
-        entries.append(&mut day_entries);
+        if let Some(mut day_entries) = try_load_history_file(&path) {
+            entries.append(&mut day_entries);
+        }
     }
 
     entries.sort_by(|left, right| right.created_at.cmp(&left.created_at));
@@ -142,6 +154,7 @@ fn compact_history_entries(app: AppHandle) -> Result<HistoryCompactResult, Strin
     let directory = history_dir(&app)?;
     let mut removed_count = 0;
     let mut upgraded_count = 0;
+    let mut skipped_files = 0;
 
     for item in fs::read_dir(&directory).map_err(|error| error.to_string())? {
         let item = item.map_err(|error| error.to_string())?;
@@ -149,7 +162,10 @@ fn compact_history_entries(app: AppHandle) -> Result<HistoryCompactResult, Strin
         if path.extension().and_then(|value| value.to_str()) != Some("json") {
             continue;
         }
-        let entries = load_history_file(&path)?;
+        let Some(entries) = try_load_history_file(&path) else {
+            skipped_files += 1;
+            continue;
+        };
         let original_len = entries.len();
         let mut seen = HashSet::new();
         let mut compacted = Vec::new();
@@ -183,6 +199,7 @@ fn compact_history_entries(app: AppHandle) -> Result<HistoryCompactResult, Strin
     Ok(HistoryCompactResult {
         removed_count,
         upgraded_count,
+        skipped_files,
     })
 }
 

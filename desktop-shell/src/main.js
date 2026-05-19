@@ -883,8 +883,9 @@ async function loadHistory() {
     historyEntries = await invoke("load_history_entries");
     const removedCount = compactResult?.removedCount || 0;
     const upgradedCount = compactResult?.upgradedCount || 0;
-    if (removedCount > 0 || upgradedCount > 0) {
-      setAppNotice(`历史记录已整理：去重 ${removedCount} 条，升级 ${upgradedCount} 条。`);
+    const skippedFiles = compactResult?.skippedFiles || 0;
+    if (removedCount > 0 || upgradedCount > 0 || skippedFiles > 0) {
+      setAppNotice(`历史记录已整理：去重 ${removedCount} 条，升级 ${upgradedCount} 条，跳过损坏文件 ${skippedFiles} 个。`, skippedFiles > 0 ? "error" : "info");
     }
   } catch (error) {
     console.error(error);
