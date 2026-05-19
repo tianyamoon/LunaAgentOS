@@ -954,6 +954,7 @@ async function runFallbackSession(session, turn) {
     }
   } catch (error) {
     appendErrorToTurn(session.id, turn.id, formatBackendError(error));
+    await saveTurnToHistory(session, turn);
   } finally {
     runningSessions = Math.max(0, runningSessions - 1);
     updateActionLabels();
