@@ -267,7 +267,7 @@ function saveMainAgent(agentId) {
 }
 
 function openProviderManager() {
-  setAppNotice("Provider 管理器入口已预留，当前阶段先稳住主 Agent 工作台。");
+  setAppNotice("Provider 管理器入口已预留，当前阶段先稳住发送目标与多会话工作台。");
 }
 
 function showProviderAgents(provider) {
@@ -300,8 +300,8 @@ function setMainAgent(agentId) {
   const agent = currentMainAgent();
   const provider = currentMainProvider();
   if (agent && provider) {
-    workspaceStatus.textContent = `当前主 Agent：${provider.name} / ${agent.name}`;
-    setAppNotice(`主 Agent 已切换到 ${provider.name} / ${agent.name}。`);
+    workspaceStatus.textContent = `当前发送目标：${provider.name} / ${agent.name}`;
+    setAppNotice(`当前发送目标已切换到 ${provider.name} / ${agent.name}。`);
   }
   renderProviders();
   renderWorkspace();
@@ -506,7 +506,7 @@ function createSession(firstTask) {
     agentId: agent.id,
     agentName: `${provider.name} / ${agent.name}`,
     task: firstTask,
-    state: 0,
+    state: 2,
     runtimeState: "live",
     turns: [],
     createdAt: new Date().toISOString(),
@@ -529,12 +529,12 @@ function createTurn(session, task) {
     state: 0,
     thoughts: [],
     outputs: [],
-    finalResponse: "",
+    finalResponse: "正在等待运行时返回内容...",
     logs: ["消息已进入当前会话，等待运行时返回内容。"],
     createdAt: new Date().toISOString(),
   };
   session.task = task;
-  session.state = 0;
+  session.state = 2;
   session.turns.push(turn);
   renderWorkspace();
   return turn;
@@ -596,10 +596,10 @@ function renderWorkspaceStatus() {
   const liveCount = sessions.filter((session) => sessionRuntimeState(session) === "live").length;
   const liveSuffix = liveCount > 0 ? `　·　运行中 ACP runtime：${liveCount}` : "";
   if (!agent || !provider) {
-    workspaceStatus.textContent = `请先设置主 Agent。${liveSuffix}`;
+    workspaceStatus.textContent = `请先设置当前发送目标。${liveSuffix}`;
     return;
   }
-  workspaceStatus.textContent = `当前主 Agent：${provider.name} / ${agent.name}${liveSuffix}`;
+  workspaceStatus.textContent = `当前发送目标：${provider.name} / ${agent.name}${liveSuffix}`;
 }
 
 function renderTurn(turn, index) {
@@ -699,7 +699,9 @@ function activateWorkspaceSession(sessionId) {
     setAppNotice("该会话当前不是 live runtime，请先重试恢复后再继续发送。", "error");
     return;
   }
+  saveMainAgent(session.agentId);
   activeSessionIds[session.agentId] = session.id;
+  renderProviders();
   renderWorkspace();
   setAppNotice(`当前工作 session 已切换到：${session.task}`);
 }
@@ -727,7 +729,12 @@ function renderWorkspace() {
     sessionId: body.closest(".session-card")?.dataset.sessionId,
     shouldStickToBottom: body.scrollTop + body.clientHeight >= body.scrollHeight - 24,
   }));
-  const visibleSessions = sessions.filter((session) => session.agentId === mainAgentId);
+  const visibleSessions = [...sessions].sort((left, right) => {
+    const leftPinned = left.agentId === mainAgentId ? 1 : 0;
+    const rightPinned = right.agentId === mainAgentId ? 1 : 0;
+    if (leftPinned !== rightPinned) return rightPinned - leftPinned;
+    return right.createdAt.localeCompare(left.createdAt);
+  });
   const activeSessionId = activeSessionIds[mainAgentId];
   renderWorkspaceStatus();
   workspaceEmpty.style.display = visibleSessions.length ? "none" : "flex";
@@ -853,7 +860,7 @@ function renderHistory() {
     historyList.innerHTML = `
       <div class="history-empty">
         <strong>暂无会话</strong>
-        <p>第一次发送给主 Agent 后，这里会记录 Agent 会话，而不是每条对话详情。</p>
+        <p>第一次发送后，这里会记录 Agent 会话，而不是每条对话详情。</p>
       </div>
     `;
     return;
@@ -1072,6 +1079,15 @@ async function runFallbackSession(session, turn) {
   if (!fallback) return;
   runningSessions += 1;
   updateActionLabels();
+  if (session.providerId === "hermes") {
+    turn.state = 2;
+    session.state = 2;
+    turn.logs = [
+      `Hermes profile ${session.profileName || session.agentName} 正在启动 ACP 运行时，首次响应可能较慢。`,
+      ...turn.logs,
+    ];
+    renderWorkspace();
+  }
   setAppNotice(`已将任务送入 ${session.agentName}，正在等待返回内容...`, "busy");
   try {
     const saved = updateTurnFromEvents(session.id, turn.id, fallback.events);
@@ -1096,6 +1112,15 @@ async function startAcpSession(session, turn) {
   }
   runningSessions += 1;
   updateActionLabels();
+  if (session.providerId === "hermes") {
+    turn.state = 2;
+    session.state = 2;
+    turn.logs = [
+      `Hermes profile ${session.profileName || session.agentName} 正在启动 ACP 运行时，首次响应可能较慢。`,
+      ...turn.logs,
+    ];
+    renderWorkspace();
+  }
   setAppNotice(`已将任务送入 ${session.agentName}，正在等待返回内容...`, "busy");
   try {
     await new Promise((resolve) => requestAnimationFrame(resolve));
@@ -1134,7 +1159,7 @@ function startSessionFromPrompt(forceNewSession = false) {
   const agent = currentMainAgent();
   const provider = currentMainProvider();
   if (!agent || !provider) {
-    setAppNotice("请先在左侧设定主 Agent，再发送任务。", "error");
+    setAppNotice("请先在左侧设定当前发送目标，再发送任务。", "error");
     return;
   }
 

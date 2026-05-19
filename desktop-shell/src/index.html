@@ -10,7 +10,7 @@
     <div class="app-shell">
       <header class="topbar">
         <div class="brand">
-          <p id="appNotice" class="app-notice">工作台准备就绪，等待主 Agent 接收任务。</p>
+          <p id="appNotice" class="app-notice">工作台准备就绪，等待发送目标接收任务。</p>
         </div>
       </header>
 
@@ -27,21 +27,21 @@
           <div class="panel-header workspace-header">
             <div>
               <h2>会话工作台</h2>
-              <p id="workspaceStatus" class="caption">请选择主 Agent，然后发送第一条任务。</p>
+              <p id="workspaceStatus" class="caption">请选择当前发送目标，然后发送第一条任务。</p>
             </div>
           </div>
 
           <div class="workspace-body">
             <div id="workspaceEmpty" class="workspace-empty">
-              <strong>主 Agent 尚未入场</strong>
-              <p>先在左侧把一个 Agent 设为主入口，再通过底部输入框发起会话。</p>
+              <strong>会话尚未入场</strong>
+              <p>先在左侧设定当前发送目标，再通过底部输入框发起会话。</p>
             </div>
             <div id="sessionDeck" class="session-deck"></div>
           </div>
 
           <div class="composer">
             <div class="composer-row">
-              <textarea id="promptBox" rows="4" placeholder="输入发送给主 Agent 的任务。"></textarea>
+              <textarea id="promptBox" rows="4" placeholder="输入发送给当前目标的任务。"></textarea>
               <div class="composer-actions">
                 <button id="sendBtn" class="primary compact">发送</button>
                 <button id="newSessionToggle" type="button" class="session-option-toggle" aria-pressed="false">
