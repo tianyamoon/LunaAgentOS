@@ -879,8 +879,13 @@ async function restoreArchivedSession(sessionId) {
 
 async function loadHistory() {
   try {
-    await invoke("compact_history_entries");
+    const compactResult = await invoke("compact_history_entries");
     historyEntries = await invoke("load_history_entries");
+    const removedCount = compactResult?.removedCount || 0;
+    const upgradedCount = compactResult?.upgradedCount || 0;
+    if (removedCount > 0 || upgradedCount > 0) {
+      setAppNotice(`历史记录已整理：去重 ${removedCount} 条，升级 ${upgradedCount} 条。`);
+    }
   } catch (error) {
     console.error(error);
     historyEntries = [];
