@@ -51,8 +51,16 @@ pub fn run_claude_acp_prompt(
     runtime_session_id: String,
     prompt: String,
     cwd: Option<String>,
+    on_event: Option<&mut dyn FnMut(Value)>,
 ) -> Result<Vec<Value>, String> {
-    run_acp_prompt(AcpRuntime::Claude, runtime_session_id, prompt, cwd, None)
+    run_acp_prompt(
+        AcpRuntime::Claude,
+        runtime_session_id,
+        prompt,
+        cwd,
+        None,
+        on_event,
+    )
 }
 
 pub fn run_hermes_acp_prompt(
@@ -60,6 +68,7 @@ pub fn run_hermes_acp_prompt(
     prompt: String,
     cwd: Option<String>,
     profile_command: Option<String>,
+    on_event: Option<&mut dyn FnMut(Value)>,
 ) -> Result<Vec<Value>, String> {
     run_acp_prompt(
         AcpRuntime::Hermes,
@@ -67,6 +76,7 @@ pub fn run_hermes_acp_prompt(
         prompt,
         cwd,
         profile_command,
+        on_event,
     )
 }
 
@@ -76,6 +86,7 @@ fn run_acp_prompt(
     prompt: String,
     cwd: Option<String>,
     profile_command: Option<String>,
+    mut on_event: Option<&mut dyn FnMut(Value)>,
 ) -> Result<Vec<Value>, String> {
     let cwd = match cwd {
         Some(value) if !value.trim().is_empty() => PathBuf::from(value),
@@ -93,6 +104,7 @@ fn run_acp_prompt(
                 &mut events,
                 SessionStartMode::New,
                 profile_command.as_deref(),
+                &mut on_event,
             )?;
             sessions.insert(runtime_session_id.clone(), session);
             sessions
@@ -101,7 +113,7 @@ fn run_acp_prompt(
         }
     };
 
-    match send_prompt(runtime, session, prompt, &mut events) {
+    match send_prompt(runtime, session, prompt, &mut events, &mut on_event) {
         Ok(()) => Ok(events),
         Err(error) => {
             if let Some(mut broken) = sessions.remove(&runtime_session_id) {
@@ -161,12 +173,14 @@ fn resume_acp_session(
         }));
         return Ok(events);
     }
+    let mut on_event = None;
     let session = start_acp_session(
         runtime,
         &cwd,
         &mut events,
         SessionStartMode::Resume(acp_session_id.clone()),
         profile_command.as_deref(),
+        &mut on_event,
     )?;
     sessions.insert(runtime_session_id, session);
     Ok(events)
@@ -220,12 +234,14 @@ fn load_acp_session(
         }));
         return Ok(events);
     }
+    let mut on_event = None;
     let session = start_acp_session(
         runtime,
         &cwd,
         &mut events,
         SessionStartMode::Load(acp_session_id.clone()),
         profile_command.as_deref(),
+        &mut on_event,
     )?;
     sessions.insert(runtime_session_id, session);
     Ok(events)
@@ -313,6 +329,7 @@ fn start_acp_session(
     mut events: &mut Vec<Value>,
     mode: SessionStartMode,
     profile_command: Option<&str>,
+    on_event: &mut Option<&mut dyn FnMut(Value)>,
 ) -> Result<AcpSession, String> {
     let mut child = build_acp_command(runtime, cwd, profile_command)
         .stdin(Stdio::piped())
@@ -368,8 +385,15 @@ fn start_acp_session(
         }
     });
     write_message(&mut stdin, &init)?;
-    let init_result = read_response(runtime, &mut reader, &mut stdin, init["id"].as_i64().unwrap(), &mut events)?;
-    events.push(json!({
+    let init_result = read_response(
+        runtime,
+        &mut reader,
+        &mut stdin,
+        init["id"].as_i64().unwrap(),
+        &mut events,
+        on_event,
+    )?;
+    push_event(&mut events, json!({
         "type": "state",
         "state": 0,
         "payload": {
@@ -378,7 +402,7 @@ fn start_acp_session(
             "agent": init_result.get("agentInfo").cloned().unwrap_or(Value::Null),
             "capabilities": init_result.get("agentCapabilities").cloned().unwrap_or(Value::Null)
         }
-    }));
+    }), on_event);
 
     let session_request = match mode {
         SessionStartMode::Resume(session_id) => json!({
@@ -413,7 +437,14 @@ fn start_acp_session(
     };
     let method = session_request["method"].as_str().unwrap_or("session/new");
     write_message(&mut stdin, &session_request)?;
-    let session_result = read_response(runtime, &mut reader, &mut stdin, session_request["id"].as_i64().unwrap(), &mut events)?;
+    let session_result = read_response(
+        runtime,
+        &mut reader,
+        &mut stdin,
+        session_request["id"].as_i64().unwrap(),
+        &mut events,
+        on_event,
+    )?;
     let session_id = session_request["params"]["sessionId"]
         .as_str()
         .map(ToString::to_string)
@@ -429,14 +460,14 @@ fn start_acp_session(
         _ => format!("{} 会话已创建。", runtime.display()),
     };
 
-    events.push(json!({
+    push_event(&mut events, json!({
         "type": "state",
         "state": 1,
         "payload": {
             "content": content,
             "sessionId": session_id
         }
-    }));
+    }), on_event);
 
     Ok(AcpSession {
         child,
@@ -447,7 +478,13 @@ fn start_acp_session(
     })
 }
 
-fn send_prompt(runtime: AcpRuntime, session: &mut AcpSession, prompt: String, events: &mut Vec<Value>) -> Result<(), String> {
+fn send_prompt(
+    runtime: AcpRuntime,
+    session: &mut AcpSession,
+    prompt: String,
+    events: &mut Vec<Value>,
+    on_event: &mut Option<&mut dyn FnMut(Value)>,
+) -> Result<(), String> {
     let prompt_request = json!({
         "jsonrpc": "2.0",
         "id": next_request_id(&mut session.next_id),
@@ -467,9 +504,10 @@ fn send_prompt(runtime: AcpRuntime, session: &mut AcpSession, prompt: String, ev
         &mut session.stdin,
         prompt_request["id"].as_i64().unwrap(),
         events,
+        on_event,
     )?;
 
-    events.push(json!({
+    push_event(events, json!({
         "type": "state",
         "state": 5,
         "payload": {
@@ -477,7 +515,7 @@ fn send_prompt(runtime: AcpRuntime, session: &mut AcpSession, prompt: String, ev
             "sessionId": session.session_id,
             "stopReason": prompt_result.get("stopReason").cloned().unwrap_or(Value::Null)
         }
-    }));
+    }), on_event);
 
     if events.is_empty() {
         return Err(format!("{} 未返回可解析事件。", runtime.display()));
@@ -607,6 +645,7 @@ fn read_response(
     stdin: &mut impl Write,
     target_id: i64,
     events: &mut Vec<Value>,
+    on_event: &mut Option<&mut dyn FnMut(Value)>,
 ) -> Result<Value, String> {
     let mut line = String::new();
     loop {
@@ -635,9 +674,22 @@ fn read_response(
         }
 
         if message.get("method").and_then(|value| value.as_str()) == Some("session/update") {
-            map_session_update(&message, events);
+            if let Some(event) = map_session_update(&message) {
+                push_event(events, event, on_event);
+            }
         }
     }
+}
+
+fn push_event(
+    events: &mut Vec<Value>,
+    event: Value,
+    on_event: &mut Option<&mut dyn FnMut(Value)>,
+) {
+    if let Some(callback) = on_event.as_deref_mut() {
+        callback(event.clone());
+    }
+    events.push(event);
 }
 
 fn respond_to_client_request(stdin: &mut impl Write, id: i64, message: &Value) -> Result<(), String> {
@@ -694,38 +746,37 @@ fn select_permission(message: &Value) -> Value {
     }
 }
 
-fn map_session_update(message: &Value, events: &mut Vec<Value>) {
+fn map_session_update(message: &Value) -> Option<Value> {
     let Some(update) = message
         .get("params")
         .and_then(|params| params.get("update"))
     else {
-        return;
+        return None;
     };
     let Some(update_type) = update.get("sessionUpdate").and_then(|value| value.as_str()) else {
-        return;
+        return None;
     };
 
     match update_type {
         "agent_message_chunk" => {
-            if let Some(text) = content_text(update.get("content")) {
-                events.push(json!({
+            content_text(update.get("content")).map(|text| {
+                json!({
                     "type": "response",
                     "state": 4,
                     "payload": { "content": text }
-                }));
-            }
+                })
+            })
         }
         "agent_thought_chunk" => {
-            if let Some(text) = content_text(update.get("content")) {
-                events.push(json!({
+            content_text(update.get("content")).map(|text| {
+                json!({
                     "type": "thought",
                     "state": 2,
                     "payload": { "content": text }
-                }));
-            }
+                })
+            })
         }
-        "tool_call" => {
-            events.push(json!({
+        "tool_call" => Some(json!({
                 "type": "tool",
                 "state": 3,
                 "payload": {
@@ -734,10 +785,8 @@ fn map_session_update(message: &Value, events: &mut Vec<Value>) {
                     "kind": update.get("kind").cloned().unwrap_or(Value::Null),
                     "status": update.get("status").cloned().unwrap_or(Value::Null)
                 }
-            }));
-        }
-        "tool_call_update" => {
-            events.push(json!({
+            })),
+        "tool_call_update" => Some(json!({
                 "type": "tool",
                 "state": 3,
                 "payload": {
@@ -745,25 +794,20 @@ fn map_session_update(message: &Value, events: &mut Vec<Value>) {
                     "status": update.get("status").cloned().unwrap_or(Value::Null),
                     "content": update.get("content").cloned().unwrap_or(Value::Null)
                 }
-            }));
-        }
-        "plan" => {
-            events.push(json!({
+            })),
+        "plan" => Some(json!({
                 "type": "plan",
                 "state": 2,
                 "payload": {
                     "entries": update.get("entries").cloned().unwrap_or(Value::Null)
                 }
-            }));
-        }
-        "usage_update" => {
-            events.push(json!({
+            })),
+        "usage_update" => Some(json!({
                 "type": "usage",
                 "state": 2,
                 "payload": update.clone()
-            }));
-        }
-        _ => {}
+            })),
+        _ => None,
     }
 }
 

@@ -6,7 +6,7 @@ use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 mod acp_runtime;
 
@@ -104,6 +104,13 @@ struct HistoryCompactResult {
     removed_count: usize,
     upgraded_count: usize,
     skipped_files: usize,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct RuntimeSessionStreamPayload {
+    runtime_session_id: String,
+    event: Value,
 }
 
 fn build_command(program: &str) -> Command {
@@ -531,12 +538,26 @@ fn run_claude_stream(prompt: String) -> Result<Vec<Value>, String> {
 
 #[tauri::command]
 async fn runtime_acp_claude_prompt(
+    app: AppHandle,
     runtime_session_id: String,
     prompt: String,
     cwd: Option<String>,
 ) -> Result<Vec<Value>, String> {
+    let runtime_session_id_for_emit = runtime_session_id.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
-        acp_runtime::run_claude_acp_prompt(runtime_session_id, prompt, cwd)
+        let mut emit_update = |event: Value| {
+            let payload = RuntimeSessionStreamPayload {
+                runtime_session_id: runtime_session_id_for_emit.clone(),
+                event,
+            };
+            let _ = app.emit("runtime-session-update", payload);
+        };
+        acp_runtime::run_claude_acp_prompt(
+            runtime_session_id,
+            prompt,
+            cwd,
+            Some(&mut emit_update),
+        )
     })
     .await
     .map_err(|error| classify_backend_error(error.to_string()))?;
@@ -545,13 +566,28 @@ async fn runtime_acp_claude_prompt(
 
 #[tauri::command]
 async fn runtime_acp_hermes_prompt(
+    app: AppHandle,
     runtime_session_id: String,
     prompt: String,
     cwd: Option<String>,
     profile_command: Option<String>,
 ) -> Result<Vec<Value>, String> {
+    let runtime_session_id_for_emit = runtime_session_id.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
-        acp_runtime::run_hermes_acp_prompt(runtime_session_id, prompt, cwd, profile_command)
+        let mut emit_update = |event: Value| {
+            let payload = RuntimeSessionStreamPayload {
+                runtime_session_id: runtime_session_id_for_emit.clone(),
+                event,
+            };
+            let _ = app.emit("runtime-session-update", payload);
+        };
+        acp_runtime::run_hermes_acp_prompt(
+            runtime_session_id,
+            prompt,
+            cwd,
+            profile_command,
+            Some(&mut emit_update),
+        )
     })
     .await
     .map_err(|error| classify_backend_error(error.to_string()))?;

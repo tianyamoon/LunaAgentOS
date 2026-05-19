@@ -1,4 +1,5 @@
 const { invoke } = window.__TAURI__.core;
+const listenRuntimeEvent = window.__TAURI__?.event?.listen?.bind(window.__TAURI__.event);
 
 const stateNames = {
   0: "INIT",
@@ -535,6 +536,7 @@ function createTurn(session, task) {
   };
   session.task = task;
   session.state = 2;
+  session.activeTurnId = turn.id;
   session.turns.push(turn);
   renderWorkspace();
   return turn;
@@ -566,9 +568,60 @@ function updateTurnFromEvents(sessionId, turnId, events) {
   if (acpSessionEvent?.payload?.sessionId) session.acpSessionId = acpSessionEvent.payload.sessionId;
   session.task = turn.task;
   session.state = turn.state;
+  session.activeTurnId = turn.id;
   renderWorkspace();
   renderHistory();
   return turn;
+}
+
+function appendStreamEventToTurn(sessionId, event) {
+  const session = sessions.find((item) => item.id === sessionId);
+  if (!session) return;
+  const turn = session.turns.find((item) => item.id === session.activeTurnId) || session.turns.at(-1);
+  if (!turn) return;
+
+  const content = eventContentText(event);
+  if (typeof event.state === "number") {
+    turn.state = event.state;
+    session.state = event.state;
+  }
+
+  if (event.payload?.sessionId) {
+    session.acpSessionId = event.payload.sessionId;
+  }
+
+  switch (event.type) {
+    case "thought":
+      if (content) {
+        if (!turn.thoughts.length) turn.thoughts.push(content);
+        else turn.thoughts[turn.thoughts.length - 1] += content;
+      }
+      break;
+    case "response":
+      if (content) {
+        if (!turn.outputs.length) turn.outputs.push(content);
+        else turn.outputs[turn.outputs.length - 1] += content;
+        turn.finalResponse = turn.outputs.join("");
+      }
+      break;
+    case "tool":
+      turn.logs = [
+        `${event.payload?.title || event.payload?.kind || "tool"} ${event.payload?.status || ""}`.trim(),
+        ...turn.logs,
+      ];
+      break;
+    case "plan":
+      turn.logs = ["计划已更新。", ...turn.logs];
+      break;
+    case "state":
+      if (content) turn.logs = [content, ...turn.logs];
+      break;
+    default:
+      if (content) turn.logs = [content, ...turn.logs];
+      break;
+  }
+
+  renderWorkspace();
 }
 
 function appendErrorToTurn(sessionId, turnId, message) {
@@ -1191,6 +1244,17 @@ newSessionToggle.addEventListener("click", () => {
   sendAsNewSession = !sendAsNewSession;
   updateActionLabels();
 });
+
+if (listenRuntimeEvent) {
+  listenRuntimeEvent("runtime-session-update", (payload) => {
+    const runtimeSessionId = payload?.payload?.runtimeSessionId;
+    const event = payload?.payload?.event;
+    if (!runtimeSessionId || !event) return;
+    appendStreamEventToTurn(runtimeSessionId, event);
+  }).catch((error) => {
+    console.error(error);
+  });
+}
 
 renderProviders();
 renderWorkspace();
