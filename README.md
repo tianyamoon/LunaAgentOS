@@ -65,6 +65,6 @@ The desktop shell has moved beyond a static prototype. Users can set the current
 - Session cards are keyboard-focusable; `Enter` / `Space` activates the current session with a clear focus-visible style.
 - Session card fullscreen reading has a modal-like backdrop and supports `Esc` to exit quickly.
 - Current-session, latest-only, flow, and fullscreen states expose `aria-*` markers, connected icon button groups, highlighted states, and semantic labels for better keyboard and assistive-technology readability.
-- Deleting a session removes it from both the workspace and local history JSON; executing or reconnecting sessions are protected from deletion.
+- Session deletion uses trash icons and two-step confirmation, then removes the session from both the workspace and local history JSON; executing or reconnecting sessions are protected from deletion.
 
 For full Chinese documentation, see [README_CN.md](./README_CN.md).

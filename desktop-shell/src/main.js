@@ -1173,7 +1173,7 @@ function renderSessionCard(session) {
             <span class="runtime-pill ${runtimeStateClasses[runtimeState] || "runtime-archived"} ${isWaiting ? "is-busy" : ""}" aria-label="会话状态：${runtimeStateLabels[runtimeState] || runtimeState}">${runtimeStateLabels[runtimeState] || runtimeState}</span>
           </div>
           ${canDismiss ? `<button type="button" class="mini-btn ghost-btn session-dismiss-btn" data-session-id="${session.id}" title="退出工作台" aria-label="退出工作台">⏏</button>` : ""}
-          ${canDismiss && !isWaiting ? `<button type="button" class="mini-btn ghost-btn danger-btn session-delete-btn" data-session-id="${session.id}" title="删除会话" aria-label="删除会话">⌫</button>` : ""}
+          ${canDismiss && !isWaiting ? `<button type="button" class="mini-btn ghost-btn danger-btn session-delete-btn" data-session-id="${session.id}" title="删除会话" aria-label="删除会话">🗑</button>` : ""}
           ${canRestoreSession(session) ? `<button type="button" class="mini-btn ghost-btn session-retry-btn" data-session-id="${session.id}">重试恢复</button>` : ""}
           <div class="session-tool-group" role="group" aria-label="会话操作">
             <button type="button" class="mini-btn ghost-btn tool-btn session-copy-btn" data-session-id="${session.id}" title="复制会话" aria-label="复制会话" ${session.turns.length ? "" : "disabled"}>⧉</button>
@@ -1383,6 +1383,8 @@ async function deleteSession(sessionId) {
   if (!session && !archived) return;
   const confirmed = window.confirm(`删除「${title}」？\n\n这会从工作台和历史归档中移除该 session 的所有轮次。`);
   if (!confirmed) return;
+  const doubleConfirmed = window.confirm(`再次确认删除「${title}」？\n\n删除后不能从 LunaAgentOS 本地历史恢复。`);
+  if (!doubleConfirmed) return;
   try {
     if (session && runtimeState === "live") {
       await archiveLiveSession(sessionId);
@@ -1564,7 +1566,7 @@ function renderHistory() {
               <strong>${item.providerName}</strong>
               <div class="history-item-actions">
                 <span>${formatTime(item.updatedAt)}</span>
-                <button type="button" class="history-delete-btn" data-session-id="${item.id}" title="删除会话" aria-label="删除会话">⌫</button>
+                <button type="button" class="history-delete-btn" data-session-id="${item.id}" title="删除会话" aria-label="删除会话">🗑</button>
               </div>
             </div>
             <div class="caption">${item.agentName} · ${item.turnCount} 轮 · ${runtimeStateLabels[item.runtimeState] || item.runtimeState}</div>
