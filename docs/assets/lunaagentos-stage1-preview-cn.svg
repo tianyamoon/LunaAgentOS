@@ -5,7 +5,7 @@
   <rect x="44" y="36" width="1112" height="603" rx="28" fill="#FFFDF9" fill-opacity="0.82" stroke="#DCC9B6"/>
   <text x="76" y="76" fill="#5A4635" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Segoe UI, Arial" font-size="16" font-weight="800" letter-spacing="1.8">异构 AGENT 统一控制台</text>
   <text x="76" y="111" fill="#211B16" font-family="Inter, Segoe UI, Arial" font-size="34" font-weight="850">LunaAgentOS</text>
-  <text x="76" y="141" fill="#7C6B5B" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Segoe UI, Arial" font-size="16">今天先跑通真实 Stage 1 工作台，明天接住更多 Agent 入口</text>
+  <text x="76" y="141" fill="#7C6B5B" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Segoe UI, Arial" font-size="16">一个工作台，接住真实 Agent 会话、可见过程与本地历史</text>
 
   <g transform="translate(74 172)">
     <rect width="235" height="410" rx="22" fill="#FFFFFF" fill-opacity="0.72" stroke="#E1D0BE"/>
