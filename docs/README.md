@@ -4,6 +4,7 @@
 
 ## 产品与阶段
 
+- `getting-started.md`：Stage 1 桌面壳快速开始与演示模式
 - `prompt-v1-alignment.md`：Stage 1 产品边界与交接对齐说明
 - `mvp-v1-interaction-model.md`：第一版交互模型与主 Agent 多会话机制
 - `version-roadmap.md`：Stage / version 路线

@@ -1,0 +1,66 @@
+<svg width="1200" height="675" viewBox="0 0 1200 675" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="675" rx="34" fill="#F5EEE4"/>
+  <circle cx="1035" cy="80" r="210" fill="#F6CDAA" opacity="0.32"/>
+  <circle cx="135" cy="590" r="220" fill="#BBD7FF" opacity="0.26"/>
+  <rect x="44" y="36" width="1112" height="603" rx="28" fill="#FFFDF9" fill-opacity="0.82" stroke="#DCC9B6"/>
+  <text x="76" y="76" fill="#5A4635" font-family="Inter, Segoe UI, Arial" font-size="16" font-weight="800" letter-spacing="1.8">HETEROGENEOUS AGENT CONTROL CONSOLE</text>
+  <text x="76" y="111" fill="#211B16" font-family="Inter, Segoe UI, Arial" font-size="34" font-weight="850">LunaAgentOS</text>
+  <text x="76" y="141" fill="#7C6B5B" font-family="Inter, Segoe UI, Arial" font-size="16">Claude Code + Hermes in one Runtime Session workspace</text>
+
+  <g transform="translate(74 172)">
+    <rect width="235" height="410" rx="22" fill="#FFFFFF" fill-opacity="0.72" stroke="#E1D0BE"/>
+    <text x="22" y="38" fill="#241B15" font-family="Inter, Segoe UI, Arial" font-size="20" font-weight="800">Agent Fleet</text>
+    <rect x="18" y="64" width="199" height="84" rx="18" fill="#FFF3E7" stroke="#E6A46D"/>
+    <circle cx="38" cy="91" r="6" fill="#D96C3A"/>
+    <text x="54" y="92" fill="#241B15" font-family="Inter, Segoe UI, Arial" font-size="16" font-weight="800">Claude Code</text>
+    <text x="54" y="119" fill="#7C6B5B" font-family="Inter, Segoe UI, Arial" font-size="13">Windows CLI · live</text>
+    <rect x="18" y="164" width="199" height="84" rx="18" fill="#F7FBFF" stroke="#A9C6E8"/>
+    <circle cx="38" cy="191" r="6" fill="#2F6698"/>
+    <text x="54" y="192" fill="#241B15" font-family="Inter, Segoe UI, Arial" font-size="16" font-weight="800">Hermes</text>
+    <text x="54" y="219" fill="#7C6B5B" font-family="Inter, Segoe UI, Arial" font-size="13">WSL ACP · process events</text>
+    <rect x="18" y="264" width="199" height="84" rx="18" fill="#FFFFFF" fill-opacity="0.62" stroke="#E2D2C1"/>
+    <circle cx="38" cy="291" r="6" fill="#9A8C80"/>
+    <text x="54" y="292" fill="#241B15" font-family="Inter, Segoe UI, Arial" font-size="16" font-weight="800">Trae IDE</text>
+    <text x="54" y="319" fill="#7C6B5B" font-family="Inter, Segoe UI, Arial" font-size="13">Bridge reserved</text>
+  </g>
+
+  <g transform="translate(331 172)">
+    <rect width="530" height="410" rx="22" fill="#FFFFFF" fill-opacity="0.78" stroke="#E1D0BE"/>
+    <text x="24" y="38" fill="#241B15" font-family="Inter, Segoe UI, Arial" font-size="20" font-weight="800">Runtime Session Workspace</text>
+    <text x="24" y="64" fill="#7C6B5B" font-family="Inter, Segoe UI, Arial" font-size="13">Each card keeps output, thought stream, runtime stream and final response together.</text>
+    <rect x="24" y="88" width="232" height="286" rx="20" fill="#FFF8F1" stroke="#E6A46D"/>
+    <text x="44" y="120" fill="#241B15" font-family="Inter, Segoe UI, Arial" font-size="16" font-weight="800">Hermes / ailearning</text>
+    <rect x="44" y="137" width="72" height="24" rx="10" fill="#EAF3FF"/>
+    <text x="58" y="154" fill="#2F6698" font-family="Inter, Segoe UI, Arial" font-size="11" font-weight="800">LIVE</text>
+    <rect x="44" y="180" width="172" height="12" rx="6" fill="#E9D7C4"/>
+    <rect x="44" y="204" width="138" height="12" rx="6" fill="#E9D7C4"/>
+    <rect x="44" y="238" width="172" height="46" rx="12" fill="#FFFFFF" fill-opacity="0.76" stroke="#E8D8C7"/>
+    <text x="56" y="266" fill="#7C6B5B" font-family="Inter, Segoe UI, Arial" font-size="12">thought/tool/usage stream</text>
+    <rect x="44" y="302" width="172" height="12" rx="6" fill="#D96C3A" opacity="0.72"/>
+    <rect x="44" y="326" width="126" height="12" rx="6" fill="#D96C3A" opacity="0.45"/>
+
+    <rect x="274" y="88" width="232" height="286" rx="20" fill="#F8FBFF" stroke="#AAC7EA"/>
+    <text x="294" y="120" fill="#241B15" font-family="Inter, Segoe UI, Arial" font-size="16" font-weight="800">Claude Code</text>
+    <rect x="294" y="137" width="72" height="24" rx="10" fill="#EAF3FF"/>
+    <text x="308" y="154" fill="#2F6698" font-family="Inter, Segoe UI, Arial" font-size="11" font-weight="800">LIVE</text>
+    <rect x="294" y="180" width="172" height="12" rx="6" fill="#CCDDEF"/>
+    <rect x="294" y="204" width="142" height="12" rx="6" fill="#CCDDEF"/>
+    <rect x="294" y="238" width="172" height="76" rx="12" fill="#FFFFFF" fill-opacity="0.76" stroke="#D5E2F2"/>
+    <text x="306" y="266" fill="#7C6B5B" font-family="Inter, Segoe UI, Arial" font-size="12">Markdown table</text>
+    <text x="306" y="291" fill="#7C6B5B" font-family="Inter, Segoe UI, Arial" font-size="12">copyable code block</text>
+    <rect x="294" y="334" width="164" height="12" rx="6" fill="#2F6698" opacity="0.42"/>
+  </g>
+
+  <g transform="translate(884 172)">
+    <rect width="242" height="410" rx="22" fill="#FFFFFF" fill-opacity="0.72" stroke="#E1D0BE"/>
+    <text x="22" y="38" fill="#241B15" font-family="Inter, Segoe UI, Arial" font-size="20" font-weight="800">Session List</text>
+    <rect x="18" y="66" width="206" height="122" rx="16" fill="#F9FBFF" stroke="#D2E0F2"/>
+    <text x="36" y="94" fill="#2F6698" font-family="Inter, Segoe UI, Arial" font-size="14" font-weight="800">Live sessions · 2</text>
+    <rect x="36" y="115" width="152" height="10" rx="5" fill="#BCD3EC"/>
+    <rect x="36" y="139" width="128" height="10" rx="5" fill="#BCD3EC"/>
+    <rect x="18" y="210" width="206" height="122" rx="16" fill="#FAF7F2" stroke="#E4D5C7"/>
+    <text x="36" y="238" fill="#7C6B5B" font-family="Inter, Segoe UI, Arial" font-size="14" font-weight="800">Archived sessions · 1</text>
+    <rect x="36" y="259" width="152" height="10" rx="5" fill="#D7C7B7"/>
+    <rect x="36" y="283" width="112" height="10" rx="5" fill="#D7C7B7"/>
+  </g>
+</svg>

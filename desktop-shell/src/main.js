@@ -150,6 +150,7 @@ const newSessionToggle = document.getElementById("newSessionToggle");
 const sendBtn = document.getElementById("sendBtn");
 const sendModeBtn = document.getElementById("sendModeBtn");
 const fontScaleBtn = document.getElementById("fontScaleBtn");
+const demoSceneBtn = document.getElementById("demoSceneBtn");
 
 let currentTargetAgentId = localStorage.getItem(CURRENT_TARGET_AGENT_KEY) || localStorage.getItem(LEGACY_TARGET_AGENT_KEY) || "claude-main";
 let currentSessionId = localStorage.getItem(CURRENT_SESSION_KEY) || null;
@@ -160,9 +161,11 @@ let sessionSeq = 0;
 let turnSeq = 0;
 let runningSessions = 0;
 let isHistoryLoading = true;
+let isLaunchDemoScene = false;
 let sendAsNewSession = false;
 let sendMode = localStorage.getItem(SEND_MODE_KEY) || "enter";
 let fontScaleId = localStorage.getItem(FONT_SCALE_KEY) || "default";
+let demoHistoryEntries = [];
 const flowDetailOpenState = new Map();
 const sessionLatestOnlyState = new Map();
 const sessionListSectionOpenState = {
@@ -285,11 +288,12 @@ function setAppNotice(message, tone = "muted") {
 
 function updateActionLabels() {
   const sending = runningSessions > 0;
-  sendBtn.textContent = sending ? "发送中" : "发送";
-  sendBtn.disabled = sending;
-  newSessionToggle.disabled = sending;
+  sendBtn.textContent = isLaunchDemoScene ? "演示中" : sending ? "发送中" : "发送";
+  sendBtn.disabled = sending || isLaunchDemoScene;
+  newSessionToggle.disabled = sending || isLaunchDemoScene;
   newSessionToggle.classList.toggle("is-active", sendAsNewSession);
   newSessionToggle.setAttribute("aria-pressed", String(sendAsNewSession));
+  if (demoSceneBtn) demoSceneBtn.textContent = isLaunchDemoScene ? "清除演示" : "演示场景";
 }
 
 function saveCurrentTargetAgent(agentId) {
@@ -457,6 +461,10 @@ function applyHermesProfiles(profiles) {
     isDefault: Boolean(profile.isDefault),
   }));
   hermesProvider.note = `已载入 ${profiles.length} 个 Hermes profile。`;
+  if (isLaunchDemoScene) {
+    ensureLaunchDemoHermesAgent();
+    currentTargetAgentId = "hermes-demo-ailearning";
+  }
   ensureCurrentTargetAgentExists();
   renderProviders();
   renderWorkspace();
@@ -683,6 +691,201 @@ function createTurn(session, task) {
   return turn;
 }
 
+function demoTimestamp(minutesAgo) {
+  return new Date(Date.now() - minutesAgo * 60 * 1000).toISOString();
+}
+
+function createDemoTurn(id, task, state, thoughts, finalResponse, logs, minutesAgo, meta = {}) {
+  return {
+    id,
+    task,
+    state,
+    thoughts,
+    outputs: finalResponse ? [finalResponse] : [],
+    finalResponse,
+    logs,
+    createdAt: demoTimestamp(minutesAgo),
+    meta,
+  };
+}
+
+function ensureLaunchDemoHermesAgent() {
+  const hermesProvider = providerById("hermes");
+  if (!hermesProvider) return null;
+  const existing = agentById("hermes-demo-ailearning");
+  if (existing) return existing;
+  const agent = {
+    id: "hermes-demo-ailearning",
+    providerId: "hermes",
+    name: "ailearning",
+    subtitle: "WSL Profile · Gateway",
+    note: "用于展示 Hermes ACP 过程流的演示 profile。",
+    state: 3,
+    profileName: "ailearning",
+    model: "MiniMax M2",
+    gateway: "Gateway API",
+    alias: "ailearning",
+    profileAlias: "ailearning",
+    profileExecutable: "ailearning",
+    skillCount: 4,
+    hasSoul: true,
+  };
+  hermesProvider.agents.push(agent);
+  return agent;
+}
+
+function buildLaunchDemoSessions() {
+  const hermesMeta = {
+    profileName: "ailearning",
+    profileAlias: "ailearning",
+    profileExecutable: "ailearning",
+    profileModel: "MiniMax M2",
+    gateway: "Gateway API",
+    skillCount: 4,
+    hasSoul: true,
+  };
+  const claudeTurn = createDemoTurn(
+    "demo-turn-claude-review",
+    "Audit the LunaAgentOS desktop shell and explain what should be visible in the first GitHub launch screenshot.",
+    5,
+    [
+      "I will treat the app as a runtime workspace rather than a chat UI. The screenshot should prove heterogeneous entries, persistent sessions, live process visibility, and local history in one glance.",
+    ],
+    "## Launch screenshot checklist\n\n| Surface | What it proves | Status |\n|---|---|---|\n| Agent Fleet | Claude Code and Hermes are real external entries | Ready |\n| Runtime Session Card | Output, thought stream, runtime stream, and final response live together | Ready |\n| Session List | Live sessions and archived sessions have separate lifecycle meaning | Ready |\n\n```text\nClaude Code + Hermes\n  -> Runtime Session Cards\n  -> Local JSON History\n```\n\nThe screenshot should make LunaAgentOS feel like a control layer, not another chat wrapper.",
+    [
+      "Parsed workspace structure: desktop-shell/src/main.js, styles.css, src-tauri/src/lib.rs",
+      "Detected capability: session cards, copy transcript, fullscreen, live/archived lifecycle",
+      "Saved launch summary into local session history",
+    ],
+    18,
+  );
+  const hermesTurn = createDemoTurn(
+    "demo-turn-hermes-live",
+    "Use Hermes to inspect the repo positioning and keep the slow runtime process visible.",
+    3,
+    [
+      "Thinking through product positioning: LunaAgentOS should not claim to replace Claude Code or Hermes. It should present itself as the neutral desktop control layer above them.",
+      "The key difference from a normal chat UI is process observability: thought, tool, plan, usage, and final response remain attached to the session card.",
+    ],
+    "Working on positioning notes…\n\n- Keep the Stage 1 boundary honest\n- Show Claude Code + Hermes in the same workspace\n- Treat each card as a persistent Runtime Session Surface\n- Keep slow Hermes work visible instead of hiding it behind a spinner",
+    [
+      "plan: compare amux / Goose / Fusion positioning",
+      "tool: read docs/competitive-positioning.md",
+      "usage: input 8.4k · output 1.2k · total 9.6k",
+      "session/update: agent_message_chunk streamed into card",
+    ],
+    7,
+    { hermesProfile: hermesMeta },
+  );
+  return [
+    {
+      id: "demo-session-hermes-live",
+      providerId: "hermes",
+      providerName: "Hermes",
+      agentId: "hermes-demo-ailearning",
+      agentName: "Hermes / ailearning",
+      task: hermesTurn.task,
+      state: 3,
+      runtimeState: "live",
+      turns: [hermesTurn],
+      createdAt: demoTimestamp(7),
+      fullscreen: false,
+      acpSessionId: null,
+      profileName: hermesMeta.profileName,
+      profileAlias: hermesMeta.profileAlias,
+      profileExecutable: hermesMeta.profileExecutable,
+      profileModel: hermesMeta.profileModel,
+      gateway: hermesMeta.gateway,
+      skillCount: hermesMeta.skillCount,
+      hasSoul: hermesMeta.hasSoul,
+    },
+    {
+      id: "demo-session-claude-review",
+      providerId: "claude",
+      providerName: "Claude Code",
+      agentId: "claude-main",
+      agentName: "Claude Code / 主会话",
+      task: claudeTurn.task,
+      state: 5,
+      runtimeState: "live",
+      turns: [claudeTurn],
+      createdAt: demoTimestamp(18),
+      fullscreen: false,
+      acpSessionId: null,
+    },
+  ];
+}
+
+function buildLaunchDemoHistoryEntries() {
+  const archivedTurn = createDemoTurn(
+    "demo-turn-archive-roadmap",
+    "Summarize Stage 1 boundary and next launch risks.",
+    5,
+    ["Stage 1 is a minimal heterogeneous console. Do not expand into orchestration before the first public version is understandable."],
+    "Stage 1 is enough for a first GitHub launch candidate when the repo clearly shows: real entries, session cards, process visibility, local history, and honest limitations.",
+    ["Loaded from local JSON archive", "Runtime is not attached; transcript remains readable"],
+    180,
+  );
+  return [{
+    schema_version: HISTORY_SCHEMA_VERSION,
+    id: "demo-history-roadmap",
+    date: demoTimestamp(180).slice(0, 10),
+    created_at: archivedTurn.createdAt,
+    provider_id: "claude",
+    provider_name: "Claude Code",
+    agent_id: "claude-main",
+    agent_name: "Claude Code / 主会话",
+    session_id: "demo-session-archive-roadmap",
+    acp_session_id: null,
+    task: archivedTurn.task,
+    status: "DONE",
+    summary: archivedTurn.finalResponse,
+    turn: archivedTurn,
+  }];
+}
+
+function activateLaunchDemoScene() {
+  ensureLaunchDemoHermesAgent();
+  isLaunchDemoScene = true;
+  isHistoryLoading = false;
+  demoHistoryEntries = buildLaunchDemoHistoryEntries();
+  sessions = [
+    ...buildLaunchDemoSessions(),
+    ...sessions.filter((session) => !session.id.startsWith("demo-session-")),
+  ];
+  currentTargetAgentId = "hermes-demo-ailearning";
+  currentSessionId = "demo-session-hermes-live";
+  activeSessionIds = new Set([...activeSessionIds, "demo-session-hermes-live", "demo-session-claude-review"]);
+  ["demo-turn-hermes-live:thoughts", "demo-turn-hermes-live:logs", "demo-turn-claude-review:logs"].forEach((key) => {
+    flowDetailOpenState.set(key, true);
+  });
+  document.body.classList.add("is-launch-demo");
+  renderProviders();
+  renderWorkspace({ scrollSessionId: "demo-session-hermes-live" });
+  renderHistory();
+  updateActionLabels();
+  setAppNotice("已载入 GitHub 首发演示场景：Claude + Hermes + 活会话/归档会话。");
+}
+
+function isDemoSession(session) {
+  return session.id.startsWith("demo-session-");
+}
+
+function leaveLaunchDemoScene() {
+  isLaunchDemoScene = false;
+  demoHistoryEntries = [];
+  sessions = sessions.filter((session) => !isDemoSession(session));
+  activeSessionIds = new Set([...activeSessionIds].filter((sessionId) => !sessionId.startsWith("demo-session-")));
+  if (currentSessionId?.startsWith("demo-session-")) currentSessionId = null;
+  if (currentTargetAgentId === "hermes-demo-ailearning") currentTargetAgentId = "claude-main";
+  document.body.classList.remove("is-launch-demo");
+  renderProviders();
+  renderWorkspace();
+  renderHistory();
+  updateActionLabels();
+  setAppNotice("已清除首发演示场景，恢复真实工作台。");
+}
+
 function getOrCreateActiveSession(task, forceNew = false) {
   const agent = currentTargetAgent();
   if (!agent) return null;
@@ -789,7 +992,8 @@ function appendErrorToTurn(sessionId, turnId, message) {
 function renderWorkspaceStatus() {
   const agent = currentTargetAgent();
   const provider = currentTargetProvider();
-  const liveCount = sessions.filter((session) => sessionRuntimeState(session) === "live").length;
+  const countedSessions = isLaunchDemoScene ? sessions.filter(isDemoSession) : sessions;
+  const liveCount = countedSessions.filter((session) => sessionRuntimeState(session) === "live").length;
   const liveSuffix = liveCount > 0 ? `　·　运行中 ACP runtime：${liveCount}` : "";
   if (!agent || !provider) {
     workspaceStatus.textContent = `请先设置当前发送目标。${liveSuffix}`;
@@ -1377,7 +1581,7 @@ async function dismissWorkspaceSession(sessionId) {
 
 async function deleteSession(sessionId) {
   const session = sessions.find((item) => item.id === sessionId);
-  const archived = archivedSessionsFromHistory(historyEntries).find((item) => item.id === sessionId);
+  const archived = archivedSessionsFromHistory(readableHistoryEntries()).find((item) => item.id === sessionId);
   const runtimeState = session ? sessionRuntimeState(session) : archived?.runtimeState || "archived";
   const title = session?.task || archived?.title || "该会话";
   if (runtimeState === "restoring") {
@@ -1389,6 +1593,14 @@ async function deleteSession(sessionId) {
     return;
   }
   if (!session && !archived) return;
+  if (isLaunchDemoScene && sessionId.startsWith("demo-session-")) {
+    sessions = sessions.filter((item) => item.id !== sessionId);
+    demoHistoryEntries = demoHistoryEntries.filter((entry) => historySessionKey(entry) !== sessionId);
+    renderWorkspace();
+    renderHistory();
+    setAppNotice("已从演示场景移除该会话。");
+    return;
+  }
   const confirmed = window.confirm(`删除「${title}」？\n\n这会从工作台和历史归档中移除该 session 的所有轮次。`);
   if (!confirmed) return;
   const doubleConfirmed = window.confirm(`再次确认删除「${title}」？\n\n删除后不能从 LunaAgentOS 本地历史恢复。`);
@@ -1400,6 +1612,7 @@ async function deleteSession(sessionId) {
     removeSessionFromWorkspace(sessionId);
     const result = await invoke("delete_history_session_entries", { sessionId });
     historyEntries = historyEntries.filter((entry) => historySessionKey(entry) !== sessionId);
+    demoHistoryEntries = demoHistoryEntries.filter((entry) => historySessionKey(entry) !== sessionId);
     renderWorkspace();
     renderHistory();
     const skipped = result?.skippedFiles ? `，跳过损坏文件 ${result.skippedFiles} 个` : "";
@@ -1416,7 +1629,10 @@ function renderWorkspace(options = {}) {
     sessionId: body.closest(".session-card")?.dataset.sessionId,
     shouldStickToBottom: body.scrollTop + body.clientHeight >= body.scrollHeight - 24,
   }));
-  const visibleSessions = [...sessions].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  const workspaceSessions = isLaunchDemoScene ? sessions.filter(isDemoSession) : sessions;
+  const visibleSessions = [...workspaceSessions].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  document.body.classList.toggle("is-launch-demo", isLaunchDemoScene);
+  sessionDeck.classList.toggle("is-launch-demo", isLaunchDemoScene);
   renderWorkspaceStatus();
   workspaceEmpty.style.display = visibleSessions.length ? "none" : "flex";
   sessionDeck.classList.toggle("is-single-session", visibleSessions.length === 1);
@@ -1448,6 +1664,10 @@ function renderWorkspace(options = {}) {
 
 function historySessionKey(entry) {
   return entry.session_id || entry.acp_session_id || entry.id;
+}
+
+function readableHistoryEntries() {
+  return isLaunchDemoScene ? demoHistoryEntries : [...demoHistoryEntries, ...historyEntries];
 }
 
 function historyTurnKey(entry) {
@@ -1505,7 +1725,8 @@ function archivedSessionsFromHistory(entries) {
 }
 
 function sessionListItems() {
-  const liveItems = sessions.map((session) => {
+  const sourceSessions = isLaunchDemoScene ? sessions.filter(isDemoSession) : sessions;
+  const liveItems = sourceSessions.map((session) => {
     const lastTurn = session.turns.at(-1);
     return {
       id: session.id,
@@ -1522,7 +1743,7 @@ function sessionListItems() {
     };
   });
   const liveIds = new Set(liveItems.map((item) => item.id));
-  const archivedItems = archivedSessionsFromHistory(historyEntries).filter((item) => !liveIds.has(item.id));
+  const archivedItems = archivedSessionsFromHistory(readableHistoryEntries()).filter((item) => !liveIds.has(item.id));
   return [...liveItems, ...archivedItems].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
 }
 
@@ -1679,7 +1900,7 @@ function ensureArchivedAgent(archived) {
 
 async function restoreArchivedSession(sessionId) {
   if (!sessionId) return;
-  const archived = archivedSessionsFromHistory(historyEntries).find((item) => item.id === sessionId);
+  const archived = archivedSessionsFromHistory(readableHistoryEntries()).find((item) => item.id === sessionId);
   if (!archived) return;
   const existing = sessions.find((item) => item.id === archived.id);
   if (existing && sessionRuntimeState(existing) === "restoring") {
@@ -1908,6 +2129,10 @@ async function startAcpSession(session, turn) {
 }
 
 function startSessionFromPrompt(forceNewSession = false) {
+  if (isLaunchDemoScene) {
+    setAppNotice("演示场景不会写入真实 runtime。请先清除演示再发送任务。", "busy");
+    return;
+  }
   const task = promptBox.value.trim();
   if (!task) {
     promptBox.focus();
@@ -1951,6 +2176,14 @@ sendModeBtn?.addEventListener("click", () => {
 
 fontScaleBtn?.addEventListener("click", () => {
   cycleFontScale();
+});
+
+demoSceneBtn?.addEventListener("click", () => {
+  if (isLaunchDemoScene) {
+    leaveLaunchDemoScene();
+    return;
+  }
+  activateLaunchDemoScene();
 });
 
 promptBox.addEventListener("keydown", (event) => {

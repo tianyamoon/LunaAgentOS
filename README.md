@@ -2,70 +2,141 @@
 
 [中文说明](./README_CN.md)
 
-LunaAgentOS aims to become an operating system for heterogeneous agents.
+LunaAgentOS is a desktop control console for heterogeneous coding agents.
 
-It is not another base agent. It sits above existing CLI, IDE, and gateway-based agent products, giving them a shared entry point, workspace, and control layer.
+It does not try to replace Claude Code, Hermes, or future IDE agents. It sits above them as a neutral workspace: choose the current target, send work into a real runtime, watch the process, and keep session history in one place.
 
-The first step is modest: unify entry points and preserve sessions in one desktop workspace. From there, it can grow into delegation flows, collaboration flows, and a broader control plane.
+![LunaAgentOS Stage 1 preview](./docs/assets/lunaagentos-stage1-preview.svg)
 
-## Current Phase
+## Why this exists
 
-The project is currently in `Stage 1 - minimal heterogeneous desktop console`.
+Modern coding agents are powerful, but they are fragmented:
 
-Stage 1 does not aim for complex orchestration yet. It first proves one core workflow:
+- **Different entries**: CLI, TUI, IDE, gateway-based agents.
+- **Different visibility**: some stream thoughts/tools, some only show final output.
+- **Different history**: sessions are hard to compare, restore, or archive across tools.
 
-> A user can stop jumping between separate agent entry points, choose the current target in one desktop workspace, send a task, observe the process, and keep local session history.
+LunaAgentOS starts with a small claim:
 
-The key boundaries are:
+> Treat each external agent as a runtime entry, and make the session card the shared surface for output, thought stream, runtime stream, final response, and local history.
 
-- At least two real entries must work: `Claude Code` and `Hermes`.
-- The left panel is the entry fleet and configuration area, not the main workspace switcher.
-- Entries are real external targets, not manually created placeholder agents.
-- The center is a session workspace, where each card carries one session's process and result.
-- The right panel is local session history.
-- The current stage stabilizes the main send target before expanding into complex multi-agent orchestration.
+## Current stage
 
-## Current Entries
+`Stage 1` means **minimal heterogeneous desktop console**.
 
-- **Claude Code**: the high-capability entry.
-- **Hermes**: the general entry and process-visibility sample.
-- **Trae IDE**: the free entry, reserved for future bridge integration.
+It is not the final agent operating system yet. It is the first credible slice:
 
-## Desktop Shell
+- **Claude Code** is a real entry.
+- **Hermes** is a real entry through WSL / ACP.
+- **Trae IDE** is reserved as a bridge target, not falsely presented as already integrated.
+- **Runtime Session Cards** are the center of the product.
+- **Local JSON history** preserves session transcripts.
+- **Live sessions** and **archived sessions** are separated in the right panel.
 
-The desktop shell has moved beyond a static prototype. Users can set the current send target, start sessions, view session cards, and see local history on the right.
+## What is working now
+
+| Area | Status | Notes |
+|---|---:|---|
+| Desktop shell | Working | Tauri 2 + Rust core + web UI |
+| Claude Code entry | Working | Real runtime path |
+| Hermes entry | Working | WSL ACP runtime path |
+| Trae IDE | Planned | Bridge route only |
+| Multi-session workspace | Working | Session cards, current session, current send target |
+| Process visibility | Working | Thought/runtime/final response surfaces |
+| Local history | Working | JSON session history, restore/read-only states |
+| Screenshot/demo mode | Working | In-app launch demo scene for GitHub screenshots |
+
+## Quick start
+
+### Requirements
+
+- Windows
+- Node.js
+- Rust + MSVC toolchain
+- Tauri 2 dependencies
+- Claude Code installed if you want the Claude entry
+- WSL + Hermes installed if you want the Hermes entry
+
+### Run the desktop shell
+
+```powershell
+cd desktop-shell
+npm install
+npm run tauri -- dev
+```
+
+### Build the lightweight release executable
+
+```powershell
+cd desktop-shell
+npm run tauri -- build --no-bundle
+```
+
+The current verified artifact path is:
+
+```text
+desktop-shell/src-tauri/target/release/desktop-shell.exe
+```
+
+For more details, see [Getting Started](./docs/getting-started.md).
+
+## Demo / screenshot mode
+
+The desktop shell now includes a controlled launch demo scene.
+
+Open the app and click **演示场景** in the top bar. It loads a non-persistent scene showing:
+
+- Claude Code and Hermes in the same workspace.
+- Two live Runtime Session Cards.
+- Thought stream, runtime stream, Markdown output, and final response.
+- A right-side session list split into live and archived sections.
+
+The demo scene is for screenshots only and does not write to real runtime history.
+
+## Product boundaries
+
+LunaAgentOS is:
+
+- **A control layer** above existing agents.
+- **A runtime session workspace**, not a normal chatbot UI.
+- **A neutral console** for heterogeneous entries.
+- **An incremental path** toward delegation, collaboration, and a control plane.
+
+LunaAgentOS is not:
+
+- A replacement for Claude Code, Hermes, or Trae.
+- A fake multi-agent demo made from internal roles.
+- A plugin market or commercial platform yet.
+- A Stage 2 orchestration system yet.
 
 ## Documentation
 
-- `README_CN.md`: full Chinese documentation
-- `docs/README.md`: product, architecture, runtime, and validation docs index
-- `docs/prompt-v1-alignment.md`: Stage 1 boundary and handoff alignment
-- `docs/hermes-acp-profile-runtime.md`: Hermes integration technical notes
-- `bridges/trae-ide/README.md`: Trae IDE bridge notes
+- [Chinese README](./README_CN.md)
+- [Getting Started](./docs/getting-started.md)
+- [Docs index](./docs/README.md)
+- [Why LunaAgentOS](./docs/why-lunaagentos.md)
+- [Architecture overview](./docs/architecture-overview.md)
+- [Stage 1 alignment](./docs/prompt-v1-alignment.md)
+- [Hermes ACP runtime](./docs/hermes-acp-profile-runtime.md)
+- [Trae IDE bridge notes](./bridges/trae-ide/README.md)
 
-## Current Verification Target
+## Roadmap
 
-- Real desktop shell.
-- Main-agent multi-session workspace.
-- Local JSON session history.
-- Real runtime paths for Claude Code and Hermes.
-- The left fleet only exposes real external entries and no longer offers manual fake-agent creation.
-- Hermes process events stream into session cards.
-- Composer keeps send as the dominant action, with secondary preferences tucked underneath it.
-- Selected entries, active sessions, and active history items share one warm accent style.
-- The current send target, current session, and live-session registry are separate state concepts.
-- The right-side session list is split into collapsible live-session and archived-session sections instead of mixing runtime and history states in one date list.
-- The middle session card is being refined as the RuntimeSession surface: TUI-like process visibility plus comfortable Markdown reading for Claude Code and Hermes.
-- Session cards support jump-to-latest, copy-response, copy-turn-transcript, copy-session-transcript, deleting unused sessions, flow expand/collapse toggling, and remembered thought/runtime detail expansion.
-- Multi-turn session cards support latest-only/all-turns mode so long conversations can focus on the newest turn while copied transcripts still keep the full context.
-- Markdown rendering now covers common agent output shapes including links, strikethrough, blockquotes, horizontal rules, ordered lists, task lists, table alignment, and copyable code blocks.
-- Running session cards show a live breathing state, streaming/latest anchors, and thought/runtime event counts.
-- Session connection state and turn execution state share consistent status chips, while session lifecycle states such as resumable, read-only, reconnecting, and reconnect failed sit in the card's top-right control bar with the action buttons.
-- Session card hierarchy is calmer: active-card chrome, connection-state colors, scrollbars, and stat chips are toned down so transcript content stays primary.
-- Table reading is improved with sticky headers and row hover, while live/waiting animations respect reduced-motion preferences.
-- Session cards are keyboard-focusable; `Enter` / `Space` activates the current session with a clear focus-visible style.
-- Session card fullscreen reading has a modal-like backdrop and supports `Esc` to exit quickly.
-- Current-session, latest-only, flow, and fullscreen states expose `aria-*` markers, connected icon button groups, highlighted states, and semantic labels for better keyboard and assistive-technology readability.
-- Session deletion uses trash icons and two-step confirmation, then removes the session from both the workspace and local history JSON; executing or reconnecting sessions are protected from deletion.
+- **Stage 1**: minimal heterogeneous console with Claude Code + Hermes.
+- **Stage 2**: call flows between entries.
+- **Stage 3**: richer collaboration workspace.
+- **Stage 4**: broader control plane.
 
-For full Chinese documentation, see [README_CN.md](./README_CN.md).
+These are internal progression stages, not public release numbers.
+
+## Contributing
+
+The most useful contributions now are:
+
+- Runtime hardening for Claude Code and Hermes.
+- Hermes event UX: thought/tool/plan/usage stream presentation.
+- Desktop shell UI polish around Runtime Session Cards.
+- Trae IDE bridge research.
+- Docs, screenshots, and validation reports.
+
+Read [CONTRIBUTING.md](./CONTRIBUTING.md) before starting.

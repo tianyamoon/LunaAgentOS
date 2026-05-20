@@ -1,178 +1,169 @@
 # LunaAgentOS
 
-## 项目定位
+LunaAgentOS 是一个面向异构 Coding Agent 的桌面控制台。
 
-LunaAgentOS 想成为异构智能体的操作系统。
+它不是另一个底层 Agent，也不是 Claude Code 的桌面套壳。它站在 Claude Code、Hermes、未来的 IDE Agent 之上，提供统一入口、会话工作台、过程可见性和本地历史。
 
-它不是另一个底层智能体，而是站在 Claude、Hermes、Trae 这类现成智能体产品之上，为它们建立统一的入口、工作台与控制层：
+![LunaAgentOS Stage 1 preview](./docs/assets/lunaagentos-stage1-preview.svg)
 
-- 统一接入
-- 统一状态机
-- 统一消息格式
-- 统一观测与归档
-- 统一的人类审批与任务分发
+## 一句话定位
 
-一句话说，它要做的是 **异构智能体之上的操作系统层**。
+> LunaAgentOS 是异构 Agent 之上的统一 Runtime Session 工作台。
 
-当前阶段先从最小桌面工作台开始：统一入口，沉淀会话；之后再发展调用流、协作流和控制平面。
+当前第一版先解决一个最小但重要的问题：
 
-## 为什么做
+- 用户不再在多个 Agent 入口之间来回跳。
+- 左侧选择当前发送目标。
+- 中间用会话卡片承载真实 runtime 的输出、思考流、运行流和最终响应。
+- 右侧沉淀本地 JSON 会话历史，并区分活会话与归档会话。
 
-当前主流智能体产品正在快速分化：
+## 为什么值得做
 
-- 有的强在命令行
-- 有的强在编辑器或集成开发环境
-- 有的强在消息网关或长连接服务
+现在的 Agent 产品越来越强，但也越来越碎：
 
-但对于用户来说，真正的痛点不是“找不到智能体”，而是：
+- **入口不同**：CLI、TUI、IDE、网关型 Agent 都在并行出现。
+- **过程可见性不同**：有的能看到 thought/tool/plan/usage，有的只给最终响应。
+- **历史割裂**：不同工具里的会话难以统一归档、恢复、对比和复盘。
+- **人类工作台缺位**：用户缺少一个中立的地方来调度、观察和沉淀多个 Agent。
 
-- 多个智能体无法统一编排
-- 思考流与工具调用不可见
-- 会话难以归档、搜索和回放
-- 人类工作流缺少审批、注入与调度入口
+LunaAgentOS 的方向不是重写这些 Agent，而是把它们收拢到一个更高层的控制台里。
 
-LunaAgentOS 的目标，就是把这些异构智能体收拢进一个统一的控制台 / 控制平面。
+## 当前阶段：Stage 1
 
-## 当前阶段：Stage 1 - 最小异构控制台雏形
+`Stage 1` 是内部推进阶段，含义是 **最小异构桌面控制台雏形**。
 
-当前仓库已经从早期协议验证推进到真实桌面工作台阶段。
+这个阶段不做复杂编排，不做插件市场，也不包装成最终 Agent OS。它先证明：
 
-当前阶段首先稳住一条主链路，而不是急着做复杂编排：
+- `Claude Code` 真实可用。
+- `Hermes` 真实可用。
+- 两者能出现在同一个桌面工作台。
+- 会话卡片能承载输出、思考流、运行流和最终响应。
+- 会话结果能沉淀到本地历史。
 
-- 启动桌面控制台
-- 左侧展示外部入口舰队
-- 用户设定当前发送目标
-- 用户输入任务并发送
-- 中间工作台生成当前会话卡片
-- 卡片承载输出流、思考流、运行流与最终响应
-- 右侧展示按日期归档的本地 JSON 会话历史
+如果只有 Claude，不算最小异构控制台成立；只有 Claude + Hermes 都进入工作台，Stage 1 才站得住。
 
-`Stage 1` 必须同时成立：
+## 当前能力状态
 
-- `Claude Code` 真实可用
-- `Hermes` 真实可用
+| 模块 | 状态 | 说明 |
+|---|---:|---|
+| 桌面壳 | 已可用 | Tauri 2 + Rust Core + 前端工作台 |
+| Claude Code | 已接入 | 真实 runtime 路径 |
+| Hermes | 已接入 | WSL / ACP runtime 路径 |
+| Trae IDE | 规划中 | 保留 Bridge 路线，不伪装已接入 |
+| 多会话工作台 | 已可用 | 当前发送目标、当前会话、活会话集合分离 |
+| Runtime Session Card | 已可用 | 输出流、思考流、运行流、最终响应 |
+| 本地历史 | 已可用 | JSON 历史、只读恢复、删除保护 |
+| 演示 / 截图模式 | 已可用 | 顶部 `演示场景` 按钮加载非持久化 demo |
 
-如果只有 Claude，这仍然会被误解成“Claude 桌面壳”；只有 `Claude + Hermes` 都进入工作台，LunaAgentOS 才具备最小异构控制台雏形。
+## 快速开始
 
-### 当前运行时要点
+### 环境要求
 
-- 桌面壳已经从静态原型进入真实工作台
-- Claude Code 与 Hermes 已进入同一个工作台
-- 多会话卡片工作台已经落地
-- 左侧只展示真实外部入口，不再暴露手动新增假 Agent
-- 启动静默：首屏先起，历史和 Hermes 配置身份后台加载
-- 输入区以 `发送` 为唯一强主动作，其它偏好项收在按钮下方并保持轻量
+- Windows
+- Node.js
+- Rust + MSVC 编译链
+- Tauri 2 相关依赖
+- 如需 Claude 入口：本机可用的 Claude Code
+- 如需 Hermes 入口：WSL + Hermes
+
+### 启动开发模式
+
+```powershell
+cd desktop-shell
+npm install
+npm run tauri -- dev
+```
+
+### 构建轻量 release 可执行文件
+
+```powershell
+cd desktop-shell
+npm run tauri -- build --no-bundle
+```
+
+当前已验证产物路径：
+
+```text
+desktop-shell/src-tauri/target/release/desktop-shell.exe
+```
+
+更详细的启动说明见：
+
+- [docs/getting-started.md](./docs/getting-started.md)
+- [desktop-shell/README.md](./desktop-shell/README.md)
+
+## 演示 / 截图模式
+
+为了 GitHub 首发，桌面壳提供了一个受控演示场景。
+
+打开应用后点击顶部 **演示场景**，会加载一组非持久化 demo 数据：
+
+- Claude Code 与 Hermes 同时出现在中间工作台。
+- Hermes 卡片展示 thought/tool/usage/session update 等过程感。
+- Claude 卡片展示 Markdown 表格与代码块阅读效果。
+- 右侧会话列表展示 `活会话` 与 `归档会话` 两个生命周期分组。
+
+这个模式只用于截图和演示，不写入真实 runtime 历史。
+
+## 产品边界
+
+LunaAgentOS 当前是：
+
+- **外部 Agent 之上的控制层**
+- **Runtime Session Card 工作台**
+- **异构入口的中立桌面控制台**
+- **走向调用流、协作流和控制平面的第一步**
+
+LunaAgentOS 当前不是：
+
+- Claude Code 的桌面壳
+- 又一个聊天器
+- 伪造多 Agent 的内部角色系统
+- 已经完成的商业平台
+- Stage 2 编排系统
+
+## 三个首批入口
+
+### Claude Code
+
+代表能力上限和高价值 coding workflow。
+
+### Hermes
+
+代表通用入口、WSL / ACP 验证，以及“让慢变得可见”的过程可见方向。
+
+### Trae IDE
+
+代表免费入口和 IDE Bridge 方向。当前只作为桥接目标保留，不伪装成已经原生接入。
 
 ## 文档入口
 
-根目录 README 只保留项目入口级信息，具体产品边界、架构、运行时接入和验证记录集中放在 `docs/`。
-
-- `docs/README.md`：文档总入口
-- `docs/prompt-v1-alignment.md`：Stage 1 产品边界与交接说明
-- `docs/mvp-v1-interaction-model.md`：第一版交互模型
-- `docs/hermes-acp-profile-runtime.md`：Hermes 接入技术说明
-- `docs/hermes-tui-direction.md`：Hermes 过程可见与 TUI 化方向
-- `bridges/trae-ide/README.md`：Trae IDE 桥接说明
-
-## 首批三家样板
-
-这个项目当前不是简单按“谁好接”来选目标，而是按“谁最能代表一类价值”来选样板：
-
-- `Claude Code`：强大
-- `Hermes`：通用
-- `Trae IDE`：免费
-
-### 1. Claude Code
-
-代表“能力上限”和高价值付费用户。
-
-它的重要性在于：如果 LunaAgentOS 能稳定接住 Claude Code，产品立刻具备高端用户相关性。
-
-### 2. Hermes
-
-代表“通用入口”和过程可见验证。
-
-它的重要性在于：
-
-- 作为 `Stage 1` 中除 Claude 之外的第二个真实入口
-- 验证异构运行时接入
-- 优先追求“让慢变得可见”，接近 Hermes TUI 的活会话体验
-
-技术细节见：
-
-- `docs/hermes-acp-profile-runtime.md`
-
-### 3. Trae IDE
-
-代表“免费入口”。
-
-它的重要性不在于它像命令行工具，而在于它自带免费模型和工具体验，具备拉新和扩大影响力的潜力。
-
-但这里要保持技术诚实：
-
-- `Trae IDE` 是产品上必须纳入的首批样板
-- 它不是当前底层协议验证中的天然原生目标
-- 它更适合作为后续编辑器桥接 / 桌面桥接方向单独推进
-
-## 当前桌面壳进展
-
-仓库已经进入真实桌面壳工程：
-
-- `desktop-shell/`
-
-当前已经完成：
-
-- `Claude Code` 与 `Hermes` 已进入同一桌面工作台
-- 左中右三区模型已经落地
-- 多会话与本地历史归档已经可用
-- Hermes 过程事件会进入会话卡片
-- 输入区已突出 `发送` 主动作，偏好项收在按钮下方
-- 入口、工作区和会话列表的选中态统一使用暖色强调风格
-- 当前发送目标、当前会话、可续聊会话集合已经拆成独立状态概念
-- 右侧会话列表按 `活会话` 与 `归档会话` 两个可折叠分组展示，不再把运行态和历史态混在日期列表里
-- 中间会话卡片开始按 RuntimeSession Surface 打磨，兼顾 TUI 过程感与 Markdown 阅读体验
-- 会话卡片支持定位最新内容、复制单轮响应、复制单轮 transcript、复制整段 transcript、删除无用 session、过程流展开/折叠切换，并记住思考流/运行流的折叠状态
-- 多轮会话卡片支持“只看最新 / 显示全部”，长会话阅读时可聚焦最新轮次，同时复制 transcript 仍保留完整上下文
-- Markdown 展示继续增强，已覆盖链接、删除线、引用、分隔线、有序列表、任务列表、表格对齐与可复制代码块等常见输出
-- 运行中的会话卡片具备 live 呼吸状态、streaming/latest 锚点，以及思考流/运行流事件计数
-- 会话连接状态与轮次执行状态统一为同尺寸状态 chip，session 生命周期状态与卡片功能按钮同处右上控制栏，展示可续聊、只读、重连中、重连失败等语义
-- 会话卡片视觉层级继续收敛：弱化当前卡片背景、区分连接状态与完成状态色彩，并降低滚动条与统计标签的抢眼程度
-- 表格阅读继续优化，支持表头 sticky、行 hover，并为 live/waiting 动效补充 reduced-motion 适配
-- 会话卡片支持键盘聚焦，使用 `Enter` / `Space` 可切换当前会话，并提供清晰 focus 样式
-- 会话卡片全屏阅读模式增强，带遮罩感，并支持 `Esc` 快速退出
-- 当前会话、只看最新、过程流、全屏等状态补充 `aria-*` 标记、连续图标按钮组、状态高亮与语义标签，提升键盘和辅助技术可读性
-- 删除 session 使用垃圾桶图标并需要二次确认，会从工作台和历史 JSON 中移除该 session 的全部轮次；执行中或重连中的 session 暂不允许删除
-
-当前可验证产物：
-
-- `desktop-shell/src-tauri/target/release/desktop-shell.exe`
-
-## 国际化与本地化策略
-
-仓库从一开始就按中英文双语来组织。
-
-### 当前文件
-
-- `README.md`
-  - 仓库入口
-  - 中文优先 + 英文摘要
-- `README_CN.md`
-  - 完整中文说明
-
-### 后续建议
-
-推送远端前可再补一版完整英文说明，形成：
-
-- `README.md`：国际访客入口页
-- `README_CN.md`：完整中文文档
-
-这样既满足中文优先，也兼顾国际传播。
+- [docs/README.md](./docs/README.md)：文档总入口
+- [docs/getting-started.md](./docs/getting-started.md)：快速开始
+- [docs/why-lunaagentos.md](./docs/why-lunaagentos.md)：为什么做
+- [docs/architecture-overview.md](./docs/architecture-overview.md)：架构总览
+- [docs/prompt-v1-alignment.md](./docs/prompt-v1-alignment.md)：Stage 1 边界
+- [docs/hermes-acp-profile-runtime.md](./docs/hermes-acp-profile-runtime.md)：Hermes ACP 接入说明
+- [docs/hermes-tui-direction.md](./docs/hermes-tui-direction.md)：Hermes 过程可见方向
+- [bridges/trae-ide/README.md](./bridges/trae-ide/README.md)：Trae IDE Bridge
 
 ## 下一步
 
-1. 重点打磨中间 session card，让它成为比 TUI 更舒服的 RuntimeSession Surface
-2. 同时兼容 `Claude Code` 的长 Markdown / 代码输出与 `Hermes` 的 TUI 式过程事件
-3. 继续优化卡片内的 Markdown 表格、代码块、思考流、运行流、滚动与全屏体验
-4. 继续打磨 Hermes 配置身份下的会话恢复、错误态与事件去噪
-5. 并行定义 `Trae IDE` 的桥接策略，而不是伪装成命令行入口
-6. 完成 Stage 1 后，再进入调用流与控制平面能力
+- 继续打磨 Runtime Session Card，让它同时适配 Claude Code 的长 Markdown / 代码输出与 Hermes 的 TUI 式过程事件。
+- 继续增强 Hermes 会话恢复、错误态和事件去噪。
+- 形成 Trae IDE Bridge 的真实技术路径。
+- 在 Stage 1 稳定后，再进入 Stage 2 调用流。
+
+## 贡献
+
+当前最需要帮助的方向：
+
+- Claude Code / Hermes runtime 稳定性
+- Hermes thought/tool/plan/usage 事件 UI
+- Runtime Session Card 视觉与可用性
+- Trae IDE Bridge 调研
+- 文档、截图、验证报告
+
+请先阅读：
+
+- [CONTRIBUTING.md](./CONTRIBUTING.md)
