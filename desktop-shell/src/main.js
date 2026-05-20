@@ -1056,8 +1056,18 @@ function turnTranscriptText(turn, index) {
   return parts.join("\n\n");
 }
 
+function flowDetailEntriesForSession(session) {
+  return session.turns.flatMap((turn) => {
+    const defaultOpen = turn.state === 2;
+    return [
+      turn.thoughts.length ? { key: `${turn.id}:thoughts`, defaultOpen } : null,
+      turn.logs.length ? { key: `${turn.id}:logs`, defaultOpen } : null,
+    ].filter(Boolean);
+  });
+}
+
 function detailKeysForSession(session) {
-  return session.turns.flatMap((turn) => [`${turn.id}:thoughts`, `${turn.id}:logs`]);
+  return flowDetailEntriesForSession(session).map((entry) => entry.key);
 }
 
 function setSessionFlowDetails(sessionId, open) {
@@ -1065,6 +1075,11 @@ function setSessionFlowDetails(sessionId, open) {
   if (!session) return;
   detailKeysForSession(session).forEach((key) => flowDetailOpenState.set(key, open));
   renderWorkspace();
+}
+
+function areSessionFlowDetailsOpen(session) {
+  const entries = flowDetailEntriesForSession(session);
+  return entries.length > 0 && entries.every(({ key, defaultOpen }) => flowDetailOpenState.get(key) ?? defaultOpen);
 }
 
 function detailOpenAttribute(key, defaultOpen) {
@@ -1157,6 +1172,8 @@ function renderSessionCard(session) {
     : "";
   const stats = sessionCardStats(session);
   const latestOnly = isSessionLatestOnly(session);
+  const hasFlowDetails = flowDetailEntriesForSession(session).length > 0;
+  const flowsOpen = areSessionFlowDetailsOpen(session);
   const turnEntries = session.turns.map((turn, index) => ({ turn, index }));
   const visibleTurnEntries = latestOnly && turnEntries.length > 1 ? turnEntries.slice(-1) : turnEntries;
   const hiddenTurnCount = turnEntries.length - visibleTurnEntries.length;
@@ -1181,13 +1198,12 @@ function renderSessionCard(session) {
         <div class="session-card-actions">
           ${canDismiss ? `<button type="button" class="mini-btn ghost-btn session-dismiss-btn" data-session-id="${session.id}" title="退出工作台" aria-label="退出工作台">⏏</button>` : ""}
           ${canRestoreSession(session) ? `<button type="button" class="mini-btn ghost-btn session-retry-btn" data-session-id="${session.id}">重试恢复</button>` : ""}
-          <button type="button" class="mini-btn ghost-btn session-copy-btn" data-session-id="${session.id}" ${session.turns.length ? "" : "disabled"}>复制会话</button>
-          <button type="button" class="mini-btn ghost-btn session-latest-only-btn ${latestOnly ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${latestOnly ? "true" : "false"}" ${session.turns.length > 1 ? "" : "disabled"}>${latestOnly ? "显示全部" : "只看最新"}</button>
-          <button type="button" class="mini-btn ghost-btn session-expand-flows-btn" data-session-id="${session.id}" ${session.turns.length ? "" : "disabled"}>展开流</button>
-          <button type="button" class="mini-btn ghost-btn session-collapse-flows-btn" data-session-id="${session.id}" ${session.turns.length ? "" : "disabled"}>折叠流</button>
-          <button type="button" class="mini-btn ghost-btn session-scroll-latest-btn" data-session-id="${session.id}">最新</button>
-          <button type="button" class="mini-btn ghost-btn session-fullscreen-btn ${session.fullscreen ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${session.fullscreen ? "true" : "false"}" title="${session.fullscreen ? "退出全屏阅读" : "进入全屏阅读"}" aria-label="${session.fullscreen ? "退出全屏阅读" : "进入全屏阅读"}">
-            ${session.fullscreen ? "退出全屏" : "全屏"}
+          <button type="button" class="mini-btn ghost-btn icon-btn session-copy-btn" data-session-id="${session.id}" title="复制会话" aria-label="复制会话" ${session.turns.length ? "" : "disabled"}>⧉</button>
+          <button type="button" class="mini-btn ghost-btn icon-btn session-latest-only-btn ${latestOnly ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${latestOnly ? "true" : "false"}" title="${latestOnly ? "显示全部轮次" : "只看最新轮次"}" aria-label="${latestOnly ? "显示全部轮次" : "只看最新轮次"}" ${session.turns.length > 1 ? "" : "disabled"}>${latestOnly ? "☰" : "◉"}</button>
+          <button type="button" class="mini-btn ghost-btn icon-btn session-toggle-flows-btn ${flowsOpen ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${flowsOpen ? "true" : "false"}" title="${flowsOpen ? "折叠过程流" : "展开过程流"}" aria-label="${flowsOpen ? "折叠过程流" : "展开过程流"}" ${hasFlowDetails ? "" : "disabled"}>${flowsOpen ? "▴" : "▾"}</button>
+          <button type="button" class="mini-btn ghost-btn icon-btn session-scroll-latest-btn" data-session-id="${session.id}" title="滚动到最新" aria-label="滚动到最新">↓</button>
+          <button type="button" class="mini-btn ghost-btn icon-btn session-fullscreen-btn ${session.fullscreen ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${session.fullscreen ? "true" : "false"}" title="${session.fullscreen ? "退出全屏阅读" : "进入全屏阅读"}" aria-label="${session.fullscreen ? "退出全屏阅读" : "进入全屏阅读"}">
+            ${session.fullscreen ? "⤢" : "⛶"}
           </button>
         </div>
       </div>
@@ -1266,16 +1282,13 @@ function bindSessionActions() {
   sessionDeck.querySelectorAll(".session-latest-only-btn").forEach((button) => {
     button.addEventListener("click", () => toggleSessionLatestOnly(button.dataset.sessionId));
   });
-  sessionDeck.querySelectorAll(".session-expand-flows-btn").forEach((button) => {
+  sessionDeck.querySelectorAll(".session-toggle-flows-btn").forEach((button) => {
     button.addEventListener("click", () => {
-      setSessionFlowDetails(button.dataset.sessionId, true);
-      setAppNotice("已展开当前会话的思考流与运行流。");
-    });
-  });
-  sessionDeck.querySelectorAll(".session-collapse-flows-btn").forEach((button) => {
-    button.addEventListener("click", () => {
-      setSessionFlowDetails(button.dataset.sessionId, false);
-      setAppNotice("已折叠当前会话的思考流与运行流。");
+      const session = sessions.find((item) => item.id === button.dataset.sessionId);
+      if (!session) return;
+      const shouldOpen = !areSessionFlowDetailsOpen(session);
+      setSessionFlowDetails(session.id, shouldOpen);
+      setAppNotice(shouldOpen ? "已展开当前会话的思考流与运行流。" : "已折叠当前会话的思考流与运行流。");
     });
   });
   sessionDeck.querySelectorAll(".turn-copy-response-btn").forEach((button) => {

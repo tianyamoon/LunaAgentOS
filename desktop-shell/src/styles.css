@@ -253,6 +253,14 @@ button:disabled {
   cursor: not-allowed;
 }
 
+.session-card-actions .icon-btn {
+  min-width: 38px;
+  height: 38px;
+  padding: 0 10px;
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
 .session-card-actions .mini-btn.is-on {
   border-color: rgba(217, 108, 58, 0.34);
   background: rgba(217, 108, 58, 0.12);
