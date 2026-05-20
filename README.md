@@ -54,6 +54,7 @@ The desktop shell has moved beyond a static prototype. Users can set the current
 - Composer keeps send as the dominant action, with secondary preferences tucked underneath it.
 - Selected entries, active sessions, and active history items share one warm accent style.
 - The current send target, current session, and live-session registry are separate state concepts.
+- The right-side session list is split into collapsible live-session and archived-session sections instead of mixing runtime and history states in one date list.
 - The middle session card is being refined as the RuntimeSession surface: TUI-like process visibility plus comfortable Markdown reading for Claude Code and Hermes.
 - Session cards support jump-to-latest, copy-response, copy-turn-transcript, copy-session-transcript, deleting unused sessions, flow expand/collapse toggling, and remembered thought/runtime detail expansion.
 - Multi-turn session cards support latest-only/all-turns mode so long conversations can focus on the newest turn while copied transcripts still keep the full context.

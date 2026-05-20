@@ -165,6 +165,10 @@ let sendMode = localStorage.getItem(SEND_MODE_KEY) || "enter";
 let fontScaleId = localStorage.getItem(FONT_SCALE_KEY) || "default";
 const flowDetailOpenState = new Map();
 const sessionLatestOnlyState = new Map();
+const sessionListSectionOpenState = {
+  live: true,
+  archive: true,
+};
 
 function allAgents() {
   return providers.flatMap((provider) => provider.agents);
@@ -246,6 +250,10 @@ function canSendToSession(session) {
 function canRestoreSession(session) {
   const state = sessionRuntimeState(session);
   return state === "archived" || state === "resume_failed";
+}
+
+function isLiveSessionListItem(item) {
+  return item.runtimeState === "live" || item.runtimeState === "restoring";
 }
 
 function isSessionExecuting(session) {
@@ -1438,14 +1446,6 @@ function renderWorkspace(options = {}) {
   });
 }
 
-function groupHistory(entries) {
-  return entries.reduce((groups, entry) => {
-    if (!groups[entry.date]) groups[entry.date] = [];
-    groups[entry.date].push(entry);
-    return groups;
-  }, {});
-}
-
 function historySessionKey(entry) {
   return entry.session_id || entry.acp_session_id || entry.id;
 }
@@ -1538,6 +1538,8 @@ function renderHistory() {
   }
 
   const sessionItems = sessionListItems();
+  const liveItems = sessionItems.filter(isLiveSessionListItem);
+  const archivedItems = sessionItems.filter((item) => !isLiveSessionListItem(item));
   if (!sessionItems.length) {
     historyList.innerHTML = `
       <div class="history-empty">
@@ -1548,40 +1550,58 @@ function renderHistory() {
     return;
   }
 
-  const groups = groupHistory(sessionItems.map((item) => ({
-    ...item,
-    date: item.date || item.updatedAt.slice(0, 10),
-  })));
-  const dates = Object.keys(groups).sort((left, right) => right.localeCompare(left));
-
-  historyList.innerHTML = dates.map((date) => `
-    <section class="history-group">
-      <div class="history-date">${date}</div>
-      <div class="history-group-list">
-        ${groups[date].map((item) => {
-          const isActiveHistoryItem = currentSessionId === item.id;
-          return `
-          <article class="history-item ${item.runtimeState === "live" ? "is-live" : "is-archive"} ${isActiveHistoryItem ? "is-active-session" : ""}" data-session-id="${item.id}" data-agent-id="${item.agentId || ""}">
-            <div class="history-item-top">
-              <strong>${item.providerName}</strong>
-              <div class="history-item-actions">
-                <span>${formatTime(item.updatedAt)}</span>
-                <button type="button" class="history-delete-btn" data-session-id="${item.id}" title="删除会话" aria-label="删除会话">🗑</button>
-              </div>
-            </div>
-            <div class="caption">${item.agentName} · ${item.turnCount} 轮 · ${runtimeStateLabels[item.runtimeState] || item.runtimeState}</div>
-            <p>${item.title}</p>
-            <p class="caption">${item.summary}</p>
-          </article>
-        `;
-        }).join("")}
-      </div>
-    </section>
-  `).join("");
+  historyList.innerHTML = `
+    ${renderSessionListSection("live", "活会话", "正在工作台中，可继续或正在重连", liveItems, "暂无活会话。")}
+    ${renderSessionListSection("archive", "归档会话", "只读历史，可恢复或删除", archivedItems, "暂无归档会话。")}
+  `;
   bindSessionListActions();
 }
 
+function renderSessionListSection(sectionId, title, note, items, emptyText) {
+  return `
+    <details class="history-section" data-history-section="${sectionId}" ${sessionListSectionOpenState[sectionId] ? "open" : ""}>
+      <summary class="history-section-summary">
+        <span class="history-section-label">
+          <span class="history-section-caret">▸</span>
+          <span>
+            <strong>${title}</strong>
+            <span class="history-section-note">${note}</span>
+          </span>
+        </span>
+        <span class="history-section-count">${items.length}</span>
+      </summary>
+      ${items.length
+        ? `<div class="history-group-list">${items.map(renderSessionListItem).join("")}</div>`
+        : `<p class="history-section-empty">${emptyText}</p>`}
+    </details>
+  `;
+}
+
+function renderSessionListItem(item) {
+  const isActiveHistoryItem = currentSessionId === item.id;
+  const listStateClass = isLiveSessionListItem(item) ? "is-live" : "is-archive";
+  return `
+    <article class="history-item ${listStateClass} ${isActiveHistoryItem ? "is-active-session" : ""}" data-session-id="${item.id}" data-agent-id="${item.agentId || ""}">
+      <div class="history-item-top">
+        <strong>${escapeHtml(item.providerName)}</strong>
+        <div class="history-item-actions">
+          <span>${escapeHtml(item.updatedAt.slice(5, 10))} ${formatTime(item.updatedAt)}</span>
+          <button type="button" class="history-delete-btn" data-session-id="${item.id}" title="删除会话" aria-label="删除会话">🗑</button>
+        </div>
+      </div>
+      <div class="caption">${escapeHtml(item.agentName)} · ${item.turnCount} 轮 · ${runtimeStateLabels[item.runtimeState] || item.runtimeState}</div>
+      <p>${escapeHtml(item.title)}</p>
+      <p class="caption">${escapeHtml(item.summary)}</p>
+    </article>
+  `;
+}
+
 function bindSessionListActions() {
+  historyList.querySelectorAll(".history-section").forEach((section) => {
+    section.addEventListener("toggle", () => {
+      sessionListSectionOpenState[section.dataset.historySection] = section.open;
+    });
+  });
   historyList.querySelectorAll(".history-delete-btn").forEach((button) => {
     button.addEventListener("click", (event) => {
       event.stopPropagation();
