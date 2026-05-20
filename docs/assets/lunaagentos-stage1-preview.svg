@@ -5,23 +5,35 @@
   <rect x="44" y="36" width="1112" height="603" rx="28" fill="#FFFDF9" fill-opacity="0.82" stroke="#DCC9B6"/>
   <text x="76" y="76" fill="#5A4635" font-family="Inter, Segoe UI, Arial" font-size="16" font-weight="800" letter-spacing="1.8">HETEROGENEOUS AGENT CONTROL CONSOLE</text>
   <text x="76" y="111" fill="#211B16" font-family="Inter, Segoe UI, Arial" font-size="34" font-weight="850">LunaAgentOS</text>
-  <text x="76" y="141" fill="#7C6B5B" font-family="Inter, Segoe UI, Arial" font-size="16">Claude Code + Hermes in one Runtime Session workspace</text>
+  <text x="76" y="141" fill="#7C6B5B" font-family="Inter, Segoe UI, Arial" font-size="16">Real Stage 1 workspace today, open fleet for tomorrow's agents</text>
 
   <g transform="translate(74 172)">
     <rect width="235" height="410" rx="22" fill="#FFFFFF" fill-opacity="0.72" stroke="#E1D0BE"/>
     <text x="22" y="38" fill="#241B15" font-family="Inter, Segoe UI, Arial" font-size="20" font-weight="800">Agent Fleet</text>
-    <rect x="18" y="64" width="199" height="84" rx="18" fill="#FFF3E7" stroke="#E6A46D"/>
-    <circle cx="38" cy="91" r="6" fill="#D96C3A"/>
-    <text x="54" y="92" fill="#241B15" font-family="Inter, Segoe UI, Arial" font-size="16" font-weight="800">Claude Code</text>
-    <text x="54" y="119" fill="#7C6B5B" font-family="Inter, Segoe UI, Arial" font-size="13">Windows CLI · live</text>
-    <rect x="18" y="164" width="199" height="84" rx="18" fill="#F7FBFF" stroke="#A9C6E8"/>
-    <circle cx="38" cy="191" r="6" fill="#2F6698"/>
-    <text x="54" y="192" fill="#241B15" font-family="Inter, Segoe UI, Arial" font-size="16" font-weight="800">Hermes</text>
-    <text x="54" y="219" fill="#7C6B5B" font-family="Inter, Segoe UI, Arial" font-size="13">WSL ACP · process events</text>
-    <rect x="18" y="264" width="199" height="84" rx="18" fill="#FFFFFF" fill-opacity="0.62" stroke="#E2D2C1"/>
-    <circle cx="38" cy="291" r="6" fill="#9A8C80"/>
-    <text x="54" y="292" fill="#241B15" font-family="Inter, Segoe UI, Arial" font-size="16" font-weight="800">Trae IDE</text>
-    <text x="54" y="319" fill="#7C6B5B" font-family="Inter, Segoe UI, Arial" font-size="13">Bridge reserved</text>
+    <text x="22" y="61" fill="#7C6B5B" font-family="Inter, Segoe UI, Arial" font-size="12">external entries, not internal roles</text>
+    <path d="M217 96 C252 80 266 54 304 50" stroke="#D96C3A" stroke-width="2" stroke-dasharray="5 7" opacity="0.42"/>
+    <path d="M217 168 C258 166 278 146 318 140" stroke="#2F6698" stroke-width="2" stroke-dasharray="5 7" opacity="0.36"/>
+    <path d="M217 240 C258 250 283 268 322 286" stroke="#8F7D6D" stroke-width="2" stroke-dasharray="5 7" opacity="0.32"/>
+    <rect x="18" y="78" width="199" height="58" rx="16" fill="#FFF3E7" stroke="#E6A46D"/>
+    <circle cx="38" cy="103" r="6" fill="#D96C3A"/>
+    <text x="54" y="104" fill="#241B15" font-family="Inter, Segoe UI, Arial" font-size="15" font-weight="800">Claude Code</text>
+    <text x="54" y="124" fill="#7C6B5B" font-family="Inter, Segoe UI, Arial" font-size="11">Windows CLI · live</text>
+    <rect x="18" y="150" width="199" height="58" rx="16" fill="#F7FBFF" stroke="#A9C6E8"/>
+    <circle cx="38" cy="175" r="6" fill="#2F6698"/>
+    <text x="54" y="176" fill="#241B15" font-family="Inter, Segoe UI, Arial" font-size="15" font-weight="800">Hermes</text>
+    <text x="54" y="196" fill="#7C6B5B" font-family="Inter, Segoe UI, Arial" font-size="11">WSL ACP · process events</text>
+    <rect x="18" y="222" width="199" height="58" rx="16" fill="#FFFFFF" fill-opacity="0.62" stroke="#E2D2C1"/>
+    <circle cx="38" cy="247" r="6" fill="#9A8C80"/>
+    <text x="54" y="248" fill="#241B15" font-family="Inter, Segoe UI, Arial" font-size="15" font-weight="800">Trae IDE Bridge</text>
+    <text x="54" y="268" fill="#7C6B5B" font-family="Inter, Segoe UI, Arial" font-size="11">reserved route</text>
+    <rect x="18" y="302" width="88" height="42" rx="14" fill="#FAF7F2" stroke="#E5D8CB"/>
+    <circle cx="36" cy="323" r="5" fill="#B08A64"/>
+    <text x="50" y="326" fill="#5A4635" font-family="Inter, Segoe UI, Arial" font-size="12" font-weight="800">Gateways</text>
+    <rect x="118" y="302" width="99" height="42" rx="14" fill="#F8FBFF" stroke="#D5E2F2"/>
+    <circle cx="136" cy="323" r="5" fill="#678DB8"/>
+    <text x="150" y="326" fill="#5A4635" font-family="Inter, Segoe UI, Arial" font-size="12" font-weight="800">Local tools</text>
+    <rect x="36" y="360" width="163" height="32" rx="16" fill="#FFFFFF" fill-opacity="0.5" stroke="#E4D6C7" stroke-dasharray="5 6"/>
+    <text x="64" y="381" fill="#8C7B6C" font-family="Inter, Segoe UI, Arial" font-size="12" font-weight="800">more agent entries...</text>
   </g>
 
   <g transform="translate(331 172)">
