@@ -64,7 +64,7 @@ LunaAgentOS 当前已经收敛出一版明确的 `Stage 1` 定义：
 - provider / agent 舰队展示区
 - 主 Agent 设定区
 - provider 管理入口预留区
-- 新增 agent 入口预留区
+- 真实外部入口展示区
 
 当前约束：
 

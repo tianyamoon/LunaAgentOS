@@ -49,6 +49,7 @@ The desktop shell has moved beyond a static prototype. Users can set the current
 - Main-agent multi-session workspace.
 - Local JSON session history.
 - Real runtime paths for Claude Code and Hermes.
+- The left fleet only exposes real external entries and no longer offers manual fake-agent creation.
 - Hermes process events stream into session cards.
 - Composer keeps send as the dominant action, with secondary preferences tucked underneath it.
 - Selected entries, active sessions, and active history items share one warm accent style.

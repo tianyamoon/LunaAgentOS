@@ -156,7 +156,6 @@ let activeSessionIds = new Set();
 let historyEntries = [];
 let sessionSeq = 0;
 let turnSeq = 0;
-let customAgentSeq = 0;
 let runningSessions = 0;
 let isHistoryLoading = true;
 let sendAsNewSession = false;
@@ -346,26 +345,6 @@ function showProviderAgents(provider) {
   setAppNotice(`${provider.name} 当前已登记的 Agent：${names}。`);
 }
 
-function createAgentForProvider(providerId) {
-  const provider = providerById(providerId);
-  if (!provider) return;
-  customAgentSeq += 1;
-  const agent = {
-    id: `${provider.id}-custom-${Date.now()}-${customAgentSeq}`,
-    providerId: provider.id,
-    name: `会话 ${provider.agents.length + 1}`,
-    subtitle: "独立 RuntimeSession",
-    note: "新建 Agent 不继承其他 Agent 的当前会话；历史任务只作为归档展示。",
-    state: 1,
-  };
-  provider.agents.push(agent);
-  saveCurrentTargetAgent(agent.id);
-  saveCurrentSession(null);
-  renderProviders();
-  renderWorkspace();
-  setAppNotice(`已新建 ${provider.name} / ${agent.name}，下一条消息会开启全新的运行时会话。`);
-}
-
 function latestActiveSessionForAgent(agentId) {
   return [...sessions]
     .filter((session) => session.agentId === agentId && activeSessionIds.has(session.id) && canSendToSession(session))
@@ -418,7 +397,6 @@ function renderProviders() {
           </div>
         `).join("")}
       </div>
-      <button type="button" class="mini-btn add-agent-btn" data-provider-id="${provider.id}">+ 新增 Agent</button>
     `;
 
     agentList.appendChild(group);
@@ -439,13 +417,6 @@ function renderProviders() {
     });
   });
 
-  agentList.querySelectorAll(".add-agent-btn").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.stopPropagation();
-      const providerId = button.dataset.providerId;
-      createAgentForProvider(providerId);
-    });
-  });
 }
 
 function applyHermesProfiles(profiles) {
