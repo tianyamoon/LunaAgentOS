@@ -737,6 +737,7 @@ function renderSessionCard(session) {
   const runtimeState = sessionRuntimeState(session);
   const isActiveReceiver = activeSessionIds[session.agentId] === session.id && canSendToSession(session);
   const isWaiting = session.state === 2;
+  const canDismiss = runtimeState !== "restoring";
   return `
     <article class="session-card ${session.fullscreen ? "fullscreen" : ""} ${isActiveReceiver ? "is-active-receiver" : ""} ${isWaiting ? "is-waiting" : ""}" data-session-id="${session.id}">
       ${isActiveReceiver ? `<div class="active-receiver-banner">当前接收任务</div>` : ""}
@@ -749,7 +750,7 @@ function renderSessionCard(session) {
           <div class="caption session-task">${session.task}</div>
         </div>
         <div class="session-card-actions">
-          ${runtimeState === "live" ? `<button type="button" class="mini-btn ghost-btn session-archive-btn" data-session-id="${session.id}">停止接收</button>` : ""}
+          ${canDismiss ? `<button type="button" class="mini-btn ghost-btn session-dismiss-btn" data-session-id="${session.id}">退出工作台</button>` : ""}
           ${canRestoreSession(session) ? `<button type="button" class="mini-btn ghost-btn session-retry-btn" data-session-id="${session.id}">重试恢复</button>` : ""}
           <button type="button" class="mini-btn ghost-btn session-fullscreen-btn" data-session-id="${session.id}">
             ${session.fullscreen ? "退出全屏" : "全屏"}
@@ -781,8 +782,8 @@ function bindSessionActions() {
       renderWorkspace();
     });
   });
-  sessionDeck.querySelectorAll(".session-archive-btn").forEach((button) => {
-    button.addEventListener("click", () => archiveLiveSession(button.dataset.sessionId));
+  sessionDeck.querySelectorAll(".session-dismiss-btn").forEach((button) => {
+    button.addEventListener("click", () => dismissWorkspaceSession(button.dataset.sessionId));
   });
   sessionDeck.querySelectorAll(".session-retry-btn").forEach((button) => {
     button.addEventListener("click", () => restoreArchivedSession(button.dataset.sessionId));
@@ -819,6 +820,36 @@ async function archiveLiveSession(sessionId) {
   renderWorkspace();
   renderHistory();
   setAppNotice(`${session.agentName} 已归档，ACP runtime 已释放。`);
+}
+
+function removeSessionFromWorkspace(sessionId) {
+  const session = sessions.find((item) => item.id === sessionId);
+  if (!session) return null;
+  sessions = sessions.filter((item) => item.id !== sessionId);
+  if (activeSessionIds[session.agentId] === session.id) {
+    delete activeSessionIds[session.agentId];
+    const fallbackLive = sessions.find((item) => item.agentId === session.agentId && canSendToSession(item));
+    if (fallbackLive) activeSessionIds[session.agentId] = fallbackLive.id;
+  }
+  return session;
+}
+
+async function dismissWorkspaceSession(sessionId) {
+  const session = sessions.find((item) => item.id === sessionId);
+  if (!session) return;
+  const runtimeState = sessionRuntimeState(session);
+  if (runtimeState === "restoring") {
+    setAppNotice("该会话正在恢复中，请稍后再退出工作台。", "busy");
+    return;
+  }
+  if (runtimeState === "live") {
+    await archiveLiveSession(sessionId);
+  }
+  const removed = removeSessionFromWorkspace(sessionId);
+  if (!removed) return;
+  renderWorkspace();
+  renderHistory();
+  setAppNotice(`${removed.agentName} 已退出工作台，历史保留在右侧归档。`);
 }
 
 function renderWorkspace() {
