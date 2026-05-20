@@ -4,7 +4,7 @@ LunaAgentOS 是一个面向异构 Coding Agent 的桌面控制台。
 
 它不是另一个底层 Agent，也不是 Claude Code 的桌面套壳。它站在 Claude Code、Hermes、未来的 IDE Agent 之上，提供统一入口、会话工作台、过程可见性和本地历史。
 
-![LunaAgentOS Stage 1 preview](./docs/assets/lunaagentos-stage1-preview.svg)
+![LunaAgentOS Stage 1 中文预览图](./docs/assets/lunaagentos-stage1-preview-cn.svg)
 
 ## 一句话定位
 
