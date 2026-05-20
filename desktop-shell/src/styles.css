@@ -233,6 +233,7 @@ button:disabled {
   gap: 6px;
   align-items: center;
   justify-content: flex-end;
+  padding-top: 1px;
 }
 
 .session-card-meta {
@@ -375,14 +376,20 @@ button:disabled {
   white-space: nowrap;
 }
 
-.session-card-title-row .runtime-pill {
-  flex: 0 0 auto;
-}
-
 .session-card-runtime {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+.session-card-actions .session-card-runtime {
+  height: 30px;
+}
+
+.session-card-actions .runtime-pill {
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 9px;
 }
 
 .runtime-pill::before {

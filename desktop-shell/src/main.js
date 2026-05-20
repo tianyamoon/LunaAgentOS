@@ -1155,9 +1155,6 @@ function renderSessionCard(session) {
         <div class="session-card-meta">
           <div class="session-card-title-row">
             <strong>${escapeHtml(session.agentName)}</strong>
-            <div class="session-card-runtime">
-              <span class="runtime-pill ${runtimeStateClasses[runtimeState] || "runtime-archived"} ${isWaiting ? "is-busy" : ""}" aria-label="会话状态：${runtimeStateLabels[runtimeState] || runtimeState}">${runtimeStateLabels[runtimeState] || runtimeState}</span>
-            </div>
           </div>
           ${profileMeta ? `<div class="caption session-profile-meta">${escapeHtml(profileMeta)}</div>` : ""}
           <div class="caption session-task">${escapeHtml(session.task)}</div>
@@ -1166,6 +1163,9 @@ function renderSessionCard(session) {
           </div>
         </div>
         <div class="session-card-actions">
+          <div class="session-card-runtime">
+            <span class="runtime-pill ${runtimeStateClasses[runtimeState] || "runtime-archived"} ${isWaiting ? "is-busy" : ""}" aria-label="会话状态：${runtimeStateLabels[runtimeState] || runtimeState}">${runtimeStateLabels[runtimeState] || runtimeState}</span>
+          </div>
           ${canDismiss ? `<button type="button" class="mini-btn ghost-btn session-dismiss-btn" data-session-id="${session.id}" title="退出工作台" aria-label="退出工作台">⏏</button>` : ""}
           ${canRestoreSession(session) ? `<button type="button" class="mini-btn ghost-btn session-retry-btn" data-session-id="${session.id}">重试恢复</button>` : ""}
           <div class="session-tool-group" role="group" aria-label="会话操作">
