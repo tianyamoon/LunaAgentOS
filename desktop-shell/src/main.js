@@ -22,10 +22,10 @@ const stateClasses = {
 };
 
 const runtimeStateLabels = {
-  live: "可继续",
-  archived: "只读归档",
-  restoring: "恢复中",
-  resume_failed: "恢复失败",
+  live: "可续聊",
+  archived: "只读",
+  restoring: "重连中",
+  resume_failed: "重连失败",
 };
 
 const runtimeStateClasses = {
@@ -1185,8 +1185,7 @@ function renderSessionCard(session) {
           <div class="session-card-title-row">
             <strong>${escapeHtml(session.agentName)}</strong>
             <div class="session-card-runtime">
-              ${isWaiting ? `<span class="live-dot" aria-hidden="true"></span>` : ""}
-              <span class="runtime-pill ${runtimeStateClasses[runtimeState] || "runtime-archived"}">${runtimeStateLabels[runtimeState] || runtimeState}</span>
+              <span class="runtime-pill ${runtimeStateClasses[runtimeState] || "runtime-archived"} ${isWaiting ? "is-busy" : ""}" aria-label="会话状态：${runtimeStateLabels[runtimeState] || runtimeState}">${runtimeStateLabels[runtimeState] || runtimeState}</span>
             </div>
           </div>
           ${profileMeta ? `<div class="caption session-profile-meta">${escapeHtml(profileMeta)}</div>` : ""}
@@ -1374,7 +1373,7 @@ async function dismissWorkspaceSession(sessionId) {
   if (!session) return;
   const runtimeState = sessionRuntimeState(session);
   if (runtimeState === "restoring") {
-    setAppNotice("该会话正在恢复中，请稍后再退出工作台。", "busy");
+    setAppNotice("该会话正在重连中，请稍后再退出工作台。", "busy");
     return;
   }
   if (runtimeState === "live") {
@@ -1570,7 +1569,7 @@ function bindSessionListActions() {
       const sessionId = item.dataset.sessionId;
       const session = sessions.find((entry) => entry.id === sessionId);
       if (!session || !canSendToSession(session)) {
-        setAppNotice("该 session 当前不是可继续状态，请先恢复。", "error");
+        setAppNotice("该 session 当前不可续聊，请先重连。", "error");
         return;
       }
       if (agentId) saveCurrentTargetAgent(agentId);
@@ -1639,7 +1638,7 @@ async function restoreArchivedSession(sessionId) {
   if (!archived) return;
   const existing = sessions.find((item) => item.id === archived.id);
   if (existing && sessionRuntimeState(existing) === "restoring") {
-    setAppNotice("该 session 正在恢复中，请稍等。", "busy");
+    setAppNotice("该 session 正在重连中，请稍等。", "busy");
     return;
   }
   const restored = existing || {
@@ -1710,7 +1709,7 @@ async function restoreArchivedSession(sessionId) {
     saveCurrentSession(restored.id);
     renderWorkspace();
     renderHistory();
-    setAppNotice("历史 session 已加载为可继续对话的 ACP runtime。");
+    setAppNotice("历史 session 已重连为可续聊的 ACP runtime。");
   } catch (loadError) {
     try {
       await invoke(commands.resume, {
@@ -1724,14 +1723,14 @@ async function restoreArchivedSession(sessionId) {
       saveCurrentSession(restored.id);
       renderWorkspace();
       renderHistory();
-      setAppNotice("ACP load 失败，已通过 resume 恢复为可继续对话的 runtime。");
+      setAppNotice("ACP load 失败，已通过 resume 重连为可续聊的 runtime。");
     } catch (resumeError) {
       restored.runtimeState = "resume_failed";
       markSessionInactive(restored.id);
       saveCurrentSession(restored.id);
       renderWorkspace();
       renderHistory();
-      setAppNotice(`ACP runtime 恢复失败，保留只读 transcript：${formatBackendError(resumeError || loadError)}`, "error");
+      setAppNotice(`ACP runtime 重连失败，保留只读 transcript：${formatBackendError(resumeError || loadError)}`, "error");
     }
   }
 }

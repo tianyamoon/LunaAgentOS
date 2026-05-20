@@ -363,28 +363,38 @@ button:disabled {
 .runtime-pill {
   display: inline-flex;
   align-items: center;
-  border-radius: 999px;
-  padding: 4px 8px;
-  font-size: 0.72rem;
+  justify-content: center;
+  min-height: 22px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 0 8px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .session-card-title-row .runtime-pill {
-  background: transparent;
-  border: 1px solid rgba(99, 82, 63, 0.1);
-  color: var(--muted);
+  flex: 0 0 auto;
 }
 
 .session-card-runtime {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
 }
 
-.live-dot {
-  width: 8px;
-  height: 8px;
+.runtime-pill::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
   border-radius: 999px;
-  background: var(--thinking);
+  background: currentColor;
+  opacity: 0.72;
+}
+
+.runtime-pill.is-busy::before {
   box-shadow: 0 0 0 5px rgba(178, 107, 0, 0.1);
   animation: liveBreath 1.4s infinite ease-in-out;
 }
@@ -394,34 +404,39 @@ button:disabled {
   box-shadow: 0 14px 34px rgba(178, 107, 0, 0.08);
 }
 
-.state-idle { background: rgba(116, 100, 83, 0.12); color: var(--muted); }
-.state-init { background: rgba(69, 115, 214, 0.14); color: #2a5aa8; }
-.state-think { background: rgba(178, 107, 0, 0.14); color: var(--thinking); }
-.state-tooling { background: rgba(150, 83, 214, 0.14); color: var(--tooling); }
-.state-resp { background: rgba(217, 108, 58, 0.14); color: var(--accent); }
-.state-done { background: rgba(33, 122, 76, 0.14); color: var(--done); }
+.state-idle { background: rgba(116, 100, 83, 0.1); border-color: rgba(116, 100, 83, 0.12); color: var(--muted); }
+.state-init { background: rgba(69, 115, 214, 0.12); border-color: rgba(69, 115, 214, 0.14); color: #2a5aa8; }
+.state-think { background: rgba(178, 107, 0, 0.12); border-color: rgba(178, 107, 0, 0.14); color: var(--thinking); }
+.state-tooling { background: rgba(150, 83, 214, 0.12); border-color: rgba(150, 83, 214, 0.14); color: var(--tooling); }
+.state-resp { background: rgba(217, 108, 58, 0.12); border-color: rgba(217, 108, 58, 0.14); color: var(--accent); }
+.state-done { background: rgba(33, 122, 76, 0.12); border-color: rgba(33, 122, 76, 0.14); color: var(--done); }
 .state-error {
   background: rgba(191, 74, 74, 0.12);
+  border-color: rgba(191, 74, 74, 0.14);
   color: #9c3434;
 }
 
 .runtime-live {
   background: rgba(53, 129, 97, 0.12);
+  border-color: rgba(53, 129, 97, 0.16);
   color: #2f7a5b;
 }
 
 .runtime-archived {
   background: rgba(99, 82, 63, 0.1);
+  border-color: rgba(99, 82, 63, 0.12);
   color: var(--muted);
 }
 
 .runtime-restoring {
   background: rgba(88, 112, 190, 0.12);
+  border-color: rgba(88, 112, 190, 0.16);
   color: #3e5fa8;
 }
 
 .runtime-failed {
   background: rgba(191, 74, 74, 0.12);
+  border-color: rgba(191, 74, 74, 0.14);
   color: #9c3434;
 }
 
@@ -1175,7 +1190,7 @@ textarea {
   }
 
   .assistant-message.is-waiting::after,
-  .live-dot {
+  .runtime-pill.is-busy::before {
     animation: none;
   }
 }
