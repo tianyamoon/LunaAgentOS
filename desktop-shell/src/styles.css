@@ -293,6 +293,17 @@ button:disabled {
   color: var(--accent);
 }
 
+.danger-btn,
+.history-delete-btn {
+  color: #9c3434;
+}
+
+.danger-btn:hover,
+.history-delete-btn:hover {
+  border-color: rgba(191, 74, 74, 0.24);
+  background: rgba(191, 74, 74, 0.1);
+}
+
 .session-card-stats {
   display: flex;
   flex-wrap: wrap;
@@ -1114,6 +1125,21 @@ textarea {
   width: 3px;
   border-radius: 999px;
   background: var(--accent);
+}
+
+.history-item-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.history-delete-btn {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 8px;
+  font-size: 0.76rem;
+  line-height: 1;
 }
 
 .history-item.is-live:hover,

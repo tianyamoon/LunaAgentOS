@@ -106,6 +106,13 @@ struct HistoryCompactResult {
     skipped_files: usize,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct HistoryDeleteResult {
+    removed_count: usize,
+    skipped_files: usize,
+}
+
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct RuntimeSessionStreamPayload {
@@ -399,6 +406,51 @@ fn compact_history_entries(app: AppHandle) -> Result<HistoryCompactResult, Strin
     Ok(HistoryCompactResult {
         removed_count,
         upgraded_count,
+        skipped_files,
+    })
+}
+
+#[tauri::command]
+fn delete_history_session_entries(
+    app: AppHandle,
+    session_id: String,
+) -> Result<HistoryDeleteResult, String> {
+    let session_id = session_id.trim().to_string();
+    if session_id.is_empty() {
+        return Err("session_id 不能为空".to_string());
+    }
+
+    let directory = history_dir(&app)?;
+    let mut removed_count = 0;
+    let mut skipped_files = 0;
+
+    for item in fs::read_dir(&directory).map_err(|error| error.to_string())? {
+        let item = item.map_err(|error| error.to_string())?;
+        let path = item.path();
+        if path.extension().and_then(|value| value.to_str()) != Some("json") {
+            continue;
+        }
+        let Some(entries) = try_load_history_file(&path) else {
+            skipped_files += 1;
+            continue;
+        };
+        let original_len = entries.len();
+        let retained: Vec<HistoryEntry> = entries
+            .into_iter()
+            .filter(|entry| {
+                history_entry_session_key(entry).unwrap_or_else(|| entry.id.clone()) != session_id
+            })
+            .collect();
+        let removed_for_file = original_len.saturating_sub(retained.len());
+        if removed_for_file > 0 {
+            removed_count += removed_for_file;
+            let json = serde_json::to_string_pretty(&retained).map_err(|error| error.to_string())?;
+            fs::write(path, json).map_err(|error| error.to_string())?;
+        }
+    }
+
+    Ok(HistoryDeleteResult {
+        removed_count,
         skipped_files,
     })
 }
@@ -706,6 +758,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             load_history_entries,
             compact_history_entries,
+            delete_history_session_entries,
             append_history_entry,
             runtime_hermes_profiles,
             run_claude_stream,

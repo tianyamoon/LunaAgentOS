@@ -55,7 +55,7 @@ The desktop shell has moved beyond a static prototype. Users can set the current
 - Selected entries, active sessions, and active history items share one warm accent style.
 - The current send target, current session, and live-session registry are separate state concepts.
 - The middle session card is being refined as the RuntimeSession surface: TUI-like process visibility plus comfortable Markdown reading for Claude Code and Hermes.
-- Session cards support jump-to-latest, copy-response, copy-turn-transcript, copy-session-transcript, flow expand/collapse toggling, and remembered thought/runtime detail expansion.
+- Session cards support jump-to-latest, copy-response, copy-turn-transcript, copy-session-transcript, deleting unused sessions, flow expand/collapse toggling, and remembered thought/runtime detail expansion.
 - Multi-turn session cards support latest-only/all-turns mode so long conversations can focus on the newest turn while copied transcripts still keep the full context.
 - Markdown rendering now covers common agent output shapes including links, strikethrough, blockquotes, horizontal rules, ordered lists, task lists, table alignment, and copyable code blocks.
 - Running session cards show a live breathing state, streaming/latest anchors, and thought/runtime event counts.
@@ -65,5 +65,6 @@ The desktop shell has moved beyond a static prototype. Users can set the current
 - Session cards are keyboard-focusable; `Enter` / `Space` activates the current session with a clear focus-visible style.
 - Session card fullscreen reading has a modal-like backdrop and supports `Esc` to exit quickly.
 - Current-session, latest-only, flow, and fullscreen states expose `aria-*` markers, connected icon button groups, highlighted states, and semantic labels for better keyboard and assistive-technology readability.
+- Deleting a session removes it from both the workspace and local history JSON; executing or reconnecting sessions are protected from deletion.
 
 For full Chinese documentation, see [README_CN.md](./README_CN.md).

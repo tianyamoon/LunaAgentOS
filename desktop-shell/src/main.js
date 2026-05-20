@@ -35,6 +35,8 @@ const runtimeStateClasses = {
   resume_failed: "runtime-failed",
 };
 
+const executingSessionStates = new Set([0, 2, 3, 4]);
+
 const acpRuntimeCommands = {
   claude: {
     prompt: "runtime_acp_claude_prompt",
@@ -244,6 +246,10 @@ function canSendToSession(session) {
 function canRestoreSession(session) {
   const state = sessionRuntimeState(session);
   return state === "archived" || state === "resume_failed";
+}
+
+function isSessionExecuting(session) {
+  return executingSessionStates.has(session.state);
 }
 
 function formatBackendError(error) {
@@ -1136,7 +1142,7 @@ function renderTurn(turn, index) {
 function renderSessionCard(session) {
   const runtimeState = sessionRuntimeState(session);
   const isActiveReceiver = currentSessionId === session.id;
-  const isWaiting = session.state === 2;
+  const isWaiting = isSessionExecuting(session);
   const canDismiss = runtimeState !== "restoring";
   const profileMeta = session.providerId === "hermes"
     ? [session.profileName, session.profileModel].filter(Boolean).join(" · ")
@@ -1167,6 +1173,7 @@ function renderSessionCard(session) {
             <span class="runtime-pill ${runtimeStateClasses[runtimeState] || "runtime-archived"} ${isWaiting ? "is-busy" : ""}" aria-label="会话状态：${runtimeStateLabels[runtimeState] || runtimeState}">${runtimeStateLabels[runtimeState] || runtimeState}</span>
           </div>
           ${canDismiss ? `<button type="button" class="mini-btn ghost-btn session-dismiss-btn" data-session-id="${session.id}" title="退出工作台" aria-label="退出工作台">⏏</button>` : ""}
+          ${canDismiss && !isWaiting ? `<button type="button" class="mini-btn ghost-btn danger-btn session-delete-btn" data-session-id="${session.id}" title="删除会话" aria-label="删除会话">⌫</button>` : ""}
           ${canRestoreSession(session) ? `<button type="button" class="mini-btn ghost-btn session-retry-btn" data-session-id="${session.id}">重试恢复</button>` : ""}
           <div class="session-tool-group" role="group" aria-label="会话操作">
             <button type="button" class="mini-btn ghost-btn tool-btn session-copy-btn" data-session-id="${session.id}" title="复制会话" aria-label="复制会话" ${session.turns.length ? "" : "disabled"}>⧉</button>
@@ -1224,6 +1231,9 @@ function bindSessionActions() {
   });
   sessionDeck.querySelectorAll(".session-dismiss-btn").forEach((button) => {
     button.addEventListener("click", () => dismissWorkspaceSession(button.dataset.sessionId));
+  });
+  sessionDeck.querySelectorAll(".session-delete-btn").forEach((button) => {
+    button.addEventListener("click", () => deleteSession(button.dataset.sessionId));
   });
   sessionDeck.querySelectorAll(".session-retry-btn").forEach((button) => {
     button.addEventListener("click", () => restoreArchivedSession(button.dataset.sessionId));
@@ -1355,6 +1365,39 @@ async function dismissWorkspaceSession(sessionId) {
   renderWorkspace();
   renderHistory();
   setAppNotice(`${removed.agentName} 已退出工作台，历史保留在右侧归档。`);
+}
+
+async function deleteSession(sessionId) {
+  const session = sessions.find((item) => item.id === sessionId);
+  const archived = archivedSessionsFromHistory(historyEntries).find((item) => item.id === sessionId);
+  const runtimeState = session ? sessionRuntimeState(session) : archived?.runtimeState || "archived";
+  const title = session?.task || archived?.title || "该会话";
+  if (runtimeState === "restoring") {
+    setAppNotice("该会话正在重连中，暂不支持删除。", "busy");
+    return;
+  }
+  if (session && isSessionExecuting(session)) {
+    setAppNotice("该会话正在执行中，请等待完成后再删除。", "busy");
+    return;
+  }
+  if (!session && !archived) return;
+  const confirmed = window.confirm(`删除「${title}」？\n\n这会从工作台和历史归档中移除该 session 的所有轮次。`);
+  if (!confirmed) return;
+  try {
+    if (session && runtimeState === "live") {
+      await archiveLiveSession(sessionId);
+    }
+    removeSessionFromWorkspace(sessionId);
+    const result = await invoke("delete_history_session_entries", { sessionId });
+    historyEntries = historyEntries.filter((entry) => historySessionKey(entry) !== sessionId);
+    renderWorkspace();
+    renderHistory();
+    const skipped = result?.skippedFiles ? `，跳过损坏文件 ${result.skippedFiles} 个` : "";
+    setAppNotice(`已删除会话，移除历史轮次 ${result?.removedCount || 0} 条${skipped}。`);
+  } catch (error) {
+    console.error(error);
+    setAppNotice(`删除会话失败：${formatBackendError(error)}`, "error");
+  }
 }
 
 function renderWorkspace(options = {}) {
@@ -1519,7 +1562,10 @@ function renderHistory() {
           <article class="history-item ${item.runtimeState === "live" ? "is-live" : "is-archive"} ${isActiveHistoryItem ? "is-active-session" : ""}" data-session-id="${item.id}" data-agent-id="${item.agentId || ""}">
             <div class="history-item-top">
               <strong>${item.providerName}</strong>
-              <span>${formatTime(item.updatedAt)}</span>
+              <div class="history-item-actions">
+                <span>${formatTime(item.updatedAt)}</span>
+                <button type="button" class="history-delete-btn" data-session-id="${item.id}" title="删除会话" aria-label="删除会话">⌫</button>
+              </div>
             </div>
             <div class="caption">${item.agentName} · ${item.turnCount} 轮 · ${runtimeStateLabels[item.runtimeState] || item.runtimeState}</div>
             <p>${item.title}</p>
@@ -1534,6 +1580,12 @@ function renderHistory() {
 }
 
 function bindSessionListActions() {
+  historyList.querySelectorAll(".history-delete-btn").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      deleteSession(button.dataset.sessionId);
+    });
+  });
   historyList.querySelectorAll(".history-item.is-live").forEach((item) => {
     item.addEventListener("click", () => {
       const agentId = item.dataset.agentId;
