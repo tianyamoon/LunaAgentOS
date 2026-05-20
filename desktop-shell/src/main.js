@@ -414,7 +414,7 @@ function renderProviders() {
             <div class="agent-entry-sub">${agent.subtitle}</div>
             ${agent.id === currentTargetAgentId
               ? ""
-              : `<div class="agent-entry-actions"><span class="agent-action-hint">设为主入口</span></div>`}
+              : `<div class="agent-entry-actions"><span class="agent-action-hint">设为发送目标</span></div>`}
           </div>
         `).join("")}
       </div>
