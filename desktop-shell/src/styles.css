@@ -253,11 +253,12 @@ button:disabled {
   cursor: not-allowed;
 }
 
-.session-card-actions .icon-btn {
-  min-width: 38px;
-  height: 38px;
-  padding: 0 10px;
-  font-size: 0.9rem;
+.session-card-actions .tool-btn {
+  min-width: auto;
+  height: 30px;
+  padding: 0 9px;
+  border-radius: 9px;
+  font-size: 0.78rem;
   line-height: 1;
 }
 

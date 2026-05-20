@@ -61,6 +61,6 @@ The desktop shell has moved beyond a static prototype. Users can set the current
 - Table reading is improved with sticky headers and row hover, while live/waiting animations respect reduced-motion preferences.
 - Session cards are keyboard-focusable; `Enter` / `Space` activates the current session with a clear focus-visible style.
 - Session card fullscreen reading has a modal-like backdrop and supports `Esc` to exit quickly.
-- Current-session, latest-only, flow, and fullscreen states expose `aria-*` markers, highlighted icon buttons, and semantic labels for better keyboard and assistive-technology readability.
+- Current-session, latest-only, flow, and fullscreen states expose `aria-*` markers, compact toolbar buttons, highlighted states, and semantic labels for better keyboard and assistive-technology readability.
 
 For full Chinese documentation, see [README_CN.md](./README_CN.md).

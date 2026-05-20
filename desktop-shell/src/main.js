@@ -1198,12 +1198,12 @@ function renderSessionCard(session) {
         <div class="session-card-actions">
           ${canDismiss ? `<button type="button" class="mini-btn ghost-btn session-dismiss-btn" data-session-id="${session.id}" title="退出工作台" aria-label="退出工作台">⏏</button>` : ""}
           ${canRestoreSession(session) ? `<button type="button" class="mini-btn ghost-btn session-retry-btn" data-session-id="${session.id}">重试恢复</button>` : ""}
-          <button type="button" class="mini-btn ghost-btn icon-btn session-copy-btn" data-session-id="${session.id}" title="复制会话" aria-label="复制会话" ${session.turns.length ? "" : "disabled"}>⧉</button>
-          <button type="button" class="mini-btn ghost-btn icon-btn session-latest-only-btn ${latestOnly ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${latestOnly ? "true" : "false"}" title="${latestOnly ? "显示全部轮次" : "只看最新轮次"}" aria-label="${latestOnly ? "显示全部轮次" : "只看最新轮次"}" ${session.turns.length > 1 ? "" : "disabled"}>${latestOnly ? "☰" : "◉"}</button>
-          <button type="button" class="mini-btn ghost-btn icon-btn session-toggle-flows-btn ${flowsOpen ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${flowsOpen ? "true" : "false"}" title="${flowsOpen ? "折叠过程流" : "展开过程流"}" aria-label="${flowsOpen ? "折叠过程流" : "展开过程流"}" ${hasFlowDetails ? "" : "disabled"}>${flowsOpen ? "▴" : "▾"}</button>
-          <button type="button" class="mini-btn ghost-btn icon-btn session-scroll-latest-btn" data-session-id="${session.id}" title="滚动到最新" aria-label="滚动到最新">↓</button>
-          <button type="button" class="mini-btn ghost-btn icon-btn session-fullscreen-btn ${session.fullscreen ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${session.fullscreen ? "true" : "false"}" title="${session.fullscreen ? "退出全屏阅读" : "进入全屏阅读"}" aria-label="${session.fullscreen ? "退出全屏阅读" : "进入全屏阅读"}">
-            ${session.fullscreen ? "⤢" : "⛶"}
+          <button type="button" class="mini-btn ghost-btn tool-btn session-copy-btn" data-session-id="${session.id}" title="复制会话" aria-label="复制会话" ${session.turns.length ? "" : "disabled"}>复制</button>
+          <button type="button" class="mini-btn ghost-btn tool-btn session-latest-only-btn ${latestOnly ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${latestOnly ? "true" : "false"}" title="${latestOnly ? "显示全部轮次" : "只看最新轮次"}" aria-label="${latestOnly ? "显示全部轮次" : "只看最新轮次"}" ${session.turns.length > 1 ? "" : "disabled"}>${latestOnly ? "全部" : "最新轮"}</button>
+          <button type="button" class="mini-btn ghost-btn tool-btn session-toggle-flows-btn ${flowsOpen ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${flowsOpen ? "true" : "false"}" title="${flowsOpen ? "折叠过程流" : "展开过程流"}" aria-label="${flowsOpen ? "折叠过程流" : "展开过程流"}" ${hasFlowDetails ? "" : "disabled"}>${flowsOpen ? "收起流" : "展开流"}</button>
+          <button type="button" class="mini-btn ghost-btn tool-btn session-scroll-latest-btn" data-session-id="${session.id}" title="滚动到最新" aria-label="滚动到最新">到底</button>
+          <button type="button" class="mini-btn ghost-btn tool-btn session-fullscreen-btn ${session.fullscreen ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${session.fullscreen ? "true" : "false"}" title="${session.fullscreen ? "退出全屏阅读" : "进入全屏阅读"}" aria-label="${session.fullscreen ? "退出全屏阅读" : "进入全屏阅读"}">
+            ${session.fullscreen ? "退出" : "全屏"}
           </button>
         </div>
       </div>
