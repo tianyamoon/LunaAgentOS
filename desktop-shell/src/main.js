@@ -1186,7 +1186,7 @@ function renderSessionCard(session) {
           <button type="button" class="mini-btn ghost-btn session-expand-flows-btn" data-session-id="${session.id}" ${session.turns.length ? "" : "disabled"}>展开流</button>
           <button type="button" class="mini-btn ghost-btn session-collapse-flows-btn" data-session-id="${session.id}" ${session.turns.length ? "" : "disabled"}>折叠流</button>
           <button type="button" class="mini-btn ghost-btn session-scroll-latest-btn" data-session-id="${session.id}">最新</button>
-          <button type="button" class="mini-btn ghost-btn session-fullscreen-btn ${session.fullscreen ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${session.fullscreen ? "true" : "false"}">
+          <button type="button" class="mini-btn ghost-btn session-fullscreen-btn ${session.fullscreen ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${session.fullscreen ? "true" : "false"}" title="${session.fullscreen ? "退出全屏阅读" : "进入全屏阅读"}" aria-label="${session.fullscreen ? "退出全屏阅读" : "进入全屏阅读"}">
             ${session.fullscreen ? "退出全屏" : "全屏"}
           </button>
         </div>
