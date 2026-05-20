@@ -253,13 +253,37 @@ button:disabled {
   cursor: not-allowed;
 }
 
+.session-tool-group {
+  display: inline-flex;
+  align-items: center;
+}
+
 .session-card-actions .tool-btn {
   min-width: auto;
   height: 30px;
   padding: 0 9px;
-  border-radius: 9px;
+  border-radius: 0;
   font-size: 0.78rem;
   line-height: 1;
+}
+
+.session-tool-group .tool-btn + .tool-btn {
+  margin-left: -1px;
+}
+
+.session-tool-group .tool-btn:first-child {
+  border-radius: 9px 0 0 9px;
+}
+
+.session-tool-group .tool-btn:last-child {
+  border-radius: 0 9px 9px 0;
+}
+
+.session-tool-group .tool-btn:focus-visible,
+.session-tool-group .tool-btn:hover,
+.session-tool-group .tool-btn.is-on {
+  position: relative;
+  z-index: 1;
 }
 
 .session-card-actions .mini-btn.is-on {
