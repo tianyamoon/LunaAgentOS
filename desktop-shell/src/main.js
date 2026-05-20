@@ -122,7 +122,9 @@ const providers = [
   },
 ];
 
-const MAIN_AGENT_KEY = "lunaagentos.mainAgentId";
+const LEGACY_TARGET_AGENT_KEY = "lunaagentos.currentTargetAgentId";
+const CURRENT_TARGET_AGENT_KEY = "lunaagentos.currentTargetAgentId";
+const CURRENT_SESSION_KEY = "lunaagentos.currentSessionId";
 const SEND_MODE_KEY = "lunaagentos.sendMode";
 const FONT_SCALE_KEY = "lunaagentos.fontScale";
 const HISTORY_SCHEMA_VERSION = 2;
@@ -147,9 +149,10 @@ const sendBtn = document.getElementById("sendBtn");
 const sendModeBtn = document.getElementById("sendModeBtn");
 const fontScaleBtn = document.getElementById("fontScaleBtn");
 
-let mainAgentId = localStorage.getItem(MAIN_AGENT_KEY) || "claude-main";
+let currentTargetAgentId = localStorage.getItem(CURRENT_TARGET_AGENT_KEY) || localStorage.getItem(LEGACY_TARGET_AGENT_KEY) || "claude-main";
+let currentSessionId = localStorage.getItem(CURRENT_SESSION_KEY) || null;
 let sessions = [];
-let activeSessionIds = {};
+let activeSessionIds = new Set();
 let historyEntries = [];
 let sessionSeq = 0;
 let turnSeq = 0;
@@ -159,6 +162,8 @@ let isHistoryLoading = true;
 let sendAsNewSession = false;
 let sendMode = localStorage.getItem(SEND_MODE_KEY) || "enter";
 let fontScaleId = localStorage.getItem(FONT_SCALE_KEY) || "default";
+const flowDetailOpenState = new Map();
+const sessionLatestOnlyState = new Map();
 
 function allAgents() {
   return providers.flatMap((provider) => provider.agents);
@@ -168,18 +173,18 @@ function providerById(id) {
   return providers.find((provider) => provider.id === id);
 }
 
-function ensureMainAgentExists() {
-  if (agentById(mainAgentId)) return;
+function ensureCurrentTargetAgentExists() {
+  if (agentById(currentTargetAgentId)) return;
   if (agentById(DEFAULT_HERMES_AGENT_ID)) {
-    saveMainAgent(DEFAULT_HERMES_AGENT_ID);
+    saveCurrentTargetAgent(DEFAULT_HERMES_AGENT_ID);
     return;
   }
   if (agentById("claude-main")) {
-    saveMainAgent("claude-main");
+    saveCurrentTargetAgent("claude-main");
     return;
   }
   const fallbackAgent = allAgents()[0];
-  if (fallbackAgent) saveMainAgent(fallbackAgent.id);
+  if (fallbackAgent) saveCurrentTargetAgent(fallbackAgent.id);
 }
 
 function agentById(id) {
@@ -191,12 +196,12 @@ function providerForAgent(agentId) {
   return agent ? providerById(agent.providerId) : null;
 }
 
-function currentMainAgent() {
-  return agentById(mainAgentId);
+function currentTargetAgent() {
+  return agentById(currentTargetAgentId);
 }
 
-function currentMainProvider() {
-  return providerForAgent(mainAgentId);
+function currentTargetProvider() {
+  return providerForAgent(currentTargetAgentId);
 }
 
 function acpCommandsForProvider(providerId) {
@@ -274,9 +279,32 @@ function updateActionLabels() {
   newSessionToggle.setAttribute("aria-pressed", String(sendAsNewSession));
 }
 
-function saveMainAgent(agentId) {
-  mainAgentId = agentId;
-  localStorage.setItem(MAIN_AGENT_KEY, agentId);
+function saveCurrentTargetAgent(agentId) {
+  currentTargetAgentId = agentId;
+  localStorage.setItem(CURRENT_TARGET_AGENT_KEY, agentId);
+  localStorage.removeItem(LEGACY_TARGET_AGENT_KEY);
+}
+
+function saveCurrentSession(sessionId) {
+  currentSessionId = sessionId || null;
+  if (currentSessionId) localStorage.setItem(CURRENT_SESSION_KEY, currentSessionId);
+  else localStorage.removeItem(CURRENT_SESSION_KEY);
+}
+
+function markSessionActive(sessionId) {
+  if (sessionId) activeSessionIds.add(sessionId);
+}
+
+function markSessionInactive(sessionId) {
+  if (sessionId) activeSessionIds.delete(sessionId);
+}
+
+function clearCurrentSessionIf(sessionId) {
+  if (currentSessionId === sessionId) saveCurrentSession(null);
+}
+
+function currentSession() {
+  return currentSessionId ? sessions.find((session) => session.id === currentSessionId) || null : null;
 }
 
 function currentFontScaleOption() {
@@ -331,17 +359,23 @@ function createAgentForProvider(providerId) {
     state: 1,
   };
   provider.agents.push(agent);
-  saveMainAgent(agent.id);
-  delete activeSessionIds[agent.id];
+  saveCurrentTargetAgent(agent.id);
+  saveCurrentSession(null);
   renderProviders();
   renderWorkspace();
   setAppNotice(`已新建 ${provider.name} / ${agent.name}，下一条消息会开启全新的运行时会话。`);
 }
 
-function setMainAgent(agentId) {
-  saveMainAgent(agentId);
-  const agent = currentMainAgent();
-  const provider = currentMainProvider();
+function latestActiveSessionForAgent(agentId) {
+  return [...sessions]
+    .filter((session) => session.agentId === agentId && activeSessionIds.has(session.id) && canSendToSession(session))
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0] || null;
+}
+
+function setCurrentTargetAgent(agentId) {
+  saveCurrentTargetAgent(agentId);
+  const agent = currentTargetAgent();
+  const provider = currentTargetProvider();
   if (agent && provider) {
     workspaceStatus.textContent = `当前发送目标：${provider.name} / ${agent.name}`;
     setAppNotice(`当前发送目标已切换到 ${provider.name} / ${agent.name}。`);
@@ -351,7 +385,7 @@ function setMainAgent(agentId) {
 }
 
 function renderProviders() {
-  ensureMainAgentExists();
+  ensureCurrentTargetAgentExists();
   agentList.innerHTML = "";
 
   providers.forEach((provider) => {
@@ -373,12 +407,12 @@ function renderProviders() {
       <p class="caption provider-note">${provider.note}</p>
       <div class="provider-agents">
         ${provider.agents.map((agent) => `
-          <div class="agent-entry ${agent.id === mainAgentId ? "is-main-agent" : "is-selectable"}" data-agent-id="${agent.id}">
+          <div class="agent-entry ${agent.id === currentTargetAgentId ? "is-main-agent" : "is-selectable"}" data-agent-id="${agent.id}">
             <div class="agent-entry-top">
               <strong>${agent.name}</strong>
             </div>
             <div class="agent-entry-sub">${agent.subtitle}</div>
-            ${agent.id === mainAgentId
+            ${agent.id === currentTargetAgentId
               ? ""
               : `<div class="agent-entry-actions"><span class="agent-action-hint">设为主入口</span></div>`}
           </div>
@@ -401,7 +435,7 @@ function renderProviders() {
     entry.addEventListener("click", () => {
       const agentId = entry.dataset.agentId;
       if (!agentId) return;
-      setMainAgent(agentId);
+      setCurrentTargetAgent(agentId);
     });
   });
 
@@ -438,7 +472,7 @@ function applyHermesProfiles(profiles) {
     isDefault: Boolean(profile.isDefault),
   }));
   hermesProvider.note = `已载入 ${profiles.length} 个 Hermes profile。`;
-  ensureMainAgentExists();
+  ensureCurrentTargetAgentExists();
   renderProviders();
   renderWorkspace();
   setAppNotice(`已载入 ${profiles.length} 个 Hermes profile。`);
@@ -607,8 +641,8 @@ function eventLogText(event) {
 }
 
 function createSession(firstTask) {
-  const agent = currentMainAgent();
-  const provider = currentMainProvider();
+  const agent = currentTargetAgent();
+  const provider = currentTargetProvider();
   if (!agent || !provider) return null;
 
   const hermesProfile = hermesProfileMetaFromAgent(agent);
@@ -635,7 +669,8 @@ function createSession(firstTask) {
     hasSoul: hermesProfile?.hasSoul || false,
   };
   sessions = [session, ...sessions];
-  activeSessionIds[agent.id] = session.id;
+  markSessionActive(session.id);
+  saveCurrentSession(session.id);
   renderWorkspace();
   renderHistory();
   return session;
@@ -659,15 +694,16 @@ function createTurn(session, task) {
   session.state = 2;
   session.activeTurnId = turn.id;
   session.turns.push(turn);
-  renderWorkspace();
+  renderWorkspace({ scrollSessionId: session.id });
   return turn;
 }
 
 function getOrCreateActiveSession(task, forceNew = false) {
-  const agent = currentMainAgent();
+  const agent = currentTargetAgent();
   if (!agent) return null;
-  const activeSessionId = activeSessionIds[agent.id];
-  const existing = !forceNew ? sessions.find((item) => item.id === activeSessionId) : null;
+  const existing = !forceNew ? currentSession() : null;
+  if (existing && existing.agentId !== agent.id) return createSession(task);
+  if (existing && !activeSessionIds.has(existing.id)) return createSession(task);
   return existing && canSendToSession(existing) ? existing : createSession(task);
 }
 
@@ -690,7 +726,7 @@ function updateTurnFromEvents(sessionId, turnId, events) {
   session.task = turn.task;
   session.state = turn.state;
   session.activeTurnId = turn.id;
-  renderWorkspace();
+  renderWorkspace({ scrollSessionId: session.id });
   renderHistory();
   return turn;
 }
@@ -745,7 +781,7 @@ function appendStreamEventToTurn(sessionId, event) {
       break;
   }
 
-  renderWorkspace();
+  renderWorkspace({ scrollSessionId: session.id });
 }
 
 function appendErrorToTurn(sessionId, turnId, message) {
@@ -758,9 +794,7 @@ function appendErrorToTurn(sessionId, turnId, message) {
   session.state = 9;
   if (session.acpSessionId) {
     session.runtimeState = "resume_failed";
-    if (activeSessionIds[session.agentId] === session.id) {
-      delete activeSessionIds[session.agentId];
-    }
+    markSessionInactive(session.id);
   }
   renderWorkspace();
   renderHistory();
@@ -768,8 +802,8 @@ function appendErrorToTurn(sessionId, turnId, message) {
 }
 
 function renderWorkspaceStatus() {
-  const agent = currentMainAgent();
-  const provider = currentMainProvider();
+  const agent = currentTargetAgent();
+  const provider = currentTargetProvider();
   const liveCount = sessions.filter((session) => sessionRuntimeState(session) === "live").length;
   const liveSuffix = liveCount > 0 ? `　·　运行中 ACP runtime：${liveCount}` : "";
   if (!agent || !provider) {
@@ -779,35 +813,333 @@ function renderWorkspaceStatus() {
   workspaceStatus.textContent = `当前发送目标：${provider.name} / ${agent.name}${liveSuffix}`;
 }
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function safeLinkHref(value) {
+  const href = String(value || "").trim();
+  if (!/^(https?:|mailto:|file:)/i.test(href)) return "";
+  return escapeHtml(href);
+}
+
+function renderInlineMarkdown(text) {
+  return escapeHtml(text)
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/~~([^~]+)~~/g, "<del>$1</del>")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, href) => {
+      const safeHref = safeLinkHref(href);
+      return safeHref ? `<a href="${safeHref}" target="_blank" rel="noreferrer">${label}</a>` : label;
+    });
+}
+
+function isMarkdownTable(lines, index) {
+  return lines[index]?.trim().startsWith("|")
+    && lines[index + 1]?.trim().startsWith("|")
+    && /^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$/.test(lines[index + 1].trim());
+}
+
+function renderMarkdownTable(lines) {
+  const cells = (line) => line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
+  const header = cells(lines[0]);
+  const alignments = cells(lines[1]).map((cell) => {
+    const left = cell.startsWith(":");
+    const right = cell.endsWith(":");
+    if (left && right) return "center";
+    if (right) return "right";
+    return "left";
+  });
+  const rows = lines.slice(2).map(cells);
+  const alignAttr = (index) => ` style="text-align: ${alignments[index] || "left"}"`;
+  return `
+    <div class="md-table-wrap">
+      <table class="md-table">
+        <thead><tr>${header.map((cell, index) => `<th${alignAttr(index)}>${renderInlineMarkdown(cell)}</th>`).join("")}</tr></thead>
+        <tbody>${rows.map((row) => `<tr>${row.map((cell, index) => `<td${alignAttr(index)}>${renderInlineMarkdown(cell)}</td>`).join("")}</tr>`).join("")}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderRichText(text) {
+  const lines = String(text || "").split(/\r?\n/);
+  const blocks = [];
+  let paragraph = [];
+  let listItems = [];
+  let orderedItems = [];
+  let index = 0;
+
+  const flushParagraph = () => {
+    if (!paragraph.length) return;
+    blocks.push(`<p>${paragraph.map(renderInlineMarkdown).join("<br>")}</p>`);
+    paragraph = [];
+  };
+  const flushList = () => {
+    if (!listItems.length) return;
+    blocks.push(`<ul>${listItems.map((item) => {
+      const task = /^\[( |x|X)\]\s+(.+)$/.exec(item);
+      if (!task) return `<li>${renderInlineMarkdown(item)}</li>`;
+      return `<li class="md-task-item"><span class="md-task-box ${task[1].toLowerCase() === "x" ? "is-checked" : ""}">${task[1].toLowerCase() === "x" ? "✓" : ""}</span>${renderInlineMarkdown(task[2])}</li>`;
+    }).join("")}</ul>`);
+    listItems = [];
+  };
+  const flushOrderedList = () => {
+    if (!orderedItems.length) return;
+    blocks.push(`<ol>${orderedItems.map((item) => `<li>${renderInlineMarkdown(item)}</li>`).join("")}</ol>`);
+    orderedItems = [];
+  };
+
+  while (index < lines.length) {
+    const line = lines[index];
+    const trimmed = line.trim();
+
+    if (trimmed.startsWith("```")) {
+      flushParagraph();
+      flushList();
+      flushOrderedList();
+      const lang = trimmed.slice(3).trim();
+      index += 1;
+      const code = [];
+      while (index < lines.length && !lines[index].trim().startsWith("```")) {
+        code.push(lines[index]);
+        index += 1;
+      }
+      if (index < lines.length) index += 1;
+      blocks.push(`
+        <div class="md-code-block">
+          <div class="md-code-toolbar">
+            ${lang ? `<span class="md-code-lang">${escapeHtml(lang)}</span>` : "<span></span>"}
+            <button type="button" class="mini-btn ghost-btn md-code-copy-btn">复制代码</button>
+          </div>
+          <pre class="md-code"><code>${escapeHtml(code.join("\n"))}</code></pre>
+        </div>
+      `);
+      continue;
+    }
+
+    if (isMarkdownTable(lines, index)) {
+      flushParagraph();
+      flushList();
+      flushOrderedList();
+      const tableLines = [lines[index], lines[index + 1]];
+      index += 2;
+      while (index < lines.length && lines[index].trim().startsWith("|")) {
+        tableLines.push(lines[index]);
+        index += 1;
+      }
+      blocks.push(renderMarkdownTable(tableLines));
+      continue;
+    }
+
+    const heading = /^(#{1,4})\s+(.+)$/.exec(trimmed);
+    if (heading) {
+      flushParagraph();
+      flushList();
+      flushOrderedList();
+      const level = Math.min(heading[1].length + 2, 6);
+      blocks.push(`<h${level}>${renderInlineMarkdown(heading[2])}</h${level}>`);
+      index += 1;
+      continue;
+    }
+
+    if (/^-{3,}$/.test(trimmed)) {
+      flushParagraph();
+      flushList();
+      flushOrderedList();
+      blocks.push("<hr>");
+      index += 1;
+      continue;
+    }
+
+    const quote = /^>\s?(.+)$/.exec(trimmed);
+    if (quote) {
+      flushParagraph();
+      flushList();
+      flushOrderedList();
+      const quoteLines = [quote[1]];
+      index += 1;
+      while (index < lines.length) {
+        const nextQuote = /^>\s?(.+)$/.exec(lines[index].trim());
+        if (!nextQuote) break;
+        quoteLines.push(nextQuote[1]);
+        index += 1;
+      }
+      blocks.push(`<blockquote>${quoteLines.map(renderInlineMarkdown).join("<br>")}</blockquote>`);
+      continue;
+    }
+
+    const list = /^[-*]\s+(.+)$/.exec(trimmed);
+    if (list) {
+      flushParagraph();
+      flushOrderedList();
+      listItems.push(list[1]);
+      index += 1;
+      continue;
+    }
+
+    const orderedList = /^\d+\.\s+(.+)$/.exec(trimmed);
+    if (orderedList) {
+      flushParagraph();
+      flushList();
+      orderedItems.push(orderedList[1]);
+      index += 1;
+      continue;
+    }
+
+    if (!trimmed) {
+      flushParagraph();
+      flushList();
+      flushOrderedList();
+      index += 1;
+      continue;
+    }
+
+    flushList();
+    flushOrderedList();
+    paragraph.push(line);
+    index += 1;
+  }
+
+  flushParagraph();
+  flushList();
+  flushOrderedList();
+  return blocks.join("");
+}
+
+function sessionCardStats(session) {
+  const turnCount = session.turns.length;
+  const thoughtCount = session.turns.reduce((count, turn) => count + turn.thoughts.length, 0);
+  const logCount = session.turns.reduce((count, turn) => count + turn.logs.length, 0);
+  const outputCount = session.turns.filter((turn) => turnResponseText(turn)).length;
+  return [
+    `轮次 ${turnCount}`,
+    thoughtCount ? `思考 ${thoughtCount}` : "",
+    logCount ? `运行 ${logCount}` : "",
+    outputCount ? `响应 ${outputCount}` : "",
+  ].filter(Boolean);
+}
+
+function isSessionLatestOnly(session) {
+  return sessionLatestOnlyState.get(session.id) ?? false;
+}
+
+function toggleSessionLatestOnly(sessionId) {
+  const session = sessions.find((item) => item.id === sessionId);
+  if (!session) return;
+  sessionLatestOnlyState.set(sessionId, !isSessionLatestOnly(session));
+  renderWorkspace({ scrollSessionId: sessionId });
+}
+
+function turnResponseText(turn) {
+  return turn.finalResponse || turn.outputs.join("\n\n");
+}
+
+function sessionTranscriptText(session) {
+  return session.turns.map((turn, index) => turnTranscriptText(turn, index)).join("\n\n---\n\n");
+}
+
+function turnTranscriptText(turn, index) {
+  const parts = [
+    `# 第 ${index + 1} 轮`,
+    `user:\n${turn.task}`,
+  ];
+  if (turn.thoughts.length) parts.push(`思考流:\n${turn.thoughts.join("\n\n")}`);
+  const response = turnResponseText(turn);
+  if (response) parts.push(`assistant:\n${response}`);
+  if (turn.logs.length) parts.push(`运行流:\n${turn.logs.join("\n")}`);
+  return parts.join("\n\n");
+}
+
+function detailKeysForSession(session) {
+  return session.turns.flatMap((turn) => [`${turn.id}:thoughts`, `${turn.id}:logs`]);
+}
+
+function setSessionFlowDetails(sessionId, open) {
+  const session = sessions.find((item) => item.id === sessionId);
+  if (!session) return;
+  detailKeysForSession(session).forEach((key) => flowDetailOpenState.set(key, open));
+  renderWorkspace();
+}
+
+function detailOpenAttribute(key, defaultOpen) {
+  const stored = flowDetailOpenState.get(key);
+  return (stored ?? defaultOpen) ? "open" : "";
+}
+
+function findTurnById(turnId) {
+  for (const session of sessions) {
+    const turnIndex = session.turns.findIndex((item) => item.id === turnId);
+    const turn = session.turns[turnIndex];
+    if (turn) return { session, turn, turnIndex };
+  }
+  return null;
+}
+
+async function copyTextToClipboard(text) {
+  if (!text) return false;
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (error) {
+    console.warn(error);
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+  const copied = document.execCommand("copy");
+  textarea.remove();
+  return copied;
+}
+
 function renderTurn(turn, index) {
   const waiting = turn.state === 2 && !turn.finalResponse;
+  const rawResponseText = turnResponseText(turn);
+  const responseText = rawResponseText || "等待响应...";
+  const thoughtDetailKey = `${turn.id}:thoughts`;
+  const logDetailKey = `${turn.id}:logs`;
   return `
     <section class="turn-block">
       <div class="turn-header">
         <strong>第 ${index + 1} 轮</strong>
-        <span class="state-pill ${stateClasses[turn.state] || "state-idle"}">${stateNames[turn.state] || "UNKNOWN"}</span>
+        <div class="turn-header-actions">
+          <span class="state-pill ${stateClasses[turn.state] || "state-idle"}">${stateNames[turn.state] || "UNKNOWN"}</span>
+          <button type="button" class="mini-btn ghost-btn turn-copy-btn" data-turn-id="${escapeHtml(turn.id)}">复制本轮</button>
+          <button type="button" class="mini-btn ghost-btn turn-copy-response-btn" data-turn-id="${escapeHtml(turn.id)}" ${rawResponseText ? "" : "disabled"}>复制响应</button>
+        </div>
       </div>
       <div class="terminal-message user-message">
         <div class="terminal-label">user</div>
-        <p>${turn.task}</p>
+        <p>${escapeHtml(turn.task)}</p>
       </div>
       ${turn.thoughts.length
         ? `
-          <details class="terminal-detail">
-            <summary>思考流</summary>
-            <div class="terminal-pre">${turn.thoughts.join("\n\n")}</div>
+          <details class="terminal-detail" data-detail-key="${escapeHtml(thoughtDetailKey)}" ${detailOpenAttribute(thoughtDetailKey, waiting)}>
+            <summary>思考流 · ${turn.thoughts.length}</summary>
+            <div class="terminal-pre rich-text">${renderRichText(turn.thoughts.join("\n\n"))}</div>
           </details>
         `
         : ""}
       <div class="terminal-message assistant-message ${waiting ? "is-waiting" : ""}">
         <div class="terminal-label">assistant</div>
-        <p>${turn.finalResponse || turn.outputs.join("\n\n") || "等待响应..."}</p>
+        <div class="rich-text">${renderRichText(responseText)}</div>
       </div>
       ${turn.logs.length
         ? `
-          <details class="terminal-detail log-block">
-            <summary>运行流</summary>
-            <div class="terminal-pre">${turn.logs.join("\n")}</div>
+          <details class="terminal-detail log-block" data-detail-key="${escapeHtml(logDetailKey)}" ${detailOpenAttribute(logDetailKey, waiting)}>
+            <summary>运行流 · ${turn.logs.length}</summary>
+            <div class="terminal-pre rich-text">${renderRichText(turn.logs.join("\n"))}</div>
           </details>
         `
         : ""}
@@ -817,45 +1149,79 @@ function renderTurn(turn, index) {
 
 function renderSessionCard(session) {
   const runtimeState = sessionRuntimeState(session);
-  const isActiveReceiver = activeSessionIds[session.agentId] === session.id && canSendToSession(session);
+  const isActiveReceiver = currentSessionId === session.id;
   const isWaiting = session.state === 2;
   const canDismiss = runtimeState !== "restoring";
   const profileMeta = session.providerId === "hermes"
     ? [session.profileName, session.profileModel].filter(Boolean).join(" · ")
     : "";
+  const stats = sessionCardStats(session);
+  const latestOnly = isSessionLatestOnly(session);
+  const turnEntries = session.turns.map((turn, index) => ({ turn, index }));
+  const visibleTurnEntries = latestOnly && turnEntries.length > 1 ? turnEntries.slice(-1) : turnEntries;
+  const hiddenTurnCount = turnEntries.length - visibleTurnEntries.length;
   return `
-    <article class="session-card ${session.fullscreen ? "fullscreen" : ""} ${isActiveReceiver ? "is-active-receiver" : ""} ${isWaiting ? "is-waiting" : ""}" data-session-id="${session.id}">
-      ${isActiveReceiver ? `<div class="active-receiver-banner">当前接收任务</div>` : ""}
+    <article class="session-card ${session.fullscreen ? "fullscreen" : ""} ${isActiveReceiver ? "is-active-receiver" : ""} ${isWaiting ? "is-waiting" : ""}" data-session-id="${session.id}" tabindex="0" aria-label="切换到会话：${escapeHtml(session.task)}" ${isActiveReceiver ? "aria-current=\"true\"" : ""}>
+      ${isActiveReceiver ? `<div class="active-receiver-banner">当前会话</div>` : ""}
       <div class="session-card-header">
-        <div>
+        <div class="session-card-meta">
           <div class="session-card-title-row">
-            <strong>${session.agentName}</strong>
-            <span class="runtime-pill ${runtimeStateClasses[runtimeState] || "runtime-archived"}">${runtimeStateLabels[runtimeState] || runtimeState}</span>
+            <strong>${escapeHtml(session.agentName)}</strong>
+            <div class="session-card-runtime">
+              ${isWaiting ? `<span class="live-dot" aria-hidden="true"></span>` : ""}
+              <span class="runtime-pill ${runtimeStateClasses[runtimeState] || "runtime-archived"}">${runtimeStateLabels[runtimeState] || runtimeState}</span>
+            </div>
           </div>
-          ${profileMeta ? `<div class="caption session-profile-meta">${profileMeta}</div>` : ""}
-          <div class="caption session-task">${session.task}</div>
+          ${profileMeta ? `<div class="caption session-profile-meta">${escapeHtml(profileMeta)}</div>` : ""}
+          <div class="caption session-task">${escapeHtml(session.task)}</div>
+          <div class="session-card-stats">
+            ${stats.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
+          </div>
         </div>
         <div class="session-card-actions">
           ${canDismiss ? `<button type="button" class="mini-btn ghost-btn session-dismiss-btn" data-session-id="${session.id}" title="退出工作台" aria-label="退出工作台">⏏</button>` : ""}
           ${canRestoreSession(session) ? `<button type="button" class="mini-btn ghost-btn session-retry-btn" data-session-id="${session.id}">重试恢复</button>` : ""}
-          <button type="button" class="mini-btn ghost-btn session-fullscreen-btn" data-session-id="${session.id}">
+          <button type="button" class="mini-btn ghost-btn session-copy-btn" data-session-id="${session.id}" ${session.turns.length ? "" : "disabled"}>复制会话</button>
+          <button type="button" class="mini-btn ghost-btn session-latest-only-btn ${latestOnly ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${latestOnly ? "true" : "false"}" ${session.turns.length > 1 ? "" : "disabled"}>${latestOnly ? "显示全部" : "只看最新"}</button>
+          <button type="button" class="mini-btn ghost-btn session-expand-flows-btn" data-session-id="${session.id}" ${session.turns.length ? "" : "disabled"}>展开流</button>
+          <button type="button" class="mini-btn ghost-btn session-collapse-flows-btn" data-session-id="${session.id}" ${session.turns.length ? "" : "disabled"}>折叠流</button>
+          <button type="button" class="mini-btn ghost-btn session-scroll-latest-btn" data-session-id="${session.id}">最新</button>
+          <button type="button" class="mini-btn ghost-btn session-fullscreen-btn ${session.fullscreen ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${session.fullscreen ? "true" : "false"}">
             ${session.fullscreen ? "退出全屏" : "全屏"}
           </button>
         </div>
       </div>
       <div class="session-card-body">
         ${session.turns.length
-          ? session.turns.map(renderTurn).join("")
+          ? `${hiddenTurnCount ? `<div class="session-hidden-turns">已隐藏前 ${hiddenTurnCount} 轮，复制会话仍包含完整 transcript。</div>` : ""}${visibleTurnEntries.map(({ turn, index }) => renderTurn(turn, index)).join("")}<div class="session-latest-anchor">${isWaiting ? "streaming..." : "latest"}</div>`
           : "<p class='flow-empty'>当前会话尚未产生消息。</p>"}
       </div>
     </article>
   `;
 }
 
+function exitFullscreenSessions() {
+  const fullscreenSessions = sessions.filter((session) => session.fullscreen);
+  if (!fullscreenSessions.length) return false;
+  fullscreenSessions.forEach((session) => {
+    session.fullscreen = false;
+  });
+  renderWorkspace();
+  setAppNotice("已退出会话全屏阅读模式。");
+  return true;
+}
+
 function bindSessionActions() {
   sessionDeck.querySelectorAll(".session-card").forEach((card) => {
     card.addEventListener("click", (event) => {
-      if (event.target.closest("button")) return;
+      if (event.target.closest("button, a, summary, details, input, textarea, select")) return;
+      if (window.getSelection()?.toString()) return;
+      activateWorkspaceSession(card.dataset.sessionId);
+    });
+    card.addEventListener("keydown", (event) => {
+      if (event.target !== card) return;
+      if (!["Enter", " "].includes(event.key)) return;
+      event.preventDefault();
       activateWorkspaceSession(card.dataset.sessionId);
     });
   });
@@ -874,20 +1240,92 @@ function bindSessionActions() {
   sessionDeck.querySelectorAll(".session-retry-btn").forEach((button) => {
     button.addEventListener("click", () => restoreArchivedSession(button.dataset.sessionId));
   });
+  sessionDeck.querySelectorAll(".terminal-detail[data-detail-key]").forEach((detail) => {
+    detail.addEventListener("toggle", () => {
+      flowDetailOpenState.set(detail.dataset.detailKey, detail.open);
+    });
+  });
+  sessionDeck.querySelectorAll(".session-scroll-latest-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+      const body = sessionDeck.querySelector(`.session-card[data-session-id="${button.dataset.sessionId}"] .session-card-body`);
+      if (body) body.scrollTop = body.scrollHeight;
+    });
+  });
+  sessionDeck.querySelectorAll(".session-copy-btn").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const session = sessions.find((item) => item.id === button.dataset.sessionId);
+      const text = session ? sessionTranscriptText(session) : "";
+      if (!text) {
+        setAppNotice("当前会话还没有可复制的 transcript。", "busy");
+        return;
+      }
+      const copied = await copyTextToClipboard(text);
+      setAppNotice(copied ? "已复制当前会话 transcript。" : "复制失败，请手动选择内容。", copied ? "muted" : "error");
+    });
+  });
+  sessionDeck.querySelectorAll(".session-latest-only-btn").forEach((button) => {
+    button.addEventListener("click", () => toggleSessionLatestOnly(button.dataset.sessionId));
+  });
+  sessionDeck.querySelectorAll(".session-expand-flows-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+      setSessionFlowDetails(button.dataset.sessionId, true);
+      setAppNotice("已展开当前会话的思考流与运行流。");
+    });
+  });
+  sessionDeck.querySelectorAll(".session-collapse-flows-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+      setSessionFlowDetails(button.dataset.sessionId, false);
+      setAppNotice("已折叠当前会话的思考流与运行流。");
+    });
+  });
+  sessionDeck.querySelectorAll(".turn-copy-response-btn").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const result = findTurnById(button.dataset.turnId);
+      const text = result ? turnResponseText(result.turn) : "";
+      if (!text) {
+        setAppNotice("当前轮次还没有可复制的响应。", "busy");
+        return;
+      }
+      const copied = await copyTextToClipboard(text);
+      setAppNotice(copied ? "已复制当前轮次响应。" : "复制失败，请手动选择内容。", copied ? "muted" : "error");
+    });
+  });
+  sessionDeck.querySelectorAll(".turn-copy-btn").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const result = findTurnById(button.dataset.turnId);
+      const text = result ? turnTranscriptText(result.turn, result.turnIndex) : "";
+      if (!text) {
+        setAppNotice("当前轮次还没有可复制的 transcript。", "busy");
+        return;
+      }
+      const copied = await copyTextToClipboard(text);
+      setAppNotice(copied ? "已复制当前轮次 transcript。" : "复制失败，请手动选择内容。", copied ? "muted" : "error");
+    });
+  });
+  sessionDeck.querySelectorAll(".md-code-copy-btn").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const code = button.closest(".md-code-block")?.querySelector("code")?.textContent || "";
+      if (!code) {
+        setAppNotice("当前代码块为空。", "busy");
+        return;
+      }
+      const copied = await copyTextToClipboard(code);
+      setAppNotice(copied ? "已复制代码块。" : "复制失败，请手动选择代码。", copied ? "muted" : "error");
+    });
+  });
 }
 
 function activateWorkspaceSession(sessionId) {
   const session = sessions.find((item) => item.id === sessionId);
   if (!session) return;
-  if (!canSendToSession(session)) {
-    setAppNotice("该会话当前不是 live runtime，请先重试恢复后再继续发送。", "error");
-    return;
-  }
-  saveMainAgent(session.agentId);
-  activeSessionIds[session.agentId] = session.id;
+  saveCurrentTargetAgent(session.agentId);
+  saveCurrentSession(session.id);
+  if (canSendToSession(session)) markSessionActive(session.id);
   renderProviders();
   renderWorkspace();
-  setAppNotice(`当前工作 session 已切换到：${session.task}`);
+  setAppNotice(canSendToSession(session)
+    ? `当前工作 session 已切换到：${session.task}`
+    : "已切换到只读会话；继续发送会创建新的 live 会话或需要先恢复。");
 }
 
 async function archiveLiveSession(sessionId) {
@@ -900,9 +1338,8 @@ async function archiveLiveSession(sessionId) {
     console.error(error);
   }
   session.runtimeState = "archived";
-  if (activeSessionIds[session.agentId] === session.id) {
-    delete activeSessionIds[session.agentId];
-  }
+  markSessionInactive(session.id);
+  clearCurrentSessionIf(session.id);
   renderWorkspace();
   renderHistory();
   setAppNotice(`${session.agentName} 已归档，ACP runtime 已释放。`);
@@ -912,11 +1349,8 @@ function removeSessionFromWorkspace(sessionId) {
   const session = sessions.find((item) => item.id === sessionId);
   if (!session) return null;
   sessions = sessions.filter((item) => item.id !== sessionId);
-  if (activeSessionIds[session.agentId] === session.id) {
-    delete activeSessionIds[session.agentId];
-    const fallbackLive = sessions.find((item) => item.agentId === session.agentId && canSendToSession(item));
-    if (fallbackLive) activeSessionIds[session.agentId] = fallbackLive.id;
-  }
+  markSessionInactive(session.id);
+  clearCurrentSessionIf(session.id);
   return session;
 }
 
@@ -938,22 +1372,27 @@ async function dismissWorkspaceSession(sessionId) {
   setAppNotice(`${removed.agentName} 已退出工作台，历史保留在右侧归档。`);
 }
 
-function renderWorkspace() {
+function renderWorkspace(options = {}) {
+  const scrollSessionId = options.scrollSessionId || null;
   const activeBodies = [...sessionDeck.querySelectorAll(".session-card-body")].map((body) => ({
     sessionId: body.closest(".session-card")?.dataset.sessionId,
     shouldStickToBottom: body.scrollTop + body.clientHeight >= body.scrollHeight - 24,
   }));
   const visibleSessions = [...sessions].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
-  const activeSessionId = activeSessionIds[mainAgentId];
   renderWorkspaceStatus();
   workspaceEmpty.style.display = visibleSessions.length ? "none" : "flex";
+  sessionDeck.classList.toggle("is-single-session", visibleSessions.length === 1);
   sessionDeck.innerHTML = visibleSessions.map(renderSessionCard).join("");
   bindSessionActions();
   requestAnimationFrame(() => {
-    const activeCard = activeSessionId
-      ? sessionDeck.querySelector(`.session-card[data-session-id="${activeSessionId}"]`)
+    const activeCard = currentSessionId
+      ? sessionDeck.querySelector(`.session-card[data-session-id="${currentSessionId}"]`)
       : null;
     activeCard?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    const scrollBody = scrollSessionId
+      ? sessionDeck.querySelector(`.session-card[data-session-id="${scrollSessionId}"] .session-card-body`)
+      : null;
+    if (scrollBody) scrollBody.scrollTop = scrollBody.scrollHeight;
     if (!activeBodies.length) {
       sessionDeck.querySelectorAll(".session-card-body").forEach((body) => {
         body.scrollTop = body.scrollHeight;
@@ -961,6 +1400,7 @@ function renderWorkspace() {
       return;
     }
     activeBodies.forEach(({ sessionId, shouldStickToBottom }) => {
+      if (sessionId === scrollSessionId) return;
       if (!shouldStickToBottom) return;
       const body = sessionDeck.querySelector(`.session-card[data-session-id="${sessionId}"] .session-card-body`);
       if (body) body.scrollTop = body.scrollHeight;
@@ -1088,8 +1528,10 @@ function renderHistory() {
     <section class="history-group">
       <div class="history-date">${date}</div>
       <div class="history-group-list">
-        ${groups[date].map((item) => `
-          <article class="history-item ${item.runtimeState === "live" ? "is-live" : "is-archive"}" data-session-id="${item.id}" data-agent-id="${item.agentId || ""}">
+        ${groups[date].map((item) => {
+          const isActiveHistoryItem = currentSessionId === item.id;
+          return `
+          <article class="history-item ${item.runtimeState === "live" ? "is-live" : "is-archive"} ${isActiveHistoryItem ? "is-active-session" : ""}" data-session-id="${item.id}" data-agent-id="${item.agentId || ""}">
             <div class="history-item-top">
               <strong>${item.providerName}</strong>
               <span>${formatTime(item.updatedAt)}</span>
@@ -1098,7 +1540,8 @@ function renderHistory() {
             <p>${item.title}</p>
             <p class="caption">${item.summary}</p>
           </article>
-        `).join("")}
+        `;
+        }).join("")}
       </div>
     </section>
   `).join("");
@@ -1115,8 +1558,11 @@ function bindSessionListActions() {
         setAppNotice("该 session 当前不是可继续状态，请先恢复。", "error");
         return;
       }
-      if (agentId) saveMainAgent(agentId);
-      if (agentId && sessionId) activeSessionIds[agentId] = sessionId;
+      if (agentId) saveCurrentTargetAgent(agentId);
+      if (sessionId) {
+        saveCurrentSession(sessionId);
+        markSessionActive(sessionId);
+      }
       renderProviders();
       renderWorkspace();
       setAppNotice("已切换到当前会话。");
@@ -1211,7 +1657,8 @@ async function restoreArchivedSession(sessionId) {
   restored.profileModel = restored.profileModel || restoredAgent.model || null;
   restored.gateway = restored.gateway || restoredAgent.gateway || null;
   if (!existing) sessions = [restored, ...sessions];
-  saveMainAgent(restored.agentId);
+  saveCurrentTargetAgent(restored.agentId);
+  saveCurrentSession(restored.id);
   renderProviders();
   renderWorkspace();
   renderHistory();
@@ -1229,6 +1676,8 @@ async function restoreArchivedSession(sessionId) {
   const commands = acpCommandsForProvider(restored.providerId);
   if (!commands) {
     restored.runtimeState = "archived";
+    markSessionInactive(restored.id);
+    saveCurrentSession(restored.id);
     renderWorkspace();
     renderHistory();
     setAppNotice("该 provider 暂不支持 ACP runtime 恢复，当前为只读 transcript。");
@@ -1242,7 +1691,8 @@ async function restoreArchivedSession(sessionId) {
       profileExecutable: restored.profileExecutable || null,
     });
     restored.runtimeState = "live";
-    activeSessionIds[restored.agentId] = restored.id;
+    markSessionActive(restored.id);
+    saveCurrentSession(restored.id);
     renderWorkspace();
     renderHistory();
     setAppNotice("历史 session 已加载为可继续对话的 ACP runtime。");
@@ -1255,12 +1705,15 @@ async function restoreArchivedSession(sessionId) {
         profileExecutable: restored.profileExecutable || null,
       });
       restored.runtimeState = "live";
-      activeSessionIds[restored.agentId] = restored.id;
+      markSessionActive(restored.id);
+      saveCurrentSession(restored.id);
       renderWorkspace();
       renderHistory();
       setAppNotice("ACP load 失败，已通过 resume 恢复为可继续对话的 runtime。");
     } catch (resumeError) {
       restored.runtimeState = "resume_failed";
+      markSessionInactive(restored.id);
+      saveCurrentSession(restored.id);
       renderWorkspace();
       renderHistory();
       setAppNotice(`ACP runtime 恢复失败，保留只读 transcript：${formatBackendError(resumeError || loadError)}`, "error");
@@ -1332,7 +1785,7 @@ async function runFallbackSession(session, turn) {
       `Hermes profile ${session.profileName || session.agentName} 正在启动 ACP 运行时，首次响应可能较慢。`,
       ...turn.logs,
     ];
-    renderWorkspace();
+    renderWorkspace({ scrollSessionId: session.id });
   }
   setAppNotice(`已将任务送入 ${session.agentName}，正在等待返回内容...`, "busy");
   try {
@@ -1365,7 +1818,7 @@ async function startAcpSession(session, turn) {
       `Hermes profile ${session.profileName || session.agentName} 正在启动 ACP 运行时，首次响应可能较慢。`,
       ...turn.logs,
     ];
-    renderWorkspace();
+    renderWorkspace({ scrollSessionId: session.id });
   }
   setAppNotice(`已将任务送入 ${session.agentName}，正在等待返回内容...`, "busy");
   try {
@@ -1402,8 +1855,8 @@ function startSessionFromPrompt(forceNewSession = false) {
     return;
   }
 
-  const agent = currentMainAgent();
-  const provider = currentMainProvider();
+  const agent = currentTargetAgent();
+  const provider = currentTargetProvider();
   if (!agent || !provider) {
     setAppNotice("请先在左侧设定当前发送目标，再发送任务。", "error");
     return;
@@ -1449,6 +1902,11 @@ promptBox.addEventListener("keydown", (event) => {
   if (!shouldSend) return;
   event.preventDefault();
   startSessionFromPrompt(sendAsNewSession);
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") return;
+  if (exitFullscreenSessions()) event.preventDefault();
 });
 
 newSessionToggle.addEventListener("click", () => {
@@ -1501,9 +1959,7 @@ async function syncRuntimeAliveStates() {
       const aliveIds = aliveByProvider[session.providerId];
       if (declaredLive && hasStartedRuntime && aliveIds && !aliveIds.has(session.id)) {
         session.runtimeState = "resume_failed";
-        if (activeSessionIds[session.agentId] === session.id) {
-          delete activeSessionIds[session.agentId];
-        }
+        activeSessionIds.delete(session.id);
         mutated = true;
       }
     });
