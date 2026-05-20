@@ -60,6 +60,7 @@ The desktop shell has moved beyond a static prototype. Users can set the current
 - Markdown rendering now covers common agent output shapes including links, strikethrough, blockquotes, horizontal rules, ordered lists, task lists, table alignment, and copyable code blocks.
 - Running session cards show a live breathing state, streaming/latest anchors, and thought/runtime event counts.
 - Session connection state and turn execution state share consistent status chips, while the card header shows session lifecycle states such as resumable, read-only, reconnecting, and reconnect failed.
+- Session card hierarchy is calmer: active-card chrome, connection-state colors, scrollbars, and stat chips are toned down so transcript content stays primary.
 - Table reading is improved with sticky headers and row hover, while live/waiting animations respect reduced-motion preferences.
 - Session cards are keyboard-focusable; `Enter` / `Space` activates the current session with a clear focus-visible style.
 - Session card fullscreen reading has a modal-like backdrop and supports `Esc` to exit quickly.

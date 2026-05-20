@@ -230,7 +230,7 @@ button:disabled {
 .session-card-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
   justify-content: flex-end;
 }
@@ -300,11 +300,12 @@ button:disabled {
 }
 
 .session-card-stats span {
-  padding: 3px 8px;
+  padding: 2px 7px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(99, 82, 63, 0.07);
+  background: rgba(255, 255, 255, 0.44);
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 700;
 }
 
@@ -417,9 +418,9 @@ button:disabled {
 }
 
 .runtime-live {
-  background: rgba(53, 129, 97, 0.12);
-  border-color: rgba(53, 129, 97, 0.16);
-  color: #2f7a5b;
+  background: rgba(45, 113, 187, 0.1);
+  border-color: rgba(45, 113, 187, 0.16);
+  color: #2f6698;
 }
 
 .runtime-archived {
@@ -507,24 +508,24 @@ button:disabled {
 }
 
 .session-card.is-active-receiver {
-  border-color: rgba(217, 108, 58, 0.46);
-  background: linear-gradient(135deg, rgba(255, 247, 238, 0.98), rgba(255, 229, 207, 0.86));
-  box-shadow: 0 16px 32px rgba(151, 85, 44, 0.14);
+  border-color: rgba(217, 108, 58, 0.3);
+  background: linear-gradient(135deg, rgba(255, 250, 245, 0.96), rgba(255, 242, 230, 0.72));
+  box-shadow: 0 14px 30px rgba(151, 85, 44, 0.1);
 }
 
 .session-card.is-active-receiver::before {
   content: "";
   position: absolute;
-  inset: 18px auto 18px 10px;
+  inset: 18px auto 18px 12px;
   width: 3px;
   border-radius: 999px;
-  background: var(--accent);
+  background: rgba(217, 108, 58, 0.78);
 }
 
 .active-receiver-banner {
   margin: -4px 0 8px 10px;
   color: var(--accent);
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -547,7 +548,26 @@ button:disabled {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  padding-right: 4px;
+  padding-right: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(99, 82, 63, 0.28) transparent;
+}
+
+.session-card-body::-webkit-scrollbar {
+  width: 7px;
+}
+
+.session-card-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.session-card-body::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(99, 82, 63, 0.24);
+}
+
+.session-card-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 82, 63, 0.38);
 }
 
 .turn-block {
@@ -568,7 +588,7 @@ button:disabled {
 .turn-header-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .turn-copy-btn,
@@ -582,7 +602,7 @@ button:disabled {
 }
 
 .user-message {
-  background: rgba(217, 108, 58, 0.08);
+  background: rgba(217, 108, 58, 0.055);
 }
 
 .terminal-message p,
@@ -596,10 +616,11 @@ button:disabled {
 .terminal-message {
   padding: 10px 12px;
   border-radius: 14px;
+  border: 1px solid rgba(99, 82, 63, 0.07);
 }
 
 .assistant-message {
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.78);
 }
 
 .rich-text {
