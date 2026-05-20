@@ -750,7 +750,7 @@ function renderSessionCard(session) {
           <div class="caption session-task">${session.task}</div>
         </div>
         <div class="session-card-actions">
-          ${canDismiss ? `<button type="button" class="mini-btn ghost-btn session-dismiss-btn" data-session-id="${session.id}">退出工作台</button>` : ""}
+          ${canDismiss ? `<button type="button" class="mini-btn ghost-btn session-dismiss-btn" data-session-id="${session.id}" title="退出工作台" aria-label="退出工作台">⏏</button>` : ""}
           ${canRestoreSession(session) ? `<button type="button" class="mini-btn ghost-btn session-retry-btn" data-session-id="${session.id}">重试恢复</button>` : ""}
           <button type="button" class="mini-btn ghost-btn session-fullscreen-btn" data-session-id="${session.id}">
             ${session.fullscreen ? "退出全屏" : "全屏"}
