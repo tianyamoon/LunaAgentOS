@@ -299,7 +299,7 @@ function cycleFontScale() {
 
 function updateSendModeLabel() {
   if (!sendModeBtn) return;
-  sendModeBtn.textContent = sendMode === "enter" ? "回车发送" : "Ctrl+回车";
+  sendModeBtn.textContent = sendMode === "enter" ? "Enter 发送" : "Ctrl+Enter";
 }
 
 function toggleSendMode() {
@@ -428,7 +428,10 @@ function applyHermesProfiles(profiles) {
     model: profile.model,
     gateway: profile.gateway,
     alias: profile.alias,
+    profileAlias: profile.alias,
+    profileExecutable: profile.alias || null,
     path: profile.path,
+    profilePath: profile.path,
     skillCount: profile.skillCount,
     hasEnv: profile.hasEnv,
     hasSoul: profile.hasSoul,
@@ -453,6 +456,38 @@ async function loadHermesProfiles() {
     console.error(error);
     setAppNotice(`读取 Hermes profile 失败：${formatBackendError(error)}`, "error");
   }
+}
+
+function hermesProfileMetaFromAgent(agent) {
+  if (!agent || agent.providerId !== "hermes") return null;
+  return {
+    profileName: agent.profileName || null,
+    profileAlias: agent.profileAlias || agent.alias || null,
+    profileExecutable: agent.profileExecutable || agent.alias || null,
+    profilePath: agent.profilePath || agent.path || null,
+    profileModel: agent.model || null,
+    gateway: agent.gateway || null,
+    skillCount: agent.skillCount ?? null,
+    hasSoul: Boolean(agent.hasSoul),
+  };
+}
+
+function hermesProfileMetaFromSession(session) {
+  if (!session || session.providerId !== "hermes") return null;
+  return {
+    profileName: session.profileName || null,
+    profileAlias: session.profileAlias || null,
+    profileExecutable: session.profileExecutable || null,
+    profilePath: session.profilePath || null,
+    profileModel: session.profileModel || null,
+    gateway: session.gateway || null,
+    skillCount: session.skillCount ?? null,
+    hasSoul: Boolean(session.hasSoul),
+  };
+}
+
+function hermesProfileMetaFromArchived(archived) {
+  return archived?.hermesProfile || archived?.turns?.find((turn) => turn.meta?.hermesProfile)?.meta?.hermesProfile || null;
 }
 
 function sessionSectionsFromEvents(events) {
@@ -515,24 +550,59 @@ function eventContentText(event) {
   if (!content) return eventLogText(event);
   if (Array.isArray(content)) {
     return content
-      .map((item) => typeof item === "string" ? item : item?.text || item?.content || "")
+      .map(contentPartText)
       .filter(Boolean)
       .join("\n");
   }
   if (typeof content === "object") {
-    return content.text || content.content || eventLogText(event);
+    return contentPartText(content) || eventLogText(event);
   }
   return String(content);
+}
+
+function contentPartText(part) {
+  if (!part) return "";
+  if (typeof part === "string") return part;
+  if (typeof part === "number" || typeof part === "boolean") return String(part);
+  if (Array.isArray(part)) return part.map(contentPartText).filter(Boolean).join("\n");
+  if (typeof part === "object") {
+    if (typeof part.text === "string") return part.text;
+    if (typeof part.content === "string") return part.content;
+    if (Array.isArray(part.content)) return part.content.map(contentPartText).filter(Boolean).join("\n");
+    if (typeof part.input === "string") return part.input;
+    if (typeof part.output === "string") return part.output;
+  }
+  return "";
 }
 
 function eventLogText(event) {
   if (event.type === "tool") {
     const title = event.payload?.title || event.payload?.kind || event.payload?.id || "工具调用";
     const status = event.payload?.status ? `：${event.payload.status}` : "";
-    return `${title}${status}`;
+    const content = contentPartText(event.payload?.content);
+    return [title, status, content ? `\n${content}` : ""].join("").trim();
   }
-  if (event.type === "plan") return "Claude 更新了执行计划。";
-  if (event.type === "usage") return "";
+  if (event.type === "plan") {
+    const entries = event.payload?.entries;
+    if (!Array.isArray(entries) || !entries.length) return "运行时更新了执行计划。";
+    const lines = entries.map((entry, index) => {
+      const title = entry.title || entry.content || entry.task || entry.description || `步骤 ${index + 1}`;
+      const status = entry.status || entry.state || "";
+      return `${status ? `[${status}] ` : ""}${title}`;
+    });
+    return ["运行时更新了执行计划：", ...lines].join("\n");
+  }
+  if (event.type === "usage") {
+    const input = event.payload?.inputTokens ?? event.payload?.input_tokens ?? event.payload?.promptTokens;
+    const output = event.payload?.outputTokens ?? event.payload?.output_tokens ?? event.payload?.completionTokens;
+    const total = event.payload?.totalTokens ?? event.payload?.total_tokens;
+    const parts = [
+      input != null ? `输入 ${input}` : "",
+      output != null ? `输出 ${output}` : "",
+      total != null ? `总计 ${total}` : "",
+    ].filter(Boolean);
+    return parts.length ? `用量更新：${parts.join(" · ")}` : "";
+  }
   return "";
 }
 
@@ -541,6 +611,7 @@ function createSession(firstTask) {
   const provider = currentMainProvider();
   if (!agent || !provider) return null;
 
+  const hermesProfile = hermesProfileMetaFromAgent(agent);
   sessionSeq += 1;
   const session = {
     id: `session-${Date.now()}-${sessionSeq}`,
@@ -554,8 +625,14 @@ function createSession(firstTask) {
     turns: [],
     createdAt: new Date().toISOString(),
     fullscreen: false,
-    profileName: agent.profileName || null,
-    profileCommand: agent.alias || null,
+    profileName: hermesProfile?.profileName || null,
+    profileAlias: hermesProfile?.profileAlias || null,
+    profileExecutable: hermesProfile?.profileExecutable || null,
+    profilePath: hermesProfile?.profilePath || null,
+    profileModel: hermesProfile?.profileModel || null,
+    gateway: hermesProfile?.gateway || null,
+    skillCount: hermesProfile?.skillCount ?? null,
+    hasSoul: hermesProfile?.hasSoul || false,
   };
   sessions = [session, ...sessions];
   activeSessionIds[agent.id] = session.id;
@@ -566,6 +643,7 @@ function createSession(firstTask) {
 
 function createTurn(session, task) {
   turnSeq += 1;
+  const hermesProfile = hermesProfileMetaFromSession(session);
   const turn = {
     id: `turn-${Date.now()}-${turnSeq}`,
     task,
@@ -575,6 +653,7 @@ function createTurn(session, task) {
     finalResponse: "正在等待运行时返回内容...",
     logs: ["消息已进入当前会话，等待运行时返回内容。"],
     createdAt: new Date().toISOString(),
+    meta: hermesProfile ? { hermesProfile } : {},
   };
   session.task = task;
   session.state = 2;
@@ -648,12 +727,15 @@ function appendStreamEventToTurn(sessionId, event) {
       break;
     case "tool":
       turn.logs = [
-        `${event.payload?.title || event.payload?.kind || "tool"} ${event.payload?.status || ""}`.trim(),
+        content || `${event.payload?.title || event.payload?.kind || "tool"} ${event.payload?.status || ""}`.trim(),
         ...turn.logs,
       ];
       break;
     case "plan":
-      turn.logs = ["计划已更新。", ...turn.logs];
+      turn.logs = [content || "计划已更新。", ...turn.logs];
+      break;
+    case "usage":
+      if (content) turn.logs = [content, ...turn.logs];
       break;
     case "state":
       if (content) turn.logs = [content, ...turn.logs];
@@ -738,6 +820,9 @@ function renderSessionCard(session) {
   const isActiveReceiver = activeSessionIds[session.agentId] === session.id && canSendToSession(session);
   const isWaiting = session.state === 2;
   const canDismiss = runtimeState !== "restoring";
+  const profileMeta = session.providerId === "hermes"
+    ? [session.profileName, session.profileModel].filter(Boolean).join(" · ")
+    : "";
   return `
     <article class="session-card ${session.fullscreen ? "fullscreen" : ""} ${isActiveReceiver ? "is-active-receiver" : ""} ${isWaiting ? "is-waiting" : ""}" data-session-id="${session.id}">
       ${isActiveReceiver ? `<div class="active-receiver-banner">当前接收任务</div>` : ""}
@@ -747,6 +832,7 @@ function renderSessionCard(session) {
             <strong>${session.agentName}</strong>
             <span class="runtime-pill ${runtimeStateClasses[runtimeState] || "runtime-archived"}">${runtimeStateLabels[runtimeState] || runtimeState}</span>
           </div>
+          ${profileMeta ? `<div class="caption session-profile-meta">${profileMeta}</div>` : ""}
           <div class="caption session-task">${session.task}</div>
         </div>
         <div class="session-card-actions">
@@ -913,6 +999,7 @@ function archivedSessionsFromHistory(entries) {
       createdAt: entry.created_at,
     };
     const current = bySession.get(key);
+    const hermesProfile = entry.turn?.meta?.hermesProfile || null;
     if (!current) {
       bySession.set(key, {
         id: key,
@@ -929,6 +1016,7 @@ function archivedSessionsFromHistory(entries) {
         turnCount: 1,
         turns: [turn],
         runtimeState: "archived",
+        hermesProfile,
       });
       return;
     }
@@ -936,6 +1024,7 @@ function archivedSessionsFromHistory(entries) {
     current.summary = entry.summary || current.summary;
     current.turnCount += 1;
     current.turns.push(turn);
+    current.hermesProfile = current.hermesProfile || hermesProfile;
   });
   return [...bySession.values()]
     .map((session) => ({
@@ -1055,10 +1144,29 @@ function ensureArchivedAgent(archived) {
     provider.agents.push(agent);
   }
   if (provider.id === "hermes") {
-    const liveAgent = provider.agents.find((entry) => entry.id === archived.agentId);
+    const hermesProfile = hermesProfileMetaFromArchived(archived);
+    const liveAgent = provider.agents.find((entry) =>
+      entry.id === archived.agentId
+      || (hermesProfile?.profileName && entry.profileName === hermesProfile.profileName)
+      || (hermesProfile?.profileAlias && entry.profileAlias === hermesProfile.profileAlias)
+      || (hermesProfile?.profilePath && entry.profilePath === hermesProfile.profilePath)
+    );
     if (liveAgent) {
       agent.profileName = liveAgent.profileName || agent.profileName || null;
-      agent.alias = liveAgent.alias || agent.alias || null;
+      agent.alias = liveAgent.alias || agent.alias || hermesProfile?.profileAlias || null;
+      agent.profileAlias = liveAgent.profileAlias || agent.profileAlias || hermesProfile?.profileAlias || null;
+      agent.profileExecutable = liveAgent.profileExecutable || agent.profileExecutable || hermesProfile?.profileExecutable || null;
+      agent.profilePath = liveAgent.profilePath || agent.profilePath || hermesProfile?.profilePath || null;
+      agent.model = liveAgent.model || agent.model || hermesProfile?.profileModel || null;
+      agent.gateway = liveAgent.gateway || agent.gateway || hermesProfile?.gateway || null;
+    } else if (hermesProfile) {
+      agent.profileName = hermesProfile.profileName || agent.profileName || null;
+      agent.alias = hermesProfile.profileAlias || agent.alias || null;
+      agent.profileAlias = hermesProfile.profileAlias || agent.profileAlias || null;
+      agent.profileExecutable = hermesProfile.profileExecutable || agent.profileExecutable || null;
+      agent.profilePath = hermesProfile.profilePath || agent.profilePath || null;
+      agent.model = hermesProfile.profileModel || agent.model || null;
+      agent.gateway = hermesProfile.gateway || agent.gateway || null;
     }
   }
   return agent;
@@ -1086,12 +1194,22 @@ async function restoreArchivedSession(sessionId) {
     fullscreen: false,
     acpSessionId: archived.acpSessionId,
     runtimeState: "archived",
-    profileName: null,
-    profileCommand: null,
+    profileName: archived.hermesProfile?.profileName || null,
+    profileAlias: archived.hermesProfile?.profileAlias || null,
+    profileExecutable: archived.hermesProfile?.profileExecutable || null,
+    profilePath: archived.hermesProfile?.profilePath || null,
+    profileModel: archived.hermesProfile?.profileModel || null,
+    gateway: archived.hermesProfile?.gateway || null,
+    skillCount: archived.hermesProfile?.skillCount ?? null,
+    hasSoul: archived.hermesProfile?.hasSoul || false,
   };
   const restoredAgent = ensureArchivedAgent(archived);
   restored.profileName = restored.profileName || restoredAgent.profileName || null;
-  restored.profileCommand = restored.profileCommand || restoredAgent.alias || null;
+  restored.profileAlias = restored.profileAlias || restoredAgent.profileAlias || restoredAgent.alias || null;
+  restored.profileExecutable = restored.profileExecutable || restoredAgent.profileExecutable || restoredAgent.alias || null;
+  restored.profilePath = restored.profilePath || restoredAgent.profilePath || restoredAgent.path || null;
+  restored.profileModel = restored.profileModel || restoredAgent.model || null;
+  restored.gateway = restored.gateway || restoredAgent.gateway || null;
   if (!existing) sessions = [restored, ...sessions];
   saveMainAgent(restored.agentId);
   renderProviders();
@@ -1121,7 +1239,7 @@ async function restoreArchivedSession(sessionId) {
       runtimeSessionId: restored.id,
       acpSessionId: restored.acpSessionId,
       cwd: null,
-      profileCommand: restored.profileCommand || null,
+      profileExecutable: restored.profileExecutable || null,
     });
     restored.runtimeState = "live";
     activeSessionIds[restored.agentId] = restored.id;
@@ -1134,7 +1252,7 @@ async function restoreArchivedSession(sessionId) {
         runtimeSessionId: restored.id,
         acpSessionId: restored.acpSessionId,
         cwd: null,
-        profileCommand: restored.profileCommand || null,
+        profileExecutable: restored.profileExecutable || null,
       });
       restored.runtimeState = "live";
       activeSessionIds[restored.agentId] = restored.id;
@@ -1171,6 +1289,11 @@ async function loadHistory() {
 }
 
 async function saveTurnToHistory(session, turn) {
+  const hermesProfile = hermesProfileMetaFromSession(session);
+  const turnForHistory = {
+    ...turn,
+    meta: hermesProfile ? { ...(turn.meta || {}), hermesProfile } : turn.meta,
+  };
   const entry = await invoke("append_history_entry", {
     entry: {
       schemaVersion: HISTORY_SCHEMA_VERSION,
@@ -1183,7 +1306,7 @@ async function saveTurnToHistory(session, turn) {
       task: turn.task,
       status: stateNames[turn.state] || "UNKNOWN",
       summary: turn.finalResponse || turn.outputs.at(-1) || turn.logs.at(0) || "消息已结束。",
-      turn,
+      turn: turnForHistory,
     },
   });
   const key = historyTurnKey(entry);
@@ -1251,7 +1374,7 @@ async function startAcpSession(session, turn) {
       runtimeSessionId: session.id,
       prompt: turn.task,
       cwd: null,
-      profileCommand: session.profileCommand || null,
+      profileExecutable: session.profileExecutable || null,
     });
     const saved = updateTurnFromEvents(session.id, turn.id, events);
     if (saved) {

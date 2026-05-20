@@ -2,9 +2,9 @@
 
 ## 项目定位
 
-LunaAgentOS 是一个“通用 Agent 控制台 / 控制平面”项目。
+LunaAgentOS 想成为异构智能体的操作系统。
 
-它不试图替代 Claude、Hermes、Trae 这类现成 Agent 产品，而是希望在它们之上建立一层统一的控制能力：
+它不是另一个底层智能体，而是站在 Claude、Hermes、Trae 这类现成智能体产品之上，为它们建立统一的入口、工作台与控制层：
 
 - 统一接入
 - 统一状态机
@@ -12,111 +12,66 @@ LunaAgentOS 是一个“通用 Agent 控制台 / 控制平面”项目。
 - 统一观测与归档
 - 统一的人类审批与任务分发
 
-一句话说，它做的是 **现成 Agent 之上的控制层**，而不是新的底层 Agent Runtime。
+一句话说，它要做的是 **异构智能体之上的操作系统层**。
+
+当前阶段先从最小桌面工作台开始：统一入口，沉淀会话；之后再发展调用流、协作流和控制平面。
 
 ## 为什么做
 
-当前主流 Agent 产品正在快速分化：
+当前主流智能体产品正在快速分化：
 
-- 有的强在 CLI
-- 有的强在 IDE
-- 有的强在 Gateway / 长连接服务
+- 有的强在命令行
+- 有的强在编辑器或集成开发环境
+- 有的强在消息网关或长连接服务
 
-但对于用户来说，真正的痛点不是“找不到 Agent”，而是：
+但对于用户来说，真正的痛点不是“找不到智能体”，而是：
 
-- 多个 Agent 无法统一编排
+- 多个智能体无法统一编排
 - 思考流与工具调用不可见
 - 会话难以归档、搜索和回放
 - 人类工作流缺少审批、注入与调度入口
 
-LunaAgentOS 的目标，就是把这些异构 Agent 收拢进一个统一的控制台/控制平面。
+LunaAgentOS 的目标，就是把这些异构智能体收拢进一个统一的控制台 / 控制平面。
 
-## 当前阶段：Phase 0 - CLI Agent Adapter POC
+## 当前阶段：Stage 1 - 最小异构控制台雏形
 
-当前仓库首先验证一件事：
+当前仓库已经从早期协议验证推进到真实桌面工作台阶段。
 
-**不同风格的 CLI 输出，能不能被收敛成一套统一事件流。**
+当前阶段首先稳住一条主链路，而不是急着做复杂编排：
 
-这一阶段关注的是协议与适配，而不是完整 GUI。
+- 启动桌面控制台
+- 左侧展示外部入口舰队
+- 用户设定当前发送目标
+- 用户输入任务并发送
+- 中间工作台生成主入口会话卡片
+- 卡片承载输出流、思考流、运行流与最终响应
+- 右侧展示按日期归档的本地 JSON 会话历史
 
-### 当前协议要点
+`Stage 1` 必须同时成立：
 
-- `Manifest`
-  - 定义插件身份、传输方式、启动命令、是否需要 PTY
-- 生命周期状态机
-  - `INIT / IDLE / THINK / TOOLING / RESP / DONE / ERROR`
-- 统一消息格式
-  - 上行事件标准化输出
-  - 下行命令统一注入
+- `Claude Code` 真实可用
+- `Hermes` 真实可用
 
-### 当前重点传输
+如果只有 Claude，这仍然会被误解成“Claude 桌面壳”；只有 `Claude + Hermes` 都进入工作台，LunaAgentOS 才具备最小异构控制台雏形。
 
-- `stdio_json`
-- `stdio_text`
+### 当前运行时要点
 
-## 当前仓库内容
+- 桌面壳已经从静态原型进入真实工作台
+- Claude Code 与 Hermes 已进入同一个工作台
+- 主入口多会话卡片工作台已经落地
+- 启动静默：首屏先起，历史和 Hermes 配置身份后台加载
+- 输入区以 `发送` 为唯一强主动作，其它偏好项保持轻量
 
-### 核心代码
+## 文档入口
 
-- `adapter.py`
-  - `StdioAgentAdapter`
-  - `Manifest` 解析
-  - `Log Scrubber`
-  - `State Inferer`
-  - 启停与优雅退出
+根目录 README 只保留项目入口级信息，具体产品边界、架构、运行时接入和验证记录集中放在 `docs/`。
 
-- `mock_agent.py`
-  - 模拟 CLI Agent
-  - 故意输出非 JSON 噪音
-  - 模拟思考、工具调用、最终回复与完成态
-
-- `test_runner.py`
-  - 加载 mock manifest
-  - 发送 prompt
-  - 监听标准化事件
-  - 验证完整状态流
-
-### 插件与桥接说明
-
-- `plugins/mock/manifest.json`
-  - 可运行的 mock manifest
-- `plugins/claude-code/manifest.example.json`
-  - `强大` 样板的示例 manifest
-- `plugins/hermes/manifest.example.json`
-  - `通用` 样板的示例 manifest
-- `bridges/trae-ide/README.md`
-  - `免费` 样板的桥接说明
-
-### 说明文档
-
-- `docs/validation-report.md`
-  - 本地协议验证结果
-- `docs/target-matrix.md`
-  - 首批三家样板矩阵
-- `docs/tech-stack-decision.md`
-  - 技术选型决策文档
-- `docs/mvp-v1-scope.md`
-  - 第一版最小需求路径
-- `docs/mvp-v1-interaction-model.md`
-  - 第一版主交互模型与主 agent 多会话机制
-- `docs/version-roadmap.md`
-  - 从 v1 到 v3 的版本路线
-- `docs/architecture-overview.md`
-  - 架构总览
-- `docs/why-lunaagentos.md`
-  - 项目动机
-- `docs/open-questions.md`
-  - 当前开放问题
-- `docs/competitive-positioning.md`
-  - amux / Goose / Fusion 竞品定位
-- `docs/light-core-principles.md`
-  - 第一版轻核心原则
-- `docs/desktop-shell-validation.md`
-  - 桌面壳验证记录
-- `CONTRIBUTING.md`
-  - 贡献指南
-- `prototype/console/`
-  - 最小控制台原型
+- `docs/README.md`：文档总入口
+- `docs/prompt-v1-alignment.md`：Stage 1 产品边界与交接说明
+- `docs/mvp-v1-interaction-model.md`：第一版交互模型
+- `docs/hermes-acp-profile-runtime.md`：Hermes 接入技术说明
+- `docs/hermes-tui-direction.md`：Hermes 过程可见与 TUI 化方向
+- `bridges/trae-ide/README.md`：Trae IDE 桥接说明
 
 ## 首批三家样板
 
@@ -134,79 +89,43 @@ LunaAgentOS 的目标，就是把这些异构 Agent 收拢进一个统一的控�
 
 ### 2. Hermes
 
-代表“最适合率先跑通真实接入”的通用样板。
+代表“通用入口”和过程可见验证。
 
-它的重要性在于：更适合作为首个现实 Adapter，帮助验证协议、状态机和事件流设计。
+它的重要性在于：
+
+- 作为 `Stage 1` 中除 Claude 之外的第二个真实入口
+- 验证异构运行时接入
+- 优先追求“让慢变得可见”，接近 Hermes TUI 的活会话体验
+
+技术细节见：
+
+- `docs/hermes-acp-profile-runtime.md`
 
 ### 3. Trae IDE
 
 代表“免费入口”。
 
-它的重要性不在于它像 CLI，而在于它自带免费模型和工具体验，具备拉新和扩大影响力的潜力。
+它的重要性不在于它像命令行工具，而在于它自带免费模型和工具体验，具备拉新和扩大影响力的潜力。
 
 但这里要保持技术诚实：
 
 - `Trae IDE` 是产品上必须纳入的首批样板
-- 它不是当前 `stdio` POC 中的天然原生目标
-- 它更适合作为后续 `IDE Bridge / Desktop Bridge` 方向单独推进
-
-## 当前验证结果
-
-当前本地已经完成 mock 链路验证。
-
-### 运行命令
-
-```powershell
-C:\Users\tiany\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe test_runner.py
-```
-
-### 验证结果
-
-```text
-INIT -> THINK -> TOOLING -> RESP -> DONE
-```
-
-这说明当前 POC 已经验证了：
-
-- manifest 加载
-- 子进程启动
-- prompt 注入
-- 脏日志过滤
-- JSON 提取
-- 状态推断
-- tool request / tool result 回注
-- 最终完成态收敛
-
-## 当前原型实现
-
-除了协议 POC，仓库中已经开始落第一版“最小控制台原型”：
-
-- 左侧 Agent 列表
-- 中间任务卡与消息流
-- 工具调用面板
-- 右侧状态时间线
-- 底部人类输入入口
-
-原型目录：
-
-- `prototype/console/`
-
-这套原型的目标不是替代最终桌面产品，而是提前把“控制台长什么样、最小交互闭环长什么样”做成可见资产，方便吸引参与者和承接未来桌面壳。
+- 它不是当前底层协议验证中的天然原生目标
+- 它更适合作为后续编辑器桥接 / 桌面桥接方向单独推进
 
 ## 当前桌面壳进展
 
-仓库里已经不只是静态原型，而是开始进入真实桌面壳工程：
+仓库已经进入真实桌面壳工程：
 
 - `desktop-shell/`
 
 当前已经完成：
 
-- `Tauri 2` 工程初始化
-- Rust / MSVC 编译链打通
-- 控制台原型接入桌面壳前端
-- 无 bundling 的 release 构建验证
-- `Claude Code CLI` 真实运行时接线
-- `WSL Hermes` 真实运行时探测
+- `Claude Code` 与 `Hermes` 已进入同一桌面工作台
+- 左中右三区模型已经落地
+- 主入口多会话与本地历史归档已经可用
+- Hermes 过程事件会进入会话卡片
+- 输入区已突出 `发送` 这一主动作
 
 当前可验证产物：
 
@@ -235,7 +154,8 @@ INIT -> THINK -> TOOLING -> RESP -> DONE
 
 ## 下一步
 
-1. 用当前 adapter 对接第一个真实目标，优先 `Hermes`
-2. 再接 `Claude Code`，验证高价值样板
-3. 并行定义 `Trae IDE` 的桥接策略，而不是伪装成 CLI manifest
-4. 在协议稳定后，继续向控制台 / 控制平面演进
+1. 继续打磨 Hermes 配置身份下的会话恢复与错误态
+2. 继续打磨 Hermes 过程事件的展示层级与去噪
+3. 增加 Hermes 配置身份缓存，避免环境探测影响启动体验
+4. 并行定义 `Trae IDE` 的桥接策略，而不是伪装成命令行入口
+5. 完成 Stage 1 后，再进入调用流与控制平面能力

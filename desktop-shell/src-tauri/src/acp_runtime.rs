@@ -67,7 +67,7 @@ pub fn run_hermes_acp_prompt(
     runtime_session_id: String,
     prompt: String,
     cwd: Option<String>,
-    profile_command: Option<String>,
+    profile_executable: Option<String>,
     on_event: Option<&mut dyn FnMut(Value)>,
 ) -> Result<Vec<Value>, String> {
     run_acp_prompt(
@@ -75,7 +75,7 @@ pub fn run_hermes_acp_prompt(
         runtime_session_id,
         prompt,
         cwd,
-        profile_command,
+        profile_executable,
         on_event,
     )
 }
@@ -85,7 +85,7 @@ fn run_acp_prompt(
     runtime_session_id: String,
     prompt: String,
     cwd: Option<String>,
-    profile_command: Option<String>,
+    profile_executable: Option<String>,
     mut on_event: Option<&mut dyn FnMut(Value)>,
 ) -> Result<Vec<Value>, String> {
     let cwd = match cwd {
@@ -103,7 +103,7 @@ fn run_acp_prompt(
                 &cwd,
                 &mut events,
                 SessionStartMode::New,
-                profile_command.as_deref(),
+                profile_executable.as_deref(),
                 &mut on_event,
             )?;
             sessions.insert(runtime_session_id.clone(), session);
@@ -137,15 +137,9 @@ pub fn resume_hermes_acp_session(
     runtime_session_id: String,
     acp_session_id: String,
     cwd: Option<String>,
-    profile_command: Option<String>,
+    profile_executable: Option<String>,
 ) -> Result<Vec<Value>, String> {
-    resume_acp_session(
-        AcpRuntime::Hermes,
-        runtime_session_id,
-        acp_session_id,
-        cwd,
-        profile_command,
-    )
+    resume_acp_session(AcpRuntime::Hermes, runtime_session_id, acp_session_id, cwd, profile_executable)
 }
 
 fn resume_acp_session(
@@ -153,7 +147,7 @@ fn resume_acp_session(
     runtime_session_id: String,
     acp_session_id: String,
     cwd: Option<String>,
-    profile_command: Option<String>,
+    profile_executable: Option<String>,
 ) -> Result<Vec<Value>, String> {
     let cwd = match cwd {
         Some(value) if !value.trim().is_empty() => PathBuf::from(value),
@@ -179,7 +173,7 @@ fn resume_acp_session(
         &cwd,
         &mut events,
         SessionStartMode::Resume(acp_session_id.clone()),
-        profile_command.as_deref(),
+        profile_executable.as_deref(),
         &mut on_event,
     )?;
     sessions.insert(runtime_session_id, session);
@@ -198,15 +192,9 @@ pub fn load_hermes_acp_session(
     runtime_session_id: String,
     acp_session_id: String,
     cwd: Option<String>,
-    profile_command: Option<String>,
+    profile_executable: Option<String>,
 ) -> Result<Vec<Value>, String> {
-    load_acp_session(
-        AcpRuntime::Hermes,
-        runtime_session_id,
-        acp_session_id,
-        cwd,
-        profile_command,
-    )
+    load_acp_session(AcpRuntime::Hermes, runtime_session_id, acp_session_id, cwd, profile_executable)
 }
 
 fn load_acp_session(
@@ -214,7 +202,7 @@ fn load_acp_session(
     runtime_session_id: String,
     acp_session_id: String,
     cwd: Option<String>,
-    profile_command: Option<String>,
+    profile_executable: Option<String>,
 ) -> Result<Vec<Value>, String> {
     let cwd = match cwd {
         Some(value) if !value.trim().is_empty() => PathBuf::from(value),
@@ -240,7 +228,7 @@ fn load_acp_session(
         &cwd,
         &mut events,
         SessionStartMode::Load(acp_session_id.clone()),
-        profile_command.as_deref(),
+        profile_executable.as_deref(),
         &mut on_event,
     )?;
     sessions.insert(runtime_session_id, session);
@@ -328,10 +316,10 @@ fn start_acp_session(
     cwd: &PathBuf,
     mut events: &mut Vec<Value>,
     mode: SessionStartMode,
-    profile_command: Option<&str>,
+    profile_executable: Option<&str>,
     on_event: &mut Option<&mut dyn FnMut(Value)>,
 ) -> Result<AcpSession, String> {
-    let mut child = build_acp_command(runtime, cwd, profile_command)
+    let mut child = build_acp_command(runtime, cwd, profile_executable)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -525,7 +513,7 @@ fn send_prompt(
     Ok(())
 }
 
-fn build_acp_command(runtime: AcpRuntime, cwd: &PathBuf, profile_command: Option<&str>) -> Command {
+fn build_acp_command(runtime: AcpRuntime, cwd: &PathBuf, profile_executable: Option<&str>) -> Command {
     let mut command = match runtime {
         AcpRuntime::Claude if cfg!(windows) => Command::new("npx.cmd"),
         AcpRuntime::Claude => Command::new("npx"),
@@ -546,7 +534,7 @@ fn build_acp_command(runtime: AcpRuntime, cwd: &PathBuf, profile_command: Option
                 .envs(load_claude_user_env());
         }
         AcpRuntime::Hermes => {
-            let executable = profile_command
+            let executable = profile_executable
                 .filter(|value| !value.trim().is_empty())
                 .unwrap_or("hermes");
             if cfg!(windows) {
@@ -813,14 +801,39 @@ fn map_session_update(message: &Value) -> Option<Value> {
 
 fn content_text(content: Option<&Value>) -> Option<String> {
     let content = content?;
-    if content.get("type").and_then(|value| value.as_str()) != Some("text") {
-        return None;
-    }
-    let text = content.get("text")?.as_str()?.to_string();
+    let text = content_part_text(content);
     if text.trim().is_empty() {
         None
     } else {
-        Some(text)
+        Some(text.trim().to_string())
+    }
+}
+
+fn content_part_text(content: &Value) -> String {
+    match content {
+        Value::String(text) => text.clone(),
+        Value::Array(items) => items
+            .iter()
+            .map(content_part_text)
+            .filter(|text| !text.trim().is_empty())
+            .collect::<Vec<_>>()
+            .join("\n"),
+        Value::Object(object) => {
+            if let Some(text) = object.get("text").and_then(|value| value.as_str()) {
+                return text.to_string();
+            }
+            if let Some(content) = object.get("content") {
+                return content_part_text(content);
+            }
+            if let Some(input) = object.get("input").and_then(|value| value.as_str()) {
+                return input.to_string();
+            }
+            if let Some(output) = object.get("output").and_then(|value| value.as_str()) {
+                return output.to_string();
+            }
+            String::new()
+        }
+        _ => String::new(),
     }
 }
 

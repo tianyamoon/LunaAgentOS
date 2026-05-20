@@ -216,7 +216,7 @@ fn parse_hermes_profile_show(raw: &str) -> std::collections::HashMap<String, Str
 
 #[tauri::command]
 fn runtime_hermes_profiles() -> Result<Vec<HermesProfileMeta>, String> {
-    let list_raw = run_shell("wsl.exe", &["-e", "bash", "-lc", "hermes profile list"])?;
+    let list_raw = run_shell("wsl.exe", &["-e", "hermes", "profile", "list"])?;
     let list_rows = parse_hermes_profile_list(&list_raw);
     if list_rows.is_empty() {
         return Ok(Vec::new());
@@ -224,8 +224,9 @@ fn runtime_hermes_profiles() -> Result<Vec<HermesProfileMeta>, String> {
 
     let mut profiles = Vec::new();
     for (profile_name, model, gateway, alias, is_default) in list_rows {
-        let show_cmd = format!("hermes profile show {}", profile_name);
-        let show_raw = run_shell("wsl.exe", &["-e", "bash", "-lc", &show_cmd]).unwrap_or_default();
+        let show_raw =
+            run_shell("wsl.exe", &["-e", "hermes", "profile", "show", &profile_name])
+                .unwrap_or_default();
         let details = parse_hermes_profile_show(&show_raw);
         let path = details.get("path").cloned().unwrap_or_default();
         let skill_count = details
@@ -570,7 +571,7 @@ async fn runtime_acp_hermes_prompt(
     runtime_session_id: String,
     prompt: String,
     cwd: Option<String>,
-    profile_command: Option<String>,
+    profile_executable: Option<String>,
 ) -> Result<Vec<Value>, String> {
     let runtime_session_id_for_emit = runtime_session_id.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
@@ -585,7 +586,7 @@ async fn runtime_acp_hermes_prompt(
             runtime_session_id,
             prompt,
             cwd,
-            profile_command,
+            profile_executable,
             Some(&mut emit_update),
         )
     })
@@ -613,14 +614,14 @@ async fn runtime_acp_hermes_resume(
     runtime_session_id: String,
     acp_session_id: String,
     cwd: Option<String>,
-    profile_command: Option<String>,
+    profile_executable: Option<String>,
 ) -> Result<Vec<Value>, String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
         acp_runtime::resume_hermes_acp_session(
             runtime_session_id,
             acp_session_id,
             cwd,
-            profile_command,
+            profile_executable,
         )
     })
     .await
@@ -683,14 +684,14 @@ async fn runtime_acp_hermes_load(
     runtime_session_id: String,
     acp_session_id: String,
     cwd: Option<String>,
-    profile_command: Option<String>,
+    profile_executable: Option<String>,
 ) -> Result<Vec<Value>, String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
         acp_runtime::load_hermes_acp_session(
             runtime_session_id,
             acp_session_id,
             cwd,
-            profile_command,
+            profile_executable,
         )
     })
     .await

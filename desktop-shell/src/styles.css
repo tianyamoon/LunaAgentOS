@@ -573,7 +573,7 @@ button:disabled {
 
 .composer {
   flex: 0 0 auto;
-  padding: 10px;
+  padding: 10px 10px 8px;
   border: 1px solid var(--border);
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.58);
@@ -581,52 +581,95 @@ button:disabled {
 
 .composer-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 116px;
+  grid-template-columns: minmax(0, 1fr) 132px;
   gap: 12px;
   align-items: stretch;
 }
 
-.composer-actions {
+.composer-primary-action {
   display: flex;
   flex-direction: column;
-  gap: 8px;
   justify-content: stretch;
+  align-items: stretch;
 }
 
-.composer-actions .mini-btn {
-  height: 34px;
+.composer-primary-action .primary {
+  width: 100%;
+  height: 48px;
+  flex: 0 0 auto;
+}
+
+.composer-options {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 26px;
+  padding: 5px 2px 0;
+  color: rgba(122, 103, 85, 0.68);
+}
+
+.composer-options-divider {
+  width: 1px;
+  height: 11px;
+  background: rgba(122, 103, 85, 0.16);
+}
+
+.composer-options .mini-btn {
+  height: 24px;
+  padding: 0 4px;
+  border-color: transparent;
+  background: transparent;
+  color: rgba(122, 103, 85, 0.78);
+  font-size: 0.76rem;
+  box-shadow: none;
+}
+
+.composer-options .mini-btn,
+.session-option-toggle {
+  transform: none;
+}
+
+.composer-options .mini-btn:hover {
+  color: var(--accent);
+  background: transparent;
+  box-shadow: none;
+  transform: none;
 }
 
 .session-option-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  height: 34px;
-  min-width: 104px;
-  padding: 0 10px;
+  gap: 6px;
+  height: 24px;
+  min-width: auto;
+  padding: 0 4px;
+  border-color: transparent;
   border-radius: 999px;
-  font-size: 0.82rem;
-  color: var(--muted);
+  font-size: 0.76rem;
+  color: rgba(122, 103, 85, 0.7);
   background: transparent;
 }
 
 .session-option-toggle:hover {
+  color: var(--accent);
+  background: transparent;
   box-shadow: none;
+  transform: none;
 }
 
 .session-option-toggle .toggle-dot {
-  width: 9px;
-  height: 9px;
+  width: 7px;
+  height: 7px;
   border-radius: 999px;
   border: 1px solid rgba(99, 82, 63, 0.28);
   background: transparent;
 }
 
 .session-option-toggle.is-active {
-  border-color: rgba(217, 108, 58, 0.24);
+  border-color: transparent;
   color: var(--accent);
-  background: rgba(255, 247, 239, 0.58);
+  background: transparent;
 }
 
 .session-option-toggle.is-active .toggle-dot {
@@ -734,6 +777,14 @@ textarea {
 
   .composer-row {
     grid-template-columns: 1fr;
+  }
+
+  .composer-primary-action {
+    align-items: flex-end;
+  }
+
+  .composer-primary-action .primary {
+    width: 132px;
   }
 }
 
