@@ -4,9 +4,17 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 1420",
+    "build": "vite build",
     "tauri": "tauri"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2"
+    "@tauri-apps/cli": "^2",
+    "vite": "^8.0.13"
+  },
+  "dependencies": {
+    "dompurify": "^3.4.5",
+    "markdown-it": "^14.1.1",
+    "mermaid": "^11.15.0"
   }
 }

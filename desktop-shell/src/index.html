@@ -12,7 +12,7 @@
         <div class="brand">
           <p class="product-eyebrow">Heterogeneous Agent Control Console</p>
           <h1>LunaAgentOS</h1>
-          <p id="appNotice" class="app-notice">工作台准备就绪，等待发送目标接收任务。</p>
+          <p id="appNotice" class="app-notice" aria-live="polite"></p>
         </div>
         <div class="topbar-tools">
           <div class="launch-metrics" aria-label="当前能力状态">
@@ -77,6 +77,7 @@
         </aside>
       </main>
     </div>
+    <div id="confirmDialog" class="confirm-dialog-backdrop" hidden></div>
 
     <script type="module" src="./main.js"></script>
   </body>

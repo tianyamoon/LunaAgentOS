@@ -12,7 +12,9 @@
 - 将 LunaAgentOS 最小控制台原型接入桌面壳前端
 - 完成一次无 bundling 的 release 构建
 - 接入 `Claude Code CLI` 的真实运行时探测与非交互事件流调用
-- 探测到 `WSL Hermes` 真实运行时
+- 探测到 `WSL Hermes` 真实运行时，并接入 Hermes ACP 会话事件流
+- 增加本地 runtime 配置文件，允许用户覆盖 Claude / Hermes 的默认启动方式
+- 将本地历史存储拆分为 `history/live/` 与 `history/archive/`，并兼容旧的 `history/*.json`
 - 将启动流程收敛为“首屏先起、历史后台加载、运行时显式刷新”
 - 将任务发送改为“卡片先入场、CLI 后台运行、不阻塞继续操作”
 - 将占位交互从弹窗提示改为状态条反馈
@@ -41,8 +43,10 @@
 
 - 在 `WSL` 中已探测到真实运行时
 - 已确认 `hermes --version` 可返回
+- 已通过 ACP runtime 链路承接任务，并将 `session/update` 过程事件进入会话卡片
+- 允许通过本地 runtime 配置覆盖 Hermes host / executable
 
-当前仍未在桌面壳内直接下发真实任务，后续接入会沿 `WSL bridge` 路线推进。
+这意味着 Hermes 不再只是占位入口，而是 Stage 1 最小异构工作台的真实运行时入口之一。
 
 ## 当前启动与静默体验
 

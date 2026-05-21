@@ -16,7 +16,7 @@ use std::os::windows::process::CommandExt;
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
-const HISTORY_SCHEMA_VERSION: u32 = 2;
+const HISTORY_SCHEMA_VERSION: u32 = 3;
 
 fn history_schema_version() -> u32 {
     HISTORY_SCHEMA_VERSION
@@ -45,22 +45,32 @@ fn classify_backend_error(error: String) -> String {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 struct HistoryEntry {
     #[serde(default = "history_schema_version")]
     schema_version: u32,
     id: String,
     date: String,
+    #[serde(alias = "created_at")]
     created_at: String,
+    #[serde(alias = "provider_id")]
     provider_id: String,
+    #[serde(alias = "provider_name")]
     provider_name: String,
+    #[serde(alias = "agent_id")]
     agent_id: String,
+    #[serde(alias = "agent_name")]
     agent_name: String,
+    #[serde(alias = "session_id")]
     session_id: Option<String>,
+    #[serde(alias = "acp_session_id")]
     acp_session_id: Option<String>,
     task: String,
     status: String,
     summary: String,
     turn: Option<Value>,
+    #[serde(alias = "runtime_state")]
+    runtime_state: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -77,6 +87,28 @@ struct HistoryEntryInput {
     status: String,
     summary: String,
     turn: Option<Value>,
+    runtime_state: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+struct RuntimeConfigFile {
+    claude_command: Option<String>,
+    #[serde(default)]
+    claude_args: Vec<String>,
+    hermes_host: Option<String>,
+    hermes_command: Option<String>,
+}
+
+impl From<RuntimeConfigFile> for acp_runtime::RuntimeConfig {
+    fn from(value: RuntimeConfigFile) -> Self {
+        acp_runtime::RuntimeConfig {
+            claude_command: value.claude_command,
+            claude_args: value.claude_args,
+            hermes_host: value.hermes_host,
+            hermes_command: value.hermes_command,
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -221,9 +253,21 @@ fn parse_hermes_profile_show(raw: &str) -> std::collections::HashMap<String, Str
     details
 }
 
+fn run_hermes_profile_command(config: &RuntimeConfigFile, args: &[&str]) -> Result<String, String> {
+    let executable = config.hermes_command.as_deref().unwrap_or("hermes");
+    if cfg!(windows) && config.hermes_host.as_deref() != Some("native") {
+        let mut command_args = vec!["-e", executable];
+        command_args.extend_from_slice(args);
+        run_shell("wsl.exe", &command_args)
+    } else {
+        run_shell(executable, args)
+    }
+}
+
 #[tauri::command]
-fn runtime_hermes_profiles() -> Result<Vec<HermesProfileMeta>, String> {
-    let list_raw = run_shell("wsl.exe", &["-e", "hermes", "profile", "list"])?;
+fn runtime_hermes_profiles(app: AppHandle) -> Result<Vec<HermesProfileMeta>, String> {
+    let config = load_runtime_config_file(&app);
+    let list_raw = run_hermes_profile_command(&config, &["profile", "list"])?;
     let list_rows = parse_hermes_profile_list(&list_raw);
     if list_rows.is_empty() {
         return Ok(Vec::new());
@@ -231,9 +275,8 @@ fn runtime_hermes_profiles() -> Result<Vec<HermesProfileMeta>, String> {
 
     let mut profiles = Vec::new();
     for (profile_name, model, gateway, alias, is_default) in list_rows {
-        let show_raw =
-            run_shell("wsl.exe", &["-e", "hermes", "profile", "show", &profile_name])
-                .unwrap_or_default();
+        let show_raw = run_hermes_profile_command(&config, &["profile", "show", &profile_name])
+            .unwrap_or_default();
         let details = parse_hermes_profile_show(&show_raw);
         let path = details.get("path").cloned().unwrap_or_default();
         let skill_count = details
@@ -291,11 +334,53 @@ fn history_dir(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(history_dir)
 }
 
-fn history_file_for_today(app: &AppHandle) -> Result<(PathBuf, String, String), String> {
+fn history_bucket_dir(app: &AppHandle, bucket: &str) -> Result<PathBuf, String> {
+    let directory = history_dir(app)?.join(bucket);
+    fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
+    Ok(directory)
+}
+
+fn history_file_for_today(app: &AppHandle, bucket: &str) -> Result<(PathBuf, String, String), String> {
     let now = Local::now();
     let date = now.format("%Y-%m-%d").to_string();
     let timestamp = now.to_rfc3339();
-    Ok((history_dir(app)?.join(format!("{date}.json")), date, timestamp))
+    Ok((history_bucket_dir(app, bucket)?.join(format!("{date}.json")), date, timestamp))
+}
+
+fn history_file_for_date(app: &AppHandle, bucket: &str, date: &str) -> Result<PathBuf, String> {
+    Ok(history_bucket_dir(app, bucket)?.join(format!("{date}.json")))
+}
+
+fn runtime_config_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let base_dir = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|error| error.to_string())?;
+    fs::create_dir_all(&base_dir).map_err(|error| error.to_string())?;
+    Ok(base_dir.join("runtime-config.json"))
+}
+
+fn load_runtime_config_file(app: &AppHandle) -> RuntimeConfigFile {
+    let Ok(path) = runtime_config_path(app) else {
+        return RuntimeConfigFile::default();
+    };
+    let Ok(raw) = fs::read_to_string(path) else {
+        return RuntimeConfigFile::default();
+    };
+    serde_json::from_str::<RuntimeConfigFile>(&raw).unwrap_or_default()
+}
+
+#[tauri::command]
+fn load_runtime_config(app: AppHandle) -> Result<RuntimeConfigFile, String> {
+    Ok(load_runtime_config_file(&app))
+}
+
+#[tauri::command]
+fn save_runtime_config(app: AppHandle, config: RuntimeConfigFile) -> Result<RuntimeConfigFile, String> {
+    let path = runtime_config_path(&app)?;
+    let json = serde_json::to_string_pretty(&config).map_err(|error| error.to_string())?;
+    fs::write(path, json).map_err(|error| error.to_string())?;
+    Ok(config)
 }
 
 fn load_history_file(path: &PathBuf) -> Result<Vec<HistoryEntry>, String> {
@@ -319,6 +404,24 @@ fn try_load_history_file(path: &PathBuf) -> Option<Vec<HistoryEntry>> {
     }
 }
 
+fn history_json_files(app: &AppHandle) -> Result<Vec<PathBuf>, String> {
+    let mut files = Vec::new();
+    for directory in [
+        history_dir(app)?,
+        history_bucket_dir(app, "live")?,
+        history_bucket_dir(app, "archive")?,
+    ] {
+        for item in fs::read_dir(&directory).map_err(|error| error.to_string())? {
+            let item = item.map_err(|error| error.to_string())?;
+            let path = item.path();
+            if path.extension().and_then(|value| value.to_str()) == Some("json") {
+                files.push(path);
+            }
+        }
+    }
+    Ok(files)
+}
+
 fn history_entry_turn_id(entry: &HistoryEntry) -> Option<String> {
     entry
         .turn
@@ -338,15 +441,9 @@ fn history_entry_session_key(entry: &HistoryEntry) -> Option<String> {
 
 #[tauri::command]
 fn load_history_entries(app: AppHandle) -> Result<Vec<HistoryEntry>, String> {
-    let directory = history_dir(&app)?;
     let mut entries = Vec::new();
 
-    for item in fs::read_dir(&directory).map_err(|error| error.to_string())? {
-        let item = item.map_err(|error| error.to_string())?;
-        let path = item.path();
-        if path.extension().and_then(|value| value.to_str()) != Some("json") {
-            continue;
-        }
+    for path in history_json_files(&app)? {
         if let Some(mut day_entries) = try_load_history_file(&path) {
             entries.append(&mut day_entries);
         }
@@ -358,17 +455,11 @@ fn load_history_entries(app: AppHandle) -> Result<Vec<HistoryEntry>, String> {
 
 #[tauri::command]
 fn compact_history_entries(app: AppHandle) -> Result<HistoryCompactResult, String> {
-    let directory = history_dir(&app)?;
     let mut removed_count = 0;
     let mut upgraded_count = 0;
     let mut skipped_files = 0;
 
-    for item in fs::read_dir(&directory).map_err(|error| error.to_string())? {
-        let item = item.map_err(|error| error.to_string())?;
-        let path = item.path();
-        if path.extension().and_then(|value| value.to_str()) != Some("json") {
-            continue;
-        }
+    for path in history_json_files(&app)? {
         let Some(entries) = try_load_history_file(&path) else {
             skipped_files += 1;
             continue;
@@ -420,16 +511,10 @@ fn delete_history_session_entries(
         return Err("session_id 不能为空".to_string());
     }
 
-    let directory = history_dir(&app)?;
     let mut removed_count = 0;
     let mut skipped_files = 0;
 
-    for item in fs::read_dir(&directory).map_err(|error| error.to_string())? {
-        let item = item.map_err(|error| error.to_string())?;
-        let path = item.path();
-        if path.extension().and_then(|value| value.to_str()) != Some("json") {
-            continue;
-        }
+    for path in history_json_files(&app)? {
         let Some(entries) = try_load_history_file(&path) else {
             skipped_files += 1;
             continue;
@@ -456,8 +541,69 @@ fn delete_history_session_entries(
 }
 
 #[tauri::command]
+fn archive_history_session_entries(
+    app: AppHandle,
+    session_id: String,
+) -> Result<HistoryDeleteResult, String> {
+    let session_id = session_id.trim().to_string();
+    if session_id.is_empty() {
+        return Err("session_id 不能为空".to_string());
+    }
+
+    let mut moved_count = 0;
+    let mut skipped_files = 0;
+    let live_dir = history_bucket_dir(&app, "live")?;
+
+    for item in fs::read_dir(&live_dir).map_err(|error| error.to_string())? {
+        let item = item.map_err(|error| error.to_string())?;
+        let path = item.path();
+        if path.extension().and_then(|value| value.to_str()) != Some("json") {
+            continue;
+        }
+        let Some(entries) = try_load_history_file(&path) else {
+            skipped_files += 1;
+            continue;
+        };
+        let mut retained = Vec::new();
+        let mut moved = Vec::new();
+        for mut entry in entries {
+            if history_entry_session_key(&entry).unwrap_or_else(|| entry.id.clone()) == session_id {
+                entry.runtime_state = Some("archived".to_string());
+                moved.push(entry);
+            } else {
+                retained.push(entry);
+            }
+        }
+        if moved.is_empty() {
+            continue;
+        }
+        moved_count += moved.len();
+        let json = serde_json::to_string_pretty(&retained).map_err(|error| error.to_string())?;
+        fs::write(&path, json).map_err(|error| error.to_string())?;
+        for entry in moved {
+            let archive_path = history_file_for_date(&app, "archive", &entry.date)?;
+            let mut archive_entries = load_history_file(&archive_path)?;
+            archive_entries.push(entry);
+            archive_entries.sort_by(|left, right| right.created_at.cmp(&left.created_at));
+            let json = serde_json::to_string_pretty(&archive_entries).map_err(|error| error.to_string())?;
+            fs::write(archive_path, json).map_err(|error| error.to_string())?;
+        }
+    }
+
+    Ok(HistoryDeleteResult {
+        removed_count: moved_count,
+        skipped_files,
+    })
+}
+
+#[tauri::command]
 fn append_history_entry(app: AppHandle, entry: HistoryEntryInput) -> Result<HistoryEntry, String> {
-    let (path, date, timestamp) = history_file_for_today(&app)?;
+    let bucket = if entry.runtime_state.as_deref() == Some("live") {
+        "live"
+    } else {
+        "archive"
+    };
+    let (path, date, timestamp) = history_file_for_today(&app, bucket)?;
     let mut entries = load_history_file(&path)?;
     let saved = HistoryEntry {
         schema_version: entry.schema_version.unwrap_or(HISTORY_SCHEMA_VERSION),
@@ -474,6 +620,7 @@ fn append_history_entry(app: AppHandle, entry: HistoryEntryInput) -> Result<Hist
         status: entry.status,
         summary: entry.summary,
         turn: entry.turn,
+        runtime_state: entry.runtime_state,
     };
     let saved_turn_id = history_entry_turn_id(&saved);
     let saved_session_key = history_entry_session_key(&saved);
@@ -597,6 +744,7 @@ async fn runtime_acp_claude_prompt(
     cwd: Option<String>,
 ) -> Result<Vec<Value>, String> {
     let runtime_session_id_for_emit = runtime_session_id.clone();
+    let config = acp_runtime::RuntimeConfig::from(load_runtime_config_file(&app));
     let result = tauri::async_runtime::spawn_blocking(move || {
         let mut emit_update = |event: Value| {
             let payload = RuntimeSessionStreamPayload {
@@ -609,6 +757,7 @@ async fn runtime_acp_claude_prompt(
             runtime_session_id,
             prompt,
             cwd,
+            config,
             Some(&mut emit_update),
         )
     })
@@ -626,6 +775,7 @@ async fn runtime_acp_hermes_prompt(
     profile_executable: Option<String>,
 ) -> Result<Vec<Value>, String> {
     let runtime_session_id_for_emit = runtime_session_id.clone();
+    let config = acp_runtime::RuntimeConfig::from(load_runtime_config_file(&app));
     let result = tauri::async_runtime::spawn_blocking(move || {
         let mut emit_update = |event: Value| {
             let payload = RuntimeSessionStreamPayload {
@@ -639,6 +789,7 @@ async fn runtime_acp_hermes_prompt(
             prompt,
             cwd,
             profile_executable,
+            config,
             Some(&mut emit_update),
         )
     })
@@ -649,12 +800,14 @@ async fn runtime_acp_hermes_prompt(
 
 #[tauri::command]
 async fn runtime_acp_claude_resume(
+    app: AppHandle,
     runtime_session_id: String,
     acp_session_id: String,
     cwd: Option<String>,
 ) -> Result<Vec<Value>, String> {
+    let config = acp_runtime::RuntimeConfig::from(load_runtime_config_file(&app));
     let result = tauri::async_runtime::spawn_blocking(move || {
-        acp_runtime::resume_claude_acp_session(runtime_session_id, acp_session_id, cwd)
+        acp_runtime::resume_claude_acp_session(runtime_session_id, acp_session_id, cwd, config)
     })
     .await
     .map_err(|error| classify_backend_error(error.to_string()))?;
@@ -663,17 +816,20 @@ async fn runtime_acp_claude_resume(
 
 #[tauri::command]
 async fn runtime_acp_hermes_resume(
+    app: AppHandle,
     runtime_session_id: String,
     acp_session_id: String,
     cwd: Option<String>,
     profile_executable: Option<String>,
 ) -> Result<Vec<Value>, String> {
+    let config = acp_runtime::RuntimeConfig::from(load_runtime_config_file(&app));
     let result = tauri::async_runtime::spawn_blocking(move || {
         acp_runtime::resume_hermes_acp_session(
             runtime_session_id,
             acp_session_id,
             cwd,
             profile_executable,
+            config,
         )
     })
     .await
@@ -719,12 +875,14 @@ async fn runtime_acp_hermes_shutdown(runtime_session_id: String) -> Result<bool,
 
 #[tauri::command]
 async fn runtime_acp_claude_load(
+    app: AppHandle,
     runtime_session_id: String,
     acp_session_id: String,
     cwd: Option<String>,
 ) -> Result<Vec<Value>, String> {
+    let config = acp_runtime::RuntimeConfig::from(load_runtime_config_file(&app));
     let result = tauri::async_runtime::spawn_blocking(move || {
-        acp_runtime::load_claude_acp_session(runtime_session_id, acp_session_id, cwd)
+        acp_runtime::load_claude_acp_session(runtime_session_id, acp_session_id, cwd, config)
     })
     .await
     .map_err(|error| classify_backend_error(error.to_string()))?;
@@ -733,17 +891,20 @@ async fn runtime_acp_claude_load(
 
 #[tauri::command]
 async fn runtime_acp_hermes_load(
+    app: AppHandle,
     runtime_session_id: String,
     acp_session_id: String,
     cwd: Option<String>,
     profile_executable: Option<String>,
 ) -> Result<Vec<Value>, String> {
+    let config = acp_runtime::RuntimeConfig::from(load_runtime_config_file(&app));
     let result = tauri::async_runtime::spawn_blocking(move || {
         acp_runtime::load_hermes_acp_session(
             runtime_session_id,
             acp_session_id,
             cwd,
             profile_executable,
+            config,
         )
     })
     .await
@@ -759,7 +920,10 @@ pub fn run() {
             load_history_entries,
             compact_history_entries,
             delete_history_session_entries,
+            archive_history_session_entries,
             append_history_entry,
+            load_runtime_config,
+            save_runtime_config,
             runtime_hermes_profiles,
             run_claude_stream,
             runtime_acp_claude_prompt,

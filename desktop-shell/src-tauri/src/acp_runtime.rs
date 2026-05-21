@@ -33,6 +33,14 @@ impl AcpRuntime {
     }
 }
 
+#[derive(Clone, Default)]
+pub struct RuntimeConfig {
+    pub claude_command: Option<String>,
+    pub claude_args: Vec<String>,
+    pub hermes_host: Option<String>,
+    pub hermes_command: Option<String>,
+}
+
 enum SessionStartMode {
     New,
     Resume(String),
@@ -51,6 +59,7 @@ pub fn run_claude_acp_prompt(
     runtime_session_id: String,
     prompt: String,
     cwd: Option<String>,
+    config: RuntimeConfig,
     on_event: Option<&mut dyn FnMut(Value)>,
 ) -> Result<Vec<Value>, String> {
     run_acp_prompt(
@@ -59,6 +68,7 @@ pub fn run_claude_acp_prompt(
         prompt,
         cwd,
         None,
+        config,
         on_event,
     )
 }
@@ -68,6 +78,7 @@ pub fn run_hermes_acp_prompt(
     prompt: String,
     cwd: Option<String>,
     profile_executable: Option<String>,
+    config: RuntimeConfig,
     on_event: Option<&mut dyn FnMut(Value)>,
 ) -> Result<Vec<Value>, String> {
     run_acp_prompt(
@@ -76,6 +87,7 @@ pub fn run_hermes_acp_prompt(
         prompt,
         cwd,
         profile_executable,
+        config,
         on_event,
     )
 }
@@ -86,6 +98,7 @@ fn run_acp_prompt(
     prompt: String,
     cwd: Option<String>,
     profile_executable: Option<String>,
+    config: RuntimeConfig,
     mut on_event: Option<&mut dyn FnMut(Value)>,
 ) -> Result<Vec<Value>, String> {
     let cwd = match cwd {
@@ -104,6 +117,7 @@ fn run_acp_prompt(
                 &mut events,
                 SessionStartMode::New,
                 profile_executable.as_deref(),
+                &config,
                 &mut on_event,
             )?;
             sessions.insert(runtime_session_id.clone(), session);
@@ -129,8 +143,9 @@ pub fn resume_claude_acp_session(
     runtime_session_id: String,
     acp_session_id: String,
     cwd: Option<String>,
+    config: RuntimeConfig,
 ) -> Result<Vec<Value>, String> {
-    resume_acp_session(AcpRuntime::Claude, runtime_session_id, acp_session_id, cwd, None)
+    resume_acp_session(AcpRuntime::Claude, runtime_session_id, acp_session_id, cwd, None, config)
 }
 
 pub fn resume_hermes_acp_session(
@@ -138,8 +153,9 @@ pub fn resume_hermes_acp_session(
     acp_session_id: String,
     cwd: Option<String>,
     profile_executable: Option<String>,
+    config: RuntimeConfig,
 ) -> Result<Vec<Value>, String> {
-    resume_acp_session(AcpRuntime::Hermes, runtime_session_id, acp_session_id, cwd, profile_executable)
+    resume_acp_session(AcpRuntime::Hermes, runtime_session_id, acp_session_id, cwd, profile_executable, config)
 }
 
 fn resume_acp_session(
@@ -148,6 +164,7 @@ fn resume_acp_session(
     acp_session_id: String,
     cwd: Option<String>,
     profile_executable: Option<String>,
+    config: RuntimeConfig,
 ) -> Result<Vec<Value>, String> {
     let cwd = match cwd {
         Some(value) if !value.trim().is_empty() => PathBuf::from(value),
@@ -174,6 +191,7 @@ fn resume_acp_session(
         &mut events,
         SessionStartMode::Resume(acp_session_id.clone()),
         profile_executable.as_deref(),
+        &config,
         &mut on_event,
     )?;
     sessions.insert(runtime_session_id, session);
@@ -184,8 +202,9 @@ pub fn load_claude_acp_session(
     runtime_session_id: String,
     acp_session_id: String,
     cwd: Option<String>,
+    config: RuntimeConfig,
 ) -> Result<Vec<Value>, String> {
-    load_acp_session(AcpRuntime::Claude, runtime_session_id, acp_session_id, cwd, None)
+    load_acp_session(AcpRuntime::Claude, runtime_session_id, acp_session_id, cwd, None, config)
 }
 
 pub fn load_hermes_acp_session(
@@ -193,8 +212,9 @@ pub fn load_hermes_acp_session(
     acp_session_id: String,
     cwd: Option<String>,
     profile_executable: Option<String>,
+    config: RuntimeConfig,
 ) -> Result<Vec<Value>, String> {
-    load_acp_session(AcpRuntime::Hermes, runtime_session_id, acp_session_id, cwd, profile_executable)
+    load_acp_session(AcpRuntime::Hermes, runtime_session_id, acp_session_id, cwd, profile_executable, config)
 }
 
 fn load_acp_session(
@@ -203,6 +223,7 @@ fn load_acp_session(
     acp_session_id: String,
     cwd: Option<String>,
     profile_executable: Option<String>,
+    config: RuntimeConfig,
 ) -> Result<Vec<Value>, String> {
     let cwd = match cwd {
         Some(value) if !value.trim().is_empty() => PathBuf::from(value),
@@ -229,6 +250,7 @@ fn load_acp_session(
         &mut events,
         SessionStartMode::Load(acp_session_id.clone()),
         profile_executable.as_deref(),
+        &config,
         &mut on_event,
     )?;
     sessions.insert(runtime_session_id, session);
@@ -317,9 +339,10 @@ fn start_acp_session(
     mut events: &mut Vec<Value>,
     mode: SessionStartMode,
     profile_executable: Option<&str>,
+    config: &RuntimeConfig,
     on_event: &mut Option<&mut dyn FnMut(Value)>,
 ) -> Result<AcpSession, String> {
-    let mut child = build_acp_command(runtime, cwd, profile_executable)
+    let mut child = build_acp_command(runtime, cwd, profile_executable, config)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -513,12 +536,17 @@ fn send_prompt(
     Ok(())
 }
 
-fn build_acp_command(runtime: AcpRuntime, cwd: &PathBuf, profile_executable: Option<&str>) -> Command {
+fn build_acp_command(runtime: AcpRuntime, cwd: &PathBuf, profile_executable: Option<&str>, config: &RuntimeConfig) -> Command {
     let mut command = match runtime {
-        AcpRuntime::Claude if cfg!(windows) => Command::new("npx.cmd"),
-        AcpRuntime::Claude => Command::new("npx"),
-        AcpRuntime::Hermes if cfg!(windows) => Command::new("wsl.exe"),
-        AcpRuntime::Hermes => Command::new("hermes"),
+        AcpRuntime::Claude if cfg!(windows) => Command::new(config.claude_command.as_deref().unwrap_or("npx.cmd")),
+        AcpRuntime::Claude => Command::new(config.claude_command.as_deref().unwrap_or("npx")),
+        AcpRuntime::Hermes if cfg!(windows) && config.hermes_host.as_deref() != Some("native") => Command::new("wsl.exe"),
+        AcpRuntime::Hermes => Command::new(
+            profile_executable
+                .filter(|value| !value.trim().is_empty())
+                .or(config.hermes_command.as_deref())
+                .unwrap_or("hermes"),
+        ),
     };
 
     #[cfg(windows)]
@@ -528,19 +556,24 @@ fn build_acp_command(runtime: AcpRuntime, cwd: &PathBuf, profile_executable: Opt
 
     match runtime {
         AcpRuntime::Claude => {
+            let args: Vec<String> = if config.claude_args.is_empty() {
+                vec!["-y".to_string(), "@agentclientprotocol/claude-agent-acp".to_string()]
+            } else {
+                config.claude_args.clone()
+            };
             command
-                .args(["-y", "@agentclientprotocol/claude-agent-acp"])
+                .args(args)
                 .current_dir(cwd)
                 .envs(load_claude_user_env());
         }
         AcpRuntime::Hermes => {
             let executable = profile_executable
                 .filter(|value| !value.trim().is_empty())
+                .or(config.hermes_command.as_deref())
                 .unwrap_or("hermes");
-            if cfg!(windows) {
+            if cfg!(windows) && config.hermes_host.as_deref() != Some("native") {
                 command.args(["--", executable, "acp", "--accept-hooks"]);
             } else {
-                command.arg(executable);
                 command.args(["acp", "--accept-hooks"]);
             }
             command.current_dir(cwd);
