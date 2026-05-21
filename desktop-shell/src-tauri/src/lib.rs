@@ -132,6 +132,23 @@ struct HermesProfileMeta {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+struct RuntimeProviderProbe {
+    provider_id: String,
+    configured: bool,
+    available: bool,
+    command: String,
+    summary: String,
+    detail: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RuntimeProbeResult {
+    providers: Vec<RuntimeProviderProbe>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct HistoryCompactResult {
     removed_count: usize,
     upgraded_count: usize,
@@ -176,6 +193,78 @@ fn run_shell(shell: &str, args: &[&str]) -> Result<String, String> {
         Err(stderr)
     } else {
         Err(stdout)
+    }
+}
+
+fn is_configured(value: &Option<String>) -> bool {
+    value.as_ref().is_some_and(|item| !item.trim().is_empty())
+}
+
+fn runtime_probe_item(
+    provider_id: &str,
+    configured: bool,
+    command: String,
+    result: Result<String, String>,
+) -> RuntimeProviderProbe {
+    let (available, detail) = match result {
+        Ok(output) => (true, output),
+        Err(error) => (false, error),
+    };
+    let summary = if available {
+        "available"
+    } else if configured {
+        "unavailable"
+    } else {
+        "not_configured"
+    };
+    RuntimeProviderProbe {
+        provider_id: provider_id.to_string(),
+        configured,
+        available,
+        command,
+        summary: summary.to_string(),
+        detail,
+    }
+}
+
+#[tauri::command]
+fn runtime_probe(app: AppHandle) -> RuntimeProbeResult {
+    let config = load_runtime_config_file(&app);
+    let claude_command = if cfg!(windows) {
+        config.claude_command.clone().unwrap_or_else(|| "npx.cmd".to_string())
+    } else {
+        config.claude_command.clone().unwrap_or_else(|| "npx".to_string())
+    };
+    let claude_configured = is_configured(&config.claude_command) || !config.claude_args.is_empty();
+    let claude_probe = run_shell(&claude_command, &["--version"]);
+
+    let hermes_host = config.hermes_host.as_deref().unwrap_or("wsl");
+    let hermes_command = config.hermes_command.clone().unwrap_or_else(|| "hermes".to_string());
+    let hermes_configured = is_configured(&config.hermes_host) || is_configured(&config.hermes_command);
+    let hermes_probe = if cfg!(windows) && hermes_host != "native" {
+        run_shell("wsl.exe", &["--", &hermes_command, "--version"])
+    } else {
+        run_shell(&hermes_command, &["--version"])
+    };
+    let hermes_display_command = if cfg!(windows) && hermes_host != "native" {
+        format!("wsl.exe -- {hermes_command}")
+    } else {
+        hermes_command
+    };
+
+    RuntimeProbeResult {
+        providers: vec![
+            runtime_probe_item("claude", claude_configured, claude_command, claude_probe),
+            runtime_probe_item("hermes", hermes_configured, hermes_display_command, hermes_probe),
+            RuntimeProviderProbe {
+                provider_id: "trae".to_string(),
+                configured: false,
+                available: false,
+                command: "IDE Bridge".to_string(),
+                summary: "planned".to_string(),
+                detail: "Trae IDE bridge is reserved for a later integration.".to_string(),
+            },
+        ],
     }
 }
 
@@ -924,6 +1013,7 @@ pub fn run() {
             append_history_entry,
             load_runtime_config,
             save_runtime_config,
+            runtime_probe,
             runtime_hermes_profiles,
             run_claude_stream,
             runtime_acp_claude_prompt,

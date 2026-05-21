@@ -39,6 +39,8 @@ LunaAgentOS 的方向不是重写这些 Agent，而是把它们收拢到一个�
 - 两者能出现在同一个桌面工作台。
 - 会话卡片能承载输出、思考流、运行流和最终响应。
 - 会话结果能沉淀到本地历史。
+- 启动时会探测本机 runtime，即使用户还没安装 Claude Code 或 Hermes，桌面壳也能正常打开。
+- 顶部提供中文 / English 界面切换。
 
 如果只有 Claude，不算最小异构控制台成立；只有 Claude + Hermes 都进入工作台，Stage 1 才站得住。
 
@@ -54,6 +56,8 @@ LunaAgentOS 的方向不是重写这些 Agent，而是把它们收拢到一个�
 | Runtime Session Card | 已可用 | 输出流、思考流、运行流、最终响应 |
 | 本地历史 | 已可用 | JSON 历史、只读恢复、删除保护 |
 | 演示 / 截图模式 | 已可用 | 顶部 `演示场景` 按钮加载非持久化 demo |
+| Runtime 配置 | 已可用 | Claude/Hermes 可按本机环境配置 |
+| 界面语言 | 已可用 | zh-CN / en-US 本地持久化切换 |
 
 ## 快速开始
 
@@ -65,6 +69,18 @@ LunaAgentOS 的方向不是重写这些 Agent，而是把它们收拢到一个�
 - Tauri 2 相关依赖
 - 如需 Claude 入口：本机可用的 Claude Code
 - 如需 Hermes 入口：WSL + Hermes
+
+Claude Code 和 Hermes 是外部 runtime，不是 LunaAgentOS 启动前置条件。未安装或路径不同的机器上，入口会显示为 `未配置` 或 `不可用`，用户可以先打开工作台，再按本机环境配置。
+
+### 配置 runtime
+
+在左侧 Agent 舰队点击 **维护**，可以通过现有 prompt 流程配置：
+
+- Claude adapter command 与 args。
+- Hermes host：`wsl` 或 `native`。
+- Hermes executable / profile alias。
+
+配置会保存到应用本地目录的 `runtime-config.json`，不会写入仓库。
 
 ### 启动开发模式
 

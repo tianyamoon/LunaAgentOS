@@ -79,6 +79,91 @@ const markdownRenderer = new MarkdownIt({
   typographer: false,
 });
 
+const translations = {
+  "zh-CN": {
+    "topbar.metricsAria": "当前能力状态",
+    "topbar.demo": "演示场景",
+    "topbar.clearDemo": "清除演示",
+    "topbar.language": "中文",
+    "fleet.title": "Agent 舰队",
+    "common.manage": "维护",
+    "workspace.title": "会话工作台",
+    "workspace.defaultStatus": "请选择当前发送目标，然后发送第一条任务。",
+    "workspace.emptyTitle": "会话尚未入场",
+    "workspace.emptyText": "先在左侧设定当前发送目标，再通过底部输入框发起会话。",
+    "workspace.currentTarget": "当前发送目标：",
+    "composer.send": "发送",
+    "composer.demo": "演示中",
+    "composer.enterSend": "Enter 发送",
+    "composer.ctrlEnter": "Ctrl+Enter",
+    "composer.newSession": "另开会话",
+    "composer.placeholderTarget": "输入发送给{provider} / {agent}的任务。",
+    "composer.placeholderNoTarget": "请先设置当前发送目标。",
+    "history.title": "会话列表",
+    "history.subtitle": "当前与归档",
+    "history.loadingTitle": "会话列表加载中",
+    "history.loadingText": "首屏先起工作台，会话归档会在后台补齐。",
+    "history.emptyTitle": "暂无会话",
+    "history.emptyText": "第一次发送后，这里会记录 Agent 会话，而不是每条对话详情。",
+    "history.activeTitle": "活跃会话",
+    "history.activeNote": "红灯在工作台，橙灯未进工作台",
+    "history.activeEmpty": "暂无活跃会话。",
+    "history.archiveTitle": "归档会话",
+    "history.archiveNote": "用户手动归档，可恢复或删除",
+    "history.archiveEmpty": "暂无归档会话。",
+    "provider.setTarget": "设为发送目标",
+    "provider.probing": "探测中",
+    "provider.available": "可用",
+    "provider.not_configured": "未配置",
+    "provider.unavailable": "不可用",
+    "provider.planned": "规划中",
+  },
+  "en-US": {
+    "topbar.metricsAria": "Current capability status",
+    "topbar.demo": "Demo scene",
+    "topbar.clearDemo": "Clear demo",
+    "topbar.language": "EN",
+    "fleet.title": "Agent Fleet",
+    "common.manage": "Manage",
+    "workspace.title": "Session Workspace",
+    "workspace.defaultStatus": "Choose the current send target, then send the first task.",
+    "workspace.emptyTitle": "No session yet",
+    "workspace.emptyText": "Choose a send target on the left, then start a session from the composer.",
+    "workspace.currentTarget": "Current target: ",
+    "composer.send": "Send",
+    "composer.demo": "Demo",
+    "composer.enterSend": "Enter sends",
+    "composer.ctrlEnter": "Ctrl+Enter",
+    "composer.newSession": "New session",
+    "composer.placeholderTarget": "Send a task to {provider} / {agent}.",
+    "composer.placeholderNoTarget": "Set a send target first.",
+    "history.title": "Sessions",
+    "history.subtitle": "Live and archived",
+    "history.loadingTitle": "Loading sessions",
+    "history.loadingText": "The workspace starts first; archived sessions load in the background.",
+    "history.emptyTitle": "No sessions",
+    "history.emptyText": "After the first send, Agent sessions will appear here.",
+    "history.activeTitle": "Live sessions",
+    "history.activeNote": "Red is in workspace, orange is detached",
+    "history.activeEmpty": "No live sessions.",
+    "history.archiveTitle": "Archived sessions",
+    "history.archiveNote": "Manually archived, restorable or deletable",
+    "history.archiveEmpty": "No archived sessions.",
+    "provider.setTarget": "Set as target",
+    "provider.probing": "Probing",
+    "provider.available": "Ready",
+    "provider.not_configured": "Not configured",
+    "provider.unavailable": "Unavailable",
+    "provider.planned": "Planned",
+  },
+};
+
+function t(key, params = {}) {
+  const table = translations[languageId] || translations["zh-CN"];
+  const template = table[key] || translations["zh-CN"][key] || key;
+  return Object.entries(params).reduce((text, [name, value]) => text.replaceAll(`{${name}}`, value), template);
+}
+
 markdownRenderer.renderer.rules.fence = (tokens, index) => {
   const token = tokens[index];
   const lang = token.info.trim().split(/\s+/)[0] || "";
@@ -325,14 +410,27 @@ const CURRENT_TARGET_AGENT_KEY = "lunaagentos.currentTargetAgentId";
 const CURRENT_SESSION_KEY = "lunaagentos.currentSessionId";
 const SEND_MODE_KEY = "lunaagentos.sendMode";
 const FONT_SCALE_KEY = "lunaagentos.fontScale";
+const LANGUAGE_KEY = "lunaagentos.language";
 const HISTORY_SCHEMA_VERSION = 3;
 const DEFAULT_HERMES_AGENT_ID = "hermes-profile-default";
 const SEND_MODE_OPTIONS = ["enter", "ctrlEnter"];
+const PROVIDER_AVAILABILITY_STATES = {
+  probing: { state: 0, key: "provider.probing" },
+  available: { state: 1, key: "provider.available" },
+  not_configured: { state: 9, key: "provider.not_configured" },
+  unavailable: { state: 9, key: "provider.unavailable" },
+  planned: { state: 6, key: "provider.planned" },
+};
 const FONT_SCALE_OPTIONS = [
   { id: "compact", label: "字体：紧凑", scale: 0.92 },
   { id: "default", label: "字体：标准", scale: 1 },
   { id: "comfortable", label: "字体：舒展", scale: 1.08 },
 ];
+
+function providerAvailabilityLabel(summary) {
+  const key = PROVIDER_AVAILABILITY_STATES[summary]?.key;
+  return key ? t(key) : summary;
+}
 
 const agentList = document.getElementById("agentList");
 const providerManagerBtn = document.getElementById("providerManagerBtn");
@@ -347,6 +445,7 @@ const sendBtn = document.getElementById("sendBtn");
 const sendModeBtn = document.getElementById("sendModeBtn");
 const fontScaleBtn = document.getElementById("fontScaleBtn");
 const demoSceneBtn = document.getElementById("demoSceneBtn");
+const languageBtn = document.getElementById("languageBtn");
 const confirmDialog = document.getElementById("confirmDialog");
 
 localStorage.removeItem(CURRENT_SESSION_KEY);
@@ -364,6 +463,12 @@ let isLaunchDemoScene = false;
 let sendAsNewSession = false;
 let sendMode = localStorage.getItem(SEND_MODE_KEY) || "enter";
 let fontScaleId = localStorage.getItem(FONT_SCALE_KEY) || "default";
+let languageId = localStorage.getItem(LANGUAGE_KEY) || "zh-CN";
+let runtimeAvailability = {
+  claude: { summary: "probing", configured: false, available: false, command: "" },
+  hermes: { summary: "probing", configured: false, available: false, command: "" },
+  trae: { summary: "planned", configured: false, available: false, command: "IDE Bridge" },
+};
 let demoHistoryEntries = [];
 const deletedSessionIds = new Set();
 const stoppedSessionIds = new Set();
@@ -423,6 +528,10 @@ function acpCommandsForProvider(providerId) {
 }
 
 function providerState(provider) {
+  const availability = runtimeAvailability[provider.id];
+  if (availability) {
+    return PROVIDER_AVAILABILITY_STATES[availability.summary]?.state ?? 1;
+  }
   const states = provider.agents.map((agent) => agent.state);
   return states.includes(3)
     ? 3
@@ -435,6 +544,16 @@ function providerState(provider) {
           : states.includes(9)
             ? 9
             : states[0] ?? 1;
+}
+
+function providerAvailability(providerId) {
+  return runtimeAvailability[providerId] || { summary: "available", configured: true, available: true, command: "" };
+}
+
+function canSendToProvider(providerId) {
+  const availability = providerAvailability(providerId);
+  if (providerId === "trae") return false;
+  return availability.available;
 }
 
 function formatTime(value) {
@@ -496,6 +615,31 @@ function setAppNotice(message, tone = "muted") {
   appNotice.classList.toggle("is-error", tone === "error");
 }
 
+function applyStaticTranslations() {
+  document.documentElement.lang = languageId;
+  document.querySelectorAll("[data-i18n]").forEach((element) => {
+    element.textContent = t(element.dataset.i18n);
+  });
+  document.querySelectorAll("[data-i18n-aria-label]").forEach((element) => {
+    element.setAttribute("aria-label", t(element.dataset.i18nAriaLabel));
+  });
+  document.title = languageId === "en-US" ? "LunaAgentOS Console" : "LunaAgentOS 控制台";
+  if (providerManagerBtn) providerManagerBtn.textContent = t("common.manage");
+  if (languageBtn) languageBtn.textContent = t("topbar.language");
+  updateActionLabels();
+  updateSendModeLabel();
+  updatePromptPlaceholder();
+}
+
+function toggleLanguage() {
+  languageId = languageId === "zh-CN" ? "en-US" : "zh-CN";
+  localStorage.setItem(LANGUAGE_KEY, languageId);
+  applyStaticTranslations();
+  renderProviders();
+  renderWorkspace();
+  renderHistory();
+}
+
 function closeConfirmDialog() {
   pendingConfirmAction = null;
   if (!confirmDialog) return;
@@ -531,20 +675,20 @@ function openConfirmDialog({ title, message, confirmLabel = "删除", onConfirm 
 }
 
 function updateActionLabels() {
-  sendBtn.textContent = isLaunchDemoScene ? "演示中" : "发送";
+  sendBtn.textContent = isLaunchDemoScene ? t("composer.demo") : t("composer.send");
   sendBtn.disabled = isLaunchDemoScene;
   newSessionToggle.disabled = isLaunchDemoScene;
   newSessionToggle.classList.toggle("is-active", sendAsNewSession);
   newSessionToggle.setAttribute("aria-pressed", String(sendAsNewSession));
-  if (demoSceneBtn) demoSceneBtn.textContent = isLaunchDemoScene ? "清除演示" : "演示场景";
+  if (demoSceneBtn) demoSceneBtn.textContent = isLaunchDemoScene ? t("topbar.clearDemo") : t("topbar.demo");
 }
 
 function updatePromptPlaceholder() {
   const agent = currentTargetAgent();
   const provider = currentTargetProvider();
   promptBox.placeholder = agent && provider
-    ? `输入发送给${provider.name} / ${agent.name}的任务。`
-    : "请先设置当前发送目标。";
+    ? t("composer.placeholderTarget", { provider: provider.name, agent: agent.name })
+    : t("composer.placeholderNoTarget");
 }
 
 function scheduleWorkspaceRender(options = {}, delayMs = 0) {
@@ -621,7 +765,7 @@ function cycleFontScale() {
 
 function updateSendModeLabel() {
   if (!sendModeBtn) return;
-  sendModeBtn.textContent = sendMode === "enter" ? "Enter 发送" : "Ctrl+Enter";
+  sendModeBtn.textContent = sendMode === "enter" ? t("composer.enterSend") : t("composer.ctrlEnter");
 }
 
 function toggleSendMode() {
@@ -636,6 +780,8 @@ async function openProviderManager() {
     const current = await invoke("load_runtime_config");
     const claudeCommand = window.prompt("Claude adapter command（留空使用默认 npx/npx.cmd）", current?.claudeCommand || "");
     if (claudeCommand === null) return;
+    const claudeArgs = window.prompt("Claude adapter args（空格分隔；留空使用默认 -y @agentclientprotocol/claude-agent-acp）", (current?.claudeArgs || []).join(" "));
+    if (claudeArgs === null) return;
     const hermesHost = window.prompt("Hermes host：wsl 或 native", current?.hermesHost || "wsl");
     if (hermesHost === null) return;
     const hermesCommand = window.prompt("Hermes executable/profile alias（留空使用 hermes 或已探测 profile）", current?.hermesCommand || "");
@@ -644,11 +790,13 @@ async function openProviderManager() {
       config: {
         ...current,
         claudeCommand: claudeCommand.trim() || null,
+        claudeArgs: claudeArgs.trim() ? claudeArgs.trim().split(/\s+/) : [],
         hermesHost: hermesHost.trim() || "wsl",
         hermesCommand: hermesCommand.trim() || null,
       },
     });
     setAppNotice("Runtime 配置已保存。后续新建/恢复 ACP 会话会使用该配置。");
+    await refreshRuntimeProbe();
   } catch (error) {
     console.error(error);
     setAppNotice(`Runtime 配置读取或保存失败：${formatBackendError(error)}`, "error");
@@ -658,6 +806,24 @@ async function openProviderManager() {
 function showProviderAgents(provider) {
   const names = provider.agents.map((agent) => agent.name).join("、");
   setAppNotice(`${provider.name} 当前已登记的 Agent：${names}。`);
+}
+
+async function refreshRuntimeProbe() {
+  try {
+    const result = await invoke("runtime_probe");
+    const next = { ...runtimeAvailability };
+    (result?.providers || []).forEach((item) => {
+      next[item.providerId] = item;
+    });
+    runtimeAvailability = next;
+    renderProviders();
+    renderWorkspaceStatus();
+    return result;
+  } catch (error) {
+    console.error(error);
+    setAppNotice(`Runtime 探测失败：${formatBackendError(error)}`, "error");
+    return null;
+  }
 }
 
 function latestActiveSessionForAgent(agentId) {
@@ -687,19 +853,23 @@ function renderProviders() {
     const group = document.createElement("section");
     group.className = "provider-group";
     const aggregateState = providerState(provider);
+    const availability = providerAvailability(provider.id);
+    const availabilityLabel = providerAvailabilityLabel(availability.summary);
+    const availabilityDetail = availability.command ? `${availabilityLabel} · ${availability.command}` : availabilityLabel;
 
     group.innerHTML = `
       <div class="provider-header">
         <div>
           <div class="provider-title-row">
             <strong>${provider.name}</strong>
-            <span class="state-pill provider-state-pill ${stateClasses[aggregateState] || "state-idle"}">${stateDisplayNames[aggregateState] || "待命"}</span>
+            <span class="state-pill provider-state-pill ${stateClasses[aggregateState] || "state-idle"}">${availabilityLabel}</span>
           </div>
           ${provider.lane ? `<div class="provider-lane">${provider.lane}</div>` : ""}
         </div>
-        <button type="button" class="mini-btn ghost-btn provider-manage-btn" data-provider-id="${provider.id}">维护</button>
+        <button type="button" class="mini-btn ghost-btn provider-manage-btn" data-provider-id="${provider.id}">${t("common.manage")}</button>
       </div>
       <p class="caption provider-note">${provider.note}</p>
+      <p class="caption provider-runtime-note">${escapeHtml(availabilityDetail)}</p>
       <div class="provider-agents">
         ${provider.agents.map((agent) => `
           <div class="agent-entry ${agent.id === currentTargetAgentId ? "is-main-agent" : "is-selectable"}" data-agent-id="${agent.id}">
@@ -709,7 +879,7 @@ function renderProviders() {
             <div class="agent-entry-sub">${agent.subtitle}</div>
             ${agent.id === currentTargetAgentId
               ? ""
-              : `<div class="agent-entry-actions"><span class="agent-action-hint">设为发送目标</span></div>`}
+              : `<div class="agent-entry-actions"><span class="agent-action-hint">${t("provider.setTarget")}</span></div>`}
           </div>
         `).join("")}
       </div>
@@ -1312,7 +1482,7 @@ function renderWorkspaceStatus() {
   const countedSessions = isLaunchDemoScene ? sessions.filter(isDemoSession) : sessions;
   const liveCount = countedSessions.filter((session) => sessionRuntimeState(session) === "live").length;
   if (!agent || !provider) {
-    workspaceStatus.textContent = "请先设置当前发送目标。";
+    workspaceStatus.textContent = t("composer.placeholderNoTarget");
     return;
   }
   const statusSession = currentSession()
@@ -1322,11 +1492,14 @@ function renderWorkspaceStatus() {
       .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0]
     || null;
   const statusState = statusSession?.state ?? agent.state ?? 1;
+  const availability = providerAvailability(provider.id);
+  const availabilityLabel = providerAvailabilityLabel(availability.summary);
   workspaceStatus.innerHTML = `
-    <span>当前发送目标：</span>
+    <span>${t("workspace.currentTarget")}</span>
     <strong class="workspace-status-target">${escapeHtml(provider.name)} / ${escapeHtml(agent.name)}</strong>
     <span class="workspace-status-separator">·</span>
     <span class="state-pill workspace-state-pill ${stateClasses[statusState] || "state-idle"}">${escapeHtml(stateNames[statusState] || "IDLE")}</span>
+    <span class="workspace-runtime-count">${escapeHtml(availabilityLabel)}</span>
     ${liveCount > 0 ? `<span class="workspace-runtime-count">ACP × ${liveCount}</span>` : ""}
   `;
 }
@@ -2275,8 +2448,8 @@ function renderHistory(options = {}) {
   if (isHistoryLoading) {
     historyList.innerHTML = `
       <div class="history-empty">
-        <strong>会话列表加载中</strong>
-        <p>首屏先起工作台，会话归档会在后台补齐。</p>
+        <strong>${t("history.loadingTitle")}</strong>
+        <p>${t("history.loadingText")}</p>
       </div>
     `;
     return;
@@ -2288,16 +2461,16 @@ function renderHistory(options = {}) {
   if (!sessionItems.length) {
     historyList.innerHTML = `
       <div class="history-empty">
-        <strong>暂无会话</strong>
-        <p>第一次发送后，这里会记录 Agent 会话，而不是每条对话详情。</p>
+        <strong>${t("history.emptyTitle")}</strong>
+        <p>${t("history.emptyText")}</p>
       </div>
     `;
     return;
   }
 
   historyList.innerHTML = `
-    ${renderSessionListSection("active", "活跃会话", "红灯在工作台，橙灯未进工作台", activeItems, "暂无活跃会话。")}
-    ${renderSessionListSection("archive", "归档会话", "用户手动归档，可恢复或删除", archivedItems, "暂无归档会话。")}
+    ${renderSessionListSection("active", t("history.activeTitle"), t("history.activeNote"), activeItems, t("history.activeEmpty"))}
+    ${renderSessionListSection("archive", t("history.archiveTitle"), t("history.archiveNote"), archivedItems, t("history.archiveEmpty"))}
   `;
   bindSessionListActions();
   if (scrollSessionId) {
@@ -2685,6 +2858,12 @@ function startSessionFromPrompt(forceNewSession = false) {
     setAppNotice("请先在左侧设定当前发送目标，再发送任务。", "error");
     return;
   }
+  if (!canSendToProvider(provider.id)) {
+    const availability = providerAvailability(provider.id);
+    const label = providerAvailabilityLabel(availability.summary);
+    setAppNotice(`${provider.name} 当前${label}，请点击“维护”配置或检查本机 runtime。`, "error");
+    return;
+  }
 
   const session = getOrCreateActiveSession(task, forceNewSession);
   if (!session) return;
@@ -2718,6 +2897,10 @@ sendModeBtn?.addEventListener("click", () => {
 
 fontScaleBtn?.addEventListener("click", () => {
   cycleFontScale();
+});
+
+languageBtn?.addEventListener("click", () => {
+  toggleLanguage();
 });
 
 demoSceneBtn?.addEventListener("click", () => {
@@ -2760,6 +2943,7 @@ if (listenRuntimeEvent) {
 }
 
 renderProviders();
+applyStaticTranslations();
 applyFontScale();
 updateSendModeLabel();
 renderWorkspace();
@@ -2769,7 +2953,9 @@ setTimeout(() => {
   void loadHistory();
 }, 0);
 setTimeout(() => {
-  void loadHermesProfiles();
+  refreshRuntimeProbe().then(() => {
+    if (canSendToProvider("hermes")) void loadHermesProfiles();
+  });
 }, 0);
 
 async function syncRuntimeAliveStates() {

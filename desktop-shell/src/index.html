@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>LunaAgentOS 控制台</title>
+    <title>LunaAgentOS Console</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -15,11 +15,12 @@
           <p id="appNotice" class="app-notice" aria-live="polite"></p>
         </div>
         <div class="topbar-tools">
-          <div class="launch-metrics" aria-label="当前能力状态">
+          <div class="launch-metrics" aria-label="当前能力状态" data-i18n-aria-label="topbar.metricsAria">
             <span>Claude Code</span>
             <span>Hermes ACP</span>
             <span>Local History</span>
           </div>
+          <button id="languageBtn" type="button" class="mini-btn ghost-btn">中文</button>
           <button id="demoSceneBtn" type="button" class="mini-btn ghost-btn">演示场景</button>
           <button id="fontScaleBtn" type="button" class="mini-btn ghost-btn">字体：标准</button>
         </div>
@@ -28,7 +29,7 @@
       <main class="layout">
         <aside class="panel fleet-panel">
           <div class="panel-header">
-            <h2>Agent 舰队</h2>
+            <h2 data-i18n="fleet.title">Agent 舰队</h2>
             <button id="providerManagerBtn" type="button" class="mini-btn ghost-btn">维护</button>
           </div>
           <div id="agentList" class="agent-list"></div>
@@ -37,15 +38,15 @@
         <section class="panel workspace-panel">
           <div class="panel-header workspace-header">
             <div>
-              <h2>会话工作台</h2>
+              <h2 data-i18n="workspace.title">会话工作台</h2>
               <p id="workspaceStatus" class="caption">请选择当前发送目标，然后发送第一条任务。</p>
             </div>
           </div>
 
           <div class="workspace-body">
             <div id="workspaceEmpty" class="workspace-empty">
-              <strong>会话尚未入场</strong>
-              <p>先在左侧设定当前发送目标，再通过底部输入框发起会话。</p>
+              <strong data-i18n="workspace.emptyTitle">会话尚未入场</strong>
+              <p data-i18n="workspace.emptyText">先在左侧设定当前发送目标，再通过底部输入框发起会话。</p>
             </div>
             <div id="sessionDeck" class="session-deck"></div>
           </div>
@@ -60,7 +61,7 @@
                   <span class="composer-options-divider"></span>
                   <button id="newSessionToggle" type="button" class="session-option-toggle" aria-pressed="false">
                     <span class="toggle-dot"></span>
-                    <span>另开会话</span>
+                    <span data-i18n="composer.newSession">另开会话</span>
                   </button>
                 </div>
               </div>
@@ -70,8 +71,8 @@
 
         <aside class="panel history-panel">
           <div class="panel-header">
-            <h2>会话列表</h2>
-            <span class="caption">当前与归档</span>
+            <h2 data-i18n="history.title">会话列表</h2>
+            <span class="caption" data-i18n="history.subtitle">当前与归档</span>
           </div>
           <div id="historyList" class="history-list"></div>
         </aside>

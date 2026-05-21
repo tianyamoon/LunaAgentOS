@@ -539,6 +539,13 @@ body.is-launch-demo .layout {
   line-height: 1.45;
 }
 
+.provider-runtime-note {
+  margin: -4px 2px 10px;
+  color: rgba(122, 103, 85, 0.62);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
 .agent-entry-top > strong {
   font-size: 0.94rem;
   line-height: 1.2;

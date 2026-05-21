@@ -32,6 +32,8 @@ It is not the final agent operating system yet. It is the first credible slice:
 - **Runtime Session Cards** are the center of the product.
 - **Local JSON history** preserves session transcripts.
 - **Live sessions** and **archived sessions** are separated in the right panel.
+- **Runtime availability** is probed at startup, so the app can launch even when Claude Code or Hermes is not installed yet.
+- **Chinese / English UI switching** is available from the top bar.
 
 ## What is working now
 
@@ -45,6 +47,8 @@ It is not the final agent operating system yet. It is the first credible slice:
 | Process visibility | Working | Thought/runtime/final response surfaces |
 | Local history | Working | JSON session history, restore/read-only states |
 | Screenshot/demo mode | Working | In-app launch demo scene for GitHub screenshots |
+| Runtime setup | Working | Claude/Hermes can be configured per machine |
+| UI language | Working | zh-CN / en-US switch persisted locally |
 
 ## Quick start
 
@@ -56,6 +60,18 @@ It is not the final agent operating system yet. It is the first credible slice:
 - Tauri 2 dependencies
 - Claude Code installed if you want the Claude entry
 - WSL + Hermes installed if you want the Hermes entry
+
+Claude Code and Hermes are external runtimes. LunaAgentOS can start without them; unavailable entries are shown as **Not configured** or **Unavailable** until you configure or install the runtime.
+
+### Configure runtimes
+
+Use the **Manage** button in the Agent Fleet to update local runtime settings:
+
+- Claude adapter command and args.
+- Hermes host: `wsl` or `native`.
+- Hermes executable or profile alias.
+
+Settings are stored in the app-local `runtime-config.json`, not in the repository.
 
 ### Run the desktop shell
 
