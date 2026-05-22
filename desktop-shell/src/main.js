@@ -130,7 +130,6 @@ const translations = {
     "history.archiveTitle": "归档会话",
     "history.archiveNote": "用户手动归档，可恢复或删除",
     "history.archiveEmpty": "暂无归档会话。",
-    "provider.setTarget": "设为发送目标",
     "provider.probing": "探测中",
     "provider.available": "可用",
     "provider.partial": "部分可用",
@@ -274,7 +273,6 @@ const translations = {
     "history.archiveTitle": "Archived sessions",
     "history.archiveNote": "Manually archived, restorable or deletable",
     "history.archiveEmpty": "No archived sessions.",
-    "provider.setTarget": "Set as target",
     "provider.probing": "Probing",
     "provider.available": "Ready",
     "provider.partial": "Partial",
@@ -1342,7 +1340,6 @@ function renderRuntimeTarget(target) {
         <strong>${escapeHtml(displayAgentName(target))}</strong>
       </div>
       ${target.subtitle ? `<div class="agent-entry-sub">${escapeHtml(target.subtitle)}</div>` : ""}
-      ${selected ? "" : `<div class="agent-entry-actions"><span class="agent-action-hint">${t("provider.setTarget")}</span></div>`}
     </div>
   `;
 }
@@ -1398,9 +1395,6 @@ function renderProviders() {
             <strong>${displayAgentName(agent)}</strong>
           </div>
           <div class="agent-entry-sub">${agent.subtitle}</div>
-          ${agent.id === currentTargetAgentId
-            ? ""
-            : `<div class="agent-entry-actions"><span class="agent-action-hint">${t("provider.setTarget")}</span></div>`}
         </div>
       `).join("");
 
