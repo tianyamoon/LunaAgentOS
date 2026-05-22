@@ -39,7 +39,7 @@ It is not the final agent operating system yet. It is the first credible slice:
 
 | Area | Status | Notes |
 |---|---:|---|
-| Desktop shell | Working | Tauri 2 + Rust core + web UI, with quiet scrollbars for dense workspace panels |
+| Desktop shell | Working | Tauri 2 + Rust core + web UI, with quiet scrollbars and a lighter left fleet target picker |
 | Claude Code entry | Working | Real runtime path |
 | Hermes entry | Working | Windows / WSL ACP runtime instances and profiles |
 | Trae IDE | Planned | Bridge route only |

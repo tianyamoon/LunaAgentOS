@@ -391,13 +391,13 @@ body.is-launch-demo .layout {
 }
 
 .provider-group {
-  padding: 14px 14px 12px;
-  border-radius: 20px;
-  border: 1px solid rgba(82, 61, 38, 0.09);
-  background: linear-gradient(180deg, rgba(255, 253, 249, 0.98), rgba(255, 248, 239, 0.72));
+  padding: 10px 10px 11px;
+  border-radius: 18px;
+  border: 1px solid rgba(82, 61, 38, 0.06);
+  background: rgba(255, 253, 249, 0.54);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 7px;
 }
 
 .provider-header,
@@ -612,26 +612,98 @@ body.is-launch-demo .layout {
 }
 
 .provider-header {
-  align-items: flex-start;
-  padding: 2px 2px 0;
+  align-items: center;
+  gap: 8px;
+  padding: 0 1px;
+}
+
+.provider-heading {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.provider-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
 }
 
 .provider-title-row {
-  gap: 8px;
+  gap: 6px;
   justify-content: flex-start;
 }
 
 .provider-title-row > strong {
-  font-size: 1rem;
+  font-size: 0.93rem;
   line-height: 1.2;
 }
 
-.provider-state-pill {
-  min-height: 20px;
-  padding: 0 7px;
+.provider-status-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
   border-radius: 999px;
+  background: rgba(99, 82, 63, 0.34);
+  box-shadow: 0 0 0 3px rgba(99, 82, 63, 0.06);
+}
+
+.provider-status-dot.is-available {
+  background: var(--done);
+  box-shadow: 0 0 0 3px rgba(33, 122, 76, 0.09);
+}
+
+.provider-status-dot.is-partial {
+  background: var(--thinking);
+  box-shadow: 0 0 0 3px rgba(178, 107, 0, 0.1);
+}
+
+.provider-status-dot.is-unavailable {
+  background: var(--error);
+  box-shadow: 0 0 0 3px rgba(192, 58, 58, 0.08);
+}
+
+.provider-status-dot.is-planned {
+  background: rgba(99, 82, 63, 0.34);
+}
+
+.provider-count-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 0 6px;
+  border: 1px solid rgba(217, 108, 58, 0.13);
+  border-radius: 999px;
+  background: rgba(217, 108, 58, 0.08);
+  color: var(--accent);
   font-size: 0.66rem;
-  opacity: 0.82;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.provider-runtime-mini {
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(122, 103, 85, 0.54);
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.provider-connection-icon-btn {
+  flex: 0 0 auto;
+  width: 26px;
+  min-width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 9px;
+  color: rgba(122, 103, 85, 0.72);
+  font-size: 0.78rem;
+  line-height: 1;
 }
 
 .provider-lane,
@@ -647,13 +719,15 @@ body.is-launch-demo .layout {
 }
 
 .provider-note {
-  margin: 6px 2px 10px;
-  color: rgba(122, 103, 85, 0.78);
+  display: none;
+  margin: 0;
+  color: rgba(122, 103, 85, 0.62);
   line-height: 1.45;
 }
 
 .provider-runtime-note {
-  margin: -4px 2px 10px;
+  display: none;
+  margin: 0;
   color: rgba(122, 103, 85, 0.62);
   font-size: 0.78rem;
   line-height: 1.35;
@@ -666,6 +740,22 @@ body.is-launch-demo .layout {
 
 .agent-entry-sub {
   margin-top: 3px;
+}
+
+.provider-targets {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.target-runtime-label {
+  flex: 0 0 auto;
+  color: rgba(122, 103, 85, 0.58);
+  font-size: 0.64rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  text-transform: uppercase;
 }
 
 .session-profile-meta {
@@ -687,43 +777,11 @@ body.is-launch-demo .layout {
   line-clamp: 2;
 }
 
-.provider-agents {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  margin-left: 10px;
-  padding: 10px 0 0 12px;
-  border-left: 1px solid rgba(99, 82, 63, 0.08);
-}
-
-.runtime-instance-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 8px;
-}
-
-.runtime-instance-block {
-  padding: 10px;
-  border: 1px solid rgba(99, 82, 63, 0.08);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.28);
-}
-
-.runtime-instance-block.is-unavailable {
-  opacity: 0.68;
-}
-
-.runtime-instance-head,
 .connection-instance-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-}
-
-.runtime-instance-head > strong {
-  font-size: 0.86rem;
 }
 
 .runtime-instance-empty {
@@ -734,11 +792,6 @@ body.is-launch-demo .layout {
   margin-top: 8px;
   color: var(--muted);
   font-size: 0.82rem;
-}
-
-.provider-agents.is-runtime-targets {
-  margin-left: 4px;
-  padding-top: 8px;
 }
 
 .agent-entry {

@@ -155,6 +155,9 @@ const translations = {
     "provider.noRuntime": "未检测到可用运行环境",
     "provider.noHermesRuntime": "未检测到 Win 或 WSL Hermes",
     "provider.noTargets": "暂未发现可发送目标",
+    "provider.targetCount": "{count} 个目标",
+    "provider.profileCount": "{count} 个 profile",
+    "provider.instanceCount": "{count} 个环境",
     "provider.trae.note": "强大且免费的工具。",
     "agent.main": "主会话",
     "agent.claude.note": "适合承接高价值任务与真实产品演示。",
@@ -298,6 +301,9 @@ const translations = {
     "provider.noRuntime": "No usable runtime detected",
     "provider.noHermesRuntime": "No Win or WSL Hermes detected",
     "provider.noTargets": "No send target detected yet",
+    "provider.targetCount": "{count} targets",
+    "provider.profileCount": "{count} profiles",
+    "provider.instanceCount": "{count} environments",
     "provider.trae.note": "Powerful free IDE tool.",
     "agent.main": "Main session",
     "agent.claude.note": "Best for high-value tasks and real product demos.",
@@ -820,6 +826,44 @@ function runtimeTargets() {
   return runtimeInstances.flatMap(targetsForRuntimeInstance);
 }
 
+function targetsForProvider(providerId) {
+  if (providerId === "trae") return [];
+  const instances = runtimeInstancesForProvider(providerId);
+  if (!instances.length) {
+    return providerById(providerId)?.agents || [];
+  }
+  return instances.flatMap(targetsForRuntimeInstance);
+}
+
+function compactTargetSubtitle(target) {
+  if (!target) return "";
+  const parts = [];
+  if (target.providerId === "hermes") {
+    if (target.gateway === "running") parts.push("Gateway 运行中");
+    else if (target.gateway) parts.push("Gateway 已停止");
+    else if (target.model) parts.push(target.model);
+  }
+  return parts.filter(Boolean).join(" · ");
+}
+
+function providerMetaLabel(provider, targets, instances) {
+  if (provider.id === "hermes" && targets.length) {
+    return t("provider.profileCount", { count: targets.length });
+  }
+  if (targets.length) {
+    return t("provider.targetCount", { count: targets.length });
+  }
+  if (instances.length) {
+    return t("provider.instanceCount", { count: instances.length });
+  }
+  return t("provider.targetCount", { count: 0 });
+}
+
+function providerRuntimeMiniLabel(instances) {
+  const labels = [...new Set(instances.map((instance) => instance.runtimeLabel).filter(Boolean))];
+  return labels.join(" / ");
+}
+
 function ensureCurrentTargetAgentExists() {
   if (currentTargetAgentId && agentById(currentTargetAgentId)) return;
   if (agentById(DEFAULT_HERMES_AGENT_ID)) {
@@ -1334,33 +1378,16 @@ function runtimeConnectionNote(provider, instances) {
 
 function renderRuntimeTarget(target) {
   const selected = target.id === currentTargetAgentId;
+  const subtitle = compactTargetSubtitle(target) || target.subtitle || "";
+  const name = displayAgentName(target);
+  const shouldShowRuntimeLabel = target.runtimeLabel && !name.includes(target.runtimeLabel);
   return `
     <div class="agent-entry ${selected ? "is-main-agent" : "is-selectable"}" data-agent-id="${target.id}">
       <div class="agent-entry-top">
-        <strong>${escapeHtml(displayAgentName(target))}</strong>
+        <strong>${escapeHtml(name)}</strong>
+        ${shouldShowRuntimeLabel ? `<span class="target-runtime-label">${escapeHtml(target.runtimeLabel)}</span>` : ""}
       </div>
-      ${target.subtitle ? `<div class="agent-entry-sub">${escapeHtml(target.subtitle)}</div>` : ""}
-    </div>
-  `;
-}
-
-function renderRuntimeInstanceBlock(provider, instance, targets, availableCount) {
-  const label = providerRuntimeLabel(provider, instance, availableCount);
-  const state = instance.available ? 1 : 9;
-  const canSelectRuntime = provider.id === "claude" && targets.length === 1;
-  if (canSelectRuntime) return renderRuntimeTarget(targets[0]);
-  return `
-    <div class="runtime-instance-block ${instance.available ? "is-available" : "is-unavailable"}">
-      <div class="runtime-instance-head">
-        <strong>${escapeHtml(label)}</strong>
-        <span class="state-pill ${stateClasses[state] || "state-idle"}">${instance.available ? t("provider.available") : t("provider.notConnected")}</span>
-      </div>
-      ${targets.length
-        ? `<div class="provider-agents is-runtime-targets">${targets.map(renderRuntimeTarget).join("")}</div>`
-        : `<div class="runtime-instance-empty">
-            <span>${instance.available ? t("provider.noTargets") : t("provider.noRuntime")}</span>
-            <button type="button" class="mini-btn ghost-btn provider-manage-btn" data-provider-id="${provider.id}">${t("common.fixConnection")}</button>
-          </div>`}
+      ${subtitle ? `<div class="agent-entry-sub">${escapeHtml(subtitle)}</div>` : ""}
     </div>
   `;
 }
@@ -1372,47 +1399,41 @@ function renderProviders() {
   providers.forEach((provider) => {
     const group = document.createElement("section");
     group.className = "provider-group";
-    const aggregateState = providerState(provider);
     const availability = providerAvailability(provider.id);
     const availabilityLabel = providerAvailabilityLabel(availability.summary);
     const instances = runtimeInstancesForProvider(provider.id);
-    const availableCount = availableRuntimeInstancesForProvider(provider.id).length;
-    const dynamicTargets = instances.flatMap(targetsForRuntimeInstance);
-    const shouldUseDynamic = instances.length > 0;
-    const availabilityDetail = shouldUseDynamic
-      ? runtimeConnectionNote(provider, instances)
-      : (availability.command ? `${availabilityLabel} · ${availability.command}` : availabilityLabel);
-    const targetMarkup = shouldUseDynamic
-      ? instances.map((instance) => renderRuntimeInstanceBlock(
-        provider,
-        instance,
-        targetsForRuntimeInstance(instance),
-        availableCount,
-      )).join("")
-      : provider.agents.map((agent) => `
-        <div class="agent-entry ${agent.id === currentTargetAgentId ? "is-main-agent" : "is-selectable"}" data-agent-id="${agent.id}">
-          <div class="agent-entry-top">
-            <strong>${displayAgentName(agent)}</strong>
-          </div>
-          <div class="agent-entry-sub">${agent.subtitle}</div>
-        </div>
-      `).join("");
+    const targets = targetsForProvider(provider.id);
+    const metaLabel = providerMetaLabel(provider, targets, instances);
+    const runtimeMiniLabel = providerRuntimeMiniLabel(instances);
+    const targetMarkup = targets.map(renderRuntimeTarget).join("");
+    const hasAvailableRuntime = instances.some((instance) => instance.available);
+    const emptyLabel = hasAvailableRuntime
+      ? t("provider.noTargets")
+      : provider.id === "hermes"
+        ? t("provider.noHermesRuntime")
+        : t("provider.noRuntime");
+    const statusClass = availability.available
+      ? (availability.summary === "partial" ? "is-partial" : "is-available")
+      : provider.id === "trae"
+        ? "is-planned"
+        : "is-unavailable";
 
     group.innerHTML = `
       <div class="provider-header">
-        <div>
+        <div class="provider-heading">
           <div class="provider-title-row">
             <strong>${provider.name}</strong>
-            <span class="state-pill provider-state-pill ${stateClasses[aggregateState] || "state-idle"}">${availabilityLabel}</span>
+            <span class="provider-status-dot ${statusClass}" title="${escapeHtml(availabilityLabel)}" aria-label="${escapeHtml(availabilityLabel)}"></span>
           </div>
-          ${provider.lane ? `<div class="provider-lane">${provider.lane}</div>` : ""}
+          <div class="provider-meta-row">
+            <span class="provider-count-badge">${escapeHtml(metaLabel)}</span>
+            ${runtimeMiniLabel ? `<span class="provider-runtime-mini">${escapeHtml(runtimeMiniLabel)}</span>` : ""}
+          </div>
         </div>
-        <button type="button" class="mini-btn ghost-btn provider-manage-btn" data-provider-id="${provider.id}">${availability.available ? t("common.manage") : t("common.fixConnection")}</button>
+        <button type="button" class="mini-btn ghost-btn provider-manage-btn provider-connection-icon-btn" data-provider-id="${provider.id}" title="${t("common.manage")}" aria-label="${t("common.manage")}">⚙</button>
       </div>
-      <p class="caption provider-note">${displayProviderNote(provider)}</p>
-      <p class="caption provider-runtime-note">${escapeHtml(availabilityDetail)}</p>
-      <div class="${shouldUseDynamic ? "runtime-instance-list" : "provider-agents"}">
-        ${targetMarkup || `<div class="runtime-instance-empty">${provider.id === "hermes" ? t("provider.noHermesRuntime") : t("provider.noRuntime")}</div>`}
+      <div class="provider-targets">
+        ${targetMarkup || `<div class="runtime-instance-empty">${emptyLabel}</div>`}
       </div>
     `;
 
