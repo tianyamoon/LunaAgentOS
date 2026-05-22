@@ -809,11 +809,16 @@ function inferHermesProfileExecutable(archived, restored) {
   const profileName = archived?.hermesProfile?.profileName || restored?.profileName;
   if (profileName && profileName !== "default") return profileName;
   const agentId = archived?.agentId || restored?.agentId || "";
-  if (agentId.startsWith("hermes-profile-")) {
-    const profileId = agentId.replace("hermes-profile-", "");
-    return profileId === "default" ? null : profileId;
-  }
+  const profileId = hermesProfileNameFromAgentId(agentId);
+  if (profileId) return profileId === "default" ? null : profileId;
   return null;
+}
+
+function hermesProfileNameFromAgentId(agentId) {
+  if (!agentId) return "";
+  if (agentId.includes(":profile:")) return agentId.split(":profile:").at(-1) || "";
+  if (agentId.startsWith("hermes-profile-")) return agentId.replace("hermes-profile-", "");
+  return "";
 }
 
 function targetDisplayName(target) {
@@ -824,6 +829,24 @@ function targetDisplayName(target) {
     return `${providerName}${target.runtimeLabel ? ` · ${target.runtimeLabel}` : ""} / ${displayAgentName(target)}`;
   }
   return target.name || providerName || displayAgentName(target);
+}
+
+function sessionIdentityTitle(session) {
+  const provider = providerById(session.providerId);
+  const providerName = provider?.name || session.providerName || "";
+  if (session.providerId === "hermes") {
+    const profileName = session.profileAlias
+      || session.profileName
+      || session.profileExecutable
+      || hermesProfileNameFromAgentId(session.agentId)
+      || session.agentName?.split("/").at(-1)?.trim();
+    return [providerName || "Hermes", profileName].filter(Boolean).join(" / ");
+  }
+  if (session.providerId === "claude") {
+    const runtimeName = session.runtimeLabel && session.runtimeLabel !== "Win" ? session.runtimeLabel : "";
+    return [providerName || "Claude Code", runtimeName].filter(Boolean).join(" · ");
+  }
+  return session.agentName || providerName || t("session.current");
 }
 
 function targetsForRuntimeInstance(instance) {
@@ -1768,6 +1791,8 @@ function createSession(firstTask) {
     skillCount: hermesProfile?.skillCount ?? null,
     hasSoul: hermesProfile?.hasSoul || false,
   };
+  session.agentName = sessionIdentityTitle(session);
+  session.targetName = session.agentName;
   sessions = [session, ...sessions];
   markSessionActive(session.id);
   renderWorkspace();
@@ -2588,12 +2613,13 @@ function renderSessionCard(session) {
   const latestOnlyLabel = latestOnly ? t("action.showAllTurns") : t("action.latestOnly");
   const flowToggleLabel = flowsOpen ? t("action.collapseFlows") : t("action.expandFlows");
   const fullscreenLabel = session.fullscreen ? t("action.exitFullscreen") : t("action.enterFullscreen");
+  const identityTitle = sessionIdentityTitle(session);
   return `
     <article class="session-card ${session.fullscreen ? "fullscreen" : ""} ${isActiveReceiver ? "is-active-receiver" : ""} ${isWaiting ? "is-waiting" : ""}" data-session-id="${session.id}" tabindex="0" aria-label="${escapeHtml(t("session.ariaSwitch", { task: session.task }))}" ${isActiveReceiver ? "aria-current=\"true\"" : ""}>
       <div class="session-card-header">
         <div class="session-identity-row">
           <div class="session-agent-title">
-            <strong>${escapeHtml(session.agentName)}</strong>
+            <strong>${escapeHtml(identityTitle)}</strong>
             ${isActiveReceiver ? `<span class="active-receiver-banner">${t("session.current")}</span>` : ""}
           </div>
           ${profileMeta ? `<div class="caption session-profile-meta">${escapeHtml(profileMeta)}</div>` : ""}
@@ -3354,8 +3380,9 @@ async function restoreArchivedSession(sessionId) {
   if (restored.providerId === "hermes") {
     restored.profileExecutable = inferHermesProfileExecutable(archived, restored);
   }
+  restored.agentName = sessionIdentityTitle(restored);
   restored.targetId = restored.targetId || restored.agentId;
-  restored.targetName = restored.targetName || restored.agentName;
+  restored.targetName = sessionIdentityTitle(restored);
   if (!existing) sessions = [restored, ...sessions];
   stoppedSessionIds.delete(restored.id);
   saveCurrentTargetAgent(restored.agentId);
