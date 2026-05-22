@@ -2060,6 +2060,19 @@ function appendErrorToTurn(sessionId, turnId, message) {
   setAppNotice(`会话 ${session.agentName} 执行失败：${message}`, "error");
 }
 
+function appendRuntimeLogToSession(session, message, state = null) {
+  const turn = session?.turns?.at(-1);
+  if (!turn || !message) return;
+  if (!turn.logs.includes(message)) {
+    turn.logs = [message, ...turn.logs];
+  }
+  if (typeof state === "number") {
+    turn.state = state;
+    session.state = state;
+  }
+  flowDetailOpenState.set(`${turn.id}:logs`, true);
+}
+
 function renderWorkspaceStatus() {
   const agent = currentTargetAgent();
   const provider = currentTargetProvider();
@@ -3319,6 +3332,7 @@ async function restoreArchivedSession(sessionId) {
     renderHistory();
     setAppNotice("历史 session 已重连为可续聊的 ACP runtime。");
   } catch (loadError) {
+    const formattedLoadError = formatBackendError(loadError);
     try {
       await invoke(commands.resume, {
         runtimeSessionId: restored.id,
@@ -3335,12 +3349,22 @@ async function restoreArchivedSession(sessionId) {
       renderHistory();
       setAppNotice("ACP load 失败，已通过 resume 重连为可续聊的 runtime。");
     } catch (resumeError) {
+      const formattedResumeError = formatBackendError(resumeError || loadError);
+      appendRuntimeLogToSession(
+        restored,
+        [
+          "ACP runtime 重连失败，已保留只读 transcript。",
+          `load 失败：${formattedLoadError}`,
+          `resume 失败：${formattedResumeError}`,
+        ].join("\n"),
+        9,
+      );
       restored.runtimeState = "resume_failed";
       markSessionInactive(restored.id);
       saveCurrentSession(restored.id);
       renderWorkspace();
       renderHistory();
-      setAppNotice(`ACP runtime 重连失败，保留只读 transcript：${formatBackendError(resumeError || loadError)}`, "error");
+      setAppNotice("ACP runtime 重连失败，已保留只读 transcript。", "error");
     }
   }
 }

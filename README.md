@@ -45,7 +45,7 @@ It is not the final agent operating system yet. It is the first credible slice:
 | Trae IDE | Planned | Bridge route only |
 | Multi-session workspace | Working | Session cards, current session, current send target |
 | Process visibility | Working | Thought/runtime/final response surfaces |
-| Local history | Working | JSON session history, restore/read-only states |
+| Local history | Working | JSON session history, restore/read-only states, and card-level reconnect diagnostics |
 | Screenshot/demo mode | Working | In-app launch demo scene for GitHub screenshots |
 | Runtime detection | Working | Startup probes distinguish provider, runtime instance, and send target/profile |
 | UI language | Working | zh-CN / en-US switch persisted locally, covering static and dynamic workspace labels |

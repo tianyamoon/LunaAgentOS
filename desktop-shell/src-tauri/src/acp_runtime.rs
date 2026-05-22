@@ -53,6 +53,7 @@ struct AcpSession {
     child: Child,
     stdin: ChildStdin,
     reader: BufReader<ChildStdout>,
+    stderr_log: Arc<Mutex<String>>,
     next_id: i64,
     session_id: String,
 }
@@ -431,6 +432,7 @@ fn start_acp_session(
         &mut reader,
         &mut stdin,
         init["id"].as_i64().unwrap(),
+        Some(&stderr_log),
         &mut events,
         on_event,
     )?;
@@ -487,6 +489,7 @@ fn start_acp_session(
         &mut reader,
         &mut stdin,
         session_request["id"].as_i64().unwrap(),
+        Some(&stderr_log),
         &mut events,
         on_event,
     )?;
@@ -524,6 +527,7 @@ fn start_acp_session(
         child,
         stdin,
         reader,
+        stderr_log,
         next_id,
         session_id,
     })
@@ -554,6 +558,7 @@ fn send_prompt(
         &mut session.reader,
         &mut session.stdin,
         prompt_request["id"].as_i64().unwrap(),
+        Some(&session.stderr_log),
         events,
         on_event,
     )?;
@@ -759,6 +764,7 @@ fn read_response(
     reader: &mut impl BufRead,
     stdin: &mut impl Write,
     target_id: i64,
+    stderr_log: Option<&Arc<Mutex<String>>>,
     events: &mut Vec<Value>,
     on_event: &mut Option<&mut dyn FnMut(Value)>,
 ) -> Result<Value, String> {
@@ -769,7 +775,7 @@ fn read_response(
             .read_line(&mut line)
             .map_err(|error| error.to_string())?;
         if bytes == 0 {
-            return Err(format!("{} adapter 已关闭 stdout。", runtime.display()));
+            return Err(format_adapter_stdout_closed(runtime, stderr_log));
         }
 
         let Ok(message) = serde_json::from_str::<Value>(line.trim()) else {
@@ -795,6 +801,23 @@ fn read_response(
                 push_event(events, event, on_event);
             }
         }
+    }
+}
+
+fn format_adapter_stdout_closed(
+    runtime: AcpRuntime,
+    stderr_log: Option<&Arc<Mutex<String>>>,
+) -> String {
+    let stderr = stderr_log
+        .and_then(|log| log.lock().ok().map(|value| value.trim().to_string()))
+        .filter(|value| !value.is_empty());
+    match stderr {
+        Some(stderr) => format!(
+            "{} adapter 已关闭 stdout。adapter stderr：{}",
+            runtime.display(),
+            stderr
+        ),
+        None => format!("{} adapter 已关闭 stdout。", runtime.display()),
     }
 }
 

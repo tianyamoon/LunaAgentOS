@@ -37,7 +37,12 @@ fn classify_backend_error(error: String) -> String {
         "SESSION_NOT_FOUND"
     } else if lower.contains("json") || lower.contains("parse") || lower.contains("解析") {
         "PROTOCOL_PARSE_FAILED"
-    } else if lower.contains("broken pipe") || lower.contains("child") || lower.contains("进程") {
+    } else if lower.contains("broken pipe")
+        || lower.contains("child")
+        || lower.contains("进程")
+        || lower.contains("已关闭 stdout")
+        || lower.contains("closed stdout")
+    {
         "RUNTIME_EXITED"
     } else {
         "UNKNOWN"
