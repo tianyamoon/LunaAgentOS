@@ -33,7 +33,7 @@ It is not the final agent operating system yet. It is the first credible slice:
 - **Local JSON history** preserves session transcripts.
 - **Live sessions** and **archived sessions** are separated in the right panel.
 - **Runtime availability** is probed at startup, so the app can launch even when Claude Code or Hermes is not installed yet.
-- **Chinese / English UI switching** is available from the top bar.
+- **Chinese / English UI switching** is available from the top bar, including dynamic provider, session-card, history, code-block, and report-view labels.
 
 ## What is working now
 
@@ -48,7 +48,7 @@ It is not the final agent operating system yet. It is the first credible slice:
 | Local history | Working | JSON session history, restore/read-only states |
 | Screenshot/demo mode | Working | In-app launch demo scene for GitHub screenshots |
 | Runtime setup | Working | Claude/Hermes can be configured per machine |
-| UI language | Working | zh-CN / en-US switch persisted locally |
+| UI language | Working | zh-CN / en-US switch persisted locally, covering static and dynamic workspace labels |
 
 ## Quick start
 

@@ -26,6 +26,17 @@ const stateDisplayNames = {
   9: "异常",
 };
 
+const stateDisplayKeys = {
+  0: "state.init",
+  1: "state.idle",
+  2: "state.think",
+  3: "state.tooling",
+  4: "state.response",
+  5: "state.done",
+  6: "state.stopped",
+  9: "state.error",
+};
+
 const stateClasses = {
   0: "state-init",
   1: "state-idle",
@@ -42,6 +53,13 @@ const runtimeStateLabels = {
   archived: "只读",
   restoring: "重连中",
   resume_failed: "重连失败",
+};
+
+const runtimeStateKeys = {
+  live: "runtime.live",
+  archived: "runtime.archived",
+  restoring: "runtime.restoring",
+  resume_failed: "runtime.resumeFailed",
 };
 
 const runtimeStateClasses = {
@@ -84,7 +102,7 @@ const translations = {
     "topbar.metricsAria": "当前能力状态",
     "topbar.demo": "演示场景",
     "topbar.clearDemo": "清除演示",
-    "topbar.language": "中文",
+    "topbar.language": "语言：中文",
     "fleet.title": "Agent 舰队",
     "common.manage": "维护",
     "workspace.title": "会话工作台",
@@ -117,12 +135,88 @@ const translations = {
     "provider.not_configured": "未配置",
     "provider.unavailable": "不可用",
     "provider.planned": "规划中",
+    "state.init": "启动中",
+    "state.idle": "待命",
+    "state.think": "思考中",
+    "state.tooling": "调用工具",
+    "state.response": "响应中",
+    "state.done": "完成",
+    "state.stopped": "已停止",
+    "state.error": "异常",
+    "runtime.live": "可续聊",
+    "runtime.archived": "只读",
+    "runtime.restoring": "重连中",
+    "runtime.resumeFailed": "重连失败",
+    "provider.claude.note": "面向开发者的命令行智能编程工具。",
+    "provider.hermes.note": "通用入口，等待载入 Hermes profile。",
+    "provider.hermes.loadedNote": "通用入口，已载入 {count} 个 Hermes profile。",
+    "provider.trae.note": "强大且免费的工具。",
+    "agent.main": "主会话",
+    "agent.claude.note": "适合承接高价值任务与真实产品演示。",
+    "agent.hermes.note": "适合作为通用样板与后续多会话扩展对象。",
+    "agent.trae.note": "作为免费入口保留产品位，等待独立桥接。",
+    "font.compact": "字体：紧凑",
+    "font.default": "字体：标准",
+    "font.comfortable": "字体：舒展",
+    "session.current": "当前会话",
+    "session.task": "任务：{task}",
+    "session.turns": "轮次 {count}",
+    "session.thoughts": "思考 {count}",
+    "session.logs": "运行 {count}",
+    "session.responses": "响应 {count}",
+    "session.noMessages": "当前会话尚未产生消息。",
+    "session.hiddenTurns": "已隐藏前 {count} 轮，复制会话仍包含完整 transcript。",
+    "turn.title": "第 {index} 轮",
+    "turn.waiting": "等待响应...",
+    "turn.thoughts": "思考流 · {count}",
+    "turn.logs": "运行流 · {count}",
+    "turn.copyTurn": "复制本轮",
+    "turn.copyResponse": "复制响应",
+    "history.signal.current": "当前会话",
+    "history.signal.workspace": "工作台中",
+    "history.signal.archive": "归档会话",
+    "history.signal.live": "活跃会话",
+    "history.delete": "删除会话",
+    "history.newSession": "新会话",
+    "session.ariaSwitch": "切换到会话：{task}",
+    "session.statusAria": "会话状态：{state}",
+    "session.statsAria": "会话统计",
+    "session.actionsAria": "会话操作",
+    "session.restoreRetry": "重试恢复",
+    "action.stop": "停止运行",
+    "action.dismiss": "移出工作台",
+    "action.archive": "归档会话",
+    "action.delete": "删除会话",
+    "action.copySession": "复制会话",
+    "action.showAllTurns": "显示全部轮次",
+    "action.latestOnly": "只看最新轮次",
+    "action.collapseFlows": "折叠过程流",
+    "action.expandFlows": "展开过程流",
+    "action.scrollLatest": "滚动到最新",
+    "action.exitFullscreen": "退出全屏阅读",
+    "action.enterFullscreen": "进入全屏阅读",
+    "action.expandTurn": "展开本轮",
+    "action.collapseTurn": "折叠本轮",
+    "action.expandAllTurns": "展开全部轮次",
+    "action.collapseAllTurns": "折叠全部轮次",
+    "action.restoringSuffix": "（重连中，暂不可用）",
+    "markdown.copySource": "复制源码",
+    "markdown.copyCode": "复制代码",
+    "markdown.diagramPreview": "Mermaid 流程图预览",
+    "markdown.diagramRendering": "正在渲染 Mermaid 图表...",
+    "markdown.diagramSource": "流程图源码",
+    "markdown.diagramFallback": "如果渲染失败，将保留源码用于复制和排查。",
+    "markdown.diagramFailed": "Mermaid 渲染失败，已保留源码。",
+    "report.prelude": "过程前言 · 已折叠",
+    "report.rawView": "原文报表视图",
+    "report.rawHint": "检测到宽表/长行，优先保留原始排版",
+    "report.renderedView": "查看 Markdown 渲染视图",
   },
   "en-US": {
     "topbar.metricsAria": "Current capability status",
     "topbar.demo": "Demo scene",
     "topbar.clearDemo": "Clear demo",
-    "topbar.language": "EN",
+    "topbar.language": "Language: English",
     "fleet.title": "Agent Fleet",
     "common.manage": "Manage",
     "workspace.title": "Session Workspace",
@@ -155,6 +249,82 @@ const translations = {
     "provider.not_configured": "Not configured",
     "provider.unavailable": "Unavailable",
     "provider.planned": "Planned",
+    "state.init": "Starting",
+    "state.idle": "Ready",
+    "state.think": "Thinking",
+    "state.tooling": "Using tools",
+    "state.response": "Responding",
+    "state.done": "Done",
+    "state.stopped": "Stopped",
+    "state.error": "Error",
+    "runtime.live": "Live",
+    "runtime.archived": "Read-only",
+    "runtime.restoring": "Reconnecting",
+    "runtime.resumeFailed": "Reconnect failed",
+    "provider.claude.note": "Command-line coding agent for developers.",
+    "provider.hermes.note": "General entry, waiting for Hermes profiles.",
+    "provider.hermes.loadedNote": "General entry, loaded {count} Hermes profiles.",
+    "provider.trae.note": "Powerful free IDE tool.",
+    "agent.main": "Main session",
+    "agent.claude.note": "Best for high-value tasks and real product demos.",
+    "agent.hermes.note": "General template for runtime and multi-session expansion.",
+    "agent.trae.note": "Reserved as a free entry until the IDE bridge is connected.",
+    "font.compact": "Font: Compact",
+    "font.default": "Font: Standard",
+    "font.comfortable": "Font: Comfortable",
+    "session.current": "Current session",
+    "session.task": "Task: {task}",
+    "session.turns": "Turns {count}",
+    "session.thoughts": "Thoughts {count}",
+    "session.logs": "Runtime {count}",
+    "session.responses": "Responses {count}",
+    "session.noMessages": "This session has no messages yet.",
+    "session.hiddenTurns": "Hidden previous {count} turns. Copying the session still includes the full transcript.",
+    "turn.title": "Turn {index}",
+    "turn.waiting": "Waiting for response...",
+    "turn.thoughts": "Thought stream · {count}",
+    "turn.logs": "Runtime stream · {count}",
+    "turn.copyTurn": "Copy turn",
+    "turn.copyResponse": "Copy response",
+    "history.signal.current": "Current session",
+    "history.signal.workspace": "In workspace",
+    "history.signal.archive": "Archived session",
+    "history.signal.live": "Live session",
+    "history.delete": "Delete session",
+    "history.newSession": "New session",
+    "session.ariaSwitch": "Switch to session: {task}",
+    "session.statusAria": "Session status: {state}",
+    "session.statsAria": "Session stats",
+    "session.actionsAria": "Session actions",
+    "session.restoreRetry": "Retry restore",
+    "action.stop": "Stop runtime",
+    "action.dismiss": "Remove from workspace",
+    "action.archive": "Archive session",
+    "action.delete": "Delete session",
+    "action.copySession": "Copy session",
+    "action.showAllTurns": "Show all turns",
+    "action.latestOnly": "Latest turn only",
+    "action.collapseFlows": "Collapse streams",
+    "action.expandFlows": "Expand streams",
+    "action.scrollLatest": "Scroll to latest",
+    "action.exitFullscreen": "Exit fullscreen reading",
+    "action.enterFullscreen": "Enter fullscreen reading",
+    "action.expandTurn": "Expand this turn",
+    "action.collapseTurn": "Collapse this turn",
+    "action.expandAllTurns": "Expand all turns",
+    "action.collapseAllTurns": "Collapse all turns",
+    "action.restoringSuffix": " (reconnecting, unavailable)",
+    "markdown.copySource": "Copy source",
+    "markdown.copyCode": "Copy code",
+    "markdown.diagramPreview": "Mermaid diagram preview",
+    "markdown.diagramRendering": "Rendering Mermaid diagram...",
+    "markdown.diagramSource": "Diagram source",
+    "markdown.diagramFallback": "If rendering fails, the source stays available for copy and debugging.",
+    "markdown.diagramFailed": "Mermaid rendering failed; source preserved.",
+    "report.prelude": "Process prelude · collapsed",
+    "report.rawView": "Raw report view",
+    "report.rawHint": "Wide table or long lines detected; preserving original layout first",
+    "report.renderedView": "View rendered Markdown",
   },
 };
 
@@ -359,14 +529,14 @@ const providers = [
     id: "claude",
     name: "Claude Code",
     lane: "",
-    note: "面向开发者的命令行智能编程工具。",
+    noteKey: "provider.claude.note",
     agents: [
       {
         id: "claude-main",
         providerId: "claude",
-        name: "主会话",
+        nameKey: "agent.main",
         subtitle: "Windows CLI",
-        note: "适合承接高价值任务与真实产品演示。",
+        noteKey: "agent.claude.note",
         state: 1,
       },
     ],
@@ -375,14 +545,14 @@ const providers = [
     id: "hermes",
     name: "Hermes",
     lane: "",
-    note: "通用入口，等待载入 Hermes profile。",
+    noteKey: "provider.hermes.note",
     agents: [
       {
         id: "hermes-main",
         providerId: "hermes",
-        name: "主会话",
+        nameKey: "agent.main",
         subtitle: "WSL Runtime",
-        note: "适合作为通用样板与后续多会话扩展对象。",
+        noteKey: "agent.hermes.note",
         state: 1,
       },
     ],
@@ -391,14 +561,14 @@ const providers = [
     id: "trae",
     name: "Trae IDE",
     lane: "",
-    note: "强大且免费的工具。",
+    noteKey: "provider.trae.note",
     agents: [
       {
         id: "trae-main",
         providerId: "trae",
-        name: "主会话",
+        nameKey: "agent.main",
         subtitle: "IDE Bridge",
-        note: "作为免费入口保留产品位，等待独立桥接。",
+        noteKey: "agent.trae.note",
         state: 1,
       },
     ],
@@ -422,14 +592,22 @@ const PROVIDER_AVAILABILITY_STATES = {
   planned: { state: 6, key: "provider.planned" },
 };
 const FONT_SCALE_OPTIONS = [
-  { id: "compact", label: "字体：紧凑", scale: 0.92 },
-  { id: "default", label: "字体：标准", scale: 1 },
-  { id: "comfortable", label: "字体：舒展", scale: 1.08 },
+  { id: "compact", labelKey: "font.compact", scale: 0.92 },
+  { id: "default", labelKey: "font.default", scale: 1 },
+  { id: "comfortable", labelKey: "font.comfortable", scale: 1.08 },
 ];
 
 function providerAvailabilityLabel(summary) {
   const key = PROVIDER_AVAILABILITY_STATES[summary]?.key;
   return key ? t(key) : summary;
+}
+
+function stateDisplayLabel(state) {
+  return stateDisplayKeys[state] ? t(stateDisplayKeys[state]) : stateDisplayNames[state] || "UNKNOWN";
+}
+
+function runtimeStateLabel(runtimeState) {
+  return runtimeStateKeys[runtimeState] ? t(runtimeStateKeys[runtimeState]) : runtimeStateLabels[runtimeState] || runtimeState;
 }
 
 const agentList = document.getElementById("agentList");
@@ -517,6 +695,18 @@ function providerForAgent(agentId) {
 
 function currentTargetAgent() {
   return agentById(currentTargetAgentId);
+}
+
+function displayAgentName(agent) {
+  return agent?.nameKey ? t(agent.nameKey) : agent?.name || "";
+}
+
+function displayAgentNote(agent) {
+  return agent?.noteKey ? t(agent.noteKey) : agent?.note || "";
+}
+
+function displayProviderNote(provider) {
+  return provider?.noteKey ? t(provider.noteKey, provider.noteParams || {}) : provider?.note || "";
 }
 
 function currentTargetProvider() {
@@ -626,6 +816,7 @@ function applyStaticTranslations() {
   document.title = languageId === "en-US" ? "LunaAgentOS Console" : "LunaAgentOS 控制台";
   if (providerManagerBtn) providerManagerBtn.textContent = t("common.manage");
   if (languageBtn) languageBtn.textContent = t("topbar.language");
+  applyFontScale();
   updateActionLabels();
   updateSendModeLabel();
   updatePromptPlaceholder();
@@ -687,7 +878,7 @@ function updatePromptPlaceholder() {
   const agent = currentTargetAgent();
   const provider = currentTargetProvider();
   promptBox.placeholder = agent && provider
-    ? t("composer.placeholderTarget", { provider: provider.name, agent: agent.name })
+    ? t("composer.placeholderTarget", { provider: provider.name, agent: displayAgentName(agent) })
     : t("composer.placeholderNoTarget");
 }
 
@@ -752,7 +943,7 @@ function currentFontScaleOption() {
 function applyFontScale() {
   const option = currentFontScaleOption();
   document.documentElement.style.setProperty("--ui-scale", String(option.scale));
-  if (fontScaleBtn) fontScaleBtn.textContent = option.label;
+  if (fontScaleBtn) fontScaleBtn.textContent = t(option.labelKey);
 }
 
 function cycleFontScale() {
@@ -804,7 +995,7 @@ async function openProviderManager() {
 }
 
 function showProviderAgents(provider) {
-  const names = provider.agents.map((agent) => agent.name).join("、");
+  const names = provider.agents.map((agent) => displayAgentName(agent)).join("、");
   setAppNotice(`${provider.name} 当前已登记的 Agent：${names}。`);
 }
 
@@ -839,7 +1030,7 @@ function setCurrentTargetAgent(agentId) {
   updatePromptPlaceholder();
   if (agent && provider) {
     renderWorkspaceStatus();
-    setAppNotice(`当前发送目标已切换到 ${provider.name} / ${agent.name}。`);
+    setAppNotice(`当前发送目标已切换到 ${provider.name} / ${displayAgentName(agent)}。`);
   }
   renderProviders();
   renderWorkspace();
@@ -868,13 +1059,13 @@ function renderProviders() {
         </div>
         <button type="button" class="mini-btn ghost-btn provider-manage-btn" data-provider-id="${provider.id}">${t("common.manage")}</button>
       </div>
-      <p class="caption provider-note">${provider.note}</p>
+      <p class="caption provider-note">${displayProviderNote(provider)}</p>
       <p class="caption provider-runtime-note">${escapeHtml(availabilityDetail)}</p>
       <div class="provider-agents">
         ${provider.agents.map((agent) => `
           <div class="agent-entry ${agent.id === currentTargetAgentId ? "is-main-agent" : "is-selectable"}" data-agent-id="${agent.id}">
             <div class="agent-entry-top">
-              <strong>${agent.name}</strong>
+              <strong>${displayAgentName(agent)}</strong>
             </div>
             <div class="agent-entry-sub">${agent.subtitle}</div>
             ${agent.id === currentTargetAgentId
@@ -928,7 +1119,9 @@ function applyHermesProfiles(profiles) {
     hasSoul: profile.hasSoul,
     isDefault: Boolean(profile.isDefault),
   }));
-  hermesProvider.note = `通用入口，已载入 ${profiles.length} 个 Hermes profile。`;
+  hermesProvider.note = null;
+  hermesProvider.noteKey = "provider.hermes.loadedNote";
+  hermesProvider.noteParams = { count: profiles.length };
   if (isLaunchDemoScene) {
     ensureLaunchDemoHermesAgent();
     currentTargetAgentId = "hermes-demo-ailearning";
@@ -1112,7 +1305,7 @@ function createSession(firstTask) {
     providerId: provider.id,
     providerName: provider.name,
     agentId: agent.id,
-    agentName: `${provider.name} / ${agent.name}`,
+    agentName: `${provider.name} / ${displayAgentName(agent)}`,
     task: firstTask,
     state: 2,
     runtimeState: "live",
@@ -1496,9 +1689,9 @@ function renderWorkspaceStatus() {
   const availabilityLabel = providerAvailabilityLabel(availability.summary);
   workspaceStatus.innerHTML = `
     <span>${t("workspace.currentTarget")}</span>
-    <strong class="workspace-status-target">${escapeHtml(provider.name)} / ${escapeHtml(agent.name)}</strong>
+    <strong class="workspace-status-target">${escapeHtml(provider.name)} / ${escapeHtml(displayAgentName(agent))}</strong>
     <span class="workspace-status-separator">·</span>
-    <span class="state-pill workspace-state-pill ${stateClasses[statusState] || "state-idle"}">${escapeHtml(stateNames[statusState] || "IDLE")}</span>
+    <span class="state-pill workspace-state-pill ${stateClasses[statusState] || "state-idle"}">${escapeHtml(stateDisplayLabel(statusState))}</span>
     <span class="workspace-runtime-count">${escapeHtml(availabilityLabel)}</span>
     ${liveCount > 0 ? `<span class="workspace-runtime-count">ACP × ${liveCount}</span>` : ""}
   `;
@@ -1573,14 +1766,14 @@ function renderCodeFence(lang, code) {
       <div class="md-diagram-block">
         <div class="md-code-toolbar">
           <span class="md-code-lang">mermaid</span>
-          <button type="button" class="mini-btn ghost-btn md-code-copy-btn">复制源码</button>
+          <button type="button" class="mini-btn ghost-btn md-code-copy-btn">${t("markdown.copySource")}</button>
         </div>
-        <div class="md-diagram-render" aria-label="Mermaid 流程图预览">
-          <span class="caption">正在渲染 Mermaid 图表...</span>
+        <div class="md-diagram-render" aria-label="${t("markdown.diagramPreview")}">
+          <span class="caption">${t("markdown.diagramRendering")}</span>
         </div>
         <div class="md-diagram-fallback">
-          <strong>流程图源码</strong>
-          <p>如果渲染失败，将保留源码用于复制和排查。</p>
+          <strong>${t("markdown.diagramSource")}</strong>
+          <p>${t("markdown.diagramFallback")}</p>
         </div>
         <pre class="md-code"><code>${escapeHtml(code)}</code></pre>
       </div>
@@ -1590,7 +1783,7 @@ function renderCodeFence(lang, code) {
     <div class="md-code-block">
       <div class="md-code-toolbar">
         ${lang ? `<span class="md-code-lang">${escapeHtml(lang)}</span>` : "<span></span>"}
-        <button type="button" class="mini-btn ghost-btn md-code-copy-btn">复制代码</button>
+        <button type="button" class="mini-btn ghost-btn md-code-copy-btn">${t("markdown.copyCode")}</button>
       </div>
       <pre class="md-code"><code>${escapeHtml(code)}</code></pre>
     </div>
@@ -1615,7 +1808,7 @@ async function renderMermaidDiagrams(root = sessionDeck) {
       block.classList.add("is-rendered");
     } catch (error) {
       console.error(error);
-      target.innerHTML = "<span class=\"caption\">Mermaid 渲染失败，已保留源码。</span>";
+      target.innerHTML = `<span class="caption">${t("markdown.diagramFailed")}</span>`;
       block.dataset.rendered = "failed";
       block.classList.add("is-render-failed");
     }
@@ -1627,9 +1820,9 @@ function sessionCardStats(session) {
   const logCount = session.turns.reduce((count, turn) => count + turn.logs.length, 0);
   const outputCount = session.turns.filter((turn) => turnResponseText(turn)).length;
   return [
-    thoughtCount ? { key: "thoughts", label: `思考 ${thoughtCount}` } : null,
-    logCount ? { key: "logs", label: `运行 ${logCount}` } : null,
-    outputCount ? { key: "responses", label: `响应 ${outputCount}` } : null,
+    thoughtCount ? { key: "thoughts", label: t("session.thoughts", { count: thoughtCount }) } : null,
+    logCount ? { key: "logs", label: t("session.logs", { count: logCount }) } : null,
+    outputCount ? { key: "responses", label: t("session.responses", { count: outputCount }) } : null,
   ].filter(Boolean);
 }
 
@@ -1682,7 +1875,7 @@ function renderResponsePrelude(prelude) {
   if (!prelude) return "";
   return `
     <details class="response-prelude-detail">
-      <summary>过程前言 · 已折叠</summary>
+      <summary>${t("report.prelude")}</summary>
       <div class="terminal-pre">${escapeHtml(prelude)}</div>
     </details>
   `;
@@ -1704,13 +1897,13 @@ function renderAssistantResponse(text, phase = "final") {
     ${preludeHtml}
     <div class="plain-report-view">
       <div class="plain-report-toolbar">
-        <span>原文报表视图</span>
-        <span class="caption">检测到宽表/长行，优先保留原始排版</span>
+        <span>${t("report.rawView")}</span>
+        <span class="caption">${t("report.rawHint")}</span>
       </div>
       <pre>${escapeHtml(display.body)}</pre>
     </div>
     <details class="rendered-report-detail">
-      <summary>查看 Markdown 渲染视图</summary>
+      <summary>${t("report.renderedView")}</summary>
       <div class="rich-text">${renderRichText(display.body)}</div>
     </details>
   `;
@@ -1862,23 +2055,24 @@ function renderTurn(turn, index) {
   const streaming = executingSessionStates.has(turn.state);
   const waiting = streaming && !turn.finalResponse;
   const rawResponseText = turnResponseText(turn);
-  const responseText = rawResponseText || "等待响应...";
+  const responseText = rawResponseText || t("turn.waiting");
   const thoughtDetailKey = `${turn.id}:thoughts`;
   const logDetailKey = `${turn.id}:logs`;
   const collapsed = collapsedTurnIds.has(turn.id);
+  const turnToggleLabel = collapsed ? t("action.expandTurn") : t("action.collapseTurn");
   return `
     <section class="turn-block ${collapsed ? "is-collapsed" : ""}" data-turn-id="${escapeHtml(turn.id)}">
       <div class="turn-header">
         <div class="turn-title">
-          <button type="button" class="mini-btn ghost-btn turn-collapse-btn ${collapsed ? "is-on" : ""}" data-turn-id="${escapeHtml(turn.id)}" aria-expanded="${collapsed ? "false" : "true"}" title="${collapsed ? "展开本轮" : "折叠本轮"}" aria-label="${collapsed ? "展开本轮" : "折叠本轮"}">
+          <button type="button" class="mini-btn ghost-btn turn-collapse-btn ${collapsed ? "is-on" : ""}" data-turn-id="${escapeHtml(turn.id)}" aria-expanded="${collapsed ? "false" : "true"}" title="${turnToggleLabel}" aria-label="${turnToggleLabel}">
             ${renderTurnCollapseIcon(collapsed)}
           </button>
-          <strong>第 ${index + 1} 轮</strong>
+          <strong>${t("turn.title", { index: index + 1 })}</strong>
         </div>
         <div class="turn-header-actions">
           <span class="state-pill ${stateClasses[turn.state] || "state-idle"}">${stateNames[turn.state] || "UNKNOWN"}</span>
-          <button type="button" class="mini-btn ghost-btn turn-copy-btn" data-turn-id="${escapeHtml(turn.id)}">复制本轮</button>
-          <button type="button" class="mini-btn ghost-btn turn-copy-response-btn" data-turn-id="${escapeHtml(turn.id)}" ${rawResponseText ? "" : "disabled"}>复制响应</button>
+          <button type="button" class="mini-btn ghost-btn turn-copy-btn" data-turn-id="${escapeHtml(turn.id)}">${t("turn.copyTurn")}</button>
+          <button type="button" class="mini-btn ghost-btn turn-copy-response-btn" data-turn-id="${escapeHtml(turn.id)}" ${rawResponseText ? "" : "disabled"}>${t("turn.copyResponse")}</button>
         </div>
       </div>
       ${collapsed
@@ -1890,7 +2084,7 @@ function renderTurn(turn, index) {
           ${turn.thoughts.length
             ? `
               <details class="terminal-detail" data-detail-key="${escapeHtml(thoughtDetailKey)}" ${detailOpenAttribute(thoughtDetailKey, waiting)}>
-                <summary>思考流 · ${turn.thoughts.length}</summary>
+                <summary>${t("turn.thoughts", { count: turn.thoughts.length })}</summary>
                 <div class="terminal-pre rich-text">${renderRichText(turn.thoughts.join("\n\n"))}</div>
               </details>
             `
@@ -1902,7 +2096,7 @@ function renderTurn(turn, index) {
           ${turn.logs.length
             ? `
               <details class="terminal-detail log-block" data-detail-key="${escapeHtml(logDetailKey)}" ${detailOpenAttribute(logDetailKey, waiting)}>
-                <summary>运行流 · ${turn.logs.length}</summary>
+                <summary>${t("turn.logs", { count: turn.logs.length })}</summary>
                 <div class="terminal-pre rich-text">${renderRichText(turn.logs.join("\n"))}</div>
               </details>
             `
@@ -1918,7 +2112,6 @@ function renderSessionCard(session) {
   const isWaiting = isSessionExecuting(session);
   const isRestoring = runtimeState === "restoring";
   const managementDisabled = isRestoring ? "disabled" : "";
-  const managementTitleSuffix = isRestoring ? "（重连中，暂不可用）" : "";
   const profileMeta = session.providerId === "hermes"
     ? [session.profileName, session.profileModel].filter(Boolean).join(" · ")
     : "";
@@ -1931,47 +2124,53 @@ function renderSessionCard(session) {
   const turnEntries = session.turns.map((turn, index) => ({ turn, index }));
   const visibleTurnEntries = latestOnly && turnEntries.length > 1 ? turnEntries.slice(-1) : turnEntries;
   const hiddenTurnCount = turnEntries.length - visibleTurnEntries.length;
+  const managementTitleSuffix = isRestoring ? t("action.restoringSuffix") : "";
+  const runtimeLabel = runtimeStateLabel(runtimeState);
+  const turnToggleLabel = turnsCollapsed ? t("action.expandAllTurns") : t("action.collapseAllTurns");
+  const latestOnlyLabel = latestOnly ? t("action.showAllTurns") : t("action.latestOnly");
+  const flowToggleLabel = flowsOpen ? t("action.collapseFlows") : t("action.expandFlows");
+  const fullscreenLabel = session.fullscreen ? t("action.exitFullscreen") : t("action.enterFullscreen");
   return `
-    <article class="session-card ${session.fullscreen ? "fullscreen" : ""} ${isActiveReceiver ? "is-active-receiver" : ""} ${isWaiting ? "is-waiting" : ""}" data-session-id="${session.id}" tabindex="0" aria-label="切换到会话：${escapeHtml(session.task)}" ${isActiveReceiver ? "aria-current=\"true\"" : ""}>
+    <article class="session-card ${session.fullscreen ? "fullscreen" : ""} ${isActiveReceiver ? "is-active-receiver" : ""} ${isWaiting ? "is-waiting" : ""}" data-session-id="${session.id}" tabindex="0" aria-label="${escapeHtml(t("session.ariaSwitch", { task: session.task }))}" ${isActiveReceiver ? "aria-current=\"true\"" : ""}>
       <div class="session-card-header">
         <div class="session-identity-row">
           <div class="session-agent-title">
             <strong>${escapeHtml(session.agentName)}</strong>
-            ${isActiveReceiver ? `<span class="active-receiver-banner">当前会话</span>` : ""}
+            ${isActiveReceiver ? `<span class="active-receiver-banner">${t("session.current")}</span>` : ""}
           </div>
           ${profileMeta ? `<div class="caption session-profile-meta">${escapeHtml(profileMeta)}</div>` : ""}
         </div>
         <div class="session-control-row">
           <div class="session-status-cluster">
-            ${shouldShowRuntimeState ? `<span class="runtime-pill ${runtimeStateClasses[runtimeState] || "runtime-archived"} ${isWaiting ? "is-busy" : ""}" aria-label="会话状态：${runtimeStateLabels[runtimeState] || runtimeState}">${runtimeStateLabels[runtimeState] || runtimeState}</span>` : ""}
-            <div class="session-card-stats" aria-label="会话统计">
-              <button type="button" class="session-stat-pill session-turns-toggle-btn ${turnsCollapsed ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${turnsCollapsed ? "true" : "false"}" title="${turnsCollapsed ? "展开全部轮次" : "折叠全部轮次"}" aria-label="${turnsCollapsed ? "展开全部轮次" : "折叠全部轮次"}" ${session.turns.length ? "" : "disabled"}>轮次 ${session.turns.length}</button>
+            ${shouldShowRuntimeState ? `<span class="runtime-pill ${runtimeStateClasses[runtimeState] || "runtime-archived"} ${isWaiting ? "is-busy" : ""}" aria-label="${escapeHtml(t("session.statusAria", { state: runtimeLabel }))}">${escapeHtml(runtimeLabel)}</span>` : ""}
+            <div class="session-card-stats" aria-label="${t("session.statsAria")}">
+              <button type="button" class="session-stat-pill session-turns-toggle-btn ${turnsCollapsed ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${turnsCollapsed ? "true" : "false"}" title="${turnToggleLabel}" aria-label="${turnToggleLabel}" ${session.turns.length ? "" : "disabled"}>${t("session.turns", { count: session.turns.length })}</button>
               ${stats.map((item) => `<span class="session-stat-pill" data-stat-key="${escapeHtml(item.key)}">${escapeHtml(item.label)}</span>`).join("")}
             </div>
           </div>
           <div class="session-card-actions">
-            ${isWaiting && runtimeState === "live" ? `<button type="button" class="mini-btn ghost-btn session-action-btn session-stop-btn" data-session-id="${session.id}" title="停止运行" aria-label="停止运行">${renderSessionActionIcon("stop")}</button>` : ""}
-            <button type="button" class="mini-btn ghost-btn session-action-btn session-dismiss-btn" data-session-id="${session.id}" title="移出工作台${managementTitleSuffix}" aria-label="移出工作台" ${managementDisabled}>${renderSessionActionIcon("dismiss")}</button>
-            <button type="button" class="mini-btn ghost-btn session-action-btn session-archive-btn" data-session-id="${session.id}" title="归档会话${managementTitleSuffix}" aria-label="归档会话" ${managementDisabled}>${renderSessionActionIcon("archive")}</button>
-            <button type="button" class="mini-btn ghost-btn session-action-btn danger-btn session-delete-btn" data-session-id="${session.id}" title="删除会话${managementTitleSuffix}" aria-label="删除会话" ${managementDisabled}>${renderSessionActionIcon("delete")}</button>
-            ${canRestoreSession(session) ? `<button type="button" class="mini-btn ghost-btn session-retry-btn" data-session-id="${session.id}">重试恢复</button>` : ""}
-            <div class="session-tool-group" role="group" aria-label="会话操作">
-              <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-copy-btn" data-session-id="${session.id}" title="复制会话" aria-label="复制会话" ${session.turns.length ? "" : "disabled"}>${renderSessionActionIcon("copy")}</button>
-              <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-latest-only-btn ${latestOnly ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${latestOnly ? "true" : "false"}" title="${latestOnly ? "显示全部轮次" : "只看最新轮次"}" aria-label="${latestOnly ? "显示全部轮次" : "只看最新轮次"}" ${session.turns.length > 1 ? "" : "disabled"}>${renderSessionActionIcon(latestOnly ? "all" : "latest")}</button>
-              <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-toggle-flows-btn ${flowsOpen ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${flowsOpen ? "true" : "false"}" title="${flowsOpen ? "折叠过程流" : "展开过程流"}" aria-label="${flowsOpen ? "折叠过程流" : "展开过程流"}" ${hasFlowDetails ? "" : "disabled"}>${renderSessionActionIcon(flowsOpen ? "collapse" : "expand")}</button>
-              <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-scroll-latest-btn" data-session-id="${session.id}" title="滚动到最新" aria-label="滚动到最新">${renderSessionActionIcon("latestScroll")}</button>
-              <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-fullscreen-btn ${session.fullscreen ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${session.fullscreen ? "true" : "false"}" title="${session.fullscreen ? "退出全屏阅读" : "进入全屏阅读"}" aria-label="${session.fullscreen ? "退出全屏阅读" : "进入全屏阅读"}">
+            ${isWaiting && runtimeState === "live" ? `<button type="button" class="mini-btn ghost-btn session-action-btn session-stop-btn" data-session-id="${session.id}" title="${t("action.stop")}" aria-label="${t("action.stop")}">${renderSessionActionIcon("stop")}</button>` : ""}
+            <button type="button" class="mini-btn ghost-btn session-action-btn session-dismiss-btn" data-session-id="${session.id}" title="${t("action.dismiss")}${managementTitleSuffix}" aria-label="${t("action.dismiss")}" ${managementDisabled}>${renderSessionActionIcon("dismiss")}</button>
+            <button type="button" class="mini-btn ghost-btn session-action-btn session-archive-btn" data-session-id="${session.id}" title="${t("action.archive")}${managementTitleSuffix}" aria-label="${t("action.archive")}" ${managementDisabled}>${renderSessionActionIcon("archive")}</button>
+            <button type="button" class="mini-btn ghost-btn session-action-btn danger-btn session-delete-btn" data-session-id="${session.id}" title="${t("action.delete")}${managementTitleSuffix}" aria-label="${t("action.delete")}" ${managementDisabled}>${renderSessionActionIcon("delete")}</button>
+            ${canRestoreSession(session) ? `<button type="button" class="mini-btn ghost-btn session-retry-btn" data-session-id="${session.id}">${t("session.restoreRetry")}</button>` : ""}
+            <div class="session-tool-group" role="group" aria-label="${t("session.actionsAria")}">
+              <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-copy-btn" data-session-id="${session.id}" title="${t("action.copySession")}" aria-label="${t("action.copySession")}" ${session.turns.length ? "" : "disabled"}>${renderSessionActionIcon("copy")}</button>
+              <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-latest-only-btn ${latestOnly ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${latestOnly ? "true" : "false"}" title="${latestOnlyLabel}" aria-label="${latestOnlyLabel}" ${session.turns.length > 1 ? "" : "disabled"}>${renderSessionActionIcon(latestOnly ? "all" : "latest")}</button>
+              <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-toggle-flows-btn ${flowsOpen ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${flowsOpen ? "true" : "false"}" title="${flowToggleLabel}" aria-label="${flowToggleLabel}" ${hasFlowDetails ? "" : "disabled"}>${renderSessionActionIcon(flowsOpen ? "collapse" : "expand")}</button>
+              <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-scroll-latest-btn" data-session-id="${session.id}" title="${t("action.scrollLatest")}" aria-label="${t("action.scrollLatest")}">${renderSessionActionIcon("latestScroll")}</button>
+              <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-fullscreen-btn ${session.fullscreen ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${session.fullscreen ? "true" : "false"}" title="${fullscreenLabel}" aria-label="${fullscreenLabel}">
                 ${renderSessionActionIcon(session.fullscreen ? "fullscreenExit" : "fullscreen")}
               </button>
             </div>
           </div>
         </div>
-        <div class="caption session-task">任务：${escapeHtml(session.task)}</div>
+        <div class="caption session-task">${escapeHtml(t("session.task", { task: session.task }))}</div>
       </div>
       <div class="session-card-body">
         ${session.turns.length
-          ? `${hiddenTurnCount ? `<div class="session-hidden-turns">已隐藏前 ${hiddenTurnCount} 轮，复制会话仍包含完整 transcript。</div>` : ""}${visibleTurnEntries.map(({ turn, index }) => renderTurn(turn, index)).join("")}<div class="session-latest-anchor">${isWaiting ? "streaming..." : "latest"}</div>`
-          : "<p class='flow-empty'>当前会话尚未产生消息。</p>"}
+          ? `${hiddenTurnCount ? `<div class="session-hidden-turns">${t("session.hiddenTurns", { count: hiddenTurnCount })}</div>` : ""}${visibleTurnEntries.map(({ turn, index }) => renderTurn(turn, index)).join("")}<div class="session-latest-anchor">${isWaiting ? "streaming..." : "latest"}</div>`
+          : `<p class='flow-empty'>${t("session.noMessages")}</p>`}
       </div>
     </article>
   `;
@@ -2434,8 +2633,8 @@ function sessionListItems() {
       updatedAt: lastTurn?.createdAt || session.createdAt,
       providerName: session.providerName,
       agentName: session.agentName,
-      title: session.task || "新会话",
-      summary: lastTurn?.finalResponse || lastTurn?.outputs.at(-1) || lastTurn?.logs.at(-1) || "当前会话",
+      title: session.task || t("history.newSession"),
+      summary: lastTurn?.finalResponse || lastTurn?.outputs.at(-1) || lastTurn?.logs.at(-1) || t("session.current"),
       turnCount: session.turns.length,
       runtimeState: sessionRuntimeState(session),
       agentId: session.agentId,
@@ -2522,22 +2721,22 @@ function renderSessionListItem(item) {
       ? "signal-archive"
       : "signal-active";
   const signalLabel = isActiveHistoryItem
-    ? "当前会话"
+    ? t("history.signal.current")
     : item.isInWorkspace
-      ? "工作台中"
+      ? t("history.signal.workspace")
       : isArchived
-        ? "归档会话"
-        : "活跃会话";
+        ? t("history.signal.archive")
+        : t("history.signal.live");
   const listStateClass = isArchived ? "is-archive" : "is-active-history";
   const shouldShowState = item.runtimeState !== "archived" && item.runtimeState !== "live";
-  const stateLabel = shouldShowState ? runtimeStateLabels[item.runtimeState] || item.runtimeState : "";
+  const stateLabel = shouldShowState ? runtimeStateLabel(item.runtimeState) : "";
   return `
     <article class="history-item ${listStateClass} ${isActiveHistoryItem ? "is-active-session" : ""}" data-session-id="${item.id}" data-agent-id="${item.agentId || ""}" ${isActiveHistoryItem ? "aria-current=\"true\"" : ""}>
       <div class="history-item-top">
         <strong class="history-tool-name"><span class="history-signal ${signalClass}" title="${escapeHtml(signalLabel)}" aria-label="${escapeHtml(signalLabel)}"></span>${escapeHtml(item.providerName)}</strong>
         <div class="history-item-actions">
           ${shouldShowState ? `<span class="history-state-pill">${escapeHtml(stateLabel)}</span>` : ""}
-          <button type="button" class="history-delete-btn" data-session-id="${item.id}" title="删除会话" aria-label="删除会话">${renderSessionActionIcon("delete")}</button>
+          <button type="button" class="history-delete-btn" data-session-id="${item.id}" title="${t("history.delete")}" aria-label="${t("history.delete")}">${renderSessionActionIcon("delete")}</button>
         </div>
       </div>
       <div class="history-item-meta">

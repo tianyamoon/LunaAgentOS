@@ -58,8 +58,14 @@ body {
 .topbar-tools {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 8px;
   padding-top: 4px;
+}
+
+.language-switch-btn {
+  min-width: 112px;
 }
 
 .product-eyebrow,
