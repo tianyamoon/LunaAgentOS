@@ -48,7 +48,7 @@ LunaAgentOS 的方向不是重写这些 Agent，而是把它们收拢到一个�
 
 | 模块 | 状态 | 说明 |
 |---|---:|---|
-| 桌面壳 | 已可用 | Tauri 2 + Rust Core + 前端工作台 |
+| 桌面壳 | 已可用 | Tauri 2 + Rust Core + 前端工作台，密集面板滚动条已弱化 |
 | Claude Code | 已接入 | 真实 runtime 路径 |
 | Hermes | 已接入 | Windows / WSL / ACP runtime instance 与 profile |
 | Trae IDE | 规划中 | 保留 Bridge 路线，不伪装已接入 |

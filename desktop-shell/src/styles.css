@@ -15,6 +15,9 @@
   --error: #c03a3a;
   --shadow: 0 18px 55px rgba(73, 49, 25, 0.08);
   --radius: 24px;
+  --scrollbar-thumb: rgba(99, 82, 63, 0.14);
+  --scrollbar-thumb-hover: rgba(99, 82, 63, 0.34);
+  --scrollbar-thumb-active: rgba(217, 108, 58, 0.32);
   font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   font-size: calc(15px * var(--ui-scale));
 }
@@ -37,6 +40,110 @@ body {
 
 body {
   min-height: 100vh;
+}
+
+.agent-list,
+.history-list,
+.session-deck,
+.session-card-body,
+.plain-report-pre,
+.response-prelude-detail .terminal-pre,
+.md-diagram-render,
+.md-code,
+.md-table-wrap {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+.agent-list:hover,
+.history-list:hover,
+.session-deck:hover,
+.session-card-body:hover,
+.plain-report-pre:hover,
+.response-prelude-detail .terminal-pre:hover,
+.md-diagram-render:hover,
+.md-code:hover,
+.md-table-wrap:hover {
+  scrollbar-color: var(--scrollbar-thumb-hover) transparent;
+}
+
+.agent-list::-webkit-scrollbar,
+.history-list::-webkit-scrollbar,
+.session-deck::-webkit-scrollbar,
+.session-card-body::-webkit-scrollbar,
+.plain-report-pre::-webkit-scrollbar,
+.response-prelude-detail .terminal-pre::-webkit-scrollbar,
+.md-diagram-render::-webkit-scrollbar,
+.md-code::-webkit-scrollbar,
+.md-table-wrap::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.agent-list::-webkit-scrollbar-track,
+.history-list::-webkit-scrollbar-track,
+.session-deck::-webkit-scrollbar-track,
+.session-card-body::-webkit-scrollbar-track,
+.plain-report-pre::-webkit-scrollbar-track,
+.response-prelude-detail .terminal-pre::-webkit-scrollbar-track,
+.md-diagram-render::-webkit-scrollbar-track,
+.md-code::-webkit-scrollbar-track,
+.md-table-wrap::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.agent-list::-webkit-scrollbar-thumb,
+.history-list::-webkit-scrollbar-thumb,
+.session-deck::-webkit-scrollbar-thumb,
+.session-card-body::-webkit-scrollbar-thumb,
+.plain-report-pre::-webkit-scrollbar-thumb,
+.response-prelude-detail .terminal-pre::-webkit-scrollbar-thumb,
+.md-diagram-render::-webkit-scrollbar-thumb,
+.md-code::-webkit-scrollbar-thumb,
+.md-table-wrap::-webkit-scrollbar-thumb {
+  min-height: 42px;
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: var(--scrollbar-thumb);
+  background-clip: padding-box;
+}
+
+.agent-list:hover::-webkit-scrollbar-thumb,
+.history-list:hover::-webkit-scrollbar-thumb,
+.session-deck:hover::-webkit-scrollbar-thumb,
+.session-card-body:hover::-webkit-scrollbar-thumb,
+.plain-report-pre:hover::-webkit-scrollbar-thumb,
+.response-prelude-detail .terminal-pre:hover::-webkit-scrollbar-thumb,
+.md-diagram-render:hover::-webkit-scrollbar-thumb,
+.md-code:hover::-webkit-scrollbar-thumb,
+.md-table-wrap:hover::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb-hover);
+  background-clip: padding-box;
+}
+
+.agent-list::-webkit-scrollbar-thumb:active,
+.history-list::-webkit-scrollbar-thumb:active,
+.session-deck::-webkit-scrollbar-thumb:active,
+.session-card-body::-webkit-scrollbar-thumb:active,
+.plain-report-pre::-webkit-scrollbar-thumb:active,
+.response-prelude-detail .terminal-pre::-webkit-scrollbar-thumb:active,
+.md-diagram-render::-webkit-scrollbar-thumb:active,
+.md-code::-webkit-scrollbar-thumb:active,
+.md-table-wrap::-webkit-scrollbar-thumb:active {
+  background: var(--scrollbar-thumb-active);
+  background-clip: padding-box;
+}
+
+.agent-list::-webkit-scrollbar-corner,
+.history-list::-webkit-scrollbar-corner,
+.session-deck::-webkit-scrollbar-corner,
+.session-card-body::-webkit-scrollbar-corner,
+.plain-report-pre::-webkit-scrollbar-corner,
+.response-prelude-detail .terminal-pre::-webkit-scrollbar-corner,
+.md-diagram-render::-webkit-scrollbar-corner,
+.md-code::-webkit-scrollbar-corner,
+.md-table-wrap::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 .app-shell {
@@ -813,7 +920,8 @@ body.is-launch-demo .layout {
   gap: 16px;
   height: 100%;
   overflow: auto;
-  padding-right: 4px;
+  padding-right: 10px;
+  scrollbar-gutter: stable;
 }
 
 .session-deck.is-single-session {
@@ -927,26 +1035,7 @@ body.is-launch-demo .layout {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  padding: 0 6px 0 10px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(99, 82, 63, 0.28) transparent;
-}
-
-.session-card-body::-webkit-scrollbar {
-  width: 7px;
-}
-
-.session-card-body::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.session-card-body::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: rgba(99, 82, 63, 0.24);
-}
-
-.session-card-body::-webkit-scrollbar-thumb:hover {
-  background: rgba(99, 82, 63, 0.38);
+  padding: 0 8px 0 10px;
 }
 
 .turn-block {
