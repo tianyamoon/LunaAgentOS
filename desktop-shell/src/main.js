@@ -888,7 +888,7 @@ function targetsForRuntimeInstance(instance) {
       gateway: profile.gateway,
       alias: profile.alias,
       profileAlias: profile.alias,
-      profileExecutable: profile.alias || profile.profileName || null,
+      profileExecutable: profile.alias || null,
       path: profile.path,
       profilePath: profile.path,
       skillCount: profile.skillCount,
@@ -1096,7 +1096,7 @@ function formatBackendError(error) {
   if (!match) return raw;
   const [, code, message] = match;
   const labels = {
-    RUNTIME_NOT_FOUND: "未找到运行时，请确认 Claude/ACP adapter 可用",
+    RUNTIME_NOT_FOUND: "未找到运行时，请确认对应 ACP adapter 可用",
     PERMISSION_DENIED: "权限被拒绝，请检查授权或目录权限",
     SESSION_NOT_FOUND: "远端 session 不存在或已失效",
     PROTOCOL_PARSE_FAILED: "协议响应解析失败",

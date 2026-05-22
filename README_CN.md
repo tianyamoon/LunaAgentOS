@@ -50,7 +50,7 @@ LunaAgentOS 的方向不是重写这些 Agent，而是把它们收拢到一个�
 |---|---:|---|
 | 桌面壳 | 已可用 | Tauri 2 + Rust Core + 前端工作台，滚动条与左侧目标选择器已降噪 |
 | Claude Code | 已接入 | 真实 runtime 路径 |
-| Hermes | 已接入 | Windows / WSL / ACP runtime instance 与 profile |
+| Hermes | 已接入 | Windows / WSL / ACP runtime instance 与 profile，只有 profile alias 会作为可执行路由 |
 | Trae IDE | 规划中 | 保留 Bridge 路线，不伪装已接入 |
 | 多会话工作台 | 已可用 | 卡片标题统一 provider/profile 身份、当前发送目标、当前会话、活会话集合分离 |
 | Runtime Session Card | 已可用 | 输出流、思考流、运行流、最终响应 |

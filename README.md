@@ -41,7 +41,7 @@ It is not the final agent operating system yet. It is the first credible slice:
 |---|---:|---|
 | Desktop shell | Working | Tauri 2 + Rust core + web UI, with quiet scrollbars and a lighter left fleet target picker |
 | Claude Code entry | Working | Real runtime path |
-| Hermes entry | Working | Windows / WSL ACP runtime instances and profiles |
+| Hermes entry | Working | Windows / WSL ACP runtime instances and profiles; profile aliases are used as executable routes |
 | Trae IDE | Planned | Bridge route only |
 | Multi-session workspace | Working | Session cards with normalized provider/profile identity, current session, current send target |
 | Process visibility | Working | Thought/runtime/final response surfaces |
