@@ -647,6 +647,10 @@ const FONT_SCALE_KEY = "lunaagentos.fontScale";
 const LANGUAGE_KEY = "lunaagentos.language";
 const HISTORY_SCHEMA_VERSION = 3;
 const DEFAULT_HERMES_AGENT_ID = "hermes-wsl:profile:default";
+const LEGACY_PROVIDER_RUNTIME_DEFAULTS = {
+  claude: { runtimeInstanceId: "claude-win", runtimeLabel: "Win", runtimeHost: "native" },
+  hermes: { runtimeInstanceId: "hermes-wsl", runtimeLabel: "WSL", runtimeHost: "wsl" },
+};
 const SEND_MODE_OPTIONS = ["enter", "ctrlEnter"];
 const PROVIDER_AVAILABILITY_STATES = {
   probing: { state: 0, key: "provider.probing" },
@@ -759,6 +763,57 @@ function providerRuntimeLabel(provider, instance, availableCount) {
 
 function runtimeHostForInstance(instance) {
   return instance?.commandKind || instance?.host || null;
+}
+
+function runtimeDefaultsForProvider(providerId, runtimeInstanceId = null) {
+  if (runtimeInstanceId) {
+    const instance = runtimeInstanceById(runtimeInstanceId);
+    if (instance) {
+      return {
+        runtimeInstanceId: instance.id,
+        runtimeLabel: instance.runtimeLabel || null,
+        runtimeHost: runtimeHostForInstance(instance),
+        runtimeCommand: instance.command || null,
+      };
+    }
+    if (runtimeInstanceId.endsWith("-wsl")) {
+      return {
+        runtimeInstanceId,
+        runtimeLabel: "WSL",
+        runtimeHost: "wsl",
+        runtimeCommand: null,
+      };
+    }
+    if (runtimeInstanceId.endsWith("-win")) {
+      return {
+        runtimeInstanceId,
+        runtimeLabel: "Win",
+        runtimeHost: "native",
+        runtimeCommand: null,
+      };
+    }
+  }
+  return LEGACY_PROVIDER_RUNTIME_DEFAULTS[providerId] || {
+    runtimeInstanceId: runtimeInstanceId || null,
+    runtimeLabel: null,
+    runtimeHost: null,
+    runtimeCommand: null,
+  };
+}
+
+function inferHermesProfileExecutable(archived, restored) {
+  if (restored?.profileExecutable) return restored.profileExecutable;
+  if (archived?.hermesProfile?.profileExecutable) return archived.hermesProfile.profileExecutable;
+  const alias = archived?.hermesProfile?.profileAlias || restored?.profileAlias;
+  if (alias) return alias;
+  const profileName = archived?.hermesProfile?.profileName || restored?.profileName;
+  if (profileName && profileName !== "default") return profileName;
+  const agentId = archived?.agentId || restored?.agentId || "";
+  if (agentId.startsWith("hermes-profile-")) {
+    const profileId = agentId.replace("hermes-profile-", "");
+    return profileId === "default" ? null : profileId;
+  }
+  return null;
 }
 
 function targetDisplayName(target) {
@@ -3003,8 +3058,11 @@ function archivedSessionsFromHistory(entries) {
         agentName: entry.agentName || entry.agent_name,
         runtimeInstanceId: entry.runtimeInstanceId || entry.runtime_instance_id || null,
         runtimeLabel: entry.runtimeLabel || entry.runtime_label || null,
+        runtimeHost: entry.runtimeHost || entry.runtime_host || null,
+        runtimeCommand: entry.runtimeCommand || entry.runtime_command || null,
         targetId: entry.targetId || entry.target_id || entry.agentId || entry.agent_id,
         targetName: entry.targetName || entry.target_name || entry.agentName || entry.agent_name,
+        profileExecutable: entry.profileExecutable || entry.profile_executable || null,
         acpSessionId: entry.acpSessionId || entry.acp_session_id,
         title: entry.task,
         summary: entry.summary,
@@ -3251,6 +3309,8 @@ async function restoreArchivedSession(sessionId) {
     agentName: archived.agentName,
     runtimeInstanceId: archived.runtimeInstanceId || null,
     runtimeLabel: archived.runtimeLabel || null,
+    runtimeHost: archived.runtimeHost || null,
+    runtimeCommand: archived.runtimeCommand || null,
     targetId: archived.targetId || archived.agentId,
     targetName: archived.targetName || archived.agentName,
     task: archived.title,
@@ -3262,7 +3322,7 @@ async function restoreArchivedSession(sessionId) {
     runtimeState: "archived",
     profileName: archived.hermesProfile?.profileName || null,
     profileAlias: archived.hermesProfile?.profileAlias || null,
-    profileExecutable: archived.hermesProfile?.profileExecutable || null,
+    profileExecutable: archived.profileExecutable || archived.hermesProfile?.profileExecutable || null,
     profilePath: archived.hermesProfile?.profilePath || null,
     profileModel: archived.hermesProfile?.profileModel || null,
     gateway: archived.hermesProfile?.gateway || null,
@@ -3285,6 +3345,14 @@ async function restoreArchivedSession(sessionId) {
     restored.runtimeLabel = restored.runtimeLabel || restoredInstance.runtimeLabel || null;
     restored.runtimeHost = restored.runtimeHost || runtimeHostForInstance(restoredInstance);
     restored.runtimeCommand = restored.runtimeCommand || restoredInstance.command || null;
+  }
+  const runtimeDefaults = runtimeDefaultsForProvider(restored.providerId, restored.runtimeInstanceId);
+  restored.runtimeInstanceId = restored.runtimeInstanceId || runtimeDefaults.runtimeInstanceId || null;
+  restored.runtimeLabel = restored.runtimeLabel || runtimeDefaults.runtimeLabel || null;
+  restored.runtimeHost = restored.runtimeHost || runtimeDefaults.runtimeHost || null;
+  restored.runtimeCommand = restored.runtimeCommand || runtimeDefaults.runtimeCommand || null;
+  if (restored.providerId === "hermes") {
+    restored.profileExecutable = inferHermesProfileExecutable(archived, restored);
   }
   restored.targetId = restored.targetId || restored.agentId;
   restored.targetName = restored.targetName || restored.agentName;
@@ -3404,8 +3472,11 @@ async function saveTurnToHistory(session, turn) {
       agentName: session.agentName,
       runtimeInstanceId: session.runtimeInstanceId || null,
       runtimeLabel: session.runtimeLabel || null,
+      runtimeHost: session.runtimeHost || null,
+      runtimeCommand: session.runtimeCommand || null,
       targetId: session.targetId || session.agentId,
       targetName: session.targetName || session.agentName,
+      profileExecutable: session.profileExecutable || null,
       sessionId: session.id,
       acpSessionId: session.acpSessionId || null,
       task: turn.task,

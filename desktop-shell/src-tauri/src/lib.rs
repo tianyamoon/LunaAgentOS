@@ -71,10 +71,16 @@ struct HistoryEntry {
     runtime_instance_id: Option<String>,
     #[serde(default, alias = "runtime_label")]
     runtime_label: Option<String>,
+    #[serde(default, alias = "runtime_host")]
+    runtime_host: Option<String>,
+    #[serde(default, alias = "runtime_command")]
+    runtime_command: Option<String>,
     #[serde(default, alias = "target_id")]
     target_id: Option<String>,
     #[serde(default, alias = "target_name")]
     target_name: Option<String>,
+    #[serde(default, alias = "profile_executable")]
+    profile_executable: Option<String>,
     #[serde(alias = "session_id")]
     session_id: Option<String>,
     #[serde(alias = "acp_session_id")]
@@ -97,8 +103,11 @@ struct HistoryEntryInput {
     agent_name: String,
     runtime_instance_id: Option<String>,
     runtime_label: Option<String>,
+    runtime_host: Option<String>,
+    runtime_command: Option<String>,
     target_id: Option<String>,
     target_name: Option<String>,
+    profile_executable: Option<String>,
     session_id: Option<String>,
     acp_session_id: Option<String>,
     task: String,
@@ -994,8 +1003,11 @@ fn append_history_entry(app: AppHandle, entry: HistoryEntryInput) -> Result<Hist
         agent_name: entry.agent_name,
         runtime_instance_id: entry.runtime_instance_id,
         runtime_label: entry.runtime_label,
+        runtime_host: entry.runtime_host,
+        runtime_command: entry.runtime_command,
         target_id: entry.target_id,
         target_name: entry.target_name,
+        profile_executable: entry.profile_executable,
         session_id: entry.session_id,
         acp_session_id: entry.acp_session_id,
         task: entry.task,
