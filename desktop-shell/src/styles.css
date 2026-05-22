@@ -1088,7 +1088,9 @@ body.is-launch-demo .layout {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
+  overflow-anchor: none;
   padding: 0 8px 0 10px;
+  scrollbar-gutter: stable;
 }
 
 .turn-block {

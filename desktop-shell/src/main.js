@@ -7,12 +7,6 @@ import {
   runtimeDefaultsForProvider as identityRuntimeDefaultsForProvider,
   runtimeHostForInstance as identityRuntimeHostForInstance,
 } from "./sessionIdentity.js";
-import {
-  canSendToSession as routingCanSendToSession,
-  currentSessionForTarget as routingCurrentSessionForTarget,
-  shouldBlockSendForCurrentSession,
-  shouldClearCurrentSessionForTarget,
-} from "./sessionRouting.js";
 
 const { invoke } = window.__TAURI__.core;
 const listenRuntimeEvent = window.__TAURI__?.event?.listen?.bind(window.__TAURI__.event);
@@ -1032,7 +1026,7 @@ function sessionRuntimeState(session) {
 }
 
 function canSendToSession(session) {
-  return routingCanSendToSession(session);
+  return sessionRuntimeState(session) === "live";
 }
 
 function canRestoreSession(session) {
@@ -1207,10 +1201,6 @@ function clearCurrentSessionIf(sessionId) {
 
 function currentSession() {
   return currentSessionId ? sessions.find((session) => session.id === currentSessionId) || null : null;
-}
-
-function currentSessionForTarget(targetId = currentTargetAgentId) {
-  return routingCurrentSessionForTarget(currentSession(), targetId);
 }
 
 function currentFontScaleOption() {
@@ -1396,11 +1386,7 @@ function latestActiveSessionForAgent(agentId) {
 }
 
 function setCurrentTargetAgent(agentId) {
-  const selectedSession = currentSession();
   saveCurrentTargetAgent(agentId);
-  if (shouldClearCurrentSessionForTarget(selectedSession, agentId)) {
-    saveCurrentSession(null);
-  }
   const agent = currentTargetAgent();
   const provider = currentTargetProvider();
   updatePromptPlaceholder();
@@ -1764,7 +1750,6 @@ function createSession(firstTask) {
   Object.assign(session, normalizeWorkspaceSession(session));
   sessions = [session, ...sessions];
   markSessionActive(session.id);
-  saveCurrentSession(session.id);
   renderWorkspace();
   renderHistory();
   return session;
@@ -2009,7 +1994,8 @@ function leaveLaunchDemoScene() {
 function getOrCreateActiveSession(task, forceNew = false) {
   const agent = currentTargetAgent();
   if (!agent) return null;
-  const existing = !forceNew ? currentSessionForTarget(agent.id) : null;
+  const existing = !forceNew ? currentSession() : null;
+  if (existing && existing.agentId !== agent.id) return createSession(task);
   if (existing && !activeSessionIds.has(existing.id)) return createSession(task);
   return existing && canSendToSession(existing) ? existing : createSession(task);
 }
@@ -2131,7 +2117,7 @@ function renderWorkspaceStatus() {
     workspaceStatus.textContent = t("composer.placeholderNoTarget");
     return;
   }
-  const statusSession = currentSessionForTarget(agent.id)
+  const statusSession = currentSession()
     || latestActiveSessionForAgent(agent.id)
     || countedSessions
       .filter((session) => session.agentId === agent.id)
@@ -3594,19 +3580,10 @@ function startSessionFromPrompt(forceNewSession = false) {
     setAppNotice(`${provider.name} 当前${label}，请点击“维护”配置或检查本机 runtime。`, "error");
     return;
   }
-  const selectedCurrentSession = currentSessionForTarget(agent.id);
-  if (shouldBlockSendForCurrentSession({
-    currentSession: selectedCurrentSession,
-    targetId: agent.id,
-    forceNewSession,
-  })) {
-    setAppNotice("当前会话不可续聊。请先恢复该会话，或开启“新会话”后再发送。", "error");
-    return;
-  }
 
   const session = getOrCreateActiveSession(task, forceNewSession);
   if (!session) return;
-  saveCurrentSession(session.id);
+  if (forceNewSession) saveCurrentSession(null);
   stoppedSessionIds.delete(session.id);
   const turn = createTurn(session, task);
   promptBox.value = "";
