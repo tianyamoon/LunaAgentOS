@@ -52,7 +52,7 @@ LunaAgentOS 的方向不是重写这些 Agent，而是把它们收拢到一个�
 | Claude Code | 已接入 | 真实 runtime 路径 |
 | Hermes | 已接入 | Windows / WSL / ACP runtime instance 与 profile，只有 profile alias 会作为可执行路由 |
 | Trae IDE | 规划中 | 保留 Bridge 路线，不伪装已接入 |
-| 多会话工作台 | 已可用 | 卡片标题统一 provider/profile 身份、当前发送目标、当前会话、活会话集合分离 |
+| 多会话工作台 | 已可用 | 卡片标题统一 provider/runtime/profile 身份并有回归测试、当前发送目标、当前会话、活会话集合分离 |
 | Runtime Session Card | 已可用 | 输出流、思考流、运行流、最终响应 |
 | 本地历史 | 已可用 | JSON 历史、旧会话 runtime 路由兜底、只读恢复、删除保护、卡片级重连诊断 |
 | 演示 / 截图模式 | 已可用 | 顶部 `演示场景` 按钮加载非持久化 demo |

@@ -43,7 +43,7 @@ It is not the final agent operating system yet. It is the first credible slice:
 | Claude Code entry | Working | Real runtime path |
 | Hermes entry | Working | Windows / WSL ACP runtime instances and profiles; profile aliases are used as executable routes |
 | Trae IDE | Planned | Bridge route only |
-| Multi-session workspace | Working | Session cards with normalized provider/profile identity, current session, current send target |
+| Multi-session workspace | Working | Session cards with tested provider/runtime/profile identity normalization, current session, current send target |
 | Process visibility | Working | Thought/runtime/final response surfaces |
 | Local history | Working | JSON session history, legacy runtime routing fallback, restore/read-only states, and card-level reconnect diagnostics |
 | Screenshot/demo mode | Working | In-app launch demo scene for GitHub screenshots |

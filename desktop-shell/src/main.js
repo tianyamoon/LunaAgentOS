@@ -1,5 +1,12 @@
 import DOMPurify from "dompurify";
 import MarkdownIt from "markdown-it";
+import {
+  hermesProfileNameFromAgentId,
+  normalizeSessionIdentity,
+  normalizedSessionTitle,
+  runtimeDefaultsForProvider as identityRuntimeDefaultsForProvider,
+  runtimeHostForInstance as identityRuntimeHostForInstance,
+} from "./sessionIdentity.js";
 
 const { invoke } = window.__TAURI__.core;
 const listenRuntimeEvent = window.__TAURI__?.event?.listen?.bind(window.__TAURI__.event);
@@ -647,10 +654,6 @@ const FONT_SCALE_KEY = "lunaagentos.fontScale";
 const LANGUAGE_KEY = "lunaagentos.language";
 const HISTORY_SCHEMA_VERSION = 3;
 const DEFAULT_HERMES_AGENT_ID = "hermes-wsl:profile:default";
-const LEGACY_PROVIDER_RUNTIME_DEFAULTS = {
-  claude: { runtimeInstanceId: "claude-win", runtimeLabel: "Win", runtimeHost: "native" },
-  hermes: { runtimeInstanceId: "hermes-wsl", runtimeLabel: "WSL", runtimeHost: "wsl" },
-};
 const SEND_MODE_OPTIONS = ["enter", "ctrlEnter"];
 const PROVIDER_AVAILABILITY_STATES = {
   probing: { state: 0, key: "provider.probing" },
@@ -762,43 +765,11 @@ function providerRuntimeLabel(provider, instance, availableCount) {
 }
 
 function runtimeHostForInstance(instance) {
-  return instance?.commandKind || instance?.host || null;
+  return identityRuntimeHostForInstance(instance);
 }
 
 function runtimeDefaultsForProvider(providerId, runtimeInstanceId = null) {
-  if (runtimeInstanceId) {
-    const instance = runtimeInstanceById(runtimeInstanceId);
-    if (instance) {
-      return {
-        runtimeInstanceId: instance.id,
-        runtimeLabel: instance.runtimeLabel || null,
-        runtimeHost: runtimeHostForInstance(instance),
-        runtimeCommand: instance.command || null,
-      };
-    }
-    if (runtimeInstanceId.endsWith("-wsl")) {
-      return {
-        runtimeInstanceId,
-        runtimeLabel: "WSL",
-        runtimeHost: "wsl",
-        runtimeCommand: null,
-      };
-    }
-    if (runtimeInstanceId.endsWith("-win")) {
-      return {
-        runtimeInstanceId,
-        runtimeLabel: "Win",
-        runtimeHost: "native",
-        runtimeCommand: null,
-      };
-    }
-  }
-  return LEGACY_PROVIDER_RUNTIME_DEFAULTS[providerId] || {
-    runtimeInstanceId: runtimeInstanceId || null,
-    runtimeLabel: null,
-    runtimeHost: null,
-    runtimeCommand: null,
-  };
+  return identityRuntimeDefaultsForProvider(providerId, runtimeInstanceId, runtimeInstances);
 }
 
 function inferHermesProfileExecutable(archived, restored) {
@@ -806,19 +777,10 @@ function inferHermesProfileExecutable(archived, restored) {
   if (archived?.hermesProfile?.profileExecutable) return archived.hermesProfile.profileExecutable;
   const alias = archived?.hermesProfile?.profileAlias || restored?.profileAlias;
   if (alias) return alias;
-  const profileName = archived?.hermesProfile?.profileName || restored?.profileName;
-  if (profileName && profileName !== "default") return profileName;
   const agentId = archived?.agentId || restored?.agentId || "";
   const profileId = hermesProfileNameFromAgentId(agentId);
   if (profileId) return profileId === "default" ? null : profileId;
   return null;
-}
-
-function hermesProfileNameFromAgentId(agentId) {
-  if (!agentId) return "";
-  if (agentId.includes(":profile:")) return agentId.split(":profile:").at(-1) || "";
-  if (agentId.startsWith("hermes-profile-")) return agentId.replace("hermes-profile-", "");
-  return "";
 }
 
 function targetDisplayName(target) {
@@ -832,21 +794,7 @@ function targetDisplayName(target) {
 }
 
 function sessionIdentityTitle(session) {
-  const provider = providerById(session.providerId);
-  const providerName = provider?.name || session.providerName || "";
-  if (session.providerId === "hermes") {
-    const profileName = session.profileAlias
-      || session.profileName
-      || session.profileExecutable
-      || hermesProfileNameFromAgentId(session.agentId)
-      || session.agentName?.split("/").at(-1)?.trim();
-    return [providerName || "Hermes", profileName].filter(Boolean).join(" / ");
-  }
-  if (session.providerId === "claude") {
-    const runtimeName = session.runtimeLabel && session.runtimeLabel !== "Win" ? session.runtimeLabel : "";
-    return [providerName || "Claude Code", runtimeName].filter(Boolean).join(" · ");
-  }
-  return session.agentName || providerName || t("session.current");
+  return normalizedSessionTitle(session, providers);
 }
 
 function targetsForRuntimeInstance(instance) {
@@ -902,6 +850,14 @@ function targetsForRuntimeInstance(instance) {
 
 function runtimeTargets() {
   return runtimeInstances.flatMap(targetsForRuntimeInstance);
+}
+
+function normalizeWorkspaceSession(session) {
+  return normalizeSessionIdentity(session, {
+    providers,
+    runtimeInstances,
+    runtimeTargets: runtimeTargets(),
+  });
 }
 
 function targetsForProvider(providerId) {
@@ -1791,8 +1747,7 @@ function createSession(firstTask) {
     skillCount: hermesProfile?.skillCount ?? null,
     hasSoul: hermesProfile?.hasSoul || false,
   };
-  session.agentName = sessionIdentityTitle(session);
-  session.targetName = session.agentName;
+  Object.assign(session, normalizeWorkspaceSession(session));
   sessions = [session, ...sessions];
   markSessionActive(session.id);
   renderWorkspace();
@@ -2590,13 +2545,14 @@ function renderTurn(turn, index) {
 }
 
 function renderSessionCard(session) {
+  const identitySession = normalizeWorkspaceSession(session);
   const runtimeState = sessionRuntimeState(session);
   const isActiveReceiver = currentSessionId === session.id;
   const isWaiting = isSessionExecuting(session);
   const isRestoring = runtimeState === "restoring";
   const managementDisabled = isRestoring ? "disabled" : "";
-  const profileMeta = session.providerId === "hermes"
-    ? [session.profileName, session.profileModel].filter(Boolean).join(" · ")
+  const profileMeta = identitySession.providerId === "hermes"
+    ? [identitySession.profileName, identitySession.profileModel].filter(Boolean).join(" · ")
     : "";
   const shouldShowRuntimeState = runtimeState !== "live";
   const stats = sessionCardStats(session);
@@ -2613,7 +2569,7 @@ function renderSessionCard(session) {
   const latestOnlyLabel = latestOnly ? t("action.showAllTurns") : t("action.latestOnly");
   const flowToggleLabel = flowsOpen ? t("action.collapseFlows") : t("action.expandFlows");
   const fullscreenLabel = session.fullscreen ? t("action.exitFullscreen") : t("action.enterFullscreen");
-  const identityTitle = sessionIdentityTitle(session);
+  const identityTitle = sessionIdentityTitle(identitySession);
   return `
     <article class="session-card ${session.fullscreen ? "fullscreen" : ""} ${isActiveReceiver ? "is-active-receiver" : ""} ${isWaiting ? "is-waiting" : ""}" data-session-id="${session.id}" tabindex="0" aria-label="${escapeHtml(t("session.ariaSwitch", { task: session.task }))}" ${isActiveReceiver ? "aria-current=\"true\"" : ""}>
       <div class="session-card-header">
@@ -3107,7 +3063,7 @@ function archivedSessionsFromHistory(entries) {
   });
   return [...bySession.values()]
     .map((session) => ({
-      ...session,
+      ...normalizeWorkspaceSession(session),
       turns: session.turns.sort((left, right) => left.createdAt.localeCompare(right.createdAt)),
     }))
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
@@ -3116,21 +3072,22 @@ function archivedSessionsFromHistory(entries) {
 function sessionListItems() {
   const sourceSessions = isLaunchDemoScene ? sessions.filter(isDemoSession) : sessions;
   const liveItems = sourceSessions.map((session) => {
+    const identitySession = normalizeWorkspaceSession(session);
     const lastTurn = session.turns.at(-1);
     return {
       id: session.id,
       date: session.createdAt.slice(0, 10),
       createdAt: session.createdAt,
       updatedAt: lastTurn?.createdAt || session.createdAt,
-      providerName: session.providerName,
-      agentName: session.agentName,
+      providerName: identitySession.providerName,
+      agentName: identitySession.agentName,
       title: session.task || t("history.newSession"),
       summary: lastTurn?.finalResponse || lastTurn?.outputs.at(-1) || lastTurn?.logs.at(-1) || t("session.current"),
       turnCount: session.turns.length,
       runtimeState: sessionRuntimeState(session),
-      agentId: session.agentId,
-      runtimeInstanceId: session.runtimeInstanceId || null,
-      targetId: session.targetId || session.agentId,
+      agentId: identitySession.agentId,
+      runtimeInstanceId: identitySession.runtimeInstanceId || null,
+      targetId: identitySession.targetId || identitySession.agentId,
       isInWorkspace: true,
       isRuntimeAttached: true,
     };
@@ -3380,9 +3337,8 @@ async function restoreArchivedSession(sessionId) {
   if (restored.providerId === "hermes") {
     restored.profileExecutable = inferHermesProfileExecutable(archived, restored);
   }
-  restored.agentName = sessionIdentityTitle(restored);
   restored.targetId = restored.targetId || restored.agentId;
-  restored.targetName = sessionIdentityTitle(restored);
+  Object.assign(restored, normalizeWorkspaceSession(restored));
   if (!existing) sessions = [restored, ...sessions];
   stoppedSessionIds.delete(restored.id);
   saveCurrentTargetAgent(restored.agentId);
