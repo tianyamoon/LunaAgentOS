@@ -32,7 +32,8 @@ fn classify_backend_error(error: String) -> String {
         "RUNTIME_NOT_FOUND"
     } else if lower.contains("permission") || lower.contains("denied") || lower.contains("权限") {
         "PERMISSION_DENIED"
-    } else if lower.contains("session") && (lower.contains("not found") || lower.contains("不存在")) {
+    } else if lower.contains("session") && (lower.contains("not found") || lower.contains("不存在"))
+    {
         "SESSION_NOT_FOUND"
     } else if lower.contains("json") || lower.contains("parse") || lower.contains("解析") {
         "PROTOCOL_PARSE_FAILED"
@@ -311,8 +312,12 @@ fn provider_probe_from_instances(
 fn runtime_probe(app: AppHandle) -> RuntimeProbeResult {
     let config = load_runtime_config_file(&app);
     let claude_configured = is_configured(&config.claude_command) || !config.claude_args.is_empty();
-    let hermes_command = config.hermes_command.clone().unwrap_or_else(|| "hermes".to_string());
-    let hermes_configured = is_configured(&config.hermes_host) || is_configured(&config.hermes_command);
+    let hermes_command = config
+        .hermes_command
+        .clone()
+        .unwrap_or_else(|| "hermes".to_string());
+    let hermes_configured =
+        is_configured(&config.hermes_host) || is_configured(&config.hermes_command);
 
     let mut instances = Vec::new();
     if cfg!(windows) {
@@ -355,11 +360,21 @@ fn runtime_probe(app: AppHandle) -> RuntimeProbeResult {
             hermes_configured,
             run_shell(
                 "wsl.exe",
-                &["--exec", "bash", "-lc", &format!("command -v {hermes_command} >/dev/null && {hermes_command} --version")],
+                &[
+                    "--exec",
+                    "bash",
+                    "-lc",
+                    &format!(
+                        "command -v {hermes_command} >/dev/null && {hermes_command} --version"
+                    ),
+                ],
             ),
         ));
     } else {
-        let claude_command = config.claude_command.clone().unwrap_or_else(|| "claude".to_string());
+        let claude_command = config
+            .claude_command
+            .clone()
+            .unwrap_or_else(|| "claude".to_string());
         instances.push(runtime_instance_probe(
             "claude-native",
             "claude",
@@ -393,7 +408,12 @@ fn runtime_probe(app: AppHandle) -> RuntimeProbeResult {
 
     RuntimeProbeResult {
         providers: vec![
-            provider_probe_from_instances("claude", claude_configured, "Claude Code", &claude_instances),
+            provider_probe_from_instances(
+                "claude",
+                claude_configured,
+                "Claude Code",
+                &claude_instances,
+            ),
             provider_probe_from_instances("hermes", hermes_configured, "Hermes", &hermes_instances),
             RuntimeProviderProbe {
                 provider_id: "trae".to_string(),
@@ -416,7 +436,9 @@ fn clean_hermes_output(raw: &str) -> Vec<String> {
                 && !line.starts_with("wsl:")
                 && !line.contains("localhost")
                 && !line.contains("WSL")
-                && !line.chars().all(|ch| matches!(ch, 'в' | '”' | 'Ђ' | '—' | '†' | ' '))
+                && !line
+                    .chars()
+                    .all(|ch| matches!(ch, 'в' | '”' | 'Ђ' | '—' | '†' | ' '))
         })
         .collect()
 }
@@ -493,12 +515,38 @@ fn hermes_instance_parts(
         "hermes-native"
     };
     let instance_id = runtime_instance_id.unwrap_or(default_id);
-    let command = config.hermes_command.clone().unwrap_or_else(|| "hermes".to_string());
+    let command = config
+        .hermes_command
+        .clone()
+        .unwrap_or_else(|| "hermes".to_string());
     match instance_id {
-        "hermes-win" => ("hermes-win".to_string(), "Win".to_string(), "native".to_string(), command),
-        "hermes-wsl" => ("hermes-wsl".to_string(), "WSL".to_string(), "wsl".to_string(), command),
-        "hermes-native" => ("hermes-native".to_string(), "".to_string(), "native".to_string(), command),
-        value => (value.to_string(), "".to_string(), config.hermes_host.clone().unwrap_or_else(|| "native".to_string()), command),
+        "hermes-win" => (
+            "hermes-win".to_string(),
+            "Win".to_string(),
+            "native".to_string(),
+            command,
+        ),
+        "hermes-wsl" => (
+            "hermes-wsl".to_string(),
+            "WSL".to_string(),
+            "wsl".to_string(),
+            command,
+        ),
+        "hermes-native" => (
+            "hermes-native".to_string(),
+            "".to_string(),
+            "native".to_string(),
+            command,
+        ),
+        value => (
+            value.to_string(),
+            "".to_string(),
+            config
+                .hermes_host
+                .clone()
+                .unwrap_or_else(|| "native".to_string()),
+            command,
+        ),
     }
 }
 
@@ -538,8 +586,12 @@ fn runtime_hermes_profiles(
     }
     let mut profile_seen: HashMap<String, usize> = HashMap::new();
     for (profile_name, model, gateway, alias, is_default) in list_rows {
-        let show_raw = run_hermes_profile_command(&config, Some(&instance_id), &["profile", "show", &profile_name])
-            .unwrap_or_default();
+        let show_raw = run_hermes_profile_command(
+            &config,
+            Some(&instance_id),
+            &["profile", "show", &profile_name],
+        )
+        .unwrap_or_default();
         let details = parse_hermes_profile_show(&show_raw);
         let path = details.get("path").cloned().unwrap_or_default();
         let skill_count = details
@@ -561,11 +613,25 @@ fn runtime_hermes_profiles(
         } else {
             "WSL Profile"
         };
-        let subtitle = format!("{} · {}", environment, if gateway == "running" { "Gateway 运行中" } else { "Gateway 已停止" });
+        let subtitle = format!(
+            "{} · {}",
+            environment,
+            if gateway == "running" {
+                "Gateway 运行中"
+            } else {
+                "Gateway 已停止"
+            }
+        );
         let note = format!(
             "模型：{} · Skills：{}{}{}",
-            if model.is_empty() { "未配置" } else { &model },
-            skill_count.map(|count| count.to_string()).unwrap_or_else(|| "未知".to_string()),
+            if model.is_empty() {
+                "未配置"
+            } else {
+                &model
+            },
+            skill_count
+                .map(|count| count.to_string())
+                .unwrap_or_else(|| "未知".to_string()),
             if has_env { " · .env" } else { "" },
             if has_soul { " · SOUL.md" } else { "" }
         );
@@ -580,7 +646,11 @@ fn runtime_hermes_profiles(
                 profile_index
             )
         } else {
-            format!("{}:profile:{}", instance_id, sanitize_id_fragment(&profile_name))
+            format!(
+                "{}:profile:{}",
+                instance_id,
+                sanitize_id_fragment(&profile_name)
+            )
         };
         let display_name = if has_duplicate_name {
             format!("{} #{}", profile_name, profile_index)
@@ -630,11 +700,18 @@ fn history_bucket_dir(app: &AppHandle, bucket: &str) -> Result<PathBuf, String> 
     Ok(directory)
 }
 
-fn history_file_for_today(app: &AppHandle, bucket: &str) -> Result<(PathBuf, String, String), String> {
+fn history_file_for_today(
+    app: &AppHandle,
+    bucket: &str,
+) -> Result<(PathBuf, String, String), String> {
     let now = Local::now();
     let date = now.format("%Y-%m-%d").to_string();
     let timestamp = now.to_rfc3339();
-    Ok((history_bucket_dir(app, bucket)?.join(format!("{date}.json")), date, timestamp))
+    Ok((
+        history_bucket_dir(app, bucket)?.join(format!("{date}.json")),
+        date,
+        timestamp,
+    ))
 }
 
 fn history_file_for_date(app: &AppHandle, bucket: &str, date: &str) -> Result<PathBuf, String> {
@@ -666,7 +743,10 @@ fn load_runtime_config(app: AppHandle) -> Result<RuntimeConfigFile, String> {
 }
 
 #[tauri::command]
-fn save_runtime_config(app: AppHandle, config: RuntimeConfigFile) -> Result<RuntimeConfigFile, String> {
+fn save_runtime_config(
+    app: AppHandle,
+    config: RuntimeConfigFile,
+) -> Result<RuntimeConfigFile, String> {
     let path = runtime_config_path(&app)?;
     let json = serde_json::to_string_pretty(&config).map_err(|error| error.to_string())?;
     fs::write(path, json).map_err(|error| error.to_string())?;
@@ -779,7 +859,8 @@ fn compact_history_entries(app: AppHandle) -> Result<HistoryCompactResult, Strin
         let removed_for_file = original_len.saturating_sub(compacted.len());
         removed_count += removed_for_file;
         if removed_for_file > 0 || upgraded {
-            let json = serde_json::to_string_pretty(&compacted).map_err(|error| error.to_string())?;
+            let json =
+                serde_json::to_string_pretty(&compacted).map_err(|error| error.to_string())?;
             fs::write(path, json).map_err(|error| error.to_string())?;
         }
     }
@@ -819,7 +900,8 @@ fn delete_history_session_entries(
         let removed_for_file = original_len.saturating_sub(retained.len());
         if removed_for_file > 0 {
             removed_count += removed_for_file;
-            let json = serde_json::to_string_pretty(&retained).map_err(|error| error.to_string())?;
+            let json =
+                serde_json::to_string_pretty(&retained).map_err(|error| error.to_string())?;
             fs::write(path, json).map_err(|error| error.to_string())?;
         }
     }
@@ -875,7 +957,8 @@ fn archive_history_session_entries(
             let mut archive_entries = load_history_file(&archive_path)?;
             archive_entries.push(entry);
             archive_entries.sort_by(|left, right| right.created_at.cmp(&left.created_at));
-            let json = serde_json::to_string_pretty(&archive_entries).map_err(|error| error.to_string())?;
+            let json = serde_json::to_string_pretty(&archive_entries)
+                .map_err(|error| error.to_string())?;
             fs::write(archive_path, json).map_err(|error| error.to_string())?;
         }
     }
@@ -1021,11 +1104,17 @@ fn run_claude_stream(prompt: String) -> Result<Vec<Value>, String> {
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
         let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        return Err(classify_backend_error(if !stderr.is_empty() { stderr } else { stdout }));
+        return Err(classify_backend_error(if !stderr.is_empty() {
+            stderr
+        } else {
+            stdout
+        }));
     };
     let events = parse_claude_stream(&raw);
     if events.is_empty() {
-        return Err(classify_backend_error("Claude Code 未返回可解析事件。".to_string()));
+        return Err(classify_backend_error(
+            "Claude Code 未返回可解析事件。".to_string(),
+        ));
     }
     Ok(events)
 }

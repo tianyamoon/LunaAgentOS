@@ -5,8 +5,8 @@ use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
-use std::sync::{Arc, Mutex};
 use std::sync::OnceLock;
+use std::sync::{Arc, Mutex};
 use std::thread;
 
 #[cfg(windows)]
@@ -147,7 +147,14 @@ pub fn resume_claude_acp_session(
     cwd: Option<String>,
     config: RuntimeConfig,
 ) -> Result<Vec<Value>, String> {
-    resume_acp_session(AcpRuntime::Claude, runtime_session_id, acp_session_id, cwd, None, config)
+    resume_acp_session(
+        AcpRuntime::Claude,
+        runtime_session_id,
+        acp_session_id,
+        cwd,
+        None,
+        config,
+    )
 }
 
 pub fn resume_hermes_acp_session(
@@ -157,7 +164,14 @@ pub fn resume_hermes_acp_session(
     profile_executable: Option<String>,
     config: RuntimeConfig,
 ) -> Result<Vec<Value>, String> {
-    resume_acp_session(AcpRuntime::Hermes, runtime_session_id, acp_session_id, cwd, profile_executable, config)
+    resume_acp_session(
+        AcpRuntime::Hermes,
+        runtime_session_id,
+        acp_session_id,
+        cwd,
+        profile_executable,
+        config,
+    )
 }
 
 fn resume_acp_session(
@@ -206,7 +220,14 @@ pub fn load_claude_acp_session(
     cwd: Option<String>,
     config: RuntimeConfig,
 ) -> Result<Vec<Value>, String> {
-    load_acp_session(AcpRuntime::Claude, runtime_session_id, acp_session_id, cwd, None, config)
+    load_acp_session(
+        AcpRuntime::Claude,
+        runtime_session_id,
+        acp_session_id,
+        cwd,
+        None,
+        config,
+    )
 }
 
 pub fn load_hermes_acp_session(
@@ -216,7 +237,14 @@ pub fn load_hermes_acp_session(
     profile_executable: Option<String>,
     config: RuntimeConfig,
 ) -> Result<Vec<Value>, String> {
-    load_acp_session(AcpRuntime::Hermes, runtime_session_id, acp_session_id, cwd, profile_executable, config)
+    load_acp_session(
+        AcpRuntime::Hermes,
+        runtime_session_id,
+        acp_session_id,
+        cwd,
+        profile_executable,
+        config,
+    )
 }
 
 fn load_acp_session(
@@ -406,16 +434,20 @@ fn start_acp_session(
         &mut events,
         on_event,
     )?;
-    push_event(&mut events, json!({
-        "type": "state",
-        "state": 0,
-        "payload": {
-            "content": format!("{} 已初始化。", runtime.display()),
-            "protocolVersion": init_result.get("protocolVersion").cloned().unwrap_or(Value::Null),
-            "agent": init_result.get("agentInfo").cloned().unwrap_or(Value::Null),
-            "capabilities": init_result.get("agentCapabilities").cloned().unwrap_or(Value::Null)
-        }
-    }), on_event);
+    push_event(
+        &mut events,
+        json!({
+            "type": "state",
+            "state": 0,
+            "payload": {
+                "content": format!("{} 已初始化。", runtime.display()),
+                "protocolVersion": init_result.get("protocolVersion").cloned().unwrap_or(Value::Null),
+                "agent": init_result.get("agentInfo").cloned().unwrap_or(Value::Null),
+                "capabilities": init_result.get("agentCapabilities").cloned().unwrap_or(Value::Null)
+            }
+        }),
+        on_event,
+    );
 
     let session_request = match mode {
         SessionStartMode::Resume(session_id) => json!({
@@ -461,10 +493,12 @@ fn start_acp_session(
     let session_id = session_request["params"]["sessionId"]
         .as_str()
         .map(ToString::to_string)
-        .or_else(|| session_result
-        .get("sessionId")
-        .and_then(|value| value.as_str())
-        .map(ToString::to_string))
+        .or_else(|| {
+            session_result
+                .get("sessionId")
+                .and_then(|value| value.as_str())
+                .map(ToString::to_string)
+        })
         .ok_or_else(|| format!("{} 未返回 sessionId。", runtime.display()))?;
 
     let content = match method {
@@ -473,14 +507,18 @@ fn start_acp_session(
         _ => format!("{} 会话已创建。", runtime.display()),
     };
 
-    push_event(&mut events, json!({
-        "type": "state",
-        "state": 1,
-        "payload": {
-            "content": content,
-            "sessionId": session_id
-        }
-    }), on_event);
+    push_event(
+        &mut events,
+        json!({
+            "type": "state",
+            "state": 1,
+            "payload": {
+                "content": content,
+                "sessionId": session_id
+            }
+        }),
+        on_event,
+    );
 
     Ok(AcpSession {
         child,
@@ -520,15 +558,19 @@ fn send_prompt(
         on_event,
     )?;
 
-    push_event(events, json!({
-        "type": "state",
-        "state": 5,
-        "payload": {
-            "content": format!("{} 回合完成。", runtime.display()),
-            "sessionId": session.session_id,
-            "stopReason": prompt_result.get("stopReason").cloned().unwrap_or(Value::Null)
-        }
-    }), on_event);
+    push_event(
+        events,
+        json!({
+            "type": "state",
+            "state": 5,
+            "payload": {
+                "content": format!("{} 回合完成。", runtime.display()),
+                "sessionId": session.session_id,
+                "stopReason": prompt_result.get("stopReason").cloned().unwrap_or(Value::Null)
+            }
+        }),
+        on_event,
+    );
 
     if events.is_empty() {
         return Err(format!("{} 未返回可解析事件。", runtime.display()));
@@ -538,10 +580,17 @@ fn send_prompt(
     Ok(())
 }
 
-fn build_acp_command(runtime: AcpRuntime, cwd: &PathBuf, profile_executable: Option<&str>, config: &RuntimeConfig) -> Command {
+fn build_acp_command(
+    runtime: AcpRuntime,
+    cwd: &PathBuf,
+    profile_executable: Option<&str>,
+    config: &RuntimeConfig,
+) -> Command {
     let runtime_host = config.runtime_host.as_deref();
     let mut command = match runtime {
-        AcpRuntime::Claude if cfg!(windows) && runtime_host == Some("wsl") => Command::new("wsl.exe"),
+        AcpRuntime::Claude if cfg!(windows) && runtime_host == Some("wsl") => {
+            Command::new("wsl.exe")
+        }
         AcpRuntime::Claude if cfg!(windows) => Command::new(
             config
                 .runtime_command
@@ -556,8 +605,16 @@ fn build_acp_command(runtime: AcpRuntime, cwd: &PathBuf, profile_executable: Opt
                 .or(config.claude_command.as_deref())
                 .unwrap_or("npx"),
         ),
-        AcpRuntime::Hermes if cfg!(windows) && runtime_host == Some("wsl") => Command::new("wsl.exe"),
-        AcpRuntime::Hermes if cfg!(windows) && runtime_host.is_none() && config.hermes_host.as_deref() != Some("native") => Command::new("wsl.exe"),
+        AcpRuntime::Hermes if cfg!(windows) && runtime_host == Some("wsl") => {
+            Command::new("wsl.exe")
+        }
+        AcpRuntime::Hermes
+            if cfg!(windows)
+                && runtime_host.is_none()
+                && config.hermes_host.as_deref() != Some("native") =>
+        {
+            Command::new("wsl.exe")
+        }
         AcpRuntime::Hermes => Command::new(
             profile_executable
                 .filter(|value| !value.trim().is_empty())
@@ -580,12 +637,18 @@ fn build_acp_command(runtime: AcpRuntime, cwd: &PathBuf, profile_executable: Opt
                 .or(config.claude_command.as_deref())
                 .unwrap_or(if cfg!(windows) { "npx.cmd" } else { "npx" });
             let args: Vec<String> = if config.claude_args.is_empty() {
-                vec!["-y".to_string(), "@agentclientprotocol/claude-agent-acp".to_string()]
+                vec![
+                    "-y".to_string(),
+                    "@agentclientprotocol/claude-agent-acp".to_string(),
+                ]
             } else {
                 config.claude_args.clone()
             };
             if cfg!(windows) && runtime_host == Some("wsl") {
-                command.args(["--exec", executable]).args(args).current_dir(cwd);
+                command
+                    .args(["--exec", executable])
+                    .args(args)
+                    .current_dir(cwd);
             } else {
                 command
                     .args(args)
@@ -599,7 +662,10 @@ fn build_acp_command(runtime: AcpRuntime, cwd: &PathBuf, profile_executable: Opt
                 .or(config.runtime_command.as_deref())
                 .or(config.hermes_command.as_deref())
                 .unwrap_or("hermes");
-            if cfg!(windows) && (runtime_host == Some("wsl") || (runtime_host.is_none() && config.hermes_host.as_deref() != Some("native"))) {
+            if cfg!(windows)
+                && (runtime_host == Some("wsl")
+                    || (runtime_host.is_none() && config.hermes_host.as_deref() != Some("native")))
+            {
                 command.args(["--", executable, "acp", "--accept-hooks"]);
             } else {
                 command.args(["acp", "--accept-hooks"]);
@@ -699,7 +765,9 @@ fn read_response(
     let mut line = String::new();
     loop {
         line.clear();
-        let bytes = reader.read_line(&mut line).map_err(|error| error.to_string())?;
+        let bytes = reader
+            .read_line(&mut line)
+            .map_err(|error| error.to_string())?;
         if bytes == 0 {
             return Err(format!("{} adapter 已关闭 stdout。", runtime.display()));
         }
@@ -730,19 +798,22 @@ fn read_response(
     }
 }
 
-fn push_event(
-    events: &mut Vec<Value>,
-    event: Value,
-    on_event: &mut Option<&mut dyn FnMut(Value)>,
-) {
+fn push_event(events: &mut Vec<Value>, event: Value, on_event: &mut Option<&mut dyn FnMut(Value)>) {
     if let Some(callback) = on_event.as_deref_mut() {
         callback(event.clone());
     }
     events.push(event);
 }
 
-fn respond_to_client_request(stdin: &mut impl Write, id: i64, message: &Value) -> Result<(), String> {
-    let method = message.get("method").and_then(|value| value.as_str()).unwrap_or("");
+fn respond_to_client_request(
+    stdin: &mut impl Write,
+    id: i64,
+    message: &Value,
+) -> Result<(), String> {
+    let method = message
+        .get("method")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
     let result = match method {
         "session/request_permission" => select_permission(message),
         "fs/read_text_file" => json!({ "content": "" }),
@@ -807,55 +878,51 @@ fn map_session_update(message: &Value) -> Option<Value> {
     };
 
     match update_type {
-        "agent_message_chunk" => {
-            content_text(update.get("content")).map(|text| {
-                json!({
-                    "type": "response",
-                    "state": 4,
-                    "payload": { "content": text }
-                })
+        "agent_message_chunk" => content_text(update.get("content")).map(|text| {
+            json!({
+                "type": "response",
+                "state": 4,
+                "payload": { "content": text }
             })
-        }
-        "agent_thought_chunk" => {
-            content_text(update.get("content")).map(|text| {
-                json!({
-                    "type": "thought",
-                    "state": 2,
-                    "payload": { "content": text }
-                })
+        }),
+        "agent_thought_chunk" => content_text(update.get("content")).map(|text| {
+            json!({
+                "type": "thought",
+                "state": 2,
+                "payload": { "content": text }
             })
-        }
+        }),
         "tool_call" => Some(json!({
-                "type": "tool",
-                "state": 3,
-                "payload": {
-                    "id": update.get("toolCallId").cloned().unwrap_or(Value::Null),
-                    "title": update.get("title").cloned().unwrap_or(Value::Null),
-                    "kind": update.get("kind").cloned().unwrap_or(Value::Null),
-                    "status": update.get("status").cloned().unwrap_or(Value::Null)
-                }
-            })),
+            "type": "tool",
+            "state": 3,
+            "payload": {
+                "id": update.get("toolCallId").cloned().unwrap_or(Value::Null),
+                "title": update.get("title").cloned().unwrap_or(Value::Null),
+                "kind": update.get("kind").cloned().unwrap_or(Value::Null),
+                "status": update.get("status").cloned().unwrap_or(Value::Null)
+            }
+        })),
         "tool_call_update" => Some(json!({
-                "type": "tool",
-                "state": 3,
-                "payload": {
-                    "id": update.get("toolCallId").cloned().unwrap_or(Value::Null),
-                    "status": update.get("status").cloned().unwrap_or(Value::Null),
-                    "content": update.get("content").cloned().unwrap_or(Value::Null)
-                }
-            })),
+            "type": "tool",
+            "state": 3,
+            "payload": {
+                "id": update.get("toolCallId").cloned().unwrap_or(Value::Null),
+                "status": update.get("status").cloned().unwrap_or(Value::Null),
+                "content": update.get("content").cloned().unwrap_or(Value::Null)
+            }
+        })),
         "plan" => Some(json!({
-                "type": "plan",
-                "state": 2,
-                "payload": {
-                    "entries": update.get("entries").cloned().unwrap_or(Value::Null)
-                }
-            })),
+            "type": "plan",
+            "state": 2,
+            "payload": {
+                "entries": update.get("entries").cloned().unwrap_or(Value::Null)
+            }
+        })),
         "usage_update" => Some(json!({
-                "type": "usage",
-                "state": 2,
-                "payload": update.clone()
-            })),
+            "type": "usage",
+            "state": 2,
+            "payload": update.clone()
+        })),
         _ => None,
     }
 }
