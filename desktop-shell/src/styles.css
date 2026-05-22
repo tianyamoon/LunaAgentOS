@@ -1089,8 +1089,10 @@ body.is-launch-demo .layout {
   min-height: 0;
   overflow: auto;
   overflow-anchor: none;
+  overscroll-behavior: contain;
   padding: 0 8px 0 10px;
   scrollbar-gutter: stable;
+  contain: layout paint;
 }
 
 .turn-block {

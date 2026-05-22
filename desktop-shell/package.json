@@ -7,6 +7,8 @@
     "dev": "vite --host 127.0.0.1 --port 1420",
     "build": "vite build",
     "test:identity": "node --test src/sessionIdentity.test.js",
+    "test:stick": "node --test src/ui/stickToBottom.test.js",
+    "test:all": "node --test \"src/**/*.test.js\"",
     "tauri": "tauri"
   },
   "devDependencies": {

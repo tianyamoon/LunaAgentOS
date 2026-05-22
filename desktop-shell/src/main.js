@@ -7,6 +7,11 @@ import {
   runtimeDefaultsForProvider as identityRuntimeDefaultsForProvider,
   runtimeHostForInstance as identityRuntimeHostForInstance,
 } from "./sessionIdentity.js";
+import {
+  createStickToBottomController,
+  createStickToBottomRegistry,
+  isAtBottom,
+} from "./ui/stickToBottom.js";
 
 const { invoke } = window.__TAURI__.core;
 const listenRuntimeEvent = window.__TAURI__?.event?.listen?.bind(window.__TAURI__.event);
@@ -78,7 +83,6 @@ const runtimeStateClasses = {
 
 const executingSessionStates = new Set([0, 2, 3, 4]);
 const HERMES_ACP_STARTUP_NOTICE = "正在启动 ACP 运行时，首次响应可能较慢。";
-const STREAM_RENDER_INTERVAL_MS = 80;
 
 const acpRuntimeCommands = {
   claude: {
@@ -688,6 +692,9 @@ const providerManagerBtn = document.getElementById("providerManagerBtn");
 const workspaceStatus = document.getElementById("workspaceStatus");
 const workspaceEmpty = document.getElementById("workspaceEmpty");
 const sessionDeck = document.getElementById("sessionDeck");
+const sessionStickRegistry = createStickToBottomRegistry({
+  factory: (element, opts) => createStickToBottomController(element, { observeResize: false, ...opts }),
+});
 const historyList = document.getElementById("historyList");
 const appNotice = document.getElementById("appNotice");
 const promptBox = document.getElementById("promptBox");
@@ -1773,7 +1780,7 @@ function createTurn(session, task) {
   session.state = 2;
   session.activeTurnId = turn.id;
   session.turns.push(turn);
-  renderWorkspace({ scrollSessionId: session.id });
+  renderWorkspace();
   return turn;
 }
 
@@ -1964,7 +1971,7 @@ function activateLaunchDemoScene() {
   });
   document.body.classList.add("is-launch-demo");
   renderProviders();
-  renderWorkspace({ scrollSessionId: "demo-session-hermes-live" });
+  renderWorkspace();
   renderHistory();
   updateActionLabels();
   setAppNotice("已载入 GitHub 首发演示场景：Claude + Hermes + 活跃会话/归档会话。");
@@ -2019,7 +2026,7 @@ function updateTurnFromEvents(sessionId, turnId, events) {
   session.task = turn.task;
   session.state = turn.state;
   session.activeTurnId = turn.id;
-  renderWorkspace({ scrollSessionId: session.id });
+  renderWorkspace();
   renderHistory();
   return turn;
 }
@@ -2075,7 +2082,7 @@ function appendStreamEventToTurn(sessionId, event) {
       break;
   }
 
-  scheduleWorkspaceRender({ scrollSessionId: session.id, preserveDeckScroll: true }, STREAM_RENDER_INTERVAL_MS);
+  scheduleSessionCardRender(session.id);
 }
 
 function appendErrorToTurn(sessionId, turnId, message) {
@@ -2272,7 +2279,7 @@ function toggleSessionLatestOnly(sessionId) {
   const session = sessions.find((item) => item.id === sessionId);
   if (!session) return;
   sessionLatestOnlyState.set(sessionId, !isSessionLatestOnly(session));
-  renderWorkspace({ scrollSessionId: sessionId });
+  renderWorkspace();
 }
 
 function turnResponseText(turn) {
@@ -2672,8 +2679,11 @@ function bindSessionActions() {
   });
   sessionDeck.querySelectorAll(".session-scroll-latest-btn").forEach((button) => {
     button.addEventListener("click", () => {
-      const body = sessionDeck.querySelector(`.session-card[data-session-id="${button.dataset.sessionId}"] .session-card-body`);
-      if (body) body.scrollTop = body.scrollHeight;
+      const sessionId = button.dataset.sessionId;
+      const body = sessionDeck.querySelector(`.session-card[data-session-id="${sessionId}"] .session-card-body`);
+      if (!body) return;
+      const controller = sessionStickRegistry.ensure(sessionId, body, { initialStuck: true });
+      controller.scrollToBottom();
     });
   });
   sessionDeck.querySelectorAll(".session-copy-btn").forEach((button) => {
@@ -2847,9 +2857,6 @@ async function stopSession(sessionId) {
 function removeSessionFromWorkspace(sessionId) {
   const session = sessions.find((item) => item.id === sessionId);
   if (!session) return null;
-  if (scheduledWorkspaceRenderOptions?.scrollSessionId === sessionId) {
-    scheduledWorkspaceRenderOptions = { ...scheduledWorkspaceRenderOptions, scrollSessionId: null };
-  }
   if (scheduledWorkspaceRenderOptions?.focusSessionId === sessionId) {
     scheduledWorkspaceRenderOptions = { ...scheduledWorkspaceRenderOptions, focusSessionId: null };
   }
@@ -2939,15 +2946,11 @@ function requestDeleteConfirmation(sessionId) {
 }
 
 function renderWorkspace(options = {}) {
-  const scrollSessionId = options.scrollSessionId || null;
   const focusSessionId = options.focusSessionId || null;
   const preserveDeckScroll = options.preserveDeckScroll === true;
   const deckScrollLeft = sessionDeck.scrollLeft;
   const deckScrollTop = sessionDeck.scrollTop;
-  const activeBodies = [...sessionDeck.querySelectorAll(".session-card-body")].map((body) => ({
-    sessionId: body.closest(".session-card")?.dataset.sessionId,
-    shouldStickToBottom: body.scrollTop + body.clientHeight >= body.scrollHeight - 24,
-  }));
+  const stickyIntent = sampleSessionStickyIntent();
   const workspaceSessions = isLaunchDemoScene ? sessions.filter(isDemoSession) : sessions;
   const visibleSessions = [...workspaceSessions].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
   document.body.classList.toggle("is-launch-demo", isLaunchDemoScene);
@@ -2975,27 +2978,82 @@ function renderWorkspace(options = {}) {
       ? sessionDeck.querySelector(`.session-card[data-session-id="${focusSessionId}"]`)
       : null;
     focusCard?.focus({ preventScroll: true });
-    const scrollBody = scrollSessionId
-      ? sessionDeck.querySelector(`.session-card[data-session-id="${scrollSessionId}"] .session-card-body`)
-      : null;
-    if (scrollBody) scrollBody.scrollTop = scrollBody.scrollHeight;
-    if (!activeBodies.length) {
-      sessionDeck.querySelectorAll(".session-card-body").forEach((body) => {
-        body.scrollTop = body.scrollHeight;
-      });
-      return;
-    }
-    activeBodies.forEach(({ sessionId, shouldStickToBottom }) => {
-      if (sessionId === scrollSessionId) return;
-      if (!shouldStickToBottom) return;
-      const body = sessionDeck.querySelector(`.session-card[data-session-id="${sessionId}"] .session-card-body`);
-      if (body) body.scrollTop = body.scrollHeight;
-    });
+    syncSessionStickControllers(visibleSessions, stickyIntent);
     if (preserveDeckScroll) {
       sessionDeck.scrollLeft = deckScrollLeft;
       sessionDeck.scrollTop = deckScrollTop;
     }
   });
+}
+
+function sampleSessionStickyIntent() {
+  const map = new Map();
+  sessionDeck.querySelectorAll(".session-card-body").forEach((body) => {
+    const sessionId = body.closest(".session-card")?.dataset.sessionId;
+    if (!sessionId) return;
+    const controller = sessionStickRegistry.get(sessionId);
+    map.set(sessionId, controller ? controller.isStuck : isAtBottom(body));
+  });
+  return map;
+}
+
+const pendingCardRenders = new Set();
+let pendingCardRenderFrame = 0;
+
+function scheduleSessionCardRender(sessionId) {
+  if (!sessionId) return;
+  pendingCardRenders.add(sessionId);
+  if (pendingCardRenderFrame) return;
+  pendingCardRenderFrame = requestAnimationFrame(() => {
+    const targets = [...pendingCardRenders];
+    pendingCardRenders.clear();
+    pendingCardRenderFrame = 0;
+    targets.forEach((id) => renderSessionCardInPlace(id));
+  });
+}
+
+function renderSessionCardInPlace(sessionId) {
+  const session = sessions.find((item) => item.id === sessionId);
+  if (!session) return;
+  const card = sessionDeck.querySelector(`.session-card[data-session-id="${sessionId}"]`);
+  if (!card) {
+    scheduleWorkspaceRender({ preserveDeckScroll: true });
+    return;
+  }
+  const previousBody = card.querySelector(".session-card-body");
+  const previousController = sessionStickRegistry.get(sessionId);
+  const previousStuck = previousController
+    ? previousController.isStuck
+    : previousBody
+      ? isAtBottom(previousBody)
+      : true;
+  const template = document.createElement("template");
+  template.innerHTML = renderSessionCard(session).trim();
+  const newArticle = template.content.firstElementChild;
+  if (!(newArticle instanceof HTMLElement)) return;
+  card.className = newArticle.className;
+  card.innerHTML = newArticle.innerHTML;
+  bindSessionActions();
+  renderMermaidDiagrams(card).catch((error) => console.error(error));
+  const newBody = card.querySelector(".session-card-body");
+  if (newBody) {
+    const controller = sessionStickRegistry.ensure(sessionId, newBody, { initialStuck: previousStuck });
+    controller.notifyContentChanged();
+  }
+}
+
+function syncSessionStickControllers(visibleSessions, stickyIntent) {
+  const ids = [];
+  visibleSessions.forEach((session) => {
+    const card = sessionDeck.querySelector(`.session-card[data-session-id="${session.id}"]`);
+    const body = card?.querySelector(".session-card-body");
+    if (!body) return;
+    const previousStuck = stickyIntent.has(session.id) ? stickyIntent.get(session.id) : true;
+    const controller = sessionStickRegistry.ensure(session.id, body, { initialStuck: previousStuck });
+    controller.notifyContentChanged();
+    ids.push(session.id);
+  });
+  sessionStickRegistry.sweep(ids);
 }
 
 function historySessionKey(entry) {
@@ -3489,7 +3547,7 @@ async function runFallbackSession(session, turn) {
     turn.state = 2;
     session.state = 2;
     prependHermesStartupNoticeIfNeeded(session, turn);
-    renderWorkspace({ scrollSessionId: session.id });
+    renderWorkspace();
   }
   setAppNotice(`已将任务送入 ${session.agentName}，正在等待返回内容...`, "busy");
   try {
@@ -3522,7 +3580,7 @@ async function startAcpSession(session, turn) {
     turn.state = 2;
     session.state = 2;
     prependHermesStartupNoticeIfNeeded(session, turn);
-    renderWorkspace({ scrollSessionId: session.id });
+    renderWorkspace();
   }
   setAppNotice(`已将任务送入 ${session.agentName}，正在等待返回内容...`, "busy");
   try {
