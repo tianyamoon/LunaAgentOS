@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 1420",
     "build": "vite build",
+    "test": "npm run test:identity && npm run test:session-routing",
     "test:identity": "node --test src/sessionIdentity.test.js",
+    "test:session-routing": "node --test src/sessionRouting.test.js",
     "tauri": "tauri"
   },
   "devDependencies": {
