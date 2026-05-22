@@ -27,12 +27,12 @@ LunaAgentOS starts with a small claim:
 It is not the final agent operating system yet. It is the first credible slice:
 
 - **Claude Code** is a real entry.
-- **Hermes** is a real entry through WSL / ACP.
+- **Hermes** is a real entry through Windows / WSL / ACP runtime instances.
 - **Trae IDE** is reserved as a bridge target, not falsely presented as already integrated.
 - **Runtime Session Cards** are the center of the product.
 - **Local JSON history** preserves session transcripts.
 - **Live sessions** and **archived sessions** are separated in the right panel.
-- **Runtime availability** is probed at startup, so the app can launch even when Claude Code or Hermes is not installed yet.
+- **Runtime availability** is probed at startup per provider/runtime instance, so the app can launch even when Claude Code or Hermes is not installed yet.
 - **Chinese / English UI switching** is available from the top bar, including dynamic provider, session-card, history, code-block, and report-view labels.
 
 ## What is working now
@@ -41,13 +41,13 @@ It is not the final agent operating system yet. It is the first credible slice:
 |---|---:|---|
 | Desktop shell | Working | Tauri 2 + Rust core + web UI |
 | Claude Code entry | Working | Real runtime path |
-| Hermes entry | Working | WSL ACP runtime path |
+| Hermes entry | Working | Windows / WSL ACP runtime instances and profiles |
 | Trae IDE | Planned | Bridge route only |
 | Multi-session workspace | Working | Session cards, current session, current send target |
 | Process visibility | Working | Thought/runtime/final response surfaces |
 | Local history | Working | JSON session history, restore/read-only states |
 | Screenshot/demo mode | Working | In-app launch demo scene for GitHub screenshots |
-| Runtime setup | Working | Claude/Hermes can be configured per machine |
+| Runtime detection | Working | Startup probes distinguish provider, runtime instance, and send target/profile |
 | UI language | Working | zh-CN / en-US switch persisted locally, covering static and dynamic workspace labels |
 
 ## Quick start
@@ -65,11 +65,16 @@ Claude Code and Hermes are external runtimes. LunaAgentOS can start without them
 
 ### Configure runtimes
 
-Use the **Manage** button in the Agent Fleet to update local runtime settings:
+Use the **Connection** button in the Agent Fleet to open connection details and recheck local runtime availability.
 
-- Claude adapter command and args.
-- Hermes host: `wsl` or `native`.
-- Hermes executable or profile alias.
+The left fleet is organized as provider -> runtime instance -> target/profile:
+
+- Claude Code can expose separate Windows and WSL runtime instances.
+- Hermes can expose separate Windows and WSL runtime instances.
+- Hermes profiles are shown under the runtime instance that reported them.
+- If a machine has no usable runtime, the entry remains visible with a clear not-connected state.
+
+The legacy prompt-based runtime configuration is kept as a fallback from the connection dialog.
 
 Settings are stored in the app-local `runtime-config.json`, not in the repository.
 

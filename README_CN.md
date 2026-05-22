@@ -35,11 +35,11 @@ LunaAgentOS 的方向不是重写这些 Agent，而是把它们收拢到一个�
 这个阶段不做复杂编排，不做插件市场，也不包装成最终 Agent OS。它先证明：
 
 - `Claude Code` 真实可用。
-- `Hermes` 真实可用。
+- `Hermes` 通过 Windows / WSL / ACP runtime instance 真实可用。
 - 两者能出现在同一个桌面工作台。
 - 会话卡片能承载输出、思考流、运行流和最终响应。
 - 会话结果能沉淀到本地历史。
-- 启动时会探测本机 runtime，即使用户还没安装 Claude Code 或 Hermes，桌面壳也能正常打开。
+- 启动时会按 provider / runtime instance 探测本机 runtime，即使用户还没安装 Claude Code 或 Hermes，桌面壳也能正常打开。
 - 顶部提供中文 / English 界面切换，并覆盖左侧入口、会话卡片、右侧历史、代码块和报表视图等动态标签。
 
 如果只有 Claude，不算最小异构控制台成立；只有 Claude + Hermes 都进入工作台，Stage 1 才站得住。
@@ -50,13 +50,13 @@ LunaAgentOS 的方向不是重写这些 Agent，而是把它们收拢到一个�
 |---|---:|---|
 | 桌面壳 | 已可用 | Tauri 2 + Rust Core + 前端工作台 |
 | Claude Code | 已接入 | 真实 runtime 路径 |
-| Hermes | 已接入 | WSL / ACP runtime 路径 |
+| Hermes | 已接入 | Windows / WSL / ACP runtime instance 与 profile |
 | Trae IDE | 规划中 | 保留 Bridge 路线，不伪装已接入 |
 | 多会话工作台 | 已可用 | 当前发送目标、当前会话、活会话集合分离 |
 | Runtime Session Card | 已可用 | 输出流、思考流、运行流、最终响应 |
 | 本地历史 | 已可用 | JSON 历史、只读恢复、删除保护 |
 | 演示 / 截图模式 | 已可用 | 顶部 `演示场景` 按钮加载非持久化 demo |
-| Runtime 配置 | 已可用 | Claude/Hermes 可按本机环境配置 |
+| Runtime 检测 | 已可用 | 启动探测区分 provider、runtime instance、发送目标/profile |
 | 界面语言 | 已可用 | zh-CN / en-US 本地持久化切换，覆盖静态与动态工作台标签 |
 
 ## 快速开始
@@ -72,13 +72,18 @@ LunaAgentOS 的方向不是重写这些 Agent，而是把它们收拢到一个�
 
 Claude Code 和 Hermes 是外部 runtime，不是 LunaAgentOS 启动前置条件。未安装或路径不同的机器上，入口会显示为 `未配置` 或 `不可用`，用户可以先打开工作台，再按本机环境配置。
 
-### 配置 runtime
+### 连接与 runtime 检测
 
-在左侧 Agent 舰队点击 **维护**，可以通过现有 prompt 流程配置：
+在左侧 Agent 舰队点击 **连接详情**，可以查看并重新检查本机 runtime 可用性。
 
-- Claude adapter command 与 args。
-- Hermes host：`wsl` 或 `native`。
-- Hermes executable / profile alias。
+左侧结构现在按 provider -> runtime instance -> target/profile 展示：
+
+- Claude Code 可以同时显示 Windows 与 WSL runtime instance。
+- Hermes 可以同时显示 Windows 与 WSL runtime instance。
+- Hermes profile 会挂在实际探测到它的 runtime instance 下。
+- 如果某台机器没有可用 runtime，入口仍保留，并显示清晰的未连接状态。
+
+旧版 prompt 配置入口保留在连接详情弹窗中，作为 fallback。
 
 配置会保存到应用本地目录的 `runtime-config.json`，不会写入仓库。
 

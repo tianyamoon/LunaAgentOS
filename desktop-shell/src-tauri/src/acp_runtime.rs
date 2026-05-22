@@ -39,6 +39,8 @@ pub struct RuntimeConfig {
     pub claude_args: Vec<String>,
     pub hermes_host: Option<String>,
     pub hermes_command: Option<String>,
+    pub runtime_host: Option<String>,
+    pub runtime_command: Option<String>,
 }
 
 enum SessionStartMode {
@@ -537,13 +539,29 @@ fn send_prompt(
 }
 
 fn build_acp_command(runtime: AcpRuntime, cwd: &PathBuf, profile_executable: Option<&str>, config: &RuntimeConfig) -> Command {
+    let runtime_host = config.runtime_host.as_deref();
     let mut command = match runtime {
-        AcpRuntime::Claude if cfg!(windows) => Command::new(config.claude_command.as_deref().unwrap_or("npx.cmd")),
-        AcpRuntime::Claude => Command::new(config.claude_command.as_deref().unwrap_or("npx")),
-        AcpRuntime::Hermes if cfg!(windows) && config.hermes_host.as_deref() != Some("native") => Command::new("wsl.exe"),
+        AcpRuntime::Claude if cfg!(windows) && runtime_host == Some("wsl") => Command::new("wsl.exe"),
+        AcpRuntime::Claude if cfg!(windows) => Command::new(
+            config
+                .runtime_command
+                .as_deref()
+                .or(config.claude_command.as_deref())
+                .unwrap_or("npx.cmd"),
+        ),
+        AcpRuntime::Claude => Command::new(
+            config
+                .runtime_command
+                .as_deref()
+                .or(config.claude_command.as_deref())
+                .unwrap_or("npx"),
+        ),
+        AcpRuntime::Hermes if cfg!(windows) && runtime_host == Some("wsl") => Command::new("wsl.exe"),
+        AcpRuntime::Hermes if cfg!(windows) && runtime_host.is_none() && config.hermes_host.as_deref() != Some("native") => Command::new("wsl.exe"),
         AcpRuntime::Hermes => Command::new(
             profile_executable
                 .filter(|value| !value.trim().is_empty())
+                .or(config.runtime_command.as_deref())
                 .or(config.hermes_command.as_deref())
                 .unwrap_or("hermes"),
         ),
@@ -556,22 +574,32 @@ fn build_acp_command(runtime: AcpRuntime, cwd: &PathBuf, profile_executable: Opt
 
     match runtime {
         AcpRuntime::Claude => {
+            let executable = config
+                .runtime_command
+                .as_deref()
+                .or(config.claude_command.as_deref())
+                .unwrap_or(if cfg!(windows) { "npx.cmd" } else { "npx" });
             let args: Vec<String> = if config.claude_args.is_empty() {
                 vec!["-y".to_string(), "@agentclientprotocol/claude-agent-acp".to_string()]
             } else {
                 config.claude_args.clone()
             };
-            command
-                .args(args)
-                .current_dir(cwd)
-                .envs(load_claude_user_env());
+            if cfg!(windows) && runtime_host == Some("wsl") {
+                command.args(["--exec", executable]).args(args).current_dir(cwd);
+            } else {
+                command
+                    .args(args)
+                    .current_dir(cwd)
+                    .envs(load_claude_user_env());
+            }
         }
         AcpRuntime::Hermes => {
             let executable = profile_executable
                 .filter(|value| !value.trim().is_empty())
+                .or(config.runtime_command.as_deref())
                 .or(config.hermes_command.as_deref())
                 .unwrap_or("hermes");
-            if cfg!(windows) && config.hermes_host.as_deref() != Some("native") {
+            if cfg!(windows) && (runtime_host == Some("wsl") || (runtime_host.is_none() && config.hermes_host.as_deref() != Some("native"))) {
                 command.args(["--", executable, "acp", "--accept-hooks"]);
             } else {
                 command.args(["acp", "--accept-hooks"]);

@@ -104,19 +104,20 @@ const translations = {
     "topbar.clearDemo": "清除演示",
     "topbar.language": "语言：中文",
     "fleet.title": "Agent 舰队",
-    "common.manage": "维护",
+    "common.manage": "连接详情",
+    "common.fixConnection": "修正连接",
     "workspace.title": "会话工作台",
     "workspace.defaultStatus": "请选择当前发送目标，然后发送第一条任务。",
     "workspace.emptyTitle": "会话尚未入场",
     "workspace.emptyText": "先在左侧设定当前发送目标，再通过底部输入框发起会话。",
-    "workspace.currentTarget": "当前发送目标：",
+    "workspace.currentTarget": "",
     "composer.send": "发送",
     "composer.demo": "演示中",
     "composer.enterSend": "Enter 发送",
     "composer.ctrlEnter": "Ctrl+Enter",
     "composer.newSession": "另开会话",
-    "composer.placeholderTarget": "输入发送给{provider} / {agent}的任务。",
-    "composer.placeholderNoTarget": "请先设置当前发送目标。",
+    "composer.placeholderTarget": "发送给 {target}",
+    "composer.placeholderNoTarget": "先连接一个入口后再发送任务。",
     "history.title": "会话列表",
     "history.subtitle": "当前与归档",
     "history.loadingTitle": "会话列表加载中",
@@ -132,6 +133,8 @@ const translations = {
     "provider.setTarget": "设为发送目标",
     "provider.probing": "探测中",
     "provider.available": "可用",
+    "provider.partial": "部分可用",
+    "provider.notConnected": "未连接",
     "provider.not_configured": "未配置",
     "provider.unavailable": "不可用",
     "provider.planned": "规划中",
@@ -150,6 +153,9 @@ const translations = {
     "provider.claude.note": "面向开发者的命令行智能编程工具。",
     "provider.hermes.note": "通用入口，等待载入 Hermes profile。",
     "provider.hermes.loadedNote": "通用入口，已载入 {count} 个 Hermes profile。",
+    "provider.noRuntime": "未检测到可用运行环境",
+    "provider.noHermesRuntime": "未检测到 Win 或 WSL Hermes",
+    "provider.noTargets": "暂未发现可发送目标",
     "provider.trae.note": "强大且免费的工具。",
     "agent.main": "主会话",
     "agent.claude.note": "适合承接高价值任务与真实产品演示。",
@@ -211,6 +217,30 @@ const translations = {
     "report.rawView": "原文报表视图",
     "report.rawHint": "检测到宽表/长行，优先保留原始排版",
     "report.renderedView": "查看 Markdown 渲染视图",
+    "runtimeConfig.title": "Runtime 维护",
+    "runtimeConfig.subtitle": "按本机环境配置当前入口。留空表示使用默认探测值。",
+    "runtimeConfig.claudeTitle": "Claude Code",
+    "runtimeConfig.hermesTitle": "Hermes",
+    "runtimeConfig.command": "命令",
+    "runtimeConfig.args": "参数",
+    "runtimeConfig.host": "运行位置",
+    "runtimeConfig.profile": "命令 / Profile alias",
+    "runtimeConfig.commandHint": "例如 npx.cmd、npx，或你的 adapter 绝对路径",
+    "runtimeConfig.argsHint": "空格分隔；留空使用默认 ACP adapter 参数",
+    "runtimeConfig.hermesHint": "例如 hermes，或已探测到的 profile alias",
+    "runtimeConfig.currentState": "当前状态：{state}",
+    "runtimeConfig.save": "保存并重新探测",
+    "runtimeConfig.cancel": "取消",
+    "runtimeConfig.legacyPrompt": "使用旧版 prompt",
+    "runtimeConfig.saving": "正在保存 Runtime 配置...",
+    "runtimeConfig.saved": "Runtime 配置已保存。后续新建/恢复 ACP 会话会使用该配置。",
+    "runtimeConfig.failed": "Runtime 配置读取或保存失败：{error}",
+    "connection.title": "连接详情",
+    "connection.subtitle": "这里只检查入口能不能打开；Agent/profile 来自运行时探测。",
+    "connection.detected": "已检测到的运行环境",
+    "connection.none": "暂未检测到可用运行环境。",
+    "connection.recheck": "重新检查",
+    "common.close": "关闭",
   },
   "en-US": {
     "topbar.metricsAria": "Current capability status",
@@ -218,19 +248,20 @@ const translations = {
     "topbar.clearDemo": "Clear demo",
     "topbar.language": "Language: English",
     "fleet.title": "Agent Fleet",
-    "common.manage": "Manage",
+    "common.manage": "Connection",
+    "common.fixConnection": "Fix connection",
     "workspace.title": "Session Workspace",
     "workspace.defaultStatus": "Choose the current send target, then send the first task.",
     "workspace.emptyTitle": "No session yet",
     "workspace.emptyText": "Choose a send target on the left, then start a session from the composer.",
-    "workspace.currentTarget": "Current target: ",
+    "workspace.currentTarget": "",
     "composer.send": "Send",
     "composer.demo": "Demo",
     "composer.enterSend": "Enter sends",
     "composer.ctrlEnter": "Ctrl+Enter",
     "composer.newSession": "New session",
-    "composer.placeholderTarget": "Send a task to {provider} / {agent}.",
-    "composer.placeholderNoTarget": "Set a send target first.",
+    "composer.placeholderTarget": "Send to {target}",
+    "composer.placeholderNoTarget": "Connect an entry before sending.",
     "history.title": "Sessions",
     "history.subtitle": "Live and archived",
     "history.loadingTitle": "Loading sessions",
@@ -246,6 +277,8 @@ const translations = {
     "provider.setTarget": "Set as target",
     "provider.probing": "Probing",
     "provider.available": "Ready",
+    "provider.partial": "Partial",
+    "provider.notConnected": "Not connected",
     "provider.not_configured": "Not configured",
     "provider.unavailable": "Unavailable",
     "provider.planned": "Planned",
@@ -264,6 +297,9 @@ const translations = {
     "provider.claude.note": "Command-line coding agent for developers.",
     "provider.hermes.note": "General entry, waiting for Hermes profiles.",
     "provider.hermes.loadedNote": "General entry, loaded {count} Hermes profiles.",
+    "provider.noRuntime": "No usable runtime detected",
+    "provider.noHermesRuntime": "No Win or WSL Hermes detected",
+    "provider.noTargets": "No send target detected yet",
     "provider.trae.note": "Powerful free IDE tool.",
     "agent.main": "Main session",
     "agent.claude.note": "Best for high-value tasks and real product demos.",
@@ -325,6 +361,30 @@ const translations = {
     "report.rawView": "Raw report view",
     "report.rawHint": "Wide table or long lines detected; preserving original layout first",
     "report.renderedView": "View rendered Markdown",
+    "runtimeConfig.title": "Runtime Maintenance",
+    "runtimeConfig.subtitle": "Configure the selected entry for this machine. Empty fields use default probe values.",
+    "runtimeConfig.claudeTitle": "Claude Code",
+    "runtimeConfig.hermesTitle": "Hermes",
+    "runtimeConfig.command": "Command",
+    "runtimeConfig.args": "Args",
+    "runtimeConfig.host": "Host",
+    "runtimeConfig.profile": "Command / profile alias",
+    "runtimeConfig.commandHint": "For example: npx.cmd, npx, or an absolute adapter path",
+    "runtimeConfig.argsHint": "Space-separated; leave empty to use default ACP adapter args",
+    "runtimeConfig.hermesHint": "For example: hermes, or a detected profile alias",
+    "runtimeConfig.currentState": "Current state: {state}",
+    "runtimeConfig.save": "Save and probe again",
+    "runtimeConfig.cancel": "Cancel",
+    "runtimeConfig.legacyPrompt": "Use legacy prompt",
+    "runtimeConfig.saving": "Saving runtime configuration...",
+    "runtimeConfig.saved": "Runtime configuration saved. New or restored ACP sessions will use it.",
+    "runtimeConfig.failed": "Failed to read or save runtime configuration: {error}",
+    "connection.title": "Connection details",
+    "connection.subtitle": "This checks whether an entry can open; agents/profiles come from runtime detection.",
+    "connection.detected": "Detected runtime environments",
+    "connection.none": "No usable runtime environment detected yet.",
+    "connection.recheck": "Recheck",
+    "common.close": "Close",
   },
 };
 
@@ -576,17 +636,19 @@ const providers = [
 ];
 
 const LEGACY_TARGET_AGENT_KEY = "lunaagentos.currentTargetAgentId";
-const CURRENT_TARGET_AGENT_KEY = "lunaagentos.currentTargetAgentId";
+const CURRENT_TARGET_AGENT_KEY = "lunaagentos.currentTargetId";
 const CURRENT_SESSION_KEY = "lunaagentos.currentSessionId";
 const SEND_MODE_KEY = "lunaagentos.sendMode";
 const FONT_SCALE_KEY = "lunaagentos.fontScale";
 const LANGUAGE_KEY = "lunaagentos.language";
 const HISTORY_SCHEMA_VERSION = 3;
-const DEFAULT_HERMES_AGENT_ID = "hermes-profile-default";
+const DEFAULT_HERMES_AGENT_ID = "hermes-wsl:profile:default";
 const SEND_MODE_OPTIONS = ["enter", "ctrlEnter"];
 const PROVIDER_AVAILABILITY_STATES = {
   probing: { state: 0, key: "provider.probing" },
   available: { state: 1, key: "provider.available" },
+  partial: { state: 2, key: "provider.partial" },
+  not_connected: { state: 9, key: "provider.notConnected" },
   not_configured: { state: 9, key: "provider.not_configured" },
   unavailable: { state: 9, key: "provider.unavailable" },
   planned: { state: 6, key: "provider.planned" },
@@ -647,6 +709,8 @@ let runtimeAvailability = {
   hermes: { summary: "probing", configured: false, available: false, command: "" },
   trae: { summary: "planned", configured: false, available: false, command: "IDE Bridge" },
 };
+let runtimeInstances = [];
+let hermesProfilesByInstance = {};
 let demoHistoryEntries = [];
 const deletedSessionIds = new Set();
 const stoppedSessionIds = new Set();
@@ -663,29 +727,128 @@ let scheduledWorkspaceRenderTimer = 0;
 let pendingConfirmAction = null;
 
 function allAgents() {
-  return providers.flatMap((provider) => provider.agents);
+  const dynamicTargets = runtimeTargets();
+  return runtimeInstances.length ? dynamicTargets : providers.flatMap((provider) => provider.agents);
 }
 
 function providerById(id) {
   return providers.find((provider) => provider.id === id);
 }
 
+function runtimeInstancesForProvider(providerId) {
+  return runtimeInstances.filter((instance) => instance.providerId === providerId);
+}
+
+function availableRuntimeInstancesForProvider(providerId) {
+  return runtimeInstancesForProvider(providerId).filter((instance) => instance.available);
+}
+
+function runtimeInstanceById(id) {
+  return runtimeInstances.find((instance) => instance.id === id) || null;
+}
+
+function providerRuntimeLabel(provider, instance, availableCount) {
+  if (!instance?.runtimeLabel) return provider.name;
+  if (availableCount === 1 && instance.runtimeLabel === "Win") return provider.name;
+  return `${provider.name} · ${instance.runtimeLabel}`;
+}
+
+function runtimeHostForInstance(instance) {
+  return instance?.commandKind || instance?.host || null;
+}
+
+function targetDisplayName(target) {
+  if (!target) return "";
+  const provider = providerById(target.providerId);
+  const providerName = target.providerName || provider?.name || "";
+  if (target.providerId === "hermes" && target.kind === "profile") {
+    return `${providerName}${target.runtimeLabel ? ` · ${target.runtimeLabel}` : ""} / ${displayAgentName(target)}`;
+  }
+  return target.name || providerName || displayAgentName(target);
+}
+
+function targetsForRuntimeInstance(instance) {
+  const provider = providerById(instance.providerId);
+  if (!provider || !instance.available) return [];
+  const availableCount = availableRuntimeInstancesForProvider(instance.providerId).length;
+  if (instance.providerId === "claude") {
+    const label = providerRuntimeLabel(provider, instance, availableCount);
+    return [{
+      id: instance.id,
+      providerId: provider.id,
+      runtimeInstanceId: instance.id,
+      runtimeLabel: instance.runtimeLabel,
+      runtimeHost: runtimeHostForInstance(instance),
+      runtimeCommand: instance.command,
+      kind: "runtime",
+      name: label,
+      subtitle: instance.runtimeLabel || "Runtime",
+      state: 1,
+      available: true,
+    }];
+  }
+  if (instance.providerId === "hermes") {
+    return (hermesProfilesByInstance[instance.id] || []).map((profile) => ({
+      id: profile.id,
+      providerId: "hermes",
+      runtimeInstanceId: instance.id,
+      runtimeLabel: instance.runtimeLabel,
+      runtimeHost: runtimeHostForInstance(instance),
+      runtimeCommand: instance.command,
+      kind: "profile",
+      name: profile.displayName,
+      subtitle: profile.subtitle || `${instance.runtimeLabel || "Runtime"} Profile`,
+      note: profile.note || "Hermes profile",
+      state: typeof profile.state === "number" ? profile.state : 1,
+      available: true,
+      profileName: profile.profileName,
+      model: profile.model,
+      gateway: profile.gateway,
+      alias: profile.alias,
+      profileAlias: profile.alias,
+      profileExecutable: profile.alias || profile.profileName || null,
+      path: profile.path,
+      profilePath: profile.path,
+      skillCount: profile.skillCount,
+      hasEnv: profile.hasEnv,
+      hasSoul: profile.hasSoul,
+      isDefault: Boolean(profile.isDefault),
+    }));
+  }
+  return [];
+}
+
+function runtimeTargets() {
+  return runtimeInstances.flatMap(targetsForRuntimeInstance);
+}
+
 function ensureCurrentTargetAgentExists() {
-  if (agentById(currentTargetAgentId)) return;
+  if (currentTargetAgentId && agentById(currentTargetAgentId)) return;
   if (agentById(DEFAULT_HERMES_AGENT_ID)) {
     saveCurrentTargetAgent(DEFAULT_HERMES_AGENT_ID);
     return;
   }
-  if (agentById("claude-main")) {
-    saveCurrentTargetAgent("claude-main");
+  if (agentById("claude-win")) {
+    saveCurrentTargetAgent("claude-win");
     return;
   }
   const fallbackAgent = allAgents()[0];
-  if (fallbackAgent) saveCurrentTargetAgent(fallbackAgent.id);
+  if (fallbackAgent) {
+    saveCurrentTargetAgent(fallbackAgent.id);
+  } else {
+    saveCurrentTargetAgent(null);
+  }
 }
 
 function agentById(id) {
-  return allAgents().find((agent) => agent.id === id);
+  if (!id) return null;
+  const runtimeTarget = runtimeTargets().find((agent) => agent.id === id);
+  if (runtimeTarget) return runtimeTarget;
+  const staticAgent = providers.flatMap((provider) => provider.agents).find((agent) => agent.id === id);
+  if (!staticAgent) return null;
+  const managedByRuntimeProbe = runtimeInstancesForProvider(staticAgent.providerId).length > 0;
+  if (managedByRuntimeProbe && !staticAgent.isArchivedAgent && !staticAgent.id.includes("-demo-")) return null;
+  return staticAgent;
 }
 
 function providerForAgent(agentId) {
@@ -718,6 +881,13 @@ function acpCommandsForProvider(providerId) {
 }
 
 function providerState(provider) {
+  const instances = runtimeInstancesForProvider(provider.id);
+  if (instances.length) {
+    const availableCount = instances.filter((instance) => instance.available).length;
+    if (availableCount === instances.length) return 1;
+    if (availableCount > 0) return 2;
+    return 9;
+  }
   const availability = runtimeAvailability[provider.id];
   if (availability) {
     return PROVIDER_AVAILABILITY_STATES[availability.summary]?.state ?? 1;
@@ -737,13 +907,31 @@ function providerState(provider) {
 }
 
 function providerAvailability(providerId) {
+  const instances = runtimeInstancesForProvider(providerId);
+  if (instances.length) {
+    const availableCount = instances.filter((instance) => instance.available).length;
+    const summary = availableCount === instances.length
+      ? "available"
+      : availableCount > 0
+        ? "partial"
+        : "not_connected";
+    return {
+      summary,
+      configured: instances.some((instance) => instance.configured),
+      available: availableCount > 0,
+      command: `${availableCount}/${instances.length}`,
+      detail: "",
+    };
+  }
   return runtimeAvailability[providerId] || { summary: "available", configured: true, available: true, command: "" };
 }
 
 function canSendToProvider(providerId) {
-  const availability = providerAvailability(providerId);
   if (providerId === "trae") return false;
-  return availability.available;
+  if (runtimeInstancesForProvider(providerId).length) {
+    return runtimeTargets().some((target) => target.providerId === providerId);
+  }
+  return providerAvailability(providerId).available;
 }
 
 function formatTime(value) {
@@ -876,9 +1064,8 @@ function updateActionLabels() {
 
 function updatePromptPlaceholder() {
   const agent = currentTargetAgent();
-  const provider = currentTargetProvider();
-  promptBox.placeholder = agent && provider
-    ? t("composer.placeholderTarget", { provider: provider.name, agent: displayAgentName(agent) })
+  promptBox.placeholder = agent
+    ? t("composer.placeholderTarget", { target: targetDisplayName(agent) })
     : t("composer.placeholderNoTarget");
 }
 
@@ -911,7 +1098,11 @@ function scheduleWorkspaceRender(options = {}, delayMs = 0) {
 
 function saveCurrentTargetAgent(agentId) {
   currentTargetAgentId = agentId;
-  localStorage.setItem(CURRENT_TARGET_AGENT_KEY, agentId);
+  if (agentId) {
+    localStorage.setItem(CURRENT_TARGET_AGENT_KEY, agentId);
+  } else {
+    localStorage.removeItem(CURRENT_TARGET_AGENT_KEY);
+  }
   localStorage.removeItem(LEGACY_TARGET_AGENT_KEY);
 }
 
@@ -966,7 +1157,7 @@ function toggleSendMode() {
   updateSendModeLabel();
 }
 
-async function openProviderManager() {
+async function openProviderManagerPrompt() {
   try {
     const current = await invoke("load_runtime_config");
     const claudeCommand = window.prompt("Claude adapter command（留空使用默认 npx/npx.cmd）", current?.claudeCommand || "");
@@ -994,6 +1185,94 @@ async function openProviderManager() {
   }
 }
 
+async function openProviderManager(providerId = currentTargetProvider()?.id || "claude") {
+  if (!confirmDialog) {
+    await openProviderManagerPrompt();
+    return;
+  }
+  try {
+    const selectedProviderId = providerId === "hermes" ? "hermes" : "claude";
+    const selectedAvailability = providerAvailability(selectedProviderId);
+    const selectedState = providerAvailabilityLabel(selectedAvailability.summary);
+    const selectedStateClass = stateClasses[PROVIDER_AVAILABILITY_STATES[selectedAvailability.summary]?.state] || "state-idle";
+    const isClaude = selectedProviderId === "claude";
+    const title = isClaude ? t("runtimeConfig.claudeTitle") : t("runtimeConfig.hermesTitle");
+    const instances = runtimeInstancesForProvider(selectedProviderId);
+    const instanceMarkup = instances.length
+      ? instances.map((instance) => {
+        const state = instance.available ? 1 : 9;
+        return `
+          <article class="connection-instance-card">
+            <div class="connection-instance-top">
+              <strong>${escapeHtml(instance.runtimeLabel || title)}</strong>
+              <span class="state-pill ${stateClasses[state] || "state-idle"}">${instance.available ? t("provider.available") : t("provider.notConnected")}</span>
+            </div>
+            <p>${escapeHtml(instance.summary || "")}</p>
+            ${instance.detail ? `<small>${escapeHtml(instance.detail)}</small>` : ""}
+            ${instance.version ? `<small>${escapeHtml(instance.version)}</small>` : ""}
+          </article>
+        `;
+      }).join("")
+      : `<p class="connection-empty">${t("connection.none")}</p>`;
+    confirmDialog.hidden = false;
+    confirmDialog.innerHTML = `
+      <form class="confirm-dialog runtime-config-dialog connection-dialog" role="dialog" aria-modal="true" aria-labelledby="runtimeConfigTitle">
+        <div class="confirm-dialog-header">
+          <span class="runtime-config-icon" aria-hidden="true">●</span>
+          <div>
+            <h3 id="runtimeConfigTitle">${t("connection.title")} · ${title}</h3>
+            <p class="runtime-config-subtitle">${t("connection.subtitle")}</p>
+          </div>
+          <button type="button" class="confirm-dialog-close runtime-config-close" aria-label="${t("common.close")}">×</button>
+        </div>
+        <div class="runtime-config-body">
+          <aside class="runtime-config-status-card">
+            <span class="runtime-config-kicker">${selectedProviderId}</span>
+            <strong>${title}</strong>
+            <span class="state-pill ${selectedStateClass}">${selectedState}</span>
+            <span>${escapeHtml(runtimeConnectionNote(providerById(selectedProviderId) || { id: selectedProviderId, name: title }, instances))}</span>
+          </aside>
+          <section class="runtime-config-section">
+            <h4>${t("connection.detected")}</h4>
+            <div class="connection-instance-list">${instanceMarkup}</div>
+          </section>
+        </div>
+        <div class="confirm-dialog-actions runtime-config-actions">
+          <button type="button" class="confirm-dialog-cancel runtime-config-close">${t("common.close")}</button>
+          <button type="button" class="mini-btn ghost-btn runtime-config-legacy">${t("runtimeConfig.legacyPrompt")}</button>
+          <button type="submit" class="primary runtime-config-save">${t("connection.recheck")}</button>
+        </div>
+      </form>
+    `;
+    confirmDialog.querySelectorAll(".runtime-config-close").forEach((button) => {
+      button.addEventListener("click", closeConfirmDialog);
+    });
+    confirmDialog.querySelector(".runtime-config-legacy")?.addEventListener("click", async () => {
+      closeConfirmDialog();
+      await openProviderManagerPrompt();
+    });
+    confirmDialog.querySelector(".runtime-config-dialog")?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const saveButton = event.currentTarget.querySelector(".runtime-config-save");
+      saveButton.disabled = true;
+      setAppNotice("正在重新检查连接...", "busy");
+      try {
+        await refreshRuntimeProbe();
+        if (selectedProviderId === "hermes") await loadHermesProfiles();
+        closeConfirmDialog();
+        setAppNotice("连接检查已完成。");
+      } catch (error) {
+        console.error(error);
+        saveButton.disabled = false;
+        setAppNotice(t("runtimeConfig.failed", { error: formatBackendError(error) }), "error");
+      }
+    });
+  } catch (error) {
+    console.error(error);
+    setAppNotice(t("runtimeConfig.failed", { error: formatBackendError(error) }), "error");
+  }
+}
+
 function showProviderAgents(provider) {
   const names = provider.agents.map((agent) => displayAgentName(agent)).join("、");
   setAppNotice(`${provider.name} 当前已登记的 Agent：${names}。`);
@@ -1007,6 +1286,13 @@ async function refreshRuntimeProbe() {
       next[item.providerId] = item;
     });
     runtimeAvailability = next;
+    runtimeInstances = Array.isArray(result?.instances) ? result.instances : [];
+    hermesProfilesByInstance = Object.fromEntries(
+      Object.entries(hermesProfilesByInstance).filter(([instanceId]) =>
+        runtimeInstances.some((instance) => instance.id === instanceId && instance.available),
+      ),
+    );
+    ensureCurrentTargetAgentExists();
     renderProviders();
     renderWorkspaceStatus();
     return result;
@@ -1030,10 +1316,56 @@ function setCurrentTargetAgent(agentId) {
   updatePromptPlaceholder();
   if (agent && provider) {
     renderWorkspaceStatus();
-    setAppNotice(`当前发送目标已切换到 ${provider.name} / ${displayAgentName(agent)}。`);
+    setAppNotice(`已切换到 ${targetDisplayName(agent)}。`);
   }
   renderProviders();
   renderWorkspace();
+}
+
+function runtimeConnectionNote(provider, instances) {
+  if (provider.id === "trae") return displayProviderNote(provider);
+  if (!instances.length) {
+    return provider.id === "hermes" ? t("provider.noHermesRuntime") : t("provider.noRuntime");
+  }
+  const available = instances.filter((instance) => instance.available);
+  if (!available.length) return provider.id === "hermes" ? t("provider.noHermesRuntime") : t("provider.noRuntime");
+  return available
+    .map((instance) => instance.runtimeLabel || provider.name)
+    .join(" / ");
+}
+
+function renderRuntimeTarget(target) {
+  const selected = target.id === currentTargetAgentId;
+  return `
+    <div class="agent-entry ${selected ? "is-main-agent" : "is-selectable"}" data-agent-id="${target.id}">
+      <div class="agent-entry-top">
+        <strong>${escapeHtml(displayAgentName(target))}</strong>
+      </div>
+      ${target.subtitle ? `<div class="agent-entry-sub">${escapeHtml(target.subtitle)}</div>` : ""}
+      ${selected ? "" : `<div class="agent-entry-actions"><span class="agent-action-hint">${t("provider.setTarget")}</span></div>`}
+    </div>
+  `;
+}
+
+function renderRuntimeInstanceBlock(provider, instance, targets, availableCount) {
+  const label = providerRuntimeLabel(provider, instance, availableCount);
+  const state = instance.available ? 1 : 9;
+  const canSelectRuntime = provider.id === "claude" && targets.length === 1;
+  if (canSelectRuntime) return renderRuntimeTarget(targets[0]);
+  return `
+    <div class="runtime-instance-block ${instance.available ? "is-available" : "is-unavailable"}">
+      <div class="runtime-instance-head">
+        <strong>${escapeHtml(label)}</strong>
+        <span class="state-pill ${stateClasses[state] || "state-idle"}">${instance.available ? t("provider.available") : t("provider.notConnected")}</span>
+      </div>
+      ${targets.length
+        ? `<div class="provider-agents is-runtime-targets">${targets.map(renderRuntimeTarget).join("")}</div>`
+        : `<div class="runtime-instance-empty">
+            <span>${instance.available ? t("provider.noTargets") : t("provider.noRuntime")}</span>
+            <button type="button" class="mini-btn ghost-btn provider-manage-btn" data-provider-id="${provider.id}">${t("common.fixConnection")}</button>
+          </div>`}
+    </div>
+  `;
 }
 
 function renderProviders() {
@@ -1046,7 +1378,31 @@ function renderProviders() {
     const aggregateState = providerState(provider);
     const availability = providerAvailability(provider.id);
     const availabilityLabel = providerAvailabilityLabel(availability.summary);
-    const availabilityDetail = availability.command ? `${availabilityLabel} · ${availability.command}` : availabilityLabel;
+    const instances = runtimeInstancesForProvider(provider.id);
+    const availableCount = availableRuntimeInstancesForProvider(provider.id).length;
+    const dynamicTargets = instances.flatMap(targetsForRuntimeInstance);
+    const shouldUseDynamic = instances.length > 0;
+    const availabilityDetail = shouldUseDynamic
+      ? runtimeConnectionNote(provider, instances)
+      : (availability.command ? `${availabilityLabel} · ${availability.command}` : availabilityLabel);
+    const targetMarkup = shouldUseDynamic
+      ? instances.map((instance) => renderRuntimeInstanceBlock(
+        provider,
+        instance,
+        targetsForRuntimeInstance(instance),
+        availableCount,
+      )).join("")
+      : provider.agents.map((agent) => `
+        <div class="agent-entry ${agent.id === currentTargetAgentId ? "is-main-agent" : "is-selectable"}" data-agent-id="${agent.id}">
+          <div class="agent-entry-top">
+            <strong>${displayAgentName(agent)}</strong>
+          </div>
+          <div class="agent-entry-sub">${agent.subtitle}</div>
+          ${agent.id === currentTargetAgentId
+            ? ""
+            : `<div class="agent-entry-actions"><span class="agent-action-hint">${t("provider.setTarget")}</span></div>`}
+        </div>
+      `).join("");
 
     group.innerHTML = `
       <div class="provider-header">
@@ -1057,22 +1413,12 @@ function renderProviders() {
           </div>
           ${provider.lane ? `<div class="provider-lane">${provider.lane}</div>` : ""}
         </div>
-        <button type="button" class="mini-btn ghost-btn provider-manage-btn" data-provider-id="${provider.id}">${t("common.manage")}</button>
+        <button type="button" class="mini-btn ghost-btn provider-manage-btn" data-provider-id="${provider.id}">${availability.available ? t("common.manage") : t("common.fixConnection")}</button>
       </div>
       <p class="caption provider-note">${displayProviderNote(provider)}</p>
       <p class="caption provider-runtime-note">${escapeHtml(availabilityDetail)}</p>
-      <div class="provider-agents">
-        ${provider.agents.map((agent) => `
-          <div class="agent-entry ${agent.id === currentTargetAgentId ? "is-main-agent" : "is-selectable"}" data-agent-id="${agent.id}">
-            <div class="agent-entry-top">
-              <strong>${displayAgentName(agent)}</strong>
-            </div>
-            <div class="agent-entry-sub">${agent.subtitle}</div>
-            ${agent.id === currentTargetAgentId
-              ? ""
-              : `<div class="agent-entry-actions"><span class="agent-action-hint">${t("provider.setTarget")}</span></div>`}
-          </div>
-        `).join("")}
+      <div class="${shouldUseDynamic ? "runtime-instance-list" : "provider-agents"}">
+        ${targetMarkup || `<div class="runtime-instance-empty">${provider.id === "hermes" ? t("provider.noHermesRuntime") : t("provider.noRuntime")}</div>`}
       </div>
     `;
 
@@ -1082,7 +1428,7 @@ function renderProviders() {
   agentList.querySelectorAll(".provider-manage-btn").forEach((button) => {
     button.addEventListener("click", (event) => {
       event.stopPropagation();
-      openProviderManager();
+      openProviderManager(button.dataset.providerId);
     });
   });
 
@@ -1131,14 +1477,37 @@ function applyHermesProfiles(profiles) {
   renderWorkspace();
 }
 
-async function loadHermesProfiles() {
+function applyHermesProfilesForInstance(runtimeInstanceId, profiles) {
+  hermesProfilesByInstance = {
+    ...hermesProfilesByInstance,
+    [runtimeInstanceId]: Array.isArray(profiles) ? profiles : [],
+  };
+  const count = Object.values(hermesProfilesByInstance).reduce((sum, items) => sum + items.length, 0);
+  const hermesProvider = providerById("hermes");
+  if (hermesProvider && count > 0) {
+    hermesProvider.note = null;
+    hermesProvider.noteKey = "provider.hermes.loadedNote";
+    hermesProvider.noteParams = { count };
+  }
+}
+
+async function loadHermesProfiles(runtimeInstanceIds = null) {
+  const instances = (runtimeInstanceIds || availableRuntimeInstancesForProvider("hermes").map((instance) => instance.id))
+    .map(runtimeInstanceById)
+    .filter(Boolean)
+    .filter((instance) => instance.available);
+  if (!instances.length) return;
   try {
-    const profiles = await invoke("runtime_hermes_profiles");
-    if (Array.isArray(profiles) && profiles.length) {
-      applyHermesProfiles(profiles);
-      return;
+    let loaded = 0;
+    for (const instance of instances) {
+      const profiles = await invoke("runtime_hermes_profiles", { runtimeInstanceId: instance.id });
+      applyHermesProfilesForInstance(instance.id, profiles);
+      loaded += Array.isArray(profiles) ? profiles.length : 0;
     }
-    setAppNotice("未探测到可用的 Hermes profile，暂时保留默认入口。");
+    ensureCurrentTargetAgentExists();
+    renderProviders();
+    renderWorkspace();
+    if (!loaded) setAppNotice("未探测到可用的 Hermes profile。");
   } catch (error) {
     console.error(error);
     setAppNotice(`读取 Hermes profile 失败：${formatBackendError(error)}`, "error");
@@ -1300,12 +1669,19 @@ function createSession(firstTask) {
 
   const hermesProfile = hermesProfileMetaFromAgent(agent);
   sessionSeq += 1;
+  const targetName = targetDisplayName(agent);
   const session = {
     id: `session-${Date.now()}-${sessionSeq}`,
     providerId: provider.id,
     providerName: provider.name,
     agentId: agent.id,
-    agentName: `${provider.name} / ${displayAgentName(agent)}`,
+    agentName: targetName,
+    targetId: agent.id,
+    targetName,
+    runtimeInstanceId: agent.runtimeInstanceId || null,
+    runtimeLabel: agent.runtimeLabel || null,
+    runtimeHost: agent.runtimeHost || null,
+    runtimeCommand: agent.runtimeCommand || null,
     task: firstTask,
     state: 2,
     runtimeState: "live",
@@ -1688,8 +2064,7 @@ function renderWorkspaceStatus() {
   const availability = providerAvailability(provider.id);
   const availabilityLabel = providerAvailabilityLabel(availability.summary);
   workspaceStatus.innerHTML = `
-    <span>${t("workspace.currentTarget")}</span>
-    <strong class="workspace-status-target">${escapeHtml(provider.name)} / ${escapeHtml(displayAgentName(agent))}</strong>
+    <strong class="workspace-status-target">${escapeHtml(targetDisplayName(agent))}</strong>
     <span class="workspace-status-separator">·</span>
     <span class="state-pill workspace-state-pill ${stateClasses[statusState] || "state-idle"}">${escapeHtml(stateDisplayLabel(statusState))}</span>
     <span class="workspace-runtime-count">${escapeHtml(availabilityLabel)}</span>
@@ -2598,6 +2973,10 @@ function archivedSessionsFromHistory(entries) {
         providerName: entry.providerName || entry.provider_name,
         agentId: entry.agentId || entry.agent_id,
         agentName: entry.agentName || entry.agent_name,
+        runtimeInstanceId: entry.runtimeInstanceId || entry.runtime_instance_id || null,
+        runtimeLabel: entry.runtimeLabel || entry.runtime_label || null,
+        targetId: entry.targetId || entry.target_id || entry.agentId || entry.agent_id,
+        targetName: entry.targetName || entry.target_name || entry.agentName || entry.agent_name,
         acpSessionId: entry.acpSessionId || entry.acp_session_id,
         title: entry.task,
         summary: entry.summary,
@@ -2638,6 +3017,8 @@ function sessionListItems() {
       turnCount: session.turns.length,
       runtimeState: sessionRuntimeState(session),
       agentId: session.agentId,
+      runtimeInstanceId: session.runtimeInstanceId || null,
+      targetId: session.targetId || session.agentId,
       isInWorkspace: true,
       isRuntimeAttached: true,
     };
@@ -2788,12 +3169,13 @@ function ensureArchivedAgent(archived) {
       subtitle: "历史归档",
       note: "从历史归档恢复的只读会话。",
       state: 5,
+      isArchivedAgent: true,
     };
     provider.agents.push(agent);
   }
   if (provider.id === "hermes") {
     const hermesProfile = hermesProfileMetaFromArchived(archived);
-    const liveAgent = provider.agents.find((entry) =>
+    const liveAgent = [...runtimeTargets(), ...provider.agents].find((entry) =>
       entry.id === archived.agentId
       || (hermesProfile?.profileName && entry.profileName === hermesProfile.profileName)
       || (hermesProfile?.profileAlias && entry.profileAlias === hermesProfile.profileAlias)
@@ -2807,6 +3189,10 @@ function ensureArchivedAgent(archived) {
       agent.profilePath = liveAgent.profilePath || agent.profilePath || hermesProfile?.profilePath || null;
       agent.model = liveAgent.model || agent.model || hermesProfile?.profileModel || null;
       agent.gateway = liveAgent.gateway || agent.gateway || hermesProfile?.gateway || null;
+      agent.runtimeInstanceId = liveAgent.runtimeInstanceId || agent.runtimeInstanceId || null;
+      agent.runtimeLabel = liveAgent.runtimeLabel || agent.runtimeLabel || null;
+      agent.runtimeHost = liveAgent.runtimeHost || agent.runtimeHost || null;
+      agent.runtimeCommand = liveAgent.runtimeCommand || agent.runtimeCommand || null;
     } else if (hermesProfile) {
       agent.profileName = hermesProfile.profileName || agent.profileName || null;
       agent.alias = hermesProfile.profileAlias || agent.alias || null;
@@ -2835,6 +3221,10 @@ async function restoreArchivedSession(sessionId) {
     providerName: archived.providerName,
     agentId: archived.agentId,
     agentName: archived.agentName,
+    runtimeInstanceId: archived.runtimeInstanceId || null,
+    runtimeLabel: archived.runtimeLabel || null,
+    targetId: archived.targetId || archived.agentId,
+    targetName: archived.targetName || archived.agentName,
     task: archived.title,
     state: 5,
     turns: archived.turns,
@@ -2858,6 +3248,18 @@ async function restoreArchivedSession(sessionId) {
   restored.profilePath = restored.profilePath || restoredAgent.profilePath || restoredAgent.path || null;
   restored.profileModel = restored.profileModel || restoredAgent.model || null;
   restored.gateway = restored.gateway || restoredAgent.gateway || null;
+  restored.runtimeInstanceId = restored.runtimeInstanceId || restoredAgent.runtimeInstanceId || null;
+  restored.runtimeLabel = restored.runtimeLabel || restoredAgent.runtimeLabel || null;
+  restored.runtimeHost = restored.runtimeHost || restoredAgent.runtimeHost || null;
+  restored.runtimeCommand = restored.runtimeCommand || restoredAgent.runtimeCommand || null;
+  const restoredInstance = runtimeInstanceById(restored.runtimeInstanceId);
+  if (restoredInstance) {
+    restored.runtimeLabel = restored.runtimeLabel || restoredInstance.runtimeLabel || null;
+    restored.runtimeHost = restored.runtimeHost || runtimeHostForInstance(restoredInstance);
+    restored.runtimeCommand = restored.runtimeCommand || restoredInstance.command || null;
+  }
+  restored.targetId = restored.targetId || restored.agentId;
+  restored.targetName = restored.targetName || restored.agentName;
   if (!existing) sessions = [restored, ...sessions];
   stoppedSessionIds.delete(restored.id);
   saveCurrentTargetAgent(restored.agentId);
@@ -2891,6 +3293,8 @@ async function restoreArchivedSession(sessionId) {
       runtimeSessionId: restored.id,
       acpSessionId: restored.acpSessionId,
       cwd: null,
+      runtimeHost: restored.runtimeHost || null,
+      runtimeCommand: restored.runtimeCommand || null,
       profileExecutable: restored.profileExecutable || null,
     });
     restored.runtimeState = "live";
@@ -2905,6 +3309,8 @@ async function restoreArchivedSession(sessionId) {
         runtimeSessionId: restored.id,
         acpSessionId: restored.acpSessionId,
         cwd: null,
+        runtimeHost: restored.runtimeHost || null,
+        runtimeCommand: restored.runtimeCommand || null,
         profileExecutable: restored.profileExecutable || null,
       });
       restored.runtimeState = "live";
@@ -2957,6 +3363,10 @@ async function saveTurnToHistory(session, turn) {
       providerName: session.providerName,
       agentId: session.agentId,
       agentName: session.agentName,
+      runtimeInstanceId: session.runtimeInstanceId || null,
+      runtimeLabel: session.runtimeLabel || null,
+      targetId: session.targetId || session.agentId,
+      targetName: session.targetName || session.agentName,
       sessionId: session.id,
       acpSessionId: session.acpSessionId || null,
       task: turn.task,
@@ -3028,6 +3438,8 @@ async function startAcpSession(session, turn) {
       runtimeSessionId: session.id,
       prompt: turn.task,
       cwd: null,
+      runtimeHost: session.runtimeHost || null,
+      runtimeCommand: session.runtimeCommand || null,
       profileExecutable: session.profileExecutable || null,
     });
     if (deletedSessionIds.has(session.id) || stoppedSessionIds.has(session.id)) return;
@@ -3165,7 +3577,7 @@ setTimeout(() => {
 }, 0);
 setTimeout(() => {
   refreshRuntimeProbe().then(() => {
-    if (canSendToProvider("hermes")) void loadHermesProfiles();
+    if (availableRuntimeInstancesForProvider("hermes").length) void loadHermesProfiles();
   });
 }, 0);
 
