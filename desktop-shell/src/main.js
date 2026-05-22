@@ -1456,7 +1456,7 @@ function appendStreamEventToTurn(sessionId, event) {
       break;
   }
 
-  scheduleWorkspaceRender({ scrollSessionId: session.id }, STREAM_RENDER_INTERVAL_MS);
+  scheduleWorkspaceRender({ scrollSessionId: session.id, preserveDeckScroll: true }, STREAM_RENDER_INTERVAL_MS);
 }
 
 function appendErrorToTurn(sessionId, turnId, message) {
@@ -2302,6 +2302,9 @@ function requestDeleteConfirmation(sessionId) {
 function renderWorkspace(options = {}) {
   const scrollSessionId = options.scrollSessionId || null;
   const focusSessionId = options.focusSessionId || null;
+  const preserveDeckScroll = options.preserveDeckScroll === true;
+  const deckScrollLeft = sessionDeck.scrollLeft;
+  const deckScrollTop = sessionDeck.scrollTop;
   const activeBodies = [...sessionDeck.querySelectorAll(".session-card-body")].map((body) => ({
     sessionId: body.closest(".session-card")?.dataset.sessionId,
     shouldStickToBottom: body.scrollTop + body.clientHeight >= body.scrollHeight - 24,
@@ -2323,7 +2326,12 @@ function renderWorkspace(options = {}) {
     const activeCard = currentSessionId
       ? sessionDeck.querySelector(`.session-card[data-session-id="${currentSessionId}"]`)
       : null;
-    activeCard?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    if (!preserveDeckScroll) {
+      activeCard?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    } else {
+      sessionDeck.scrollLeft = deckScrollLeft;
+      sessionDeck.scrollTop = deckScrollTop;
+    }
     const focusCard = focusSessionId
       ? sessionDeck.querySelector(`.session-card[data-session-id="${focusSessionId}"]`)
       : null;
@@ -2344,6 +2352,10 @@ function renderWorkspace(options = {}) {
       const body = sessionDeck.querySelector(`.session-card[data-session-id="${sessionId}"] .session-card-body`);
       if (body) body.scrollTop = body.scrollHeight;
     });
+    if (preserveDeckScroll) {
+      sessionDeck.scrollLeft = deckScrollLeft;
+      sessionDeck.scrollTop = deckScrollTop;
+    }
   });
 }
 
