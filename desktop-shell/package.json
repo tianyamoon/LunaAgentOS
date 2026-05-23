@@ -9,6 +9,7 @@
     "test:identity": "node --test src/sessionIdentity.test.js",
     "test:stick": "node --test src/ui/stickToBottom.test.js",
     "test:lifecycle": "node --test src/state/sessionLifecycle.test.js",
+    "test:i18n": "node --test src/i18n/index.test.js",
     "test:all": "node --test \"src/**/*.test.js\"",
     "tauri": "tauri"
   },
