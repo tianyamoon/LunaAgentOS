@@ -1,43 +1,41 @@
-﻿<p align="center">
+<p align="center">
   <img src="./docs/assets/logo2.png" alt="LunaAgentOS" width="560" />
 </p>
 
 <h1 align="center">LunaAgentOS</h1>
 
-LunaAgentOS 是一个以协议为核心的异构 Coding Agent 操作层。
+<p align="center">
+  <a href="./README.md">English</a>
+</p>
 
-它以统一 JSON Contract、Runtime Adapter / Plugin Contract 和 Runtime Session Model 为基础。LunaAgentOS App 是协议的具象化控制台，也是官方推荐使用方式：选择目标、把任务送入真实 runtime、观察过程，并沉淀本地历史。
+LunaAgentOS 把真实的 Coding Agent runtime 放进同一个桌面工作台。
+
+当前它是一个 Windows 优先的应用，已经接入 Claude Code 和 Hermes：你可以选择目标，把任务发给真实 runtime，实时观察 thought 和 runtime 事件，并把本地会话历史留在一个地方。
 
 ![LunaAgentOS 桌面预览图](./docs/assets/lunaagentos-stage1-preview-cn.svg)
 
-## 远景
+## 为什么做
 
-Agent 会越来越强，也会越来越分散：
+Agent 会越来越强，但它们周围的工作空间仍然很割裂：
 
-- **入口分散**：CLI、TUI、IDE、Gateway、SDK 都会长期并存。
-- **过程可见性不一致**：有的 runtime 能看到 thought/tool/plan/usage，有的只给最终响应。
-- **历史割裂**：不同工具里的会话很难统一归档、恢复、对比和复盘。
+- 不同产品暴露不同入口：CLI、TUI、IDE、gateway、SDK 会长期共存。
+- 过程可见性不一致：有的 runtime 能持续流出 thought、tool、plan、usage，有的只有最终响应。
+- 会话历史分散在不同工具里，很难统一恢复、对比和复盘。
 
-LunaAgentOS 要做的是这些 Agent 之上的协议与控制层：
+LunaAgentOS 关注的是这些 runtime 之上的控制层。它把每个外部 Agent 视为 runtime entry，把 session card 做成统一承载输出、思考流、运行流、最终响应和本地历史的共享界面。
 
-> 把每个外部 Agent 当作 runtime entry，把会话卡片做成统一承载输出流、思考流、运行流、最终响应和本地历史的 Runtime Session Surface。
-
-长期方向是 adapter-driven operating layer：Protocol 和 Adapter 定义运行契约，Runtime Session Model 承载工作过程，App 把这套契约变成可使用的产品体验。
-
-## 当前能力
+## 当前能做什么
 
 | 模块 | 状态 | 说明 |
 |---|---:|---|
-| 产品定义 | 已明确 | Protocol / Adapter Contract / Runtime Session Model |
-| LunaAgentOS App | 已可用 | Tauri 2 + Rust Core + 前端工作台 |
+| LunaAgentOS App | 已可用 | Tauri 2 桌面应用，Rust Core + Web 工作台 |
 | Claude Code | 已接入 | 真实 runtime 入口 |
 | Hermes | 已接入 | Windows / WSL ACP runtime instance 与 profile |
-| Trae IDE | Bridge | IDE-first Adapter 路线 |
-| Runtime Session Card | 已可用 | 输出流、思考流、运行流、最终响应 |
-| 多会话工作台 | 已可用 | 当前发送目标、当前会话、活会话、归档会话和一致生命周期色彩 |
-| 本地历史 | 已可用 | JSON 历史、恢复、只读归档和错误态 |
-| 演示模式 | 已可用 | 顶部 `演示场景` 加载非持久化 demo |
-| Runtime 检测 | 已可用 | 区分 provider、runtime instance、target/profile |
+| Trae IDE | Bridge 路线 | IDE-first adapter 方向 |
+| Runtime Session Card | 已可用 | 输出流、思考流、运行流、最终响应同屏展示 |
+| 多会话工作台 | 已可用 | 当前发送目标、活会话、归档会话 |
+| 本地历史 | 已可用 | JSON 历史、恢复、只读归档 |
+| 演示模式 | 已可用 | 非持久化演示场景，适合理解产品和截图 |
 | 界面语言 | 已可用 | zh-CN / en-US 本地持久化切换 |
 
 ## 快速开始
@@ -51,9 +49,9 @@ LunaAgentOS 要做的是这些 Agent 之上的协议与控制层：
 - 如需 Claude 入口：本机可用的 Claude Code
 - 如需 Hermes 入口：WSL + Hermes
 
-Claude Code 和 Hermes 是可选外部 runtime。未安装或路径不同的机器上，入口会显示为 `未配置` 或 `不可用`。
+Claude Code 和 Hermes 都是可选的外部 runtime。就算没有安装，LunaAgentOS 也可以启动，只是对应入口会显示为未配置或不可用。
 
-### 运行 LunaAgentOS App
+### 运行应用
 
 ```powershell
 cd apps/desktop-shell
@@ -74,75 +72,63 @@ npm run tauri -- build --no-bundle
 apps/desktop-shell/src-tauri/target/release/desktop-shell.exe
 ```
 
-更详细的启动说明见：
-
-- [docs/getting-started.md](./docs/getting-started.md)
-- [apps/desktop-shell/README.md](./apps/desktop-shell/README.md)
-
-## 演示模式
-
-打开应用后点击顶部 **演示场景**，会加载一组非持久化 demo 数据：
-
-- Claude Code 与 Hermes 同时出现在中间工作台。
-- Hermes 卡片展示 thought/tool/usage/session update 等过程感。
-- Claude 卡片展示 Markdown 表格与代码块阅读效果。
-- 右侧会话列表展示 `活会话` 与 `归档会话` 两个生命周期分组。
-
-这个模式只用于截图和理解产品形态，不写入真实 runtime 历史。
+更详细的说明见：[docs/getting-started.zh-CN.md](./docs/getting-started.zh-CN.md)
 
 ## 产品边界
 
 LunaAgentOS 当前是：
 
-- **外部 Agent 之上的控制层**
-- **异构 runtime entry 的协议与 Adapter Contract**
-- **Runtime Session Card 工作台**
-- **协议的具象化控制台**
-- **走向调用流、协作工作台和控制平面的起点**
+- 现有 Agent runtime 之上的控制层
+- 面向异构入口的 runtime adapter / plugin contract
+- 以 Runtime Session Card 为中心的工作台
+- 用于观测、路由、恢复真实 session 的本地优先应用
 
-App 是当前官方推荐使用方式。新增 Agent 产品通过 Adapter Contract 接入，让产品体验保持一致，同时保留每个 runtime 的原生强项。
+LunaAgentOS 当前不是：
 
-## 三个首批入口
-
-### Claude Code
-
-代表高价值 coding workflow。
-
-### Hermes
-
-代表 WSL / ACP 接入验证，以及“让慢变得可见”的过程可见方向。
-
-### Trae IDE
-
-代表 IDE-first Agent 产品的 Bridge 接入路线。
+- Claude Code 或 Hermes 的替代品
+- 要把所有 Agent 内部机制强行做成一样
+- 现在就去做插件市场或商业平台
 
 ## 文档入口
 
-- [docs/README.md](./docs/README.md)：文档总入口
-- [docs/product-definition.md](./docs/product-definition.md)：产品定义、协议与 Adapter 方向
-- [docs/getting-started.md](./docs/getting-started.md)：快速开始
-- [docs/current-boundary.md](./docs/current-boundary.md)：当前产品边界
-- [docs/why-lunaagentos.md](./docs/why-lunaagentos.md)：为什么做
-- [docs/architecture-overview.md](./docs/architecture-overview.md)：架构总览
-- [docs/roadmap.md](./docs/roadmap.md)：路线图
-- [protocol/README.md](./protocol/README.md)：协议契约
-- [adapters/README.md](./adapters/README.md)：Adapter 入口
-- [apps/README.md](./apps/README.md)：App 入口
-- [docs/hermes-acp-profile-runtime.md](./docs/hermes-acp-profile-runtime.md)：Hermes ACP 接入说明
-- [docs/hermes-tui-direction.md](./docs/hermes-tui-direction.md)：Hermes 过程可见方向
-- [bridges/trae-ide/README.md](./bridges/trae-ide/README.md)：Trae IDE Bridge
+### 先看这些
+
+- [文档总览](./docs/README_CN.md)
+- [快速开始](./docs/getting-started.zh-CN.md)
+- [当前产品边界](./docs/current-boundary.zh-CN.md)
+- [贡献指南](./CONTRIBUTING.md)
+
+### 产品与架构
+
+- [产品定义（中文）](./docs/product-definition.zh-CN.md)
+- [为什么做 LunaAgentOS（中文）](./docs/why-lunaagentos.zh-CN.md)
+- [轻核心原则（中文）](./docs/light-core-principles.zh-CN.md)
+- [Architecture Overview](./docs/architecture-overview.md)
+- [Roadmap](./docs/roadmap.md)
+- [Protocol](./protocol/README.md)
+- [Adapters](./adapters/README.md)
+- [Apps](./apps/README.md)
+- [Hermes ACP Runtime](./docs/hermes-acp-profile-runtime.md)
+- [Trae IDE Bridge](./bridges/trae-ide/README.md)
+
+### 英文入口
+
+- [English README](./README.md)
+- [English docs index](./docs/README.md)
+
+## 许可证
+
+本项目采用 [Apache-2.0](./LICENSE) 许可证。
 
 ## 贡献
 
-当前最需要帮助的方向：
+当前最有价值的贡献方向：
 
 - Claude Code / Hermes runtime 稳定性
-- Hermes thought/tool/plan/usage 事件 UI
-- Runtime Session Card 视觉与可用性
+- Runtime Session Card 的可用性和可读性
+- Hermes thought / tool / plan / usage 事件体验
 - 本地历史、恢复和错误态验证
-- Trae IDE Bridge 设计与接入
+- Trae IDE bridge 设计与接入
 - 文档、截图和发布材料
 
-请先阅读：
-
-- [CONTRIBUTING.md](./CONTRIBUTING.md)
+开始前先看：[CONTRIBUTING.md](./CONTRIBUTING.md)

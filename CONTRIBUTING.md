@@ -1,158 +1,118 @@
-﻿# 贡献指南
+# 贡献指南
 
-LunaAgentOS 正在建设一个以协议为核心的异构 Coding Agent 操作层。当前重点是稳定 Adapter Contract、Runtime Session Model、LunaAgentOS App，以及 Claude Code / Hermes first-party runtime entries。
+LunaAgentOS 正在建设一个以协议为核心的异构 Coding Agent 控制层。当前最重要的工作，是让现有 runtime 接入稳定可信，让 Runtime Session 工作台足够好用，并把 adapter contract 逐步做实。
 
-## 当前产品边界
+## 开始前先确认
 
-- `Claude Code` 是真实外部入口。
-- `Hermes` 是真实外部入口。
-- `Trae IDE` 是 IDE-first adapter path 的 Bridge 目标。
-- LunaAgentOS App 是协议的具象化控制台和官方推荐使用方式。
-- 新增 Agent 通过 adapter/plugin 接入 LunaAgentOS。
-- 中间工作台的核心对象是 `Runtime Session Card`。
-- 左侧是入口舰队和配置区。
-- 右侧是活会话 / 归档会话列表和本地历史。
+在着手实现前，请先确认这三个前提：
 
-## 我们欢迎什么样的贡献
+1. 你理解 LunaAgentOS 是外部 Agent 之上的控制层，不是另一个底层 Agent。
+2. 你认可当前阶段优先稳定 Claude Code、Hermes 和 Runtime Session workspace。
+3. 你接受项目现在仍在快速迭代，文档、命名和边界会继续收敛。
 
-- Claude Code / Hermes runtime 稳定性。
-- Hermes thought / tool / plan / usage 事件 UI。
-- Runtime Session Card 视觉与可用性。
-- 本地历史、恢复、删除、错误态验证。
-- Trae IDE Bridge 设计与接入。
-- Runtime surface / Adapter 协议收敛。
-- Adapter manifest / capability model / unified JSON contract。
-- 文档、截图、Demo 和发布材料。
-- 测试与回归验证。
+## 本地开发
 
-## 当前优先方向
+### 基础要求
 
-### Runtime 稳定性
+- Windows
+- Node.js
+- Rust + MSVC 编译链
+- Tauri 2 相关依赖
 
-- Claude Code 会话路径稳定性。
-- Hermes WSL / ACP 路径稳定性。
-- runtime 退出、恢复、错误态、只读归档验证。
+可选 runtime：
 
-### Adapter Contract
+- Claude Code：用于验证 Claude entry
+- WSL + Hermes：用于验证 Hermes entry
 
-- 明确 adapter manifest 应该描述什么。
-- 明确不同 runtime surface 如何映射到统一 Runtime Session Event。
-- 强化 Claude Code / Hermes first-party adapter 表达。
-- 让新增 Agent 产品通过 Adapter Contract 接入。
+### 启动应用
 
-### 会话卡片体验
+```powershell
+cd apps/desktop-shell
+npm install
+npm run tauri -- dev
+```
 
-中间会话卡片是当前产品主角。最需要：
+### 构建轻量可执行文件
 
-- 更舒服的 Markdown / 代码 / 表格阅读。
-- 更清楚的 thought / runtime / final response 层级。
-- 更稳定的滚动、复制、全屏、只看最新等操作。
-- 更接近 Hermes TUI 的“活会话”过程感。
+```powershell
+cd apps/desktop-shell
+npm run tauri -- build --no-bundle
+```
 
-### Bridge 方案
+### 运行测试
 
-`Trae IDE` 代表 IDE-first Agent 产品的 Bridge 路径。
+```powershell
+cd apps/desktop-shell
+npm run test:all
+```
 
-## 协作原则
+常用的定向检查：
 
-### 中文优先
+- `npm run test:runtime`
+- `npm run test:history`
+- `npm run test:providers`
+- `npm run test:markdown`
+- `npm run lint:undef`
 
-项目文档默认中文优先。GitHub 首页保留英文可扫描摘要，中文文档承载更完整解释。
+如果你的改动影响某个明确模块，请至少运行对应测试；如果改动跨越多个工作流，优先补跑 `npm run test:all`。
 
-### 真实入口优先
+## 当前最欢迎的贡献
 
-左侧展示的是外部入口对象。Claude 内部 subagent / delegation 属于 Claude 自身机制。
+- Claude Code / Hermes runtime 稳定性
+- Runtime Session Card 的可用性与可读性
+- Hermes thought / tool / plan / usage 事件层级
+- 本地历史、恢复、删除、错误态验证
+- Trae IDE Bridge 设计与接入
+- Runtime surface / adapter contract 收敛
+- 文档、截图、demo 和发布材料
 
-### Runtime Session 优先
+## 改动时的项目判断
 
-中间卡片是 Runtime Session Surface。它要同时照顾：
+### 优先保持什么
 
-- Claude Code 的长 Markdown / 代码输出。
-- Hermes 的 thought / tool / plan / usage / state 过程事件。
+- **协议优先**：新增 runtime 能力尽量先落到 contract，而不是只写死在某个界面里。
+- **adapter 边界清晰**：runtime 特有逻辑尽量留在 adapter 一侧。
+- **Runtime Session 优先**：中间工作台始终围绕 session card 组织。
+- **真实入口优先**：Claude Code、Hermes、Trae IDE 都被视为真实外部入口，而不是 UI 装饰。
+- **轻核心**：控制层保持聚焦，不抢底层 runtime 已经做得好的事情。
 
-### Protocol / Adapter 优先
+### 当前不要急着做什么
 
-LunaAgentOS 的核心是统一协议、Adapter / Plugin Contract 和 Runtime Session Model。LunaAgentOS App 是这套协议的具象化控制台和官方推荐使用方式。
+- 一次性接入大量 Agent
+- 过早抽象商业化能力
+- 在控制层里重做 runtime 原生体验
+- 跳过 contract 直接堆特例逻辑
 
-### 保持轻核心
+## 提交建议
 
-当前优先级之外：
+### Issue
 
-- 一次性接入大量 Agent。
-- 重 GUI 平台。
-- 复杂商业功能。
-- 超出 Runtime Session workspace 的复杂调用流。
+提问题或提需求时，尽量说清楚：
 
-### 对外部 Agent 保持尊重
+- 你使用的入口：Claude Code / Hermes / Trae IDE
+- 运行环境：Windows、WSL、相关版本信息
+- 你期待的行为
+- 实际发生了什么
+- 是否能稳定复现
 
-LunaAgentOS 的目标是接入、观测、沉淀现有 Agent，并形成可扩展控制层。
+### Pull Request
 
-## 参与建议
+PR 最有帮助的内容是：
 
-### 如果你偏协议 / 后端
+- 改动解决了什么问题
+- 为什么这样改
+- 影响了哪些入口或工作流
+- 你跑过哪些验证命令
+- 如果是 UI 改动，附上截图或录屏
 
-适合参与：
+如果改动涉及协议、命名或边界，请在描述里把判断讲清楚，不要只贴实现细节。
 
-- Runtime 管理。
-- ACP 事件去噪与恢复策略。
-- Runtime surface 抽象。
-- 统一消息流。
-- 本地历史与会话恢复。
+## 文档语言
 
-### 如果你偏桌面端 / UI
+项目目前同时维护中英文入口：
 
-适合参与：
+- 根 README 提供中英文双入口
+- 英文文档优先承担公开介绍和对外扫描
+- 中文文档优先承载更完整的背景、解释和推进判断
 
-- 控制台布局。
-- Runtime Session Card。
-- 思考流 / 运行流 / 最终响应层级。
-- Markdown、代码块、表格、全屏阅读。
-- 截图 / Demo Mode / 发布视觉。
-
-### 如果你偏产品 / 研究
-
-适合参与：
-
-- Agent 接入设计。
-- Trae IDE Bridge 路线。
-- 产品路线与架构分析。
-- 文档与架构说明。
-
-## 优先模块
-
-### P0
-
-- Runtime Session Card 打磨。
-- Claude Code / Hermes runtime hardening。
-- Hermes 过程事件 UI。
-- 本地历史与恢复路径验证。
-- README / 截图 / 快速开始。
-
-### P1
-
-- `Trae IDE` Bridge。
-- 调用流设计。
-- 协作工作台。
-- 更清晰的控制平面边界。
-
-## 当前边界
-
-- 完全统一技术栈。
-- 锁死所有架构细节。
-- 支持所有 Agent。
-- 插件市场或商业化平台。
-
-当前更重要的是：
-
-- 保持方向一致。
-- 保持协议清晰。
-- 保持边界诚实。
-- 让 Claude Code + Hermes 的异构工作台稳定可信。
-
-## 交流标准
-
-如果你要参与，希望先确认 3 件事：
-
-1. 你理解 LunaAgentOS 是“控制层”，不是另一个底层 Agent。
-2. 你认可“协议优先、Adapter 优先、Runtime Session 优先”的推进方式。
-3. 你认可当前目标是稳定异构 runtime workspace，并逐步扩展到 Adapter ecosystem 和 control plane。
+如果你新增关键文档，优先保证至少有一种语言版本完整可读；如果它会出现在 GitHub 首页或 docs 首页，请尽量补齐对应语言入口。

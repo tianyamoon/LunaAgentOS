@@ -1,4 +1,4 @@
-﻿<p align="center">
+<p align="center">
   <img src="./docs/assets/logo2.png" alt="LunaAgentOS" width="560" />
 </p>
 
@@ -8,40 +8,34 @@
   <a href="./README_CN.md">中文说明</a>
 </p>
 
-LunaAgentOS is a protocol-centered operating layer for heterogeneous coding agents.
+LunaAgentOS puts real coding-agent runtimes into one desktop workspace.
 
-Its foundation is a unified JSON contract, a Runtime Adapter / Plugin Contract, and a Runtime Session Model. The LunaAgentOS App is the concrete protocol console and the official recommended product experience: choose a target, send work into a real runtime, watch the process, and keep local session history in one place.
+Today it works as a Windows-first app for Claude Code and Hermes: choose a runtime target, send work into a real session, watch thought and runtime events as they arrive, and keep local session history in one place.
 
 ![LunaAgentOS desktop preview](./docs/assets/lunaagentos-stage1-preview.svg)
 
-## Vision
+## Why it exists
 
-Coding agents are becoming powerful, but the human workspace around them is still fragmented:
+Coding agents are getting stronger, but the workspace around them is still fragmented:
 
-- **Entries are fragmented**: CLI, TUI, IDE, gateway, and SDK surfaces all coexist.
-- **Process visibility is uneven**: some runtimes expose thought/tool/plan/usage streams, while others only show final output.
-- **Session history is scattered**: useful work is hard to restore, compare, or review across tools.
+- Different products expose different surfaces: CLI, TUI, IDE, gateway, and SDK.
+- Process visibility is inconsistent: some runtimes stream thought, tool, plan, or usage events, while others only show a final answer.
+- Session history is scattered across tools and hard to restore, compare, or review.
 
-LunaAgentOS focuses on the layer above those runtimes:
+LunaAgentOS focuses on the layer above those runtimes. It treats each external agent as a runtime entry and makes the session card the shared surface for output, thought, runtime events, final response, and local history.
 
-> Treat each external agent as a runtime entry, and make the session card the shared surface for output, thought stream, runtime stream, final response, and local history.
-
-The long-term direction is an adapter-driven operating layer for heterogeneous agents: protocol and adapters define the operating contract, Runtime Session Model carries the work, and the App makes that contract usable.
-
-## What works now
+## What you can do today
 
 | Area | Status | Notes |
 |---|---:|---|
-| Product definition | Active | Protocol / Adapter Contract / Runtime Session Model |
-| LunaAgentOS App | Working | Tauri 2 + Rust core + web workspace |
+| LunaAgentOS App | Working | Tauri 2 desktop app with Rust core and web workspace |
 | Claude Code | Working | Real runtime entry |
 | Hermes | Working | Windows / WSL ACP runtime instances and profiles |
-| Trae IDE | Bridge | IDE-first adapter path |
-| Runtime Session Cards | Working | Output, thought stream, runtime stream, final response |
-| Multi-session workspace | Working | Current send target, current session, lifecycle-colored live and archived sessions |
-| Local history | Working | JSON session history with restore/read-only states |
-| Demo mode | Working | Non-persistent launch scene for screenshots and orientation |
-| Runtime detection | Working | Provider/runtime-instance/target-profile probing |
+| Trae IDE | Bridge path | IDE-first adapter direction |
+| Runtime Session Cards | Working | Output, thought, runtime, and final response in one surface |
+| Multi-session workspace | Working | Current send target, live sessions, archived sessions |
+| Local history | Working | JSON session history with restore and read-only states |
+| Demo mode | Working | Non-persistent launch scene for orientation and screenshots |
 | UI language | Working | zh-CN / en-US switch persisted locally |
 
 ## Quick start
@@ -50,14 +44,14 @@ The long-term direction is an adapter-driven operating layer for heterogeneous a
 
 - Windows
 - Node.js
-- Rust + MSVC toolchain
+- Rust with the MSVC toolchain
 - Tauri 2 dependencies
 - Claude Code installed if you want the Claude entry
-- WSL + Hermes installed if you want the Hermes entry
+- WSL and Hermes installed if you want the Hermes entry
 
-Claude Code and Hermes are external runtimes. LunaAgentOS can open without them; unavailable entries stay visible with a clear configuration state.
+Claude Code and Hermes are optional external runtimes. LunaAgentOS can open without them; unavailable entries remain visible with a clear configuration state.
 
-### Run the LunaAgentOS App
+### Run the app
 
 ```powershell
 cd apps/desktop-shell
@@ -65,7 +59,7 @@ npm install
 npm run tauri -- dev
 ```
 
-### Build the lightweight executable
+### Build a lightweight executable
 
 ```powershell
 cd apps/desktop-shell
@@ -78,55 +72,63 @@ Executable path:
 apps/desktop-shell/src-tauri/target/release/desktop-shell.exe
 ```
 
-For details, see [Getting Started](./docs/getting-started.md).
+More detail: [Getting Started](./docs/getting-started.md)
 
-## Demo mode
-
-Open the app and click **演示场景** in the top bar. It loads a non-persistent scene showing:
-
-- Claude Code and Hermes in the same workspace.
-- Live Runtime Session Cards.
-- Thought stream, runtime stream, Markdown output, and final response.
-- A right-side session list split into live and archived sections.
-
-The demo scene is for orientation and screenshots only. It does not write to real local history.
-
-## Product boundaries
+## Product boundary
 
 LunaAgentOS is:
 
-- **A control layer** above existing agents.
-- **A protocol and adapter contract** for heterogeneous runtime entries.
-- **A runtime-session workspace** centered on durable session cards.
-- **A concrete protocol console** for heterogeneous entries.
-- **A path toward agent collaboration and a broader control plane.**
+- A control layer above existing agent runtimes
+- A runtime adapter and plugin contract for heterogeneous entries
+- A Runtime Session workspace centered on durable session cards
+- A local-first app for observing, routing, and restoring real sessions
 
-The App is the official recommended way to use LunaAgentOS today. New agent products enter through the adapter contract so the product experience stays coherent while each runtime keeps its native strengths.
+LunaAgentOS is not:
+
+- A replacement for Claude Code or Hermes
+- A claim that every agent must look the same internally
+- A marketplace or broad commercial platform today
 
 ## Documentation
 
+### Start here
+
 - [Docs index](./docs/README.md)
-- [Product definition](./docs/product-definition.md)
 - [Getting Started](./docs/getting-started.md)
-- [Current product boundary](./docs/current-boundary.md)
+- [Current Product Boundary](./docs/current-boundary.md)
+- [Contributing](./CONTRIBUTING_EN.md)
+
+### Product and architecture
+
+- [Product Definition](./docs/product-definition.md)
 - [Why LunaAgentOS](./docs/why-lunaagentos.md)
-- [Architecture overview](./docs/architecture-overview.md)
+- [Light-Core Principles](./docs/light-core-principles.md)
+- [Architecture Overview](./docs/architecture-overview.md)
 - [Roadmap](./docs/roadmap.md)
 - [Protocol](./protocol/README.md)
 - [Adapters](./adapters/README.md)
 - [Apps](./apps/README.md)
-- [Hermes ACP runtime](./docs/hermes-acp-profile-runtime.md)
-- [Trae IDE bridge](./bridges/trae-ide/README.md)
+- [Hermes ACP Runtime](./docs/hermes-acp-profile-runtime.md)
+- [Trae IDE Bridge](./bridges/trae-ide/README.md)
+
+### Chinese docs
+
+- [Chinese README](./README_CN.md)
+- [Chinese docs index](./docs/README_CN.md)
+
+## License
+
+This project is licensed under [Apache-2.0](./LICENSE).
 
 ## Contributing
 
-The most useful contributions now are:
+The highest-value contributions right now are:
 
-- Runtime hardening for Claude Code and Hermes.
-- Hermes event UX: thought/tool/plan/usage stream presentation.
-- Runtime Session Card usability.
-- Local history, restore, and error-state validation.
-- Trae IDE bridge design and integration.
-- Documentation, screenshots, and release polish.
+- Runtime hardening for Claude Code and Hermes
+- Runtime Session Card usability and readability
+- Hermes thought, tool, plan, and usage event UX
+- Local history, restore, and error-state validation
+- Trae IDE bridge design and integration
+- Documentation, screenshots, and release polish
 
-Read [CONTRIBUTING.md](./CONTRIBUTING.md) before starting.
+Read [CONTRIBUTING_EN.md](./CONTRIBUTING_EN.md) before starting.

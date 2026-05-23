@@ -1,76 +1,48 @@
-# LunaAgentOS 轻核心原则
+# Light-Core Principles
 
-LunaAgentOS 的核心原则是：**统一入口，状态可见，协议清晰，App 保持轻量。**
+LunaAgentOS is strongest when the control layer stays focused.
 
-## 为什么保持轻核心
+These principles explain what "light core" means in practice.
 
-Coding Agent 本身已经承担模型调用、工具执行、文件操作和长任务运行。LunaAgentOS 不替代底层 Agent，也不把第一层产品做成重平台。
+## 1. Keep runtime-specific logic at the edge
 
-LunaAgentOS 聚焦上层控制：
+Different runtimes expose different surfaces and behaviors. LunaAgentOS should normalize what it needs for coordination, history, and visibility, while leaving runtime-native behavior in adapters whenever possible.
 
-- 连接外部 Agent。
-- 展示 runtime availability。
-- 发送任务到明确 target。
-- 观察 output、thought、tool、plan、usage 和 state。
-- 保存本地 history。
-- 支持 session restore 和错误态。
+## 2. Make the human workspace coherent
 
-## 当前轻核心
+The product should help a human operator understand:
 
-当前产品核心由四部分组成：
+- which runtime they are using
+- what session is active
+- what the runtime is currently doing
+- what history can be restored later
 
-```text
-Protocol
-  -> Adapter Contract
-  -> Runtime Session Model
-  -> LunaAgentOS App
-```
+The goal is not more chrome. The goal is less confusion.
 
-这些部分共同提供：
+## 3. Preserve native strengths
 
-- Agent Fleet。
-- 当前发送目标。
-- Runtime Session Cards。
-- 活会话 / 归档会话。
-- 本地 JSON history。
-- Runtime detection。
-- first-party Claude Code 和 Hermes entries。
-- Trae IDE bridge entry。
+Claude Code, Hermes, and future entries should still feel like themselves. LunaAgentOS should make them easier to observe and operate together, not flatten them into one generic response surface.
 
-## 做什么
+## 4. Treat process visibility as product value
 
-LunaAgentOS 当前优先做：
+Thought, tool, plan, usage, and state events are not debug leftovers. When exposed responsibly, they are part of the product value of a control layer.
 
-- 统一 runtime entry。
-- 清晰 provider/runtime/profile 状态。
-- 可观察 Runtime Session Card。
-- 稳定本地 history 和 restore。
-- Adapter manifest、capability 和 normalized event contract。
-- Claude Code / Hermes runtime hardening。
-- Trae IDE bridge path。
+## 5. Prefer durable sessions over disposable prompts
 
-## 不做什么
+LunaAgentOS is organized around Runtime Sessions, not around isolated send-and-forget requests. History, restore behavior, and session identity are part of the core product shape.
 
-LunaAgentOS 当前不把重心放在：
+## 6. Grow the contract before the platform story
 
-- 重云端平台。
-- 企业治理后台。
-- 一次性接入所有 Agent。
-- 插件市场。
-- 复杂商业化工作流。
+The extension model only becomes real after the contract is stable enough to support new runtimes without constant bespoke changes.
 
-这些能力属于更后面的控制平面阶段。当前轻核心先保证真实 runtime entry、清晰 session surface 和稳定 adapter boundary。
+That means the project should first strengthen:
 
-## 设计标准
+- adapter manifests
+- normalized runtime events
+- capability modeling
+- local history and restore behavior
+- workspace routing semantics
 
-一个新能力进入 LunaAgentOS 时，需要满足：
+## 7. Stay honest about current scope
 
-- 能通过 Adapter Contract 表达。
-- 能进入 Runtime Session Model。
-- 能被 App 清晰展示。
-- 不破坏外部 Agent 的原生优势。
-- 不把 runtime-specific 逻辑泄漏到通用 UI。
-
-## 结论
-
-轻核心让 LunaAgentOS 在保持可运行、可理解、可扩展的同时，为未来的 adapter ecosystem、collaboration workspace 和 control plane 留出空间。
+The light core stays credible when the project is explicit about what is ready now, what is still directional, and what belongs to a later layer.

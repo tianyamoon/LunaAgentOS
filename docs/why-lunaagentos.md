@@ -1,76 +1,72 @@
-# 为什么做 LunaAgentOS
+# Why LunaAgentOS
 
-## Agent 需要统一控制层
+## The problem
 
-Coding Agent 正在进入多个形态：
+Coding agents are expanding into multiple product shapes:
 
-- CLI Agent
-- TUI Agent
-- IDE Agent
-- Gateway / 服务型 Agent
-- SDK / 可编程 Agent
+- CLI agents
+- TUI agents
+- IDE agents
+- gateway or service-style agents
+- SDK-first programmable agents
 
-这些 Agent 的能力越来越强，但入口、协议、运行状态、历史和权限模型仍然分散。LunaAgentOS 解决的是这些 Agent 之上的统一控制问题。
+Their capabilities keep improving, but the human workspace around them is still fragmented. Entry points, visibility, history, and routing are split across products.
 
-## LunaAgentOS 的定位
+## The project answer
 
-LunaAgentOS 是一个以协议为核心的异构 Coding Agent 操作层。
+LunaAgentOS answers that fragmentation with a control layer above the runtimes.
 
-它提供：
+It aims to provide:
 
-- **统一入口**：把不同 Agent 产品呈现为可选择、可配置、可观察的 runtime entries。
-- **统一协议**：用 Adapter Contract 描述 runtime surface、capability、target/profile 和 session behavior。
-- **统一会话模型**：用 Runtime Session Model 承载 output、thought、runtime events、final response、history 和 restore state。
-- **统一工作台**：用 LunaAgentOS App 把协议变成可运行、可观察、可恢复的产品体验。
+- A unified entry surface for heterogeneous agent products
+- A shared adapter contract for runtime surfaces, targets, and capabilities
+- A Runtime Session model that can hold output, thought, runtime events, final response, history, and restore state
+- A desktop app that turns those ideas into a working workspace
 
-## 当前已经具备的基础
+## Why protocol matters
 
-LunaAgentOS 当前包含：
+Without a stable protocol, every new integration becomes a custom UI path.
 
-- 可运行的 Tauri 桌面 App。
-- Claude Code first-party adapter entry。
-- Hermes Windows / WSL ACP runtime instances and profiles。
-- Trae IDE bridge entry。
-- Agent Fleet、当前发送目标和 provider/runtime/profile 状态。
-- Runtime Session Cards。
-- 活会话 / 归档会话列表。
-- 本地 JSON history、恢复和错误态。
-- 协议、adapter、core、app 的清晰仓库边界。
-
-## 为什么协议是核心
-
-统一协议让 LunaAgentOS 可以把不同产品映射到同一个操作模型：
+The protocol lets LunaAgentOS map different products into one operating model:
 
 ```text
 agent product
   -> adapter manifest
   -> adapter implementation
   -> normalized Runtime Session events
-  -> App workspace
+  -> app workspace
 ```
 
-这个模型让 LunaAgentOS 可以持续接入新的 Agent 产品，同时保持 App 体验一致。
+That is the difference between a one-off integration and a system that can grow.
 
-## First-party adapters 的作用
+## Why first-party adapters matter
 
-Claude Code 和 Hermes 是当前 first-party adapters：
+Claude Code and Hermes are the first practical tests of the model.
 
-- Claude Code 验证长文本、Markdown、代码输出和 resumable coding sessions。
-- Hermes 验证 profile identity、WSL routing、ACP events、thought/tool/plan/usage stream 和过程可见体验。
+- Claude Code tests long-form coding output, markdown-heavy sessions, and resumable work
+- Hermes tests WSL routing, ACP updates, profile identity, and high-visibility process events
+- Trae IDE keeps the IDE-first bridge path honest
 
-Trae IDE 代表 IDE-first bridge path，用于把 IDE-native Agent 产品纳入同一个 Adapter Contract。
+Together they force the contract to deal with real runtime behavior instead of idealized examples.
 
-## 未来方向
+## What this project is trying to preserve
 
-LunaAgentOS 的未来方向是成为异构 Agent 的控制平面：
+LunaAgentOS is not trying to erase the differences between products.
 
-- 更稳定的 Adapter Host。
-- 更清晰的 Capability Model。
-- 更强的 Runtime Session replay、restore 和 observation。
-- 可选择内容并发送到其他 entry 或 session 的 call flow。
-- 多 Agent 协作工作台。
-- tools、models、skills、MCP resources、permissions 和 routing 的统一能力层。
+It is trying to preserve three things at once:
 
-## 结论
+- The native strengths of each runtime
+- A coherent workspace for the human operator
+- A stable boundary for adding more agent products later
 
-LunaAgentOS 值得做，因为 Agent 产品会持续增加，用户需要一个稳定、开放、可扩展的控制层来统一入口、过程、历史和协作。
+## Near-term direction
+
+The near-term goal is not maximum breadth. It is credibility:
+
+- keep the current app reliable
+- improve the Runtime Session workspace
+- make the adapter boundary more explicit
+- strengthen local history and restore behavior
+- make agent-to-agent routing visible when that layer lands
+
+If that foundation is strong, LunaAgentOS can grow into a broader control plane without becoming another thin chat wrapper.
