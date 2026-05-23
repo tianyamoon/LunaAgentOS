@@ -11,6 +11,7 @@
     "test:lifecycle": "node --test src/state/sessionLifecycle.test.js",
     "test:i18n": "node --test src/i18n/index.test.js",
     "test:markdown": "node --test src/markdown/normalize.test.js src/markdown/escape.test.js",
+    "test:demo": "node --test src/launchDemo/index.test.js",
     "test:all": "node --test \"src/**/*.test.js\"",
     "tauri": "tauri"
   },
