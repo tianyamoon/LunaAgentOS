@@ -70,6 +70,10 @@ import {
   runtimeTargets as runtimeTargetsRaw,
   targetsForRuntimeInstance as targetsForRuntimeInstanceRaw,
 } from "./providers/runtimeView.js";
+import {
+  applyEventsToTurn,
+  applyStreamEventToTurn,
+} from "./runtime/streamEvents.js";
 
 const { invoke } = window.__TAURI__.core;
 const listenRuntimeEvent = window.__TAURI__?.event?.listen?.bind(window.__TAURI__.event);
@@ -1134,122 +1138,6 @@ function hermesProfileMetaFromArchived(archived) {
   return archived?.hermesProfile || archived?.turns?.find((turn) => turn.meta?.hermesProfile)?.meta?.hermesProfile || null;
 }
 
-function sessionSectionsFromEvents(events) {
-  const sections = {
-    thoughts: [],
-    outputs: [],
-    finalResponse: "",
-    logs: [],
-  };
-  let thoughtText = "";
-  let outputText = "";
-
-  events.forEach((event) => {
-    const content = eventContentText(event);
-    if (!content) return;
-
-    if (event.type === "thought") {
-      thoughtText += content;
-      return;
-    }
-
-    if (event.type === "response") {
-      outputText += content;
-      sections.finalResponse = outputText;
-      return;
-    }
-
-    if (event.type === "state" && event.state === 5) {
-      if (!sections.finalResponse) {
-        sections.finalResponse = content;
-      } else if (content.trim() === sections.finalResponse.trim()) {
-        return;
-      } else {
-        sections.logs.push(content);
-      }
-      return;
-    }
-
-    if (event.type === "state" && (event.state === 0 || event.state === 1 || event.state === 2)) {
-      return;
-    }
-
-    sections.logs.push(content);
-  });
-
-  if (thoughtText.trim()) {
-    sections.thoughts.push(thoughtText.trim());
-  }
-  if (outputText.trim()) {
-    sections.outputs.push(outputText.trim());
-    sections.finalResponse = outputText.trim();
-  }
-
-  return sections;
-}
-
-function eventContentText(event) {
-  const content = event.payload?.content;
-  if (typeof content === "string") return content;
-  if (!content) return eventLogText(event);
-  if (Array.isArray(content)) {
-    return content
-      .map(contentPartText)
-      .filter(Boolean)
-      .join("\n");
-  }
-  if (typeof content === "object") {
-    return contentPartText(content) || eventLogText(event);
-  }
-  return String(content);
-}
-
-function contentPartText(part) {
-  if (!part) return "";
-  if (typeof part === "string") return part;
-  if (typeof part === "number" || typeof part === "boolean") return String(part);
-  if (Array.isArray(part)) return part.map(contentPartText).filter(Boolean).join("\n");
-  if (typeof part === "object") {
-    if (typeof part.text === "string") return part.text;
-    if (typeof part.content === "string") return part.content;
-    if (Array.isArray(part.content)) return part.content.map(contentPartText).filter(Boolean).join("\n");
-    if (typeof part.input === "string") return part.input;
-    if (typeof part.output === "string") return part.output;
-  }
-  return "";
-}
-
-function eventLogText(event) {
-  if (event.type === "tool") {
-    const title = event.payload?.title || event.payload?.kind || event.payload?.id || "工具调用";
-    const status = event.payload?.status ? `：${event.payload.status}` : "";
-    const content = contentPartText(event.payload?.content);
-    return [title, status, content ? `\n${content}` : ""].join("").trim();
-  }
-  if (event.type === "plan") {
-    const entries = event.payload?.entries;
-    if (!Array.isArray(entries) || !entries.length) return "运行时更新了执行计划。";
-    const lines = entries.map((entry, index) => {
-      const title = entry.title || entry.content || entry.task || entry.description || `步骤 ${index + 1}`;
-      const status = entry.status || entry.state || "";
-      return `${status ? `[${status}] ` : ""}${title}`;
-    });
-    return ["运行时更新了执行计划：", ...lines].join("\n");
-  }
-  if (event.type === "usage") {
-    const input = event.payload?.inputTokens ?? event.payload?.input_tokens ?? event.payload?.promptTokens;
-    const output = event.payload?.outputTokens ?? event.payload?.output_tokens ?? event.payload?.completionTokens;
-    const total = event.payload?.totalTokens ?? event.payload?.total_tokens;
-    const parts = [
-      input != null ? `输入 ${input}` : "",
-      output != null ? `输出 ${output}` : "",
-      total != null ? `总计 ${total}` : "",
-    ].filter(Boolean);
-    return parts.length ? `用量更新：${parts.join(" · ")}` : "";
-  }
-  return "";
-}
-
 function createSession(firstTask) {
   const agent = currentTargetAgent();
   const provider = currentTargetProvider();
@@ -1428,19 +1316,7 @@ function updateTurnFromEvents(sessionId, turnId, events) {
   const turn = session.turns.find((item) => item.id === turnId);
   if (!turn) return null;
 
-  const sections = sessionSectionsFromEvents(events);
-  const lastState = [...events].reverse().find((event) => typeof event.state === "number");
-  const acpSessionEvent = [...events].reverse().find((event) => event.payload?.sessionId);
-
-  turn.thoughts = sections.thoughts;
-  turn.outputs = sections.outputs;
-  turn.finalResponse = sections.finalResponse;
-  turn.logs = sections.logs;
-  turn.state = lastState ? lastState.state : turn.state;
-  if (acpSessionEvent?.payload?.sessionId) session.acpSessionId = acpSessionEvent.payload.sessionId;
-  session.task = turn.task;
-  session.state = turn.state;
-  session.activeTurnId = turn.id;
+  applyEventsToTurn(session, turn, events);
   renderWorkspace();
   renderHistory();
   return turn;
@@ -1453,50 +1329,7 @@ function appendStreamEventToTurn(sessionId, event) {
   const turn = session.turns.find((item) => item.id === session.activeTurnId) || session.turns.at(-1);
   if (!turn) return;
 
-  const content = eventContentText(event);
-  if (typeof event.state === "number") {
-    turn.state = event.state;
-    session.state = event.state;
-  }
-
-  if (event.payload?.sessionId) {
-    session.acpSessionId = event.payload.sessionId;
-  }
-
-  switch (event.type) {
-    case "thought":
-      if (content) {
-        if (!turn.thoughts.length) turn.thoughts.push(content);
-        else turn.thoughts[turn.thoughts.length - 1] += content;
-      }
-      break;
-    case "response":
-      if (content) {
-        if (!turn.outputs.length) turn.outputs.push(content);
-        else turn.outputs[turn.outputs.length - 1] += content;
-        turn.finalResponse = turn.outputs.join("");
-      }
-      break;
-    case "tool":
-      turn.logs = [
-        content || `${event.payload?.title || event.payload?.kind || "tool"} ${event.payload?.status || ""}`.trim(),
-        ...turn.logs,
-      ];
-      break;
-    case "plan":
-      turn.logs = [content || "计划已更新。", ...turn.logs];
-      break;
-    case "usage":
-      if (content) turn.logs = [content, ...turn.logs];
-      break;
-    case "state":
-      if (content) turn.logs = [content, ...turn.logs];
-      break;
-    default:
-      if (content) turn.logs = [content, ...turn.logs];
-      break;
-  }
-
+  applyStreamEventToTurn(session, turn, event);
   scheduleSessionCardRender(session.id);
 }
 
