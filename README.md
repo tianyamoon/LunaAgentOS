@@ -32,7 +32,7 @@ The long-term direction is an adapter-driven operating layer for heterogeneous a
 | Hermes | Working | Windows / WSL ACP runtime instances and profiles |
 | Trae IDE | Planned | Bridge target for the IDE-first adapter path |
 | Runtime Session Cards | Working | Output, thought stream, runtime stream, final response |
-| Multi-session workspace | Working | Current send target, current session, live sessions, archived sessions |
+| Multi-session workspace | Working | Current send target, current session, lifecycle-colored live and archived sessions |
 | Local history | Working | JSON session history with restore/read-only states |
 | Demo mode | Working | Non-persistent launch scene for screenshots and orientation |
 | Runtime detection | Working | Provider/runtime-instance/target-profile probing |

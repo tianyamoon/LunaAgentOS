@@ -2010,24 +2010,26 @@ textarea {
 .history-signal {
   display: inline-block;
   flex: 0 0 auto;
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 999px;
+  background: rgba(99, 82, 63, 0.34);
   box-shadow: 0 0 0 3px rgba(99, 82, 63, 0.06);
 }
 
 .history-signal.signal-workspace {
-  background: #dc2626;
-  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+  background: var(--done);
+  box-shadow: 0 0 0 3px rgba(33, 122, 76, 0.09);
 }
 
 .history-signal.signal-active {
-  background: #f59e0b;
-  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.14);
+  background: var(--done);
+  box-shadow: 0 0 0 3px rgba(33, 122, 76, 0.09);
 }
 
 .history-signal.signal-archive {
   background: rgba(116, 100, 83, 0.48);
+  box-shadow: 0 0 0 3px rgba(99, 82, 63, 0.06);
 }
 
 .history-state-pill {

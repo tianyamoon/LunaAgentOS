@@ -30,7 +30,7 @@ LunaAgentOS 要做的是这些 Agent 之上的协议与控制层：
 | Hermes | 已接入 | Windows / WSL ACP runtime instance 与 profile |
 | Trae IDE | 规划中 | 保留 Bridge 路线，不伪装已接入 |
 | Runtime Session Card | 已可用 | 输出流、思考流、运行流、最终响应 |
-| 多会话工作台 | 已可用 | 当前发送目标、当前会话、活会话、归档会话 |
+| 多会话工作台 | 已可用 | 当前发送目标、当前会话、活会话、归档会话和一致生命周期色彩 |
 | 本地历史 | 已可用 | JSON 历史、恢复、只读归档和错误态 |
 | 演示模式 | 已可用 | 顶部 `演示场景` 加载非持久化 demo |
 | Runtime 检测 | 已可用 | 区分 provider、runtime instance、target/profile |
