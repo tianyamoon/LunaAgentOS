@@ -69,6 +69,7 @@ import {
   runtimeInstanceById as runtimeInstanceByIdRaw,
   runtimeInstancesForProvider as runtimeInstancesForProviderRaw,
   runtimeTargets as runtimeTargetsRaw,
+  sortTargetsForAgentList,
   targetsForRuntimeInstance as targetsForRuntimeInstanceRaw,
 } from "./providers/runtimeView.js";
 import {
@@ -188,6 +189,7 @@ const CURRENT_TARGET_AGENT_KEY = "lunaagentos.currentTargetId";
 const CURRENT_SESSION_KEY = "lunaagentos.currentSessionId";
 const SEND_MODE_KEY = "lunaagentos.sendMode";
 const FONT_SCALE_KEY = "lunaagentos.fontScale";
+const PROVIDER_COLLAPSE_KEY = "lunaagentos.providerCollapsedIds";
 const HISTORY_SCHEMA_VERSION = 3;
 const DEFAULT_HERMES_AGENT_ID = "hermes-wsl:profile:default";
 const SEND_MODE_OPTIONS = ["enter", "ctrlEnter"];
@@ -217,6 +219,19 @@ function stateDisplayLabel(state) {
 
 function runtimeStateLabel(runtimeState) {
   return runtimeStateKeys[runtimeState] ? t(runtimeStateKeys[runtimeState]) : runtimeStateLabels[runtimeState] || runtimeState;
+}
+
+function readCollapsedProviderIds() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(PROVIDER_COLLAPSE_KEY) || "[]");
+    return Array.isArray(stored) ? stored.filter(Boolean) : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function saveCollapsedProviderIds() {
+  localStorage.setItem(PROVIDER_COLLAPSE_KEY, JSON.stringify([...collapsedProviderIds]));
 }
 
 const agentList = document.getElementById("agentList");
@@ -269,6 +284,7 @@ const sessionListSectionOpenState = {
   active: true,
   archive: true,
 };
+const collapsedProviderIds = new Set(readCollapsedProviderIds());
 let scheduledWorkspaceRenderOptions = null;
 let scheduledWorkspaceRenderFrame = 0;
 let scheduledWorkspaceRenderTimer = 0;
@@ -328,6 +344,26 @@ function targetDisplayName(target) {
   return target.name || providerName || displayAgentName(target);
 }
 
+function isStoppedHermesTarget(target) {
+  if (!target || target.providerId !== "hermes") return false;
+  if (target.gateway) return target.gateway !== "running";
+  return target.state === 9;
+}
+
+function isTargetSendable(target) {
+  if (!target) return false;
+  if (isStoppedHermesTarget(target)) return false;
+  return target.available !== false;
+}
+
+function targetSendBlockNotice(target) {
+  const targetName = targetDisplayName(target) || displayAgentName(target) || "Hermes";
+  if (isStoppedHermesTarget(target)) {
+    return t("composer.blockStoppedTarget", { target: targetName });
+  }
+  return t("composer.blockUnavailableTarget", { target: targetName });
+}
+
 function sessionIdentityTitle(session) {
   return normalizedSessionTitle(session, providers);
 }
@@ -380,7 +416,7 @@ function targetsForProvider(providerId) {
   if (!instances.length) {
     return providerById(providerId)?.agents || [];
   }
-  return instances.flatMap(targetsForRuntimeInstance);
+  return sortTargetsForAgentList(instances.flatMap(targetsForRuntimeInstance));
 }
 
 function compactTargetSubtitle(target) {
@@ -413,16 +449,19 @@ function providerRuntimeMiniLabel(instances) {
 }
 
 function ensureCurrentTargetAgentExists() {
-  if (currentTargetAgentId && agentById(currentTargetAgentId)) return;
-  if (agentById(DEFAULT_HERMES_AGENT_ID)) {
+  const currentTarget = agentById(currentTargetAgentId);
+  if (currentTarget && isTargetSendable(currentTarget)) return;
+  const defaultHermesTarget = agentById(DEFAULT_HERMES_AGENT_ID);
+  if (defaultHermesTarget && isTargetSendable(defaultHermesTarget)) {
     saveCurrentTargetAgent(DEFAULT_HERMES_AGENT_ID);
     return;
   }
-  if (agentById("claude-win")) {
+  const claudeWinTarget = agentById("claude-win");
+  if (claudeWinTarget && isTargetSendable(claudeWinTarget)) {
     saveCurrentTargetAgent("claude-win");
     return;
   }
-  const fallbackAgent = allAgents()[0];
+  const fallbackAgent = allAgents().find(isTargetSendable);
   if (fallbackAgent) {
     saveCurrentTargetAgent(fallbackAgent.id);
   } else {
@@ -519,7 +558,7 @@ function providerAvailability(providerId) {
 function canSendToProvider(providerId) {
   if (providerId === "trae") return false;
   if (runtimeInstancesForProvider(providerId).length) {
-    return runtimeTargets().some((target) => target.providerId === providerId);
+    return runtimeTargets().some((target) => target.providerId === providerId && isTargetSendable(target));
   }
   return providerAvailability(providerId).available;
 }
@@ -757,6 +796,17 @@ function saveCurrentSession(sessionId) {
   localStorage.removeItem(CURRENT_SESSION_KEY);
 }
 
+function toggleProviderCollapsed(providerId) {
+  if (!providerId) return;
+  if (collapsedProviderIds.has(providerId)) {
+    collapsedProviderIds.delete(providerId);
+  } else {
+    collapsedProviderIds.add(providerId);
+  }
+  saveCollapsedProviderIds();
+  renderProviders();
+}
+
 function markSessionActive(sessionId) {
   sessionsStore.markActive(sessionId);
 }
@@ -976,6 +1026,13 @@ function latestActiveSessionForAgent(agentId) {
 }
 
 function setCurrentTargetAgent(agentId) {
+  const target = agentById(agentId);
+  if (!isTargetSendable(target)) {
+    setAppNotice(targetSendBlockNotice(target), "error");
+    renderProviders();
+    updateActionLabels();
+    return;
+  }
   const previousSession = currentSession();
   saveCurrentTargetAgent(agentId);
   const agent = currentTargetAgent();
@@ -1009,12 +1066,17 @@ function runtimeConnectionNote(provider, instances) {
 }
 
 function renderRuntimeTarget(target) {
-  const selected = target.id === currentTargetAgentId;
+  const sendable = isTargetSendable(target);
+  const selected = sendable && target.id === currentTargetAgentId;
   const subtitle = compactTargetSubtitle(target) || target.subtitle || "";
   const name = displayAgentName(target);
   const shouldShowRuntimeLabel = target.runtimeLabel && !name.includes(target.runtimeLabel);
+  const entryClass = selected ? "is-main-agent" : sendable ? "is-selectable" : "is-unavailable";
+  const disabledAttrs = sendable
+    ? ""
+    : ` aria-disabled="true" title="${escapeHtml(targetSendBlockNotice(target))}"`;
   return `
-    <div class="agent-entry ${selected ? "is-main-agent" : "is-selectable"}" data-agent-id="${target.id}">
+    <div class="agent-entry ${entryClass}" data-agent-id="${target.id}" data-sendable="${String(sendable)}"${disabledAttrs}>
       <div class="agent-entry-top">
         <strong>${escapeHtml(name)}</strong>
         ${shouldShowRuntimeLabel ? `<span class="target-runtime-label">${escapeHtml(target.runtimeLabel)}</span>` : ""}
@@ -1049,27 +1111,41 @@ function renderProviders() {
       : provider.id === "trae"
         ? "is-planned"
         : "is-unavailable";
+    const collapsed = collapsedProviderIds.has(provider.id);
+    const collapseLabel = collapsed
+      ? t("provider.expand", { provider: provider.name })
+      : t("provider.collapse", { provider: provider.name });
+    group.classList.toggle("is-collapsed", collapsed);
 
     group.innerHTML = `
       <div class="provider-header">
-        <div class="provider-heading">
-          <div class="provider-title-row">
-            <strong>${provider.name}</strong>
-            <span class="provider-status-dot ${statusClass}" title="${escapeHtml(availabilityLabel)}" aria-label="${escapeHtml(availabilityLabel)}"></span>
+        <button type="button" class="provider-collapse-btn" data-provider-id="${provider.id}" aria-expanded="${collapsed ? "false" : "true"}" aria-controls="provider-targets-${provider.id}" aria-label="${escapeHtml(collapseLabel)}" title="${escapeHtml(collapseLabel)}">
+          <span class="provider-collapse-caret" aria-hidden="true">▸</span>
+          <div class="provider-heading">
+            <div class="provider-title-row">
+              <strong>${provider.name}</strong>
+              <span class="provider-status-dot ${statusClass}" title="${escapeHtml(availabilityLabel)}" aria-label="${escapeHtml(availabilityLabel)}"></span>
+            </div>
+            <div class="provider-meta-row">
+              <span class="provider-count-badge">${escapeHtml(metaLabel)}</span>
+              ${runtimeMiniLabel ? `<span class="provider-runtime-mini">${escapeHtml(runtimeMiniLabel)}</span>` : ""}
+            </div>
           </div>
-          <div class="provider-meta-row">
-            <span class="provider-count-badge">${escapeHtml(metaLabel)}</span>
-            ${runtimeMiniLabel ? `<span class="provider-runtime-mini">${escapeHtml(runtimeMiniLabel)}</span>` : ""}
-          </div>
-        </div>
+        </button>
         <button type="button" class="mini-btn ghost-btn provider-manage-btn provider-connection-icon-btn" data-provider-id="${provider.id}" title="${t("common.manage")}" aria-label="${t("common.manage")}">⚙</button>
       </div>
-      <div class="provider-targets">
+      <div class="provider-targets" id="provider-targets-${provider.id}" ${collapsed ? "hidden" : ""}>
         ${targetMarkup || `<div class="runtime-instance-empty">${emptyLabel}</div>`}
       </div>
     `;
 
     agentList.appendChild(group);
+  });
+
+  agentList.querySelectorAll(".provider-collapse-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+      toggleProviderCollapsed(button.dataset.providerId);
+    });
   });
 
   agentList.querySelectorAll(".provider-manage-btn").forEach((button) => {
@@ -1079,10 +1155,16 @@ function renderProviders() {
     });
   });
 
-  agentList.querySelectorAll(".agent-entry.is-selectable").forEach((entry) => {
+  agentList.querySelectorAll(".agent-entry").forEach((entry) => {
     entry.addEventListener("click", () => {
       const agentId = entry.dataset.agentId;
       if (!agentId) return;
+      const target = agentById(agentId);
+      if (entry.dataset.sendable === "false" || !isTargetSendable(target)) {
+        setAppNotice(targetSendBlockNotice(target), "error");
+        return;
+      }
+      if (target.id === currentTargetAgentId) return;
       setCurrentTargetAgent(agentId);
     });
   });
@@ -2777,6 +2859,11 @@ function startSessionFromPrompt(forceNewSession = false) {
   const provider = currentTargetProvider();
   if (!agent || !provider) {
     setAppNotice("请先在左侧设定当前发送目标，再发送任务。", "error");
+    return;
+  }
+  if (!isTargetSendable(agent)) {
+    setAppNotice(targetSendBlockNotice(agent), "error");
+    promptBox.focus();
     return;
   }
   if (!canSendToProvider(provider.id)) {

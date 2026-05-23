@@ -7,6 +7,7 @@ import {
   providerRuntimeLabel,
   targetsForRuntimeInstance,
   runtimeTargets,
+  sortTargetsForAgentList,
 } from "./runtimeView.js";
 
 const claudeProvider = { id: "claude", name: "Claude Code" };
@@ -112,6 +113,43 @@ test("targetsForRuntimeInstance: hermes expands hermes profiles", () => {
   assert.equal(targets[0].profileExecutable, null); // default has alias=null
   assert.equal(targets[1].profileExecutable, "ailearing");
   assert.equal(targets[0].isDefault, true);
+});
+
+test("targetsForRuntimeInstance: stopped hermes profiles stay visible but unavailable", () => {
+  const profiles = [
+    {
+      id: "hermes-wsl:profile:stopped",
+      displayName: "stopped",
+      profileName: "stopped",
+      alias: "stopped",
+      model: "qwen3.6-plus",
+      gateway: "stopped",
+      state: 9,
+    },
+  ];
+  const targets = targetsForRuntimeInstance(hermesWsl, {
+    providers: [hermesProvider],
+    runtimeInstances: [hermesWsl],
+    hermesProfilesByInstance: { "hermes-wsl": profiles },
+  });
+  assert.equal(targets.length, 1);
+  assert.equal(targets[0].gateway, "stopped");
+  assert.equal(targets[0].available, false);
+});
+
+test("sortTargetsForAgentList moves stopped targets to the bottom stably", () => {
+  const targets = sortTargetsForAgentList([
+    { id: "stopped-a", providerId: "hermes", gateway: "stopped", available: false },
+    { id: "running-a", providerId: "hermes", gateway: "running", available: true },
+    { id: "running-b", providerId: "claude", available: true },
+    { id: "stopped-b", providerId: "hermes", state: 9, available: false },
+  ]);
+  assert.deepEqual(targets.map((target) => target.id), [
+    "running-a",
+    "running-b",
+    "stopped-a",
+    "stopped-b",
+  ]);
 });
 
 test("targetsForRuntimeInstance: unavailable instances yield no targets", () => {

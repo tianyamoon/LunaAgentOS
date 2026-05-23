@@ -400,6 +400,10 @@ body.is-launch-demo .layout {
   gap: 7px;
 }
 
+.provider-group.is-collapsed {
+  padding-bottom: 10px;
+}
+
 .provider-header,
 .provider-title-row,
 .agent-entry-top,
@@ -655,6 +659,42 @@ body.is-launch-demo .layout {
   min-width: 0;
 }
 
+.provider-collapse-btn {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.provider-collapse-btn:focus-visible {
+  outline: 2px solid rgba(217, 108, 58, 0.34);
+  outline-offset: 4px;
+  border-radius: 10px;
+}
+
+.provider-collapse-caret {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  margin-right: 4px;
+  color: rgba(122, 103, 85, 0.62);
+  font-size: 0.76rem;
+  transition: transform 120ms ease;
+}
+
+.provider-collapse-btn[aria-expanded="true"] .provider-collapse-caret {
+  transform: rotate(90deg);
+}
+
 .provider-meta-row {
   display: flex;
   align-items: center;
@@ -780,6 +820,10 @@ body.is-launch-demo .layout {
   gap: 7px;
 }
 
+.provider-targets[hidden] {
+  display: none;
+}
+
 .target-runtime-label {
   flex: 0 0 auto;
   color: rgba(122, 103, 85, 0.58);
@@ -842,6 +886,18 @@ body.is-launch-demo .layout {
 .agent-entry.is-selectable:hover {
   border-color: rgba(217, 108, 58, 0.16);
   background: rgba(255, 255, 255, 0.78);
+}
+
+.agent-entry.is-unavailable {
+  cursor: not-allowed;
+  opacity: 0.62;
+  border-color: rgba(130, 96, 70, 0.08);
+  background: rgba(255, 255, 255, 0.34);
+}
+
+.agent-entry.is-unavailable:hover {
+  border-color: rgba(177, 72, 72, 0.18);
+  background: rgba(255, 245, 245, 0.5);
 }
 
 .agent-entry.is-main-agent {
