@@ -16,10 +16,13 @@
     "test:history": "node --test src/history/entries.test.js src/history/payload.test.js",
     "test:providers": "node --test src/providers/runtimeView.test.js",
     "test:all": "node --test \"src/**/*.test.js\"",
+    "lint:undef": "node scripts/find-undef.mjs",
     "tauri": "tauri"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
+    "acorn": "^8.16.0",
+    "acorn-walk": "^8.3.5",
     "vite": "^8.0.13"
   },
   "dependencies": {

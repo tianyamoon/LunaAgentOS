@@ -1,11 +1,15 @@
 ﻿import {
+  closeStreamingMarkdown,
   escapeHtml,
-  renderMermaidDiagrams,
-  renderRichText,
+  hasMarkdownTable,
+  isMarkdownTable,
+  normalizeLooseMarkdownTables,
+  normalizeRuntimeMarkdown,
   renderCodeFence,
   renderInlineMarkdown,
   renderMarkdownTable,
-  isMarkdownTable,
+  renderMermaidDiagrams,
+  renderRichText,
 } from "./markdown/index.js";
 import {
   hermesProfileNameFromAgentId,
@@ -2942,7 +2946,7 @@ function startSessionFromPrompt(forceNewSession = false) {
     return;
   }
 
-  void startFallbackSession(session, turn, provider.id);
+  void runFallbackSession(session, turn);
 }
 
 providerManagerBtn?.addEventListener("click", () => {
