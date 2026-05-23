@@ -1788,6 +1788,18 @@ textarea {
   resize: none;
   min-height: 84px;
   background: rgba(255, 255, 255, 0.8);
+  transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+}
+
+.composer.is-current-session-mode textarea {
+  border-color: rgba(217, 108, 58, 0.34);
+  box-shadow: 0 0 0 1px rgba(217, 108, 58, 0.08);
+}
+
+.composer.is-new-session-mode textarea {
+  border-color: rgba(191, 74, 74, 0.72);
+  background: rgba(255, 248, 244, 0.92);
+  box-shadow: 0 0 0 2px rgba(191, 74, 74, 0.1), 0 10px 28px rgba(191, 74, 74, 0.06);
 }
 
 .history-empty {

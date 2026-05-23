@@ -229,6 +229,7 @@ const sessionStickRegistry = createStickToBottomRegistry({
 const historyList = document.getElementById("historyList");
 const appNotice = document.getElementById("appNotice");
 const promptBox = document.getElementById("promptBox");
+const composer = promptBox?.closest(".composer");
 const newSessionToggle = document.getElementById("newSessionToggle");
 const sendBtn = document.getElementById("sendBtn");
 const sendModeBtn = document.getElementById("sendModeBtn");
@@ -670,18 +671,22 @@ function openConfirmDialog({ title, message, confirmLabel = "删除", onConfirm 
 }
 
 function updateActionLabels() {
+  const composingNewSession = isComposingNewSession();
   sendBtn.textContent = isLaunchDemoScene ? t("composer.demo") : t("composer.send");
   sendBtn.disabled = isLaunchDemoScene;
   newSessionToggle.disabled = isLaunchDemoScene;
-  newSessionToggle.classList.toggle("is-active", sendAsNewSession);
-  newSessionToggle.setAttribute("aria-pressed", String(sendAsNewSession));
+  newSessionToggle.classList.toggle("is-active", composingNewSession);
+  newSessionToggle.setAttribute("aria-pressed", String(composingNewSession));
+  composer?.classList.toggle("is-new-session-mode", !isLaunchDemoScene && composingNewSession);
+  composer?.classList.toggle("is-current-session-mode", !isLaunchDemoScene && !composingNewSession);
   if (demoSceneBtn) demoSceneBtn.textContent = isLaunchDemoScene ? t("topbar.clearDemo") : t("topbar.demo");
+  updatePromptPlaceholder();
 }
 
 function updatePromptPlaceholder() {
-  const agent = currentTargetAgent();
-  promptBox.placeholder = agent
-    ? t("composer.placeholderTarget", { target: targetDisplayName(agent) })
+  const target = currentComposerTargetLabel();
+  promptBox.placeholder = target
+    ? t(isComposingNewSession() ? "composer.placeholderNewSession" : "composer.placeholderCurrentSession", { target })
     : t("composer.placeholderNoTarget");
 }
 
@@ -742,6 +747,27 @@ function clearCurrentSessionIf(sessionId) {
 
 function currentSession() {
   return sessionsStore.getSession(sessionsStore.getCurrentSessionId());
+}
+
+function isComposingNewSession() {
+  return sendAsNewSession || !currentSession();
+}
+
+function currentComposerTargetLabel() {
+  const session = currentSession();
+  if (session && !isComposingNewSession()) {
+    return sessionIdentityTitle(normalizeWorkspaceSession(session));
+  }
+  const agent = currentTargetAgent();
+  return agent ? targetDisplayName(agent) : "";
+}
+
+function currentSessionSendBlockReason(session, agent) {
+  if (!session) return "";
+  if (agent && session.agentId !== agent.id) return t("composer.blockInactiveSession");
+  if (!activeSessionIds.has(session.id)) return t("composer.blockInactiveSession");
+  if (canSendToSession(session)) return "";
+  return t("composer.blockInactiveSession");
 }
 
 function currentFontScaleOption() {
@@ -925,16 +951,24 @@ function latestActiveSessionForAgent(agentId) {
 }
 
 function setCurrentTargetAgent(agentId) {
+  const previousSession = currentSession();
   saveCurrentTargetAgent(agentId);
   const agent = currentTargetAgent();
   const provider = currentTargetProvider();
-  updatePromptPlaceholder();
+  if (previousSession && previousSession.agentId !== agentId) {
+    saveCurrentSession(null);
+    sendAsNewSession = true;
+  } else if (!currentSession()) {
+    sendAsNewSession = true;
+  }
+  updateActionLabels();
   if (agent && provider) {
     renderWorkspaceStatus();
     setAppNotice(`已切换到 ${targetDisplayName(agent)}。`);
   }
   renderProviders();
   renderWorkspace();
+  renderHistory();
 }
 
 function runtimeConnectionNote(provider, instances) {
@@ -1307,7 +1341,7 @@ function getOrCreateActiveSession(task, forceNew = false) {
   const existing = !forceNew ? currentSession() : null;
   if (existing && existing.agentId !== agent.id) return createSession(task);
   if (existing && !activeSessionIds.has(existing.id)) return createSession(task);
-  return existing && canSendToSession(existing) ? existing : createSession(task);
+  return existing || createSession(task);
 }
 
 function updateTurnFromEvents(sessionId, turnId, events) {
@@ -1918,7 +1952,9 @@ function activateWorkspaceSession(sessionId, options = {}) {
   if (!session) return;
   saveCurrentTargetAgent(session.agentId);
   saveCurrentSession(session.id);
+  sendAsNewSession = false;
   if (canSendToSession(session)) markSessionActive(session.id);
+  updateActionLabels();
   renderProviders();
   renderWorkspace({ focusSessionId: options.focusWorkspace ? session.id : null });
   renderHistory({ scrollSessionId: session.id });
@@ -1927,7 +1963,7 @@ function activateWorkspaceSession(sessionId, options = {}) {
     ? `当前工作 session 已切换到：${session.task}`
     : runtimeState === "restoring"
       ? "已定位到正在重连的会话，请稍等。"
-      : "已切换到只读会话；继续发送会创建新的 live 会话或需要先恢复。");
+      : "已切换到只读会话；继续发送会被阻止，请先恢复或在左侧选择入口另开会话。");
 }
 
 async function shutdownRuntimeSession(session) {
@@ -2714,9 +2750,18 @@ function startSessionFromPrompt(forceNewSession = false) {
     return;
   }
 
-  const session = getOrCreateActiveSession(task, forceNewSession);
+  const selectedSession = currentSession();
+  const composingNewSession = forceNewSession || isComposingNewSession();
+  const blockReason = !composingNewSession ? currentSessionSendBlockReason(selectedSession, agent) : "";
+  if (blockReason) {
+    setAppNotice(blockReason, "error");
+    promptBox.focus();
+    return;
+  }
+
+  const session = getOrCreateActiveSession(task, composingNewSession);
   if (!session) return;
-  if (forceNewSession) saveCurrentSession(null);
+  saveCurrentSession(session.id);
   stoppedSessionIds.delete(session.id);
   const turn = createTurn(session, task);
   promptBox.value = "";
@@ -2776,7 +2821,14 @@ document.addEventListener("keydown", (event) => {
 });
 
 newSessionToggle.addEventListener("click", () => {
-  sendAsNewSession = !sendAsNewSession;
+  if (currentSession()) {
+    saveCurrentSession(null);
+    sendAsNewSession = true;
+    renderWorkspace();
+    renderHistory();
+  } else {
+    sendAsNewSession = !sendAsNewSession;
+  }
   updateActionLabels();
 });
 
