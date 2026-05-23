@@ -1,0 +1,39 @@
+{
+  "$schema": "../../../protocol/schemas/adapter-manifest.schema.json",
+  "schemaVersion": "0.1.0-draft",
+  "id": "trae-ide",
+  "displayName": "Trae IDE",
+  "kind": "first_party",
+  "status": "planned",
+  "entryRole": "bridge",
+  "description": "Trae IDE is the first-party bridge direction for IDE-first agent products.",
+  "surfaces": [
+    {
+      "kind": "ide_bridge",
+      "status": "planned",
+      "hosts": ["windows"],
+      "notes": "The App keeps Trae IDE visible as a bridge target while the native bridge contract is defined."
+    }
+  ],
+  "targets": [
+    {
+      "id": "trae-ide-bridge",
+      "label": "Trae IDE Bridge",
+      "kind": "bridge",
+      "runtimeSurface": "ide_bridge",
+      "status": "planned"
+    }
+  ],
+  "capabilities": {
+    "runtimeSession": false,
+    "streamingEvents": false,
+    "resume": false,
+    "loadSession": false,
+    "profiles": false,
+    "tools": false,
+    "models": false,
+    "skills": false,
+    "mcp": false,
+    "permissions": false
+  }
+}

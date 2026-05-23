@@ -1,14 +1,14 @@
 ﻿# Current Product Boundary
 
-LunaAgentOS is currently a protocol-centered control layer with a working desktop reference app for heterogeneous coding-agent runtime sessions.
+LunaAgentOS is a protocol-centered control layer with a working App for heterogeneous coding-agent runtime sessions.
 
 ## What LunaAgentOS is
 
-- **A control layer above existing agents**: it connects to external runtimes instead of replacing them.
-- **A Runtime Adapter / Plugin contract direction**: new agent products should eventually enter through adapters rather than app-specific code changes.
+- **A control layer above existing agents**: it connects to external runtimes and keeps their native strengths visible.
+- **A Runtime Adapter / Plugin contract direction**: new agent products enter through adapters and normalized runtime events.
 - **A Runtime Session workspace**: the central object is a session card, not a chat bubble list.
 - **A neutral console**: Claude Code, Hermes, and future IDE agents are modeled as external entries.
-- **A local-first reference app**: the desktop shell proves the protocol and session model, but it is not the product soul.
+- **A local-first App**: the App is the protocol's concrete control console and official recommended use path.
 
 ## What works now
 
@@ -22,14 +22,12 @@ LunaAgentOS is currently a protocol-centered control layer with a working deskto
 - Demo mode shows the intended Claude + Hermes workspace without writing real history.
 - The product definition now treats protocol, adapters, and Runtime Session Model as the architecture guide for future refactors.
 
-## What LunaAgentOS is not
+## Current scope
 
-- It is not a replacement for Claude Code, Hermes, or Trae IDE.
-- It is not a fake multi-agent system made from internal roles.
-- It is not a normal chatbot container.
-- It is not a desktop-shell-centered project where adapters are just internal UI configuration.
-- It is not a full orchestration platform yet.
-- It is not a plugin market or commercial platform.
+- LunaAgentOS controls and observes external runtimes through adapters.
+- LunaAgentOS keeps Claude Code, Hermes, and Trae IDE as external product entries.
+- LunaAgentOS organizes work around Runtime Session Cards.
+- LunaAgentOS grows adapter capability, runtime routing, and collaboration flow before marketplace or commercial-platform features.
 
 ## Modeling rules
 
@@ -41,11 +39,11 @@ The left fleet represents external entry objects:
 - Hermes
 - Trae IDE bridge target
 
-Claude internal subagents or delegation workers are treated as Claude's own internal mechanism, not as independent LunaAgentOS entries.
+Claude internal subagents or delegation workers remain part of Claude's own internal mechanism.
 
 ### Adapter boundary
 
-Claude Code and Hermes are first-party adapters that validate the contract. They are not the definition of LunaAgentOS itself.
+Claude Code and Hermes are first-party adapters that validate the contract.
 
 The long-term rule is:
 
@@ -53,13 +51,13 @@ The long-term rule is:
 new agent product -> adapter manifest + adapter implementation -> LunaAgentOS unified JSON contract
 ```
 
-Adding a new agent product should move toward adapter/plugin installation, not editing the desktop app.
+Adding a new agent product follows adapter/plugin installation and normalized Runtime Session events.
 
 ### Current send target
 
-The current send target only answers: “where does the next user input go by default?”
+The current send target answers: “where does the next user input go by default?”
 
-It does not mean the whole system has only one agent, and it does not replace the active session workspace.
+The active session workspace remains the center of multi-session work.
 
 ### Runtime Session Cards
 
@@ -74,7 +72,7 @@ A session card is the shared surface for:
 
 ## Next direction
 
-The next product layer is not “more fake agents.” It is targetable collaboration:
+The next product layer is targetable collaboration:
 
 - Send selected session content to another entry.
 - Send selected content to another existing session.

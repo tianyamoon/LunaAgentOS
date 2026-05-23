@@ -1,0 +1,40 @@
+{
+  "$schema": "../schemas/adapter-manifest.schema.json",
+  "schemaVersion": "0.1.0-draft",
+  "id": "claude-code",
+  "displayName": "Claude Code",
+  "kind": "first_party",
+  "status": "active",
+  "entryRole": "runtime",
+  "description": "First-party adapter for Claude Code as a high-value coding runtime.",
+  "surfaces": [
+    {
+      "kind": "acp_stdio",
+      "status": "active",
+      "command": "claude",
+      "hosts": ["windows", "wsl"],
+      "notes": "Current App integration drives Claude Code through the ACP runtime path."
+    }
+  ],
+  "targets": [
+    {
+      "id": "claude-code",
+      "label": "Claude Code",
+      "kind": "runtime",
+      "runtimeSurface": "acp_stdio",
+      "status": "active"
+    }
+  ],
+  "capabilities": {
+    "runtimeSession": true,
+    "streamingEvents": true,
+    "resume": true,
+    "loadSession": true,
+    "profiles": false,
+    "tools": true,
+    "models": true,
+    "skills": false,
+    "mcp": true,
+    "permissions": true
+  }
+}

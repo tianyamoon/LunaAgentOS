@@ -1,23 +1,23 @@
 # 为什么做 LunaAgentOS
 
-## 不是因为没有 Agent
+## Agent 越来越强，控制层仍然稀缺
 
-今天的问题不是“找不到 Agent”。
+今天的关键问题是 Agent 入口、协议和过程状态正在快速分散。
 
 真正的问题是：
 
 - Agent 越来越多
 - 协议越来越碎
 - 工具越来越强
-- 但控制层几乎没有统一标准
+- 控制层几乎没有统一标准
 
 结果就是：
 
 - 每个 Agent 都能干活
-- 但多个 Agent 很难被统一编排
+- 多个 Agent 很难被统一编排
 - 人类也很难真正掌控全局
 
-## LunaAgentOS 想解决的不是单点能力
+## LunaAgentOS 解决上层控制问题
 
 LunaAgentOS 想解决的是更上层的问题：
 
@@ -28,15 +28,15 @@ LunaAgentOS 想解决的是更上层的问题：
 
 一句话：
 
-LunaAgentOS 不做“更强的某一个 Agent”，而做“多个 Agent 之上的控制层”。
+LunaAgentOS 做多个 Agent 之上的控制层。
 
 ## 为什么这件事值得做
 
 ### 1. 市场已经证明“统一接入”有需求
 
-已经有产品在做多 Agent 或多 Provider 的统一入口，这说明方向不是伪需求。
+已经有产品在做多 Agent 或多 Provider 的统一入口，这说明统一接入是明确需求。
 
-### 2. 但“接入”本身不是终局
+### 2. 接入之后是控制层
 
 真正更有价值的是：
 
@@ -51,7 +51,7 @@ LunaAgentOS 不做“更强的某一个 Agent”，而做“多个 Agent 之上�
 模型会变，Provider 会变，CLI 会变。  
 但“如何统一掌控多个 Agent”这个问题，会长期存在。
 
-## 为什么第一版不是为了完成功能
+## 第一版为了建立可信起点
 
 第一版真正的意义是：
 
@@ -60,11 +60,11 @@ LunaAgentOS 不做“更强的某一个 Agent”，而做“多个 Agent 之上�
 - 建立骨架
 - 证明方向
 
-如果第一版不能让别人愿意加入，那它就还不是一个真正的项目起点。
+第一版要让贡献者看到清晰目标、可信骨架和可运行入口。
 
 ## 为什么选“强大 / 通用 / 免费”三家样板
 
-因为我们不是在选三个最像的技术目标，而是在选三个最能代表产品价值的位置：
+因为这三个技术目标代表不同产品价值位置：
 
 - `Claude Code`：强大
 - `Hermes`：通用
@@ -92,21 +92,21 @@ LunaAgentOS 不做“更强的某一个 Agent”，而做“多个 Agent 之上�
 - 可扩展 Adapter
 - 统一 UI 与控制逻辑
 
-## 为什么 App 不是灵魂
+## App 与协议内核
 
-桌面壳很重要，因为它让协议和 runtime session 变得可见、可验证、可使用。
+App 很重要，因为它让协议和 runtime session 变得可见、可验证、可使用。
 
-但 LunaAgentOS 的灵魂不是某一个 App，而是：
+LunaAgentOS 的灵魂是：
 
 - 统一 JSON Contract
 - Runtime Adapter / Plugin Contract
 - Runtime Session Model
 - tools / models / skills / MCP 等共用能力层
 
-真正的目标是：未来出现新的 Agent 产品时，不需要修改 LunaAgentOS core 或 app，而是通过 adapter manifest 和 adapter implementation 接入。
+真正的目标是：未来出现新的 Agent 产品时，通过 adapter manifest 和 adapter implementation 接入 LunaAgentOS。
 
-Claude Code 和 Hermes 是 first-party adapters，是样板和验证路径，不是 LunaAgentOS 的产品定义本身。
+Claude Code 和 Hermes 是 first-party adapters，是样板和验证路径。
 
 ## 结论
 
-LunaAgentOS 值得做，不是因为世界上缺一个 Agent，而是因为世界上缺一个真正可扩展的 Agent 控制层。
+LunaAgentOS 值得做，因为世界需要一个真正可扩展的 Agent 控制层。

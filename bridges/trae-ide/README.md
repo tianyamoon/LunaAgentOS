@@ -8,9 +8,9 @@ Trae represents the IDE-first entry type. LunaAgentOS keeps it visible because h
 
 ## Current boundary
 
-Trae IDE is not presented as a native runtime entry yet.
+Trae IDE is the bridge target for the IDE-first adapter path.
 
-LunaAgentOS should not create a fake stdio adapter or fake manifest just to make the fleet look symmetrical. The integration should stay honest: Trae belongs to the bridge path until there is a real bridge surface.
+The integration stays on the bridge path until the IDE runtime surface is defined.
 
 ## Bridge options
 

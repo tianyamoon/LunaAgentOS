@@ -2,14 +2,14 @@
 
 LunaAgentOS is a protocol-centered control layer above external coding-agent runtimes.
 
-It does not rewrite the agents. It defines a unified adapter contract and Runtime Session Model, connects to external runtimes through adapters, observes their sessions, normalizes their process visibility, and lets apps render active and archived work.
+It defines a unified adapter contract and Runtime Session Model, connects to external runtimes through adapters, observes their sessions, normalizes their process visibility, and lets the App render active and archived work.
 
 ## Layers
 
 ```text
 ┌──────────────────────────────────────────────┐
-│                    Apps                      │
-│       Desktop Shell / future consoles         │
+│               LunaAgentOS App                │
+│        Protocol console and workspace         │
 ├──────────────────────────────────────────────┤
 │             Runtime Session Model            │
 │       Session / Turn / Event / History        │
@@ -41,13 +41,13 @@ The contract should cover:
 - Normalized event stream.
 - Tools, models, skills, MCP resources, permissions, routing metadata, and history.
 
-Adding a new agent product should move toward installing an adapter manifest plus adapter implementation, not editing app-specific switch statements.
+Adding a new agent product follows the adapter path: manifest, adapter implementation, normalized runtime events, and App rendering.
 
-## Apps
+## App
 
-Apps consume the normalized state produced by the protocol/core layer.
+The App is the protocol's concrete control console and the official recommended way to use LunaAgentOS today.
 
-The current app is `desktop-shell/`, which provides:
+The current app is [`apps/desktop-shell/`](../apps/desktop-shell/), which provides:
 
 - Native Tauri window.
 - Agent Fleet and configuration.
@@ -55,7 +55,7 @@ The current app is `desktop-shell/`, which provides:
 - Live sessions and archived sessions.
 - Local history and restore actions.
 
-The desktop shell is a reference app and proof surface. It is not the product soul.
+The App renders normalized sessions and capabilities while adapters keep runtime-specific logic behind the protocol contract.
 
 ## Adapter Host / Core
 
@@ -92,7 +92,7 @@ Claude Code represents a high-value coding runtime. LunaAgentOS should model it 
 
 ### Hermes
 
-Hermes represents profile-based runtime entries and process visibility. Its ACP updates can expose thought, message, tool, plan, and usage events. LunaAgentOS should model it as a first-party adapter, not as product identity.
+Hermes represents profile-based runtime entries and process visibility. Its ACP updates can expose thought, message, tool, plan, and usage events. LunaAgentOS models it as a first-party adapter.
 
 ### Trae IDE
 
@@ -100,4 +100,4 @@ Trae IDE is a bridge target and future adapter direction. LunaAgentOS keeps it v
 
 ## Direction
 
-The architecture is designed to stay light at the control layer and let external agents remain powerful at the runtime layer. The next architecture work should follow [Product Definition](./product-definition.md): protocol first, adapter/plugin second, Runtime Session Model third, apps last.
+The architecture keeps the control layer light and lets external agents remain powerful at the runtime layer. The next architecture work follows [Product Definition](./product-definition.md): protocol defines the contract, adapters connect external agent products, Runtime Session Model carries the work, and the App makes the system usable.

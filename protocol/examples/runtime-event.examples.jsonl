@@ -1,0 +1,4 @@
+{"type":"state","timestamp":"2026-05-23T00:00:00.000Z","source":"adapter","state":"live","visibility":"diagnostic","payload":{"message":"runtime session started"}}
+{"type":"thought","timestamp":"2026-05-23T00:00:01.000Z","source":"runtime","content":"Inspecting project context.","visibility":"secondary","payload":{}}
+{"type":"tool","timestamp":"2026-05-23T00:00:02.000Z","source":"runtime","content":"read_file docs/product-definition.md","visibility":"diagnostic","payload":{"tool":"read_file"}}
+{"type":"response","timestamp":"2026-05-23T00:00:03.000Z","source":"runtime","content":"Implemented the requested change.","visibility":"primary","payload":{"stopReason":"end_turn"}}

@@ -53,7 +53,7 @@ export function buildLaunchDemoSessions() {
     ],
     "## Launch screenshot checklist\n\n| Surface | What it proves | Status |\n|---|---|---|\n| Agent Fleet | Claude Code and Hermes are real external entries | Ready |\n| Runtime Session Card | Output, thought stream, runtime stream, and final response live together | Ready |\n| Session List | Live sessions and archived sessions have separate lifecycle meaning | Ready |\n\n```mermaid\nflowchart LR\n  Fleet[Agent Fleet] --> Cards[Runtime Session Cards]\n  Cards --> History[Local JSON History]\n```\n\nThe screenshot should make LunaAgentOS feel like a control layer, not another chat wrapper.",
     [
-      "Parsed workspace structure: desktop-shell/src/main.js, styles.css, src-tauri/src/lib.rs",
+      "Parsed workspace structure: apps/desktop-shell/src/main.js, styles.css, src-tauri/src/lib.rs",
       "Detected capability: session cards, copy transcript, fullscreen, live/archived lifecycle",
       "Saved launch summary into local session history",
     ],

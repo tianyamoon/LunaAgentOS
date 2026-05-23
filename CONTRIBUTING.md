@@ -6,11 +6,11 @@ LunaAgentOS 正在建设一个以协议为核心的异构 Coding Agent 操作层
 
 - `Claude Code` 是真实外部入口。
 - `Hermes` 是真实外部入口。
-- `Trae IDE` 是 Bridge 目标，不伪装成当前已原生接入。
-- `desktop-shell` 是当前参考 App，不是产品灵魂。
-- 长期目标是新增 Agent 通过 adapter/plugin 接入，而不是修改 app 内部逻辑。
+- `Trae IDE` 是 IDE-first adapter path 的 Bridge 目标。
+- LunaAgentOS App 是协议的具象化控制台和官方推荐使用方式。
+- 新增 Agent 通过 adapter/plugin 接入 LunaAgentOS。
 - 中间工作台的核心对象是 `Runtime Session Card`。
-- 左侧是入口舰队和配置区，不是主工作区切换器。
+- 左侧是入口舰队和配置区。
 - 右侧是活会话 / 归档会话列表和本地历史。
 
 ## 我们欢迎什么样的贡献
@@ -38,7 +38,7 @@ LunaAgentOS 正在建设一个以协议为核心的异构 Coding Agent 操作层
 - 明确 adapter manifest 应该描述什么。
 - 明确不同 runtime surface 如何映射到统一 Runtime Session Event。
 - 把 Claude Code / Hermes 逐步表达成 first-party adapters。
-- 避免新增 Agent 产品时继续修改 app-specific switch statements。
+- 让新增 Agent 产品通过 Adapter Contract 接入。
 
 ### 会话卡片体验
 
@@ -51,7 +51,7 @@ LunaAgentOS 正在建设一个以协议为核心的异构 Coding Agent 操作层
 
 ### Bridge 方案探索
 
-尤其是 `Trae IDE`。目标不是伪造接入，而是诚实探索桥接路径。
+尤其是 `Trae IDE`。目标是把 IDE-first agent 产品纳入清晰的 Bridge 路径。
 
 ## 协作原则
 
@@ -61,18 +61,18 @@ LunaAgentOS 正在建设一个以协议为核心的异构 Coding Agent 操作层
 
 ### 真实入口优先
 
-左侧展示的是外部入口对象，不是内部假角色。不要把 Claude 内部 subagent / delegation 提升成 LunaAgentOS 左侧独立 agent。
+左侧展示的是外部入口对象。Claude 内部 subagent / delegation 属于 Claude 自身机制。
 
 ### Runtime Session 优先
 
-中间卡片不是普通聊天气泡容器，而是 Runtime Session Surface。它要同时照顾：
+中间卡片是 Runtime Session Surface。它要同时照顾：
 
 - Claude Code 的长 Markdown / 代码输出。
 - Hermes 的 thought / tool / plan / usage / state 过程事件。
 
 ### Protocol / Adapter 优先
 
-LunaAgentOS 的核心不是 desktop shell，而是统一协议、Adapter / Plugin Contract 和 Runtime Session Model。桌面壳是第一个消费这套协议的参考 App。
+LunaAgentOS 的核心是统一协议、Adapter / Plugin Contract 和 Runtime Session Model。LunaAgentOS App 是这套协议的具象化控制台和官方推荐使用方式。
 
 ### 不过早做大全
 
@@ -85,7 +85,7 @@ LunaAgentOS 的核心不是 desktop shell，而是统一协议、Adapter / Plugi
 
 ### 对外部 Agent 保持尊重
 
-LunaAgentOS 的目标不是重写现有 Agent，而是接入、观测、沉淀，并逐步形成控制层。
+LunaAgentOS 的目标是接入、观测、沉淀现有 Agent，并逐步形成控制层。
 
 ## 参与建议
 

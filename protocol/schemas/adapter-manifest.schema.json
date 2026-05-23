@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lunaagentos.dev/protocol/schemas/adapter-manifest.schema.json",
+  "title": "LunaAgentOS Adapter Manifest",
+  "type": "object",
+  "required": ["schemaVersion", "id", "displayName", "kind", "status", "surfaces", "capabilities"],
+  "properties": {
+    "schemaVersion": { "type": "string" },
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "displayName": { "type": "string" },
+    "kind": { "type": "string", "enum": ["first_party", "community", "internal", "legacy"] },
+    "status": { "type": "string", "enum": ["active", "planned", "legacy", "experimental"] },
+    "description": { "type": "string" },
+    "entryRole": { "type": "string", "enum": ["runtime", "bridge", "example"] },
+    "surfaces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind", "status"],
+        "properties": {
+          "kind": { "type": "string", "enum": ["acp_stdio", "pty", "sdk", "gateway", "ide_bridge", "stdio_text"] },
+          "status": { "type": "string", "enum": ["active", "planned", "legacy", "experimental"] },
+          "command": { "type": "string" },
+          "args": { "type": "array", "items": { "type": "string" } },
+          "hosts": { "type": "array", "items": { "type": "string" } },
+          "notes": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "targets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "kind"],
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" },
+          "kind": { "type": "string", "enum": ["runtime", "profile", "bridge"] },
+          "runtimeSurface": { "type": "string" },
+          "status": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "properties": {
+        "runtimeSession": { "type": "boolean" },
+        "streamingEvents": { "type": "boolean" },
+        "resume": { "type": "boolean" },
+        "loadSession": { "type": "boolean" },
+        "profiles": { "type": "boolean" },
+        "tools": { "type": "boolean" },
+        "models": { "type": "boolean" },
+        "skills": { "type": "boolean" },
+        "mcp": { "type": "boolean" },
+        "permissions": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

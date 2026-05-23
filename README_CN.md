@@ -2,7 +2,7 @@
 
 LunaAgentOS 是一个以协议为核心的异构 Coding Agent 操作层。
 
-它的核心不是桌面壳，而是统一 JSON Contract、Runtime Adapter / Plugin Contract 和 Runtime Session Model。当前桌面壳是消费这套协议的第一个参考 App：选择目标、把任务送入真实 runtime、观察过程，并沉淀本地历史。
+它以统一 JSON Contract、Runtime Adapter / Plugin Contract 和 Runtime Session Model 为基础。LunaAgentOS App 是协议的具象化控制台，也是官方推荐使用方式：选择目标、把任务送入真实 runtime、观察过程，并沉淀本地历史。
 
 ![LunaAgentOS 桌面预览图](./docs/assets/lunaagentos-stage1-preview-cn.svg)
 
@@ -18,14 +18,14 @@ LunaAgentOS 要做的是这些 Agent 之上的协议与控制层：
 
 > 把每个外部 Agent 当作 runtime entry，把会话卡片做成统一承载输出流、思考流、运行流、最终响应和本地历史的 Runtime Session Surface。
 
-长期方向是 adapter-driven operating layer：Protocol first，Adapter/plugin second，Runtime Session Model third，Apps last。
+长期方向是 adapter-driven operating layer：Protocol 和 Adapter 定义运行契约，Runtime Session Model 承载工作过程，App 把这套契约变成可使用的产品体验。
 
 ## 当前能力
 
 | 模块 | 状态 | 说明 |
 |---|---:|---|
 | 产品定义 | 已明确 | Protocol / Adapter Contract / Runtime Session Model |
-| 桌面壳 | 已可用 | Tauri 2 + Rust Core + 前端工作台 |
+| LunaAgentOS App | 已可用 | Tauri 2 + Rust Core + 前端工作台 |
 | Claude Code | 已接入 | 真实 runtime 入口 |
 | Hermes | 已接入 | Windows / WSL ACP runtime instance 与 profile |
 | Trae IDE | 规划中 | 保留 Bridge 路线，不伪装已接入 |
@@ -47,12 +47,12 @@ LunaAgentOS 要做的是这些 Agent 之上的协议与控制层：
 - 如需 Claude 入口：本机可用的 Claude Code
 - 如需 Hermes 入口：WSL + Hermes
 
-Claude Code 和 Hermes 是外部 runtime，不是 LunaAgentOS 启动前置条件。未安装或路径不同的机器上，入口会显示为 `未配置` 或 `不可用`。
+Claude Code 和 Hermes 是可选外部 runtime。未安装或路径不同的机器上，入口会显示为 `未配置` 或 `不可用`。
 
-### 运行桌面壳
+### 运行 LunaAgentOS App
 
 ```powershell
-cd desktop-shell
+cd apps/desktop-shell
 npm install
 npm run tauri -- dev
 ```
@@ -60,20 +60,20 @@ npm run tauri -- dev
 ### 构建轻量可执行文件
 
 ```powershell
-cd desktop-shell
+cd apps/desktop-shell
 npm run tauri -- build --no-bundle
 ```
 
 可执行文件路径：
 
 ```text
-desktop-shell/src-tauri/target/release/desktop-shell.exe
+apps/desktop-shell/src-tauri/target/release/desktop-shell.exe
 ```
 
 更详细的启动说明见：
 
 - [docs/getting-started.md](./docs/getting-started.md)
-- [desktop-shell/README.md](./desktop-shell/README.md)
+- [apps/desktop-shell/README.md](./apps/desktop-shell/README.md)
 
 ## 演示模式
 
@@ -93,17 +93,10 @@ LunaAgentOS 当前是：
 - **外部 Agent 之上的控制层**
 - **异构 runtime entry 的协议与 Adapter Contract**
 - **Runtime Session Card 工作台**
-- **异构入口的中立桌面控制台**
+- **协议的具象化控制台**
 - **走向调用流、协作工作台和控制平面的起点**
 
-LunaAgentOS 当前不是：
-
-- Claude Code 的桌面壳
-- 以 desktop-shell 为中心、adapter 只是内部 UI 配置的项目
-- 又一个聊天器
-- 伪造多 Agent 的内部角色系统
-- 已完成的商业平台
-- 完整编排系统
+App 是当前官方推荐使用方式。新增 Agent 产品通过 Adapter Contract 接入，让产品体验保持一致，同时保留每个 runtime 的原生强项。
 
 ## 三个首批入口
 
@@ -128,6 +121,9 @@ LunaAgentOS 当前不是：
 - [docs/why-lunaagentos.md](./docs/why-lunaagentos.md)：为什么做
 - [docs/architecture-overview.md](./docs/architecture-overview.md)：架构总览
 - [docs/roadmap.md](./docs/roadmap.md)：路线图
+- [protocol/README.md](./protocol/README.md)：协议契约
+- [adapters/README.md](./adapters/README.md)：Adapter 入口
+- [apps/README.md](./apps/README.md)：App 入口
 - [docs/hermes-acp-profile-runtime.md](./docs/hermes-acp-profile-runtime.md)：Hermes ACP 接入说明
 - [docs/hermes-tui-direction.md](./docs/hermes-tui-direction.md)：Hermes 过程可见方向
 - [bridges/trae-ide/README.md](./bridges/trae-ide/README.md)：Trae IDE Bridge

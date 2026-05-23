@@ -1,0 +1,40 @@
+{
+  "$schema": "../schemas/adapter-manifest.schema.json",
+  "schemaVersion": "0.1.0-draft",
+  "id": "hermes",
+  "displayName": "Hermes",
+  "kind": "first_party",
+  "status": "active",
+  "entryRole": "runtime",
+  "description": "First-party adapter for Hermes profile-based coding-agent runtimes.",
+  "surfaces": [
+    {
+      "kind": "acp_stdio",
+      "status": "active",
+      "command": "hermes acp --accept-hooks",
+      "hosts": ["windows", "wsl"],
+      "notes": "Current App integration discovers Hermes runtime instances and profile targets."
+    }
+  ],
+  "targets": [
+    {
+      "id": "hermes-profile",
+      "label": "Hermes Profile",
+      "kind": "profile",
+      "runtimeSurface": "acp_stdio",
+      "status": "active"
+    }
+  ],
+  "capabilities": {
+    "runtimeSession": true,
+    "streamingEvents": true,
+    "resume": true,
+    "loadSession": true,
+    "profiles": true,
+    "tools": true,
+    "models": true,
+    "skills": true,
+    "mcp": true,
+    "permissions": true
+  }
+}

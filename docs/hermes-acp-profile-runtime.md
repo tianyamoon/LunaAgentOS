@@ -14,7 +14,7 @@ Runtime surface priority:
 
 1. `hermes acp`: main path for structured editor-style runtime sessions.
 2. `hermes gateway`: future path for background service or channel-based scenarios.
-3. `hermes -z`: fallback or smoke-test path only, not the full Runtime Session model.
+3. `hermes -z`: fallback or smoke-test path for lightweight checks.
 
 ## Profile loading
 
@@ -53,7 +53,7 @@ On Windows, Rust starts the process through WSL:
 wsl.exe -- <profileExecutable> acp --accept-hooks
 ```
 
-Subprocess creation uses hidden-window behavior on Windows so the desktop shell does not flash a CLI window during runtime operations.
+Subprocess creation uses hidden-window behavior on Windows to keep runtime operations quiet.
 
 ## Session and history
 
@@ -67,7 +67,7 @@ History restore uses the saved runtime and profile identity to recover the most 
 
 ## UI constraints
 
-Hermes is not modeled as one fake generic entry. It is a real provider that can expose runtime instances and profile targets.
+Hermes is a real provider that exposes runtime instances and profile targets.
 
 Session cards should show concrete runtime/profile identity, for example:
 

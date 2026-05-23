@@ -1,0 +1,10 @@
+{
+  "id": "mock-agent",
+  "name": "Mock Agent",
+  "transport": "stdio_text",
+  "command": [
+    "python",
+    "mock_agent.py"
+  ],
+  "requires_pty": false
+}

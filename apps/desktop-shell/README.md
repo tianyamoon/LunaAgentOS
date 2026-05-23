@@ -1,10 +1,10 @@
-﻿# LunaAgentOS Desktop Shell
+﻿# LunaAgentOS App
 
-This directory contains the LunaAgentOS desktop reference application.
+This directory contains the LunaAgentOS App: the protocol's concrete control console and the official recommended way to use LunaAgentOS today.
 
 ## Role
 
-The desktop shell consumes the protocol/core layer and provides:
+The App consumes the protocol/core layer and provides:
 
 - A native Tauri window.
 - The Agent Fleet, Runtime Session workspace, and session list UI.
@@ -48,11 +48,11 @@ The Windows helper scripts are kept for convenience:
 
 ## Product principle
 
-The desktop shell should stay light and should not become the product center:
+The App stays light around heavy external agents:
 
 - Fast to open.
 - Low overhead around heavy external agents.
 - Runtime state visible.
 - Session cards as the center of the workspace.
-- No fake internal agents just to make the UI look fuller.
-- No adapter model that only exists as internal UI configuration.
+- External entries remain real products.
+- Adapter capabilities enter the product through the protocol contract.

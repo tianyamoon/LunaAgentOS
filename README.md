@@ -4,7 +4,7 @@
 
 LunaAgentOS is a protocol-centered operating layer for heterogeneous coding agents.
 
-Its core is a unified JSON contract, a Runtime Adapter / Plugin Contract, and a Runtime Session Model. The desktop shell is the first reference app that consumes this layer: choose a target, send work into a real runtime, watch the process, and keep local session history in one place.
+Its foundation is a unified JSON contract, a Runtime Adapter / Plugin Contract, and a Runtime Session Model. The LunaAgentOS App is the concrete protocol console and the official recommended product experience: choose a target, send work into a real runtime, watch the process, and keep local session history in one place.
 
 ![LunaAgentOS desktop preview](./docs/assets/lunaagentos-stage1-preview.svg)
 
@@ -20,17 +20,17 @@ LunaAgentOS focuses on the layer above those runtimes:
 
 > Treat each external agent as a runtime entry, and make the session card the shared surface for output, thought stream, runtime stream, final response, and local history.
 
-The long-term direction is an adapter-driven operating layer for heterogeneous agents: protocol first, adapters second, Runtime Session Model third, apps last.
+The long-term direction is an adapter-driven operating layer for heterogeneous agents: protocol and adapters define the operating contract, Runtime Session Model carries the work, and the App makes that contract usable.
 
 ## What works now
 
 | Area | Status | Notes |
 |---|---:|---|
 | Product definition | Active | Protocol / Adapter Contract / Runtime Session Model |
-| Desktop shell | Working | Tauri 2 + Rust core + web workspace |
+| LunaAgentOS App | Working | Tauri 2 + Rust core + web workspace |
 | Claude Code | Working | Real runtime entry |
 | Hermes | Working | Windows / WSL ACP runtime instances and profiles |
-| Trae IDE | Planned | Bridge target, not presented as a native runtime yet |
+| Trae IDE | Planned | Bridge target for the IDE-first adapter path |
 | Runtime Session Cards | Working | Output, thought stream, runtime stream, final response |
 | Multi-session workspace | Working | Current send target, current session, live sessions, archived sessions |
 | Local history | Working | JSON session history with restore/read-only states |
@@ -51,10 +51,10 @@ The long-term direction is an adapter-driven operating layer for heterogeneous a
 
 Claude Code and Hermes are external runtimes. LunaAgentOS can open without them; unavailable entries stay visible with a clear configuration state.
 
-### Run the desktop shell
+### Run the LunaAgentOS App
 
 ```powershell
-cd desktop-shell
+cd apps/desktop-shell
 npm install
 npm run tauri -- dev
 ```
@@ -62,14 +62,14 @@ npm run tauri -- dev
 ### Build the lightweight executable
 
 ```powershell
-cd desktop-shell
+cd apps/desktop-shell
 npm run tauri -- build --no-bundle
 ```
 
 Executable path:
 
 ```text
-desktop-shell/src-tauri/target/release/desktop-shell.exe
+apps/desktop-shell/src-tauri/target/release/desktop-shell.exe
 ```
 
 For details, see [Getting Started](./docs/getting-started.md).
@@ -91,17 +91,11 @@ LunaAgentOS is:
 
 - **A control layer** above existing agents.
 - **A protocol and adapter contract** for heterogeneous runtime entries.
-- **A runtime-session workspace**, not a normal chatbot UI.
-- **A neutral console** for heterogeneous entries.
+- **A runtime-session workspace** centered on durable session cards.
+- **A concrete protocol console** for heterogeneous entries.
 - **A path toward agent collaboration and a broader control plane.**
 
-LunaAgentOS is not:
-
-- A replacement for Claude Code, Hermes, or Trae.
-- A desktop shell whose adapters are only internal UI configuration.
-- A fake multi-agent demo made from internal roles.
-- A plugin market or commercial platform.
-- A full orchestration system yet.
+The App is the official recommended way to use LunaAgentOS today. New agent products enter through the adapter contract so the product experience stays coherent while each runtime keeps its native strengths.
 
 ## Documentation
 
@@ -112,6 +106,9 @@ LunaAgentOS is not:
 - [Why LunaAgentOS](./docs/why-lunaagentos.md)
 - [Architecture overview](./docs/architecture-overview.md)
 - [Roadmap](./docs/roadmap.md)
+- [Protocol](./protocol/README.md)
+- [Adapters](./adapters/README.md)
+- [Apps](./apps/README.md)
 - [Hermes ACP runtime](./docs/hermes-acp-profile-runtime.md)
 - [Trae IDE bridge notes](./bridges/trae-ide/README.md)
 

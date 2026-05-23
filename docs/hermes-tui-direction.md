@@ -59,4 +59,4 @@ For Hermes, that means:
 
 ## Summary
 
-Hermes' value in LunaAgentOS is not just the result page. Its value is the live session.
+Hermes' value in LunaAgentOS is the live session: visible process, runtime state, and final result in one Runtime Session Card.
