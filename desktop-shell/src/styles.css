@@ -472,12 +472,44 @@ body.is-launch-demo .layout {
 }
 
 .session-agent-title > strong {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
   min-width: 0;
   overflow: hidden;
   font-size: 1.02rem;
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.session-title-provider,
+.session-title-target {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-title-runtime {
+  flex: 0 0 auto;
+  font-size: 0.58em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  color: rgba(82, 61, 38, 0.38);
+  transform: translateY(-0.06em);
+}
+
+.session-title-runtime::before {
+  content: "·";
+  margin-right: 5px;
+  color: rgba(82, 61, 38, 0.3);
+}
+
+.session-title-target::before {
+  content: "/";
+  margin: 0 2px 0 1px;
+  color: rgba(82, 61, 38, 0.42);
 }
 
 .session-agent-title .active-receiver-banner {

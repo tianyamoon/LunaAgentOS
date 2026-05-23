@@ -125,6 +125,29 @@ export function normalizedSessionTitle(session, providers = []) {
   return session.agentName || providerName || "当前会话";
 }
 
+export function normalizedSessionTitleParts(session, providers = []) {
+  const providerName = displayProviderName(session.providerId, session.providerName, providers);
+  if (session.providerId === "hermes") {
+    return {
+      providerName: providerName || "Hermes",
+      runtimeLabel: session.runtimeLabel || "",
+      targetName: hermesProfileDisplayName(session),
+    };
+  }
+  if (session.providerId === "claude") {
+    return {
+      providerName: providerName || "Claude Code",
+      runtimeLabel: session.runtimeLabel || "",
+      targetName: "",
+    };
+  }
+  return {
+    providerName: session.agentName || providerName || "当前会话",
+    runtimeLabel: "",
+    targetName: "",
+  };
+}
+
 export function normalizeSessionIdentity(session, context = {}) {
   const providers = context.providers || [];
   const runtimeInstances = context.runtimeInstances || [];

@@ -15,6 +15,7 @@ import {
   hermesProfileNameFromAgentId,
   normalizeSessionIdentity,
   normalizedSessionTitle,
+  normalizedSessionTitleParts,
   runtimeDefaultsForProvider as identityRuntimeDefaultsForProvider,
   runtimeHostForInstance as identityRuntimeHostForInstance,
 } from "./sessionIdentity.js";
@@ -329,6 +330,24 @@ function targetDisplayName(target) {
 
 function sessionIdentityTitle(session) {
   return normalizedSessionTitle(session, providers);
+}
+
+function renderSessionIdentityTitle(session) {
+  const parts = normalizedSessionTitleParts(session, providers);
+  if (session.providerId === "hermes") {
+    return [
+      `<span class="session-title-provider">${escapeHtml(parts.providerName)}</span>`,
+      parts.runtimeLabel ? `<span class="session-title-runtime">${escapeHtml(parts.runtimeLabel)}</span>` : "",
+      parts.targetName ? `<span class="session-title-target">${escapeHtml(parts.targetName)}</span>` : "",
+    ].filter(Boolean).join("");
+  }
+  if (session.providerId === "claude") {
+    return [
+      `<span class="session-title-provider">${escapeHtml(parts.providerName)}</span>`,
+      parts.runtimeLabel ? `<span class="session-title-runtime">${escapeHtml(parts.runtimeLabel)}</span>` : "",
+    ].filter(Boolean).join("");
+  }
+  return `<span class="session-title-provider">${escapeHtml(parts.providerName)}</span>`;
 }
 
 function targetsForRuntimeInstance(instance) {
@@ -1771,12 +1790,13 @@ function renderSessionCard(session) {
   const flowToggleLabel = flowsOpen ? t("action.collapseFlows") : t("action.expandFlows");
   const fullscreenLabel = session.fullscreen ? t("action.exitFullscreen") : t("action.enterFullscreen");
   const identityTitle = sessionIdentityTitle(identitySession);
+  const identityTitleMarkup = renderSessionIdentityTitle(identitySession);
   return `
     <article class="session-card ${session.fullscreen ? "fullscreen" : ""} ${isActiveReceiver ? "is-active-receiver" : ""} ${isWaiting ? "is-waiting" : ""}" data-session-id="${session.id}" tabindex="0" aria-label="${escapeHtml(t("session.ariaSwitch", { task: session.task }))}" ${isActiveReceiver ? "aria-current=\"true\"" : ""}>
       <div class="session-card-header">
         <div class="session-identity-row">
           <div class="session-agent-title">
-            <strong>${escapeHtml(identityTitle)}</strong>
+            <strong title="${escapeHtml(identityTitle)}">${identityTitleMarkup}</strong>
             ${isActiveReceiver ? `<span class="active-receiver-banner">${t("session.current")}</span>` : ""}
           </div>
           ${profileMeta ? `<div class="caption session-profile-meta">${escapeHtml(profileMeta)}</div>` : ""}
