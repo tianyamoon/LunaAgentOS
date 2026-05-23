@@ -1,3 +1,6 @@
 __pycache__/
 *.pyc
 .claude/
+
+# Local working notes (not for the public repo)
+docs/refactor-progress.md
