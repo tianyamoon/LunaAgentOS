@@ -47,6 +47,11 @@ import {
   isDemoSession,
   isDemoSessionId,
 } from "./launchDemo/index.js";
+import {
+  archivedSessionsFromHistory as archivedSessionsFromHistoryRaw,
+  historySessionKey,
+  historyTurnKey,
+} from "./history/entries.js";
 
 const { invoke } = window.__TAURI__.core;
 const listenRuntimeEvent = window.__TAURI__?.event?.listen?.bind(window.__TAURI__.event);
@@ -419,6 +424,10 @@ function normalizeWorkspaceSession(session) {
     runtimeInstances,
     runtimeTargets: runtimeTargets(),
   });
+}
+
+function archivedSessionsFromHistory(entries) {
+  return archivedSessionsFromHistoryRaw(entries, { normalizeSession: normalizeWorkspaceSession });
 }
 
 function targetsForProvider(providerId) {
@@ -2420,76 +2429,12 @@ function syncSessionStickControllers(visibleSessions, stickyIntent) {
   sessionStickRegistry.sweep(ids);
 }
 
-function historySessionKey(entry) {
-  return entry.sessionId || entry.session_id || entry.acpSessionId || entry.acp_session_id || entry.id;
-}
 
 function readableHistoryEntries() {
   return isLaunchDemoScene ? demoHistoryEntries : [...demoHistoryEntries, ...historyEntries];
 }
 
-function historyTurnKey(entry) {
-  return `${historySessionKey(entry)}:${entry.turn?.id || entry.id}`;
-}
 
-function archivedSessionsFromHistory(entries) {
-  const bySession = new Map();
-  entries.forEach((entry) => {
-    const key = historySessionKey(entry);
-    const createdAt = entry.createdAt || entry.created_at;
-    if (!key || !createdAt) return;
-    const turn = entry.turn || {
-      id: entry.id,
-      task: entry.task,
-      state: 5,
-      thoughts: [],
-      outputs: [],
-      finalResponse: entry.summary,
-      logs: ["由历史归档恢复，当前不是运行中的 runtime session。"],
-      createdAt,
-    };
-    const current = bySession.get(key);
-    const hermesProfile = entry.turn?.meta?.hermesProfile || null;
-    if (!current) {
-      bySession.set(key, {
-        id: key,
-        date: entry.date,
-        createdAt,
-        updatedAt: createdAt,
-        providerId: entry.providerId || entry.provider_id,
-        providerName: entry.providerName || entry.provider_name,
-        agentId: entry.agentId || entry.agent_id,
-        agentName: entry.agentName || entry.agent_name,
-        runtimeInstanceId: entry.runtimeInstanceId || entry.runtime_instance_id || null,
-        runtimeLabel: entry.runtimeLabel || entry.runtime_label || null,
-        runtimeHost: entry.runtimeHost || entry.runtime_host || null,
-        runtimeCommand: entry.runtimeCommand || entry.runtime_command || null,
-        targetId: entry.targetId || entry.target_id || entry.agentId || entry.agent_id,
-        targetName: entry.targetName || entry.target_name || entry.agentName || entry.agent_name,
-        profileExecutable: entry.profileExecutable || entry.profile_executable || null,
-        acpSessionId: entry.acpSessionId || entry.acp_session_id,
-        title: entry.task,
-        summary: entry.summary,
-        turnCount: 1,
-        turns: [turn],
-        runtimeState: entry.runtimeState || entry.runtime_state || "archived",
-        hermesProfile,
-      });
-      return;
-    }
-    current.updatedAt = current.updatedAt > createdAt ? current.updatedAt : createdAt;
-    current.summary = entry.summary || current.summary;
-    current.turnCount += 1;
-    current.turns.push(turn);
-    current.hermesProfile = current.hermesProfile || hermesProfile;
-  });
-  return [...bySession.values()]
-    .map((session) => ({
-      ...normalizeWorkspaceSession(session),
-      turns: session.turns.sort((left, right) => left.createdAt.localeCompare(right.createdAt)),
-    }))
-    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
-}
 
 function sessionListItems() {
   const sourceSessions = isLaunchDemoScene ? sessions.filter(isDemoSession) : sessions;
