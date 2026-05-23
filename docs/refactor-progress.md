@@ -13,7 +13,8 @@
 | `bcc15f5` | C2 + C3 | markdown / mermaid 拆出 `src/markdown/`（17+7 个单测） |
 | `e69d813` | C5 | launch demo 纯数据函数拆出 `src/launchDemo/`（8 个单测） |
 | `cc15fc0` | C7 (partial) | history 归档辅助函数拆出 `src/history/`（9 个单测） |
-| _本轮_ | C9 + UX | sessions store 抽出 + main.js 接入 + 空 deck 占位文案智能切换（15 个单测） |
+| `e7b9ca8` | C9 + UX | sessions store 抽出 + main.js 接入 + 空 deck 占位文案智能切换（15 个单测） |
+| _本轮_ | C7 (rest) | `saveTurnToHistory` / `loadHistory` 纯逻辑拆到 `src/history/payload.js`（11 个单测） |
 
 ## main.js 体量变化
 
@@ -26,13 +27,14 @@
 | C2+C3 (markdown) 后 | 3253 |
 | C5 (demo) 后 | 3127 |
 | C7-partial (history) 后 | 3068 |
-| C9 + UX 后 | **2894** |
+| C9 + UX 后 | 2894 |
+| C7 (rest) 后 | **2870** |
 
-净减约 17% / 拆出 5 个独立模块 + 1 个状态机 + 1 个 UI 控制器 + 1 个 sessions store。
+净减约 17% / 拆出 5 个独立模块 + 1 个状态机 + 1 个 UI 控制器 + 1 个 sessions store + 1 个 history payload。
 
 ## 测试基线
 
-`npm run test:all` 当前 **107 个测试全过**：
+`npm run test:all` 当前 **118 个测试全过**：
 
 | 模块 | 测试 |
 |---|---|
@@ -44,6 +46,7 @@
 | `src/markdown/escape.test.js` | 7 |
 | `src/launchDemo/index.test.js` | 8 |
 | `src/history/entries.test.js` | 9 |
+| `src/history/payload.test.js` | 11 |
 | `src/ui/stickToBottom.test.js` | 11 |
 
 每个模块也有独立 `npm run test:<name>`：`identity / stick / lifecycle / store / i18n / markdown / demo / history`。
@@ -79,6 +82,7 @@
 - `src/markdown/{normalize.js, escape.js, mermaid.js, index.js}` — markdown 渲染 + 规范化 + mermaid 懒加载
 - `src/launchDemo/index.js` — 纯数据 builder（`buildLaunchDemoSessions / buildLaunchDemoHistoryEntries / createDemoTurn`）
 - `src/history/entries.js` — `archivedSessionsFromHistory` + 历史 key 抽取（`normalizeSession` 入参注入）
+- `src/history/payload.js` — `buildHistoryEntryPayload / upsertHistoryEntry / formatCompactHistoryNotice`，把 `saveTurnToHistory` / `loadHistory` 中的纯部分挪出来
 - `src/state/sessionLifecycle.js` — 上面状态机
 - `src/state/sessionsStore.js` — 工作台核心 mutable state（sessions / currentSessionId / activeSessionIds / 墓碑 Set / 三个 UI flag 容器），暴露 stable references + 显式 mutation API + subscribe / batch
 - `src/ui/stickToBottom.js` — 上面控制器
@@ -94,8 +98,8 @@
 - **C6 runtime (ACP / fallback / streamEvents)**
   - `runFallbackSession / startAcpSession / appendStreamEventToTurn / updateTurnFromEvents / sessionSectionsFromEvents`
   - 仍然重度依赖 `sessions / activeSessionIds / 墓碑 Set / setSessionLifecycle / scheduleSessionCardRender`，但现在它们都已经在 `sessionsStore` 后面。
-  - 拆分意义大；建议先做 C7 剩余作为热身。
-- **C7 剩余**：`saveTurnToHistory / loadHistory` 留在 main.js（mutate `historyEntries / isHistoryLoading`，依赖 `invoke`）。
+  - 拆分意义大；C9 store + C7 payload 已就绪，下一步可以专注 stream/event 解析的纯化。
+- ~~**C7 剩余**：`saveTurnToHistory / loadHistory`~~ ✅ 已完成（IO/notice 留在 main.js，纯部分迁到 `src/history/payload.js`）。
 - **C8 + A1：UI 拆分 + lit-html 迁移**
   - 最大的一块。`renderWorkspace / renderSessionCard / renderTurn / renderHistory / renderProviders` 切到 `src/ui/` 多文件 + lit-html template。
   - 当前的 in-place 单卡片渲染已经基本根治抖动，所以 lit-html 不再急。

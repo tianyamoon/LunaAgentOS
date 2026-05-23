@@ -50,8 +50,12 @@ import {
 import {
   archivedSessionsFromHistory as archivedSessionsFromHistoryRaw,
   historySessionKey,
-  historyTurnKey,
 } from "./history/entries.js";
+import {
+  buildHistoryEntryPayload,
+  formatCompactHistoryNotice,
+  upsertHistoryEntry,
+} from "./history/payload.js";
 import { createSessionsStore } from "./state/sessionsStore.js";
 
 const { invoke } = window.__TAURI__.core;
@@ -2831,12 +2835,8 @@ async function loadHistory() {
   try {
     const compactResult = await invoke("compact_history_entries");
     historyEntries = await invoke("load_history_entries");
-    const removedCount = compactResult?.removedCount || 0;
-    const upgradedCount = compactResult?.upgradedCount || 0;
-    const skippedFiles = compactResult?.skippedFiles || 0;
-    if (removedCount > 0 || upgradedCount > 0 || skippedFiles > 0) {
-      setAppNotice(`历史记录已整理：去重 ${removedCount} 条，升级 ${upgradedCount} 条，跳过损坏文件 ${skippedFiles} 个。`, skippedFiles > 0 ? "error" : "info");
-    }
+    const notice = formatCompactHistoryNotice(compactResult);
+    if (notice) setAppNotice(notice.message, notice.kind);
   } catch (error) {
     console.error(error);
     historyEntries = [];
@@ -2848,41 +2848,17 @@ async function loadHistory() {
 }
 
 async function saveTurnToHistory(session, turn) {
-  const hermesProfile = hermesProfileMetaFromSession(session);
-  const turnForHistory = {
-    ...turn,
-    meta: hermesProfile ? { ...(turn.meta || {}), hermesProfile } : turn.meta,
-  };
   const entry = await invoke("append_history_entry", {
-    entry: {
+    entry: buildHistoryEntryPayload({
+      session,
+      turn,
+      hermesProfile: hermesProfileMetaFromSession(session),
       schemaVersion: HISTORY_SCHEMA_VERSION,
-      providerId: session.providerId,
-      providerName: session.providerName,
-      agentId: session.agentId,
-      agentName: session.agentName,
-      runtimeInstanceId: session.runtimeInstanceId || null,
-      runtimeLabel: session.runtimeLabel || null,
-      runtimeHost: session.runtimeHost || null,
-      runtimeCommand: session.runtimeCommand || null,
-      targetId: session.targetId || session.agentId,
-      targetName: session.targetName || session.agentName,
-      profileExecutable: session.profileExecutable || null,
-      sessionId: session.id,
-      acpSessionId: session.acpSessionId || null,
-      task: turn.task,
-      status: stateNames[turn.state] || "UNKNOWN",
-      summary: turn.finalResponse || turn.outputs.at(-1) || turn.logs.at(0) || "消息已结束。",
-      turn: turnForHistory,
       runtimeState: sessionRuntimeState(session),
-    },
+      getStateName: (state) => stateNames[state],
+    }),
   });
-  const key = historyTurnKey(entry);
-  const existingIndex = historyEntries.findIndex((item) => historyTurnKey(item) === key);
-  if (existingIndex >= 0) {
-    historyEntries = historyEntries.map((item, index) => (index === existingIndex ? entry : item));
-  } else {
-    historyEntries = [entry, ...historyEntries];
-  }
+  historyEntries = upsertHistoryEntry(historyEntries, entry);
   renderHistory();
 }
 
