@@ -1,20 +1,27 @@
-# Trae IDE Bridge Notes
+﻿# Trae IDE Bridge Notes
 
-`Trae IDE` is part of the first LunaAgentOS product wedge because it fills the `free` position in the `strongest / general / free` trio.
+Trae IDE is a future bridge target for LunaAgentOS.
 
-It is not represented as a native Phase 0 CLI manifest here on purpose.
+## Product role
 
-## Reason
+Trae represents the IDE-first entry type. LunaAgentOS keeps it visible because heterogeneous agent control should eventually cover CLI, TUI, gateway, SDK, and IDE surfaces.
 
-The current POC protocol focuses on `stdio_json` and `stdio_text` CLI runtimes. Trae IDE is strategically important, but its public surface is IDE-first rather than cleanly CLI-first.
+## Current boundary
 
-## Bridge options to explore later
+Trae IDE is not presented as a native runtime entry yet.
 
-- desktop automation wrapper
+LunaAgentOS should not create a fake stdio adapter or fake manifest just to make the fleet look symmetrical. The integration should stay honest: Trae belongs to the bridge path until there is a real bridge surface.
+
+## Bridge options
+
+Potential bridge directions:
+
 - IDE extension bridge
-- terminal interception inside the IDE
-- session relay through a local helper process
+- Local helper process
+- Terminal/session relay inside the IDE
+- Desktop automation wrapper
+- Structured session export/import path
 
-## Current rule
+## Rule
 
-Do not create a fake `stdio` manifest for Trae IDE just to make the matrix look symmetrical. Keep it as a real bridge target.
+Keep Trae IDE as a real bridge target, not a simulated runtime.

@@ -1,64 +1,57 @@
-# LunaAgentOS Desktop Shell
+﻿# LunaAgentOS Desktop Shell
 
-## 目的
+This directory contains the LunaAgentOS desktop application.
 
-这是 LunaAgentOS 第一版桌面壳工程。
+## Role
 
-它的目标不是一步到位做完整产品，而是先把以下几件事坐实：
+The desktop shell provides:
 
-- 真实桌面壳存在
-- Rust / Tauri 编译链已打通
-- 最小控制台原型已经进入桌面工程
-- 后续可以直接在这里继续推进第一版桌面应用
+- A native Tauri window.
+- The Agent Fleet, Runtime Session workspace, and session list UI.
+- Runtime configuration and availability checks.
+- Rust commands for ACP sessions, process routing, and local JSON history.
 
-## 当前状态
+## Stack
 
-当前已经完成：
+- Tauri 2
+- Rust core commands
+- Lightweight web UI
+- Local JSON history
 
-- `Tauri 2` 工程初始化
-- 控制台原型前端接入
-- Windows 下 `Rust + MSVC` 编译链验证
-- `--no-bundle` release 构建通过
+## Run locally
 
-## 当前可验证产物
+### Development mode
 
-可执行文件路径：
+```powershell
+npm run tauri -- dev
+```
 
-- `src-tauri/target/release/desktop-shell.exe`
+### Lightweight executable
 
-## 本地运行
+```powershell
+npm run tauri -- build --no-bundle
+```
 
-### 开发模式
+Executable path:
 
-双击运行：
+```text
+src-tauri/target/release/desktop-shell.exe
+```
+
+### Helper scripts
+
+The Windows helper scripts are kept for convenience:
 
 - `run-tauri-dev.cmd`
-
-### Release 构建（推荐）
-
-双击运行：
-
 - `run-tauri-build-nobundle.cmd`
-
-### 完整 bundle 构建
-
-双击运行：
-
 - `run-tauri-build.cmd`
 
-说明：
+## Product principle
 
-- 当前推荐优先用 `run-tauri-build-nobundle.cmd`
-- 它更适合作为第一版可验证路径
-- 完整 installer bundling 后续再补
+The desktop shell should stay light:
 
-## 当前原则
-
-第一版桌面壳只做轻核心：
-
-- 启动快
-- 占用轻
-- 状态可见
-- 多 Agent 工作台方向明确
-
-而不是一上来就做成重平台。
+- Fast to open.
+- Low overhead around heavy external agents.
+- Runtime state visible.
+- Session cards as the center of the workspace.
+- No fake internal agents just to make the UI look fuller.

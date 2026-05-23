@@ -1,163 +1,95 @@
-# LunaAgentOS 架构总览
+﻿# LunaAgentOS Architecture Overview
 
-## 核心定位
+LunaAgentOS is a control layer above external coding-agent runtimes.
 
-LunaAgentOS 是一个面向多 Agent 的统一控制层。
+It does not rewrite the agents. It connects to them, observes their runtime sessions, normalizes their process visibility, and gives the developer one desktop workspace for active and archived work.
 
-它不替换现有 Agent，而是在它们之上建立：
-
-- 统一接入
-- 统一状态机
-- 统一消息流
-- 统一人类工作台
-- 统一归档与观测
-
-## 总体分层
+## Layers
 
 ```text
 ┌──────────────────────────────────────────────┐
 │                Desktop Shell                 │
-│     窗口 / 布局 / 系统集成 / 生命周期         │
+│        Tauri window / system integration      │
 ├──────────────────────────────────────────────┤
 │                  UI Layer                    │
-│ Agent 列表 / 输出区 / 状态流 / 工具面板 / 审批 │
+│   Agent Fleet / Session Cards / History       │
 ├──────────────────────────────────────────────┤
-│                   Core                       │
-│ 状态机 / 事件总线 / 进程管理 / 协议执行        │
+│                Runtime Core                  │
+│   ACP sessions / process control / history    │
 ├──────────────────────────────────────────────┤
-│                Adapter Layer                 │
-│ stdio_json / stdio_text / MCP / Bridge       │
+│              Runtime Surfaces                │
+│      ACP / CLI / Gateway / IDE Bridge         │
 ├──────────────────────────────────────────────┤
 │              External Runtimes               │
-│ Claude Code / Hermes / Trae IDE / ...        │
+│        Claude Code / Hermes / Trae IDE        │
 └──────────────────────────────────────────────┘
 ```
 
-## 各层职责
+## Desktop Shell
 
-### 1. Desktop Shell
+The desktop shell provides:
 
-职责：
+- Native app window.
+- Local runtime configuration.
+- Local history storage.
+- Bridge between the web workspace and Rust runtime commands.
 
-- 提供桌面应用入口
-- 管理窗口与生命周期
-- 承载控制台布局
-- 负责与系统集成
+Current stack:
 
-当前倾向：
+- Tauri 2
+- Rust core commands
+- Lightweight web UI
 
-- 主推荐：`Tauri 2`
-- 备选：`Avalonia`
+## UI Layer
 
-### 2. UI Layer
+The UI is organized around three areas:
 
-职责：
+- **Left**: Agent Fleet and configuration.
+- **Center**: active Runtime Session Cards.
+- **Right**: live sessions and archived sessions.
 
-- 展示 Agent 列表
-- 展示当前输出
-- 展示状态流
-- 展示工具调用
-- 提供人类输入与审批入口
+The center workspace is the product core. A session card is responsible for output, thought stream, runtime/tool/plan/usage stream, final response, scrolling, copy, fullscreen, restore, and archive actions.
 
-第一版最小界面建议：
+## Runtime Core
 
-- 左侧 Agent 区
-- 中间输出区
-- 右侧或底部状态 / 工具区
-- 顶部或底部任务输入区
+The Rust side owns runtime-facing responsibilities:
 
-### 3. Core
+- Runtime availability probing.
+- ACP process startup.
+- Session prompt / load / resume / shutdown commands.
+- Runtime event streaming into the frontend.
+- Local JSON history read/write/archive/delete.
+- Windows / WSL command routing.
 
-职责：
+## Runtime Surfaces
 
-- 维护生命周期状态机
-- 维护统一消息格式
-- 驱动事件总线
-- 管理任务流转
-- 管理进程与会话
+Different external agents expose different surfaces. LunaAgentOS treats these as runtime surfaces, not as product boundaries.
 
-这层是 LunaAgentOS 的真正核心。
+Current primary surface:
 
-### 4. Adapter Layer
+- **ACP / protocol** for structured runtime sessions and updates.
 
-职责：
+Important future surfaces:
 
-- 读取插件 `manifest`
-- 启动外部运行时
-- 清洗日志
-- 解析输出
-- 推断状态
-- 归一化为统一事件
+- **PTY / terminal** for native CLI/TUI compatibility.
+- **Gateway / messaging** for background and channel-based agents.
+- **SDK** for official programmable runtimes.
+- **IDE Bridge** for IDE-first products such as Trae IDE.
 
-第一阶段重点：
-
-- `stdio_json`
-- `stdio_text`
-
-后续阶段：
-
-- `MCP`
-- `HTTP / Gateway`
-- `IDE Bridge`
-
-### 5. External Runtimes
-
-这是被 LunaAgentOS 接管的现成 Agent 或产品：
-
-- `Claude Code`
-- `Hermes`
-- `Trae IDE`
-
-它们不被重写，只被接入。
-
-## 当前三家样板在架构中的位置
+## External Runtimes
 
 ### Claude Code
 
-- 角色：强大样板
-- 类型：CLI-first / 高价值目标
-- 作用：证明 LunaAgentOS 能接住高端 Agent
+Claude Code represents a high-value coding runtime. LunaAgentOS models it as one external entry that can own multiple sessions.
 
 ### Hermes
 
-- 角色：通用样板
-- 类型：CLI/Gateway 友好目标
-- 作用：最适合作为首个现实 Adapter
+Hermes represents profile-based runtime entries and process visibility. Its ACP updates can expose thought, message, tool, plan, and usage events.
 
 ### Trae IDE
 
-- 角色：免费样板
-- 类型：IDE-first 桥接目标
-- 作用：扩大影响力与用户入口
+Trae IDE is a bridge target. LunaAgentOS keeps it visible as a future integration direction without pretending it is already a native runtime entry.
 
-## 当前关键原则
+## Direction
 
-### 原则 1：协议优先于实现语言
-
-核心协议必须保持语言无关：
-
-- `manifest.json`
-- 生命周期状态机
-- 统一消息格式
-
-### 原则 2：控制层轻，运行时重
-
-Agent 自身已经消耗很多资源，LunaAgentOS 应尽量轻量，避免控制层反过来成为主要负担。
-
-### 原则 3：样板优先于大全
-
-先把最有代表性的三类样板打清楚，不急于兼容所有 Agent。
-
-## 第一版的最小架构闭环
-
-```text
-用户输入
-  -> Desktop Shell / UI
-  -> Core
-  -> Adapter
-  -> Agent Runtime
-  -> 标准化事件流
-  -> UI 状态更新
-```
-
-第一版不追求全功能，只追求这条链稳定成立。
+The architecture is designed to stay light at the control layer and let external agents remain powerful at the runtime layer. The next architecture pressure will come from targetable call flow between entries and sessions.

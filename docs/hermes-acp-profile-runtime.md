@@ -1,35 +1,33 @@
-# Hermes ACP Profile Runtime
+﻿# Hermes ACP Profile Runtime
 
-## 目的
+This document explains how LunaAgentOS treats Hermes as a real profile-based runtime entry.
 
-本文记录 LunaAgentOS Stage 1 中 Hermes 的技术接入方式。README 只保留项目概要，Hermes ACP、profile 元数据、历史恢复等实现细节集中放在这里。
+## Runtime principle
 
-## 接入原则
-
-Stage 1 优先使用 Hermes 官方 ACP surface：
+LunaAgentOS uses the Hermes ACP surface as the main Runtime Session path:
 
 ```text
 hermes acp --accept-hooks
 ```
 
-优先级：
+Runtime surface priority:
 
-1. `hermes acp`：桌面工作台与 editor-style runtime session 的主路径。
-2. `hermes gateway`：后续消息通道、后台服务或多渠道场景再考虑。
-3. `hermes -z`：只作为 smoke test 或临时 fallback，不标记为完整 RuntimeSession。
+1. `hermes acp`: main path for structured editor-style runtime sessions.
+2. `hermes gateway`: future path for background service or channel-based scenarios.
+3. `hermes -z`: fallback or smoke-test path only, not the full Runtime Session model.
 
-## Profile 载入
+## Profile loading
 
-Hermes profiles 从 WSL 内的 Hermes CLI 动态读取：
+Hermes profiles are loaded dynamically from the Hermes CLI through WSL:
 
 ```text
 wsl.exe -e hermes profile list
 wsl.exe -e hermes profile show <profile>
 ```
 
-前端将返回的 profile 映射成左侧 Hermes provider 下的真实入口对象。
+The frontend maps returned profiles into real send targets under the Hermes provider.
 
-当前保留的 profile 元数据：
+Profile metadata kept by LunaAgentOS:
 
 - `profileName`
 - `profileAlias`
@@ -40,64 +38,56 @@ wsl.exe -e hermes profile show <profile>
 - `skillCount`
 - `hasSoul`
 
-敏感信息不进入 UI 与 history，例如 `.env` 内容、token、API key。
+Sensitive values do not enter the UI or history, including `.env` content, tokens, and API keys.
 
-## ACP 启动语义
+## ACP startup semantics
 
-前端内部字段使用 `profileExecutable` 表达实际启动 Hermes ACP 的可执行入口。
+`profileExecutable` means the executable route used to start Hermes ACP.
 
-- default profile：回退到 `hermes acp --accept-hooks`
-- profile alias：使用 alias executable，例如 `/root/.local/bin/ailearing acp --accept-hooks`
+- Default profile: use `hermes acp --accept-hooks`.
+- Profile alias: use the alias executable, such as `/root/.local/bin/ailearing acp --accept-hooks`.
 
-Windows 下由 Rust 通过 `wsl.exe` 启动：
+On Windows, Rust starts the process through WSL:
 
 ```text
 wsl.exe -- <profileExecutable> acp --accept-hooks
 ```
 
-进程创建使用隐藏窗口 flag，避免桌面壳运行时闪出 CLI 窗口。
+Subprocess creation uses hidden-window behavior on Windows so the desktop shell does not flash a CLI window during runtime operations.
 
-## Session 与历史
+## Session and history
 
-Hermes session 会在前端 session 对象里保留 profile 元数据，并在保存 turn 时写入：
+Hermes sessions keep profile metadata on the frontend session object and save it into turn metadata:
 
 ```text
 turn.meta.hermesProfile
 ```
 
-历史恢复时按以下顺序回填 Hermes profile 身份：
+History restore uses the saved runtime and profile identity to recover the most accurate card title, profile label, and runtime route available.
 
-1. `agentId`
-2. `profileName`
-3. `profileAlias`
-4. `profilePath`
+## UI constraints
 
-这样即使 Hermes profiles 是动态载入的，历史会话也能尽量恢复到正确 profile。
+Hermes is not modeled as one fake generic entry. It is a real provider that can expose runtime instances and profile targets.
 
-## UI 约束
-
-Hermes 在 LunaAgentOS 中不是单一假入口，而是 profile-based 的真实入口组。
-
-工作台卡片中应展示具体 profile 信息，例如：
+Session cards should show concrete runtime/profile identity, for example:
 
 ```text
-Hermes / ailearing
+Hermes · WSL / ailearing
 profile: ailearing · qwen3.6-plus
 ```
 
-Hermes 的体验目标不是单纯更快，而是让运行过程可见：输出流、思考流、工具流、计划流都应尽量进入卡片。
+Hermes UX should make slow work visible instead of hiding it behind a final-only response. The card should surface:
 
-当前前端会监听后端的 `runtime-session-update` 事件，并在会话卡片中实时追加：
+- Output stream
+- Thought stream
+- Tool/runtime stream
+- Plan updates
+- Usage updates
+- Final response
 
-- `agent_thought_chunk`：进入思考流
-- `agent_message_chunk`：进入输出流
-- `tool_call` / `tool_call_update`：进入运行流
-- `plan`：进入运行流中的计划更新
-- `usage_update`：进入运行流中的用量更新
+## Next improvements
 
-## 当前后续项
-
-- 继续打磨 Hermes ACP event 的展示层级与去噪。
-- 增加 Hermes profile 缓存，避免 WSL 探测影响启动观感。
-- 继续验证 load/resume 语义，不假定所有 ACP 实现完全等价。
-- 保持 `hermes -z` 只作为 fallback / smoke test。
+- Continue improving Hermes ACP event hierarchy and de-noising.
+- Improve profile caching so WSL probing feels lighter.
+- Keep load/resume behavior explicit and recoverable.
+- Keep one-shot mode separate from the Runtime Session model.
