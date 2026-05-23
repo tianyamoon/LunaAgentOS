@@ -13,6 +13,7 @@
 | `bcc15f5` | C2 + C3 | markdown / mermaid 拆出 `src/markdown/`（17+7 个单测） |
 | `e69d813` | C5 | launch demo 纯数据函数拆出 `src/launchDemo/`（8 个单测） |
 | `cc15fc0` | C7 (partial) | history 归档辅助函数拆出 `src/history/`（9 个单测） |
+| _本轮_ | C9 + UX | sessions store 抽出 + main.js 接入 + 空 deck 占位文案智能切换（15 个单测） |
 
 ## main.js 体量变化
 
@@ -24,18 +25,20 @@
 | C1 (i18n) 后 | 3539 |
 | C2+C3 (markdown) 后 | 3253 |
 | C5 (demo) 后 | 3127 |
-| C7-partial (history) 后 | **3068** |
+| C7-partial (history) 后 | 3068 |
+| C9 + UX 后 | **2894** |
 
-净减约 12% / 拆出 4 个独立模块 + 1 个状态机 + 1 个 UI 控制器。
+净减约 17% / 拆出 5 个独立模块 + 1 个状态机 + 1 个 UI 控制器 + 1 个 sessions store。
 
 ## 测试基线
 
-`npm run test:all` 当前 **92 个测试全过**：
+`npm run test:all` 当前 **107 个测试全过**：
 
 | 模块 | 测试 |
 |---|---|
 | `src/sessionIdentity.test.js` | 3 |
 | `src/state/sessionLifecycle.test.js` | 26 |
+| `src/state/sessionsStore.test.js` | 15 |
 | `src/i18n/index.test.js` | 11 |
 | `src/markdown/normalize.test.js` | 17 |
 | `src/markdown/escape.test.js` | 7 |
@@ -43,7 +46,7 @@
 | `src/history/entries.test.js` | 9 |
 | `src/ui/stickToBottom.test.js` | 11 |
 
-每个模块也有独立 `npm run test:<name>`：`identity / stick / lifecycle / i18n / markdown / demo / history`。
+每个模块也有独立 `npm run test:<name>`：`identity / stick / lifecycle / store / i18n / markdown / demo / history`。
 
 ## 关键产物
 
@@ -77,6 +80,7 @@
 - `src/launchDemo/index.js` — 纯数据 builder（`buildLaunchDemoSessions / buildLaunchDemoHistoryEntries / createDemoTurn`）
 - `src/history/entries.js` — `archivedSessionsFromHistory` + 历史 key 抽取（`normalizeSession` 入参注入）
 - `src/state/sessionLifecycle.js` — 上面状态机
+- `src/state/sessionsStore.js` — 工作台核心 mutable state（sessions / currentSessionId / activeSessionIds / 墓碑 Set / 三个 UI flag 容器），暴露 stable references + 显式 mutation API + subscribe / batch
 - `src/ui/stickToBottom.js` — 上面控制器
 - 已存在的 `src/sessionIdentity.js`（前序工作） — 保留并被新结构使用
 
@@ -86,26 +90,23 @@
 
 - **C4 providers**
   - 涉及 `providers / runtimeAvailability / runtimeInstances / hermesProfilesByInstance / runtimeTargets / targetsForProvider / etc.`
-  - 跟 `currentTargetAgentId` 强耦合，建议先跑 **C9 store** 抽出，再来拆。
+  - 跟 `currentTargetAgentId` 强耦合。C9 store 已就绪，下一步可以基于 store API 注入。
 - **C6 runtime (ACP / fallback / streamEvents)**
   - `runFallbackSession / startAcpSession / appendStreamEventToTurn / updateTurnFromEvents / sessionSectionsFromEvents`
-  - 重度依赖 `sessions / activeSessionIds / 墓碑 Set / setSessionLifecycle / scheduleSessionCardRender`
-  - 拆分意义大但前置条件多。
-- **C7 剩余**：`saveTurnToHistory / loadHistory` 留在 main.js（mutate `historyEntries / isHistoryLoading`）。
+  - 仍然重度依赖 `sessions / activeSessionIds / 墓碑 Set / setSessionLifecycle / scheduleSessionCardRender`，但现在它们都已经在 `sessionsStore` 后面。
+  - 拆分意义大；建议先做 C7 剩余作为热身。
+- **C7 剩余**：`saveTurnToHistory / loadHistory` 留在 main.js（mutate `historyEntries / isHistoryLoading`，依赖 `invoke`）。
 - **C8 + A1：UI 拆分 + lit-html 迁移**
-  - 这是最大的一块。建议跟 C9 store 一起做，把 `renderWorkspace / renderSessionCard / renderTurn / renderHistory / renderProviders` 切到 `src/ui/` 多文件 + lit-html template。
+  - 最大的一块。`renderWorkspace / renderSessionCard / renderTurn / renderHistory / renderProviders` 切到 `src/ui/` 多文件 + lit-html template。
   - 当前的 in-place 单卡片渲染已经基本根治抖动，所以 lit-html 不再急。
-- **C9 sessions store**
-  - 抽 `sessions / currentSessionId / activeSessionIds / 墓碑 Set / scheduledWorkspaceRenderOptions / sessionSeq / turnSeq / runningSessions / isLaunchDemoScene / sendAsNewSession / flowDetailOpenState / collapsedTurnIds / sessionLatestOnlyState` 等到 `src/state/sessions.js`
-  - 这是最具杠杆作用的一步：完成后 C4 / C6 / C7 / C8 都会变得简单。
 
 ### Phase B 剩余
 
-- **B3**：`flowDetailOpenState / collapsedTurnIds / sessionLatestOnlyState` 合并进 `session.uiFlags`。建议跟 C9 store 一起做。
+- **B3**：`flowDetailOpenState / collapsedTurnIds / sessionLatestOnlyState` 合并进 `session.uiFlags`。store 已经把它们收口为统一接口，B3 就是把 key 从 `${turnId}:${kind}` / `Set(turnId)` / `Map(sessionId)` 迁移到 session 对象内部 uiFlags 字段。
 
 ## 给下一个接手的 agent 的 4 句话提醒
 
-1. 不要试图一次性吃掉 main.js 拆分。下一个最有杠杆的步骤是 **C9 sessions store 抽出**，做完之后 C4 / C6 / C7 / C8 会自然分离。
+1. **C9 store 已落地**：所有 sessions / currentSessionId / activeSessionIds / 墓碑 Set / 三个 UI flag 容器都在 `src/state/sessionsStore.js`。`main.js` 顶部通过 `getXxxRef()` 拿 stable references；mutation 入口走 `sessionsStore.upsertHead / removeSessionById / setCurrentSessionId / markActive` 等。**不要再加新的 module-level state**——加进 store。
 2. 修改 lifecycle 时必须走 `setSessionLifecycle(session, target)`，不要直接写 `session.runtimeState =` 或裸 `stoppedSessionIds.add`。
 3. 流式事件路径已经是 turn-level rAF 合批 + per-card render；不要改回整 deck `innerHTML =`。
 4. `Stage 1` 边界没有变。`launchDemo` 仍随主包加载、Hermes 仍是同时存在的真实第二入口。

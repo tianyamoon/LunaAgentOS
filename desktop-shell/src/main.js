@@ -52,6 +52,7 @@ import {
   historySessionKey,
   historyTurnKey,
 } from "./history/entries.js";
+import { createSessionsStore } from "./state/sessionsStore.js";
 
 const { invoke } = window.__TAURI__.core;
 const listenRuntimeEvent = window.__TAURI__?.event?.listen?.bind(window.__TAURI__.event);
@@ -269,9 +270,9 @@ const confirmDialog = document.getElementById("confirmDialog");
 localStorage.removeItem(CURRENT_SESSION_KEY);
 
 let currentTargetAgentId = localStorage.getItem(CURRENT_TARGET_AGENT_KEY) || localStorage.getItem(LEGACY_TARGET_AGENT_KEY) || "claude-main";
-let currentSessionId = null;
-let sessions = [];
-let activeSessionIds = new Set();
+const sessionsStore = createSessionsStore();
+const sessions = sessionsStore.getSessionsRef();
+const activeSessionIds = sessionsStore.getActiveSessionIdsRef();
 let historyEntries = [];
 let sessionSeq = 0;
 let turnSeq = 0;
@@ -289,11 +290,11 @@ let runtimeAvailability = {
 let runtimeInstances = [];
 let hermesProfilesByInstance = {};
 let demoHistoryEntries = [];
-const deletedSessionIds = new Set();
-const stoppedSessionIds = new Set();
-const flowDetailOpenState = new Map();
-const collapsedTurnIds = new Set();
-const sessionLatestOnlyState = new Map();
+const deletedSessionIds = sessionsStore.getDeletedSessionIdsRef();
+const stoppedSessionIds = sessionsStore.getStoppedSessionIdsRef();
+const flowDetailOpenState = sessionsStore.getFlowDetailOpenStateRef();
+const collapsedTurnIds = sessionsStore.getCollapsedTurnIdsRef();
+const sessionLatestOnlyState = sessionsStore.getSessionLatestOnlyStateRef();
 const sessionListSectionOpenState = {
   active: true,
   archive: true,
@@ -799,24 +800,25 @@ function saveCurrentTargetAgent(agentId) {
 }
 
 function saveCurrentSession(sessionId) {
-  currentSessionId = sessionId || null;
+  sessionsStore.setCurrentSessionId(sessionId || null);
   localStorage.removeItem(CURRENT_SESSION_KEY);
 }
 
 function markSessionActive(sessionId) {
-  if (sessionId) activeSessionIds.add(sessionId);
+  sessionsStore.markActive(sessionId);
 }
 
 function markSessionInactive(sessionId) {
-  if (sessionId) activeSessionIds.delete(sessionId);
+  sessionsStore.markInactive(sessionId);
 }
 
 function clearCurrentSessionIf(sessionId) {
-  if (currentSessionId === sessionId) saveCurrentSession(null);
+  sessionsStore.clearCurrentSessionIf(sessionId);
+  localStorage.removeItem(CURRENT_SESSION_KEY);
 }
 
 function currentSession() {
-  return currentSessionId ? sessions.find((session) => session.id === currentSessionId) || null : null;
+  return sessionsStore.getSession(sessionsStore.getCurrentSessionId());
 }
 
 function currentFontScaleOption() {
@@ -1365,7 +1367,7 @@ function createSession(firstTask) {
     hasSoul: hermesProfile?.hasSoul || false,
   };
   Object.assign(session, normalizeWorkspaceSession(session));
-  sessions = [session, ...sessions];
+  sessionsStore.upsertHead(session);
   markSessionActive(session.id);
   renderWorkspace();
   renderHistory();
@@ -1445,13 +1447,16 @@ function activateLaunchDemoScene() {
   isLaunchDemoScene = true;
   isHistoryLoading = false;
   demoHistoryEntries = buildLaunchDemoHistoryEntries(HISTORY_SCHEMA_VERSION);
-  sessions = [
-    ...buildLaunchDemoSessions(),
-    ...sessions.filter((session) => !session.id.startsWith("demo-session-")),
-  ];
+  sessionsStore.batch(() => {
+    sessionsStore.replaceSessions([
+      ...buildLaunchDemoSessions(),
+      ...sessions.filter((session) => !session.id.startsWith("demo-session-")),
+    ]);
+    sessionsStore.setCurrentSessionId("demo-session-hermes-live");
+    sessionsStore.markActive("demo-session-hermes-live");
+    sessionsStore.markActive("demo-session-claude-review");
+  });
   currentTargetAgentId = "hermes-demo-ailearning";
-  currentSessionId = "demo-session-hermes-live";
-  activeSessionIds = new Set([...activeSessionIds, "demo-session-hermes-live", "demo-session-claude-review"]);
   ["demo-turn-hermes-live:thoughts", "demo-turn-hermes-live:logs", "demo-turn-claude-review:logs"].forEach((key) => {
     flowDetailOpenState.set(key, true);
   });
@@ -1467,9 +1472,15 @@ function activateLaunchDemoScene() {
 function leaveLaunchDemoScene() {
   isLaunchDemoScene = false;
   demoHistoryEntries = [];
-  sessions = sessions.filter((session) => !isDemoSession(session));
-  activeSessionIds = new Set([...activeSessionIds].filter((sessionId) => !sessionId.startsWith("demo-session-")));
-  if (currentSessionId?.startsWith("demo-session-")) currentSessionId = null;
+  sessionsStore.batch(() => {
+    sessionsStore.filterSessions((session) => !isDemoSession(session));
+    sessionsStore.replaceActiveSessionIds(
+      [...activeSessionIds].filter((sessionId) => !sessionId.startsWith("demo-session-")),
+    );
+    if (sessionsStore.getCurrentSessionId()?.startsWith("demo-session-")) {
+      sessionsStore.setCurrentSessionId(null);
+    }
+  });
   if (currentTargetAgentId === "hermes-demo-ailearning") currentTargetAgentId = "claude-main";
   removeLaunchDemoHermesAgent();
   ensureCurrentTargetAgentExists();
@@ -1596,6 +1607,32 @@ function appendRuntimeLogToSession(session, message, state = null) {
     session.state = state;
   }
   flowDetailOpenState.set(`${turn.id}:logs`, true);
+}
+
+function updateWorkspaceEmptyCopy() {
+  const restorableCount = countRestorableActiveHistoryItems();
+  const titleEl = workspaceEmpty.querySelector("strong");
+  const textEl = workspaceEmpty.querySelector("p");
+  if (!titleEl || !textEl) return;
+  if (restorableCount > 0) {
+    titleEl.textContent = t("workspace.emptyRestoreTitle");
+    textEl.textContent = t("workspace.emptyRestoreText");
+    titleEl.dataset.i18n = "workspace.emptyRestoreTitle";
+    textEl.dataset.i18n = "workspace.emptyRestoreText";
+  } else {
+    titleEl.textContent = t("workspace.emptyTitle");
+    textEl.textContent = t("workspace.emptyText");
+    titleEl.dataset.i18n = "workspace.emptyTitle";
+    textEl.dataset.i18n = "workspace.emptyText";
+  }
+}
+
+function countRestorableActiveHistoryItems() {
+  const liveIds = new Set(sessions.map((session) => session.id));
+  return archivedSessionsFromHistory(readableHistoryEntries())
+    .filter((item) => !liveIds.has(item.id))
+    .filter((item) => (item.runtimeState || "archived") !== "archived")
+    .length;
 }
 
 function renderWorkspaceStatus() {
@@ -1923,7 +1960,7 @@ function renderTurn(turn, index) {
 function renderSessionCard(session) {
   const identitySession = normalizeWorkspaceSession(session);
   const runtimeState = sessionRuntimeState(session);
-  const isActiveReceiver = currentSessionId === session.id;
+  const isActiveReceiver = sessionsStore.getCurrentSessionId() === session.id;
   const isWaiting = isSessionExecuting(session);
   const isRestoring = runtimeState === "restoring";
   const managementDisabled = isRestoring ? "disabled" : "";
@@ -2229,7 +2266,7 @@ function removeSessionFromWorkspace(sessionId) {
   if (scheduledWorkspaceRenderOptions?.focusSessionId === sessionId) {
     scheduledWorkspaceRenderOptions = { ...scheduledWorkspaceRenderOptions, focusSessionId: null };
   }
-  sessions = sessions.filter((item) => item.id !== sessionId);
+  sessionsStore.removeSessionById(sessionId);
   markSessionInactive(session.id);
   clearCurrentSessionIf(session.id);
   return session;
@@ -2272,7 +2309,7 @@ async function deleteSession(sessionId) {
   }
   if (!session && !archived) return;
   if (isLaunchDemoScene && sessionId.startsWith("demo-session-")) {
-    sessions = sessions.filter((item) => item.id !== sessionId);
+    sessionsStore.removeSessionById(sessionId);
     demoHistoryEntries = demoHistoryEntries.filter((entry) => historySessionKey(entry) !== sessionId);
     renderWorkspace();
     renderHistory();
@@ -2331,6 +2368,7 @@ function renderWorkspace(options = {}) {
   updatePromptPlaceholder();
   renderWorkspaceStatus();
   workspaceEmpty.style.display = visibleSessions.length ? "none" : "flex";
+  if (!visibleSessions.length) updateWorkspaceEmptyCopy();
   sessionDeck.classList.toggle("is-single-session", visibleSessions.length === 1);
   sessionDeck.classList.toggle("is-two-sessions", visibleSessions.length === 2);
   sessionDeck.classList.toggle("is-many-sessions", visibleSessions.length > 2);
@@ -2338,8 +2376,9 @@ function renderWorkspace(options = {}) {
   bindSessionActions();
   renderMermaidDiagrams(sessionDeck).catch((error) => console.error(error));
   requestAnimationFrame(() => {
-    const activeCard = currentSessionId
-      ? sessionDeck.querySelector(`.session-card[data-session-id="${currentSessionId}"]`)
+    const focusedSessionId = sessionsStore.getCurrentSessionId();
+    const activeCard = focusedSessionId
+      ? sessionDeck.querySelector(`.session-card[data-session-id="${focusedSessionId}"]`)
       : null;
     if (!preserveDeckScroll) {
       activeCard?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
@@ -2530,7 +2569,7 @@ function renderSessionListSection(sectionId, title, note, items, emptyText) {
 }
 
 function renderSessionListItem(item) {
-  const isActiveHistoryItem = currentSessionId === item.id;
+  const isActiveHistoryItem = sessionsStore.getCurrentSessionId() === item.id;
   const isArchived = isArchivedSessionListItem(item);
   const signalClass = isActiveHistoryItem || item.isInWorkspace
     ? "signal-workspace"
@@ -2707,8 +2746,8 @@ async function restoreArchivedSession(sessionId) {
   }
   restored.targetId = restored.targetId || restored.agentId;
   Object.assign(restored, normalizeWorkspaceSession(restored));
-  if (!existing) sessions = [restored, ...sessions];
-  stoppedSessionIds.delete(restored.id);
+  if (!existing) sessionsStore.upsertHead(restored);
+  sessionsStore.unmarkStopped(restored.id);
   saveCurrentTargetAgent(restored.agentId);
   saveCurrentSession(restored.id);
   renderProviders();

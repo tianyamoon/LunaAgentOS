@@ -9,6 +9,7 @@
     "test:identity": "node --test src/sessionIdentity.test.js",
     "test:stick": "node --test src/ui/stickToBottom.test.js",
     "test:lifecycle": "node --test src/state/sessionLifecycle.test.js",
+    "test:store": "node --test src/state/sessionsStore.test.js",
     "test:i18n": "node --test src/i18n/index.test.js",
     "test:markdown": "node --test src/markdown/normalize.test.js src/markdown/escape.test.js",
     "test:demo": "node --test src/launchDemo/index.test.js",
