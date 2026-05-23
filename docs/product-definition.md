@@ -11,7 +11,7 @@ LunaAgentOS 要解决的是不同 Agent 产品之间缺少统一控制层的问�
 - **统一 JSON Contract**：稳定描述 adapter manifest、runtime session、event、tools、models、skills、MCP resources、permissions、routing metadata 和 history。
 - **Runtime Adapter / Plugin Contract**：让每个外部 Agent 产品用自己的 adapter 暴露能力，并通过统一 contract 进入 LunaAgentOS。
 - **Runtime Session Model**：统一 session、turn、event、lifecycle 和 history，让不同 App 可以一致消费。
-- **Agent 共用能力层**：未来把分散在各个 Agent 产品里的 models、tools、skills、MCP servers、profiles、approvals、runtime capabilities 抽出来，再由 LunaAgentOS 统一观测、组织和分发。
+- **Agent 共用能力层**：统一观测、组织和分发分散在各个 Agent 产品里的 models、tools、skills、MCP servers、profiles、approvals 和 runtime capabilities。
 
 ## App 的位置
 
@@ -23,7 +23,7 @@ LunaAgentOS 要解决的是不同 Agent 产品之间缺少统一控制层的问�
 - Runtime Session Cards。
 - 活会话与归档会话视图。
 - Runtime 探测与本地历史。
-- Claude Code、Hermes 和未来入口的可视化工作台。
+- Claude Code、Hermes 和 IDE Bridge 入口的可视化工作台。
 
 App 承载产品体验，协议、Adapter Host 和 Runtime Session Model 承载运行契约：
 
@@ -67,9 +67,9 @@ LunaAgentOS 支持多种底层 runtime surface。
 
 ## First-party adapters
 
-Claude Code 和 Hermes 是 first-party adapters，用来验证 contract。
+Claude Code 和 Hermes 是 first-party adapters，用来验证并强化 contract。
 
-它们应该被描述为：
+它们在 LunaAgentOS 中被描述为：
 
 - 具体外部 Agent 产品。
 - 真实 runtime entries。
@@ -106,7 +106,7 @@ docs/
 ```
 
 
-后续运行链路抽象继续小步推进，每一步都验证 Claude Code 和 Hermes 当前真实 runtime 路径。
+下一步架构工作继续强化 Adapter Host、Runtime Session Model 和 Capability Model，并保持 Claude Code 与 Hermes 的真实 runtime 路径稳定可用。
 
 ## 设计约束
 
@@ -118,7 +118,7 @@ docs/
 
 ## 当前实现边界
 
-今天仓库里已经有一个可工作的 App 和第一批真实 runtime integration。下一步架构工作必须受这个产品定义指导：
+仓库已经包含可工作的 App 和第一批真实 runtime integration。后续架构工作以这个产品定义为边界：
 
 ```text
 Protocol defines the contract.

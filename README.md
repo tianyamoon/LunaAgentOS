@@ -30,7 +30,7 @@ The long-term direction is an adapter-driven operating layer for heterogeneous a
 | LunaAgentOS App | Working | Tauri 2 + Rust core + web workspace |
 | Claude Code | Working | Real runtime entry |
 | Hermes | Working | Windows / WSL ACP runtime instances and profiles |
-| Trae IDE | Planned | Bridge target for the IDE-first adapter path |
+| Trae IDE | Bridge | IDE-first adapter path |
 | Runtime Session Cards | Working | Output, thought stream, runtime stream, final response |
 | Multi-session workspace | Working | Current send target, current session, lifecycle-colored live and archived sessions |
 | Local history | Working | JSON session history with restore/read-only states |
@@ -110,7 +110,7 @@ The App is the official recommended way to use LunaAgentOS today. New agent prod
 - [Adapters](./adapters/README.md)
 - [Apps](./apps/README.md)
 - [Hermes ACP runtime](./docs/hermes-acp-profile-runtime.md)
-- [Trae IDE bridge notes](./bridges/trae-ide/README.md)
+- [Trae IDE bridge](./bridges/trae-ide/README.md)
 
 ## Contributing
 
@@ -120,7 +120,7 @@ The most useful contributions now are:
 - Hermes event UX: thought/tool/plan/usage stream presentation.
 - Runtime Session Card usability.
 - Local history, restore, and error-state validation.
-- Trae IDE bridge research.
+- Trae IDE bridge design and integration.
 - Documentation, screenshots, and release polish.
 
 Read [CONTRIBUTING.md](./CONTRIBUTING.md) before starting.

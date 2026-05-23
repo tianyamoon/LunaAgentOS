@@ -13,7 +13,7 @@ hermes acp --accept-hooks
 Runtime surface priority:
 
 1. `hermes acp`: main path for structured editor-style runtime sessions.
-2. `hermes gateway`: future path for background service or channel-based scenarios.
+2. `hermes gateway`: planned path for background service or channel-based scenarios.
 3. `hermes -z`: fallback or smoke-test path for lightweight checks.
 
 ## Profile loading
@@ -69,14 +69,14 @@ History restore uses the saved runtime and profile identity to recover the most 
 
 Hermes is a real provider that exposes runtime instances and profile targets.
 
-Session cards should show concrete runtime/profile identity, for example:
+Session cards show concrete runtime/profile identity, for example:
 
 ```text
 Hermes · WSL / ailearing
 profile: ailearing · qwen3.6-plus
 ```
 
-Hermes UX should make slow work visible instead of hiding it behind a final-only response. The card should surface:
+Hermes UX makes slow work visible instead of hiding it behind a final-only response. The card surfaces:
 
 - Output stream
 - Thought stream

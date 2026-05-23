@@ -1,101 +1,76 @@
 # LunaAgentOS 轻核心原则
 
-## 目的
+LunaAgentOS 的核心原则是：**统一入口，状态可见，协议清晰，App 保持轻量。**
 
-第一版不能做重。
+## 为什么保持轻核心
 
-原因很简单：
+Coding Agent 本身已经承担模型调用、工具执行、文件操作和长任务运行。LunaAgentOS 不替代底层 Agent，也不把第一层产品做成重平台。
 
-- Agent 本身已经很吃资源
-- 普通懂点开发的人也要能直接用起来
-- 我们需要的是真实入口，而不是大而全平台
+LunaAgentOS 聚焦上层控制：
 
-## 最轻、最核心的一点
+- 连接外部 Agent。
+- 展示 runtime availability。
+- 发送任务到明确 target。
+- 观察 output、thought、tool、plan、usage 和 state。
+- 保存本地 history。
+- 支持 session restore 和错误态。
 
-如果只保留一个核心价值，LunaAgentOS 第一版最该保留的是：
+## 当前轻核心
 
-**统一入口 + 状态可见。**
+当前产品核心由四部分组成：
 
-也就是：
+```text
+Protocol
+  -> Adapter Contract
+  -> Runtime Session Model
+  -> LunaAgentOS App
+```
 
-- 用户保留现有 Agent
-- LunaAgentOS 不抢底层运行时
-- 但它通过统一协议和轻量 App，把任务状态、工具过程、最终结果收进同一个 Runtime Session Model
+这些部分共同提供：
 
-## 第一版要轻到什么程度
+- Agent Fleet。
+- 当前发送目标。
+- Runtime Session Cards。
+- 活会话 / 归档会话。
+- 本地 JSON history。
+- Runtime detection。
+- first-party Claude Code 和 Hermes entries。
+- Trae IDE bridge entry。
 
-### 对用户来说
+## 做什么
 
-第一版最好做到：
+LunaAgentOS 当前优先做：
 
-- 打开快
-- 不要求复杂部署
-- 就算只懂一点开发，也能理解怎么用
-- 看一眼就知道哪个 Agent 在做什么
+- 统一 runtime entry。
+- 清晰 provider/runtime/profile 状态。
+- 可观察 Runtime Session Card。
+- 稳定本地 history 和 restore。
+- Adapter manifest、capability 和 normalized event contract。
+- Claude Code / Hermes runtime hardening。
+- Trae IDE bridge path。
 
-### 对实现来说
+## 不做什么
 
-第一版不应该依赖：
+LunaAgentOS 当前不把重心放在：
 
-- 重数据库
-- 重后端平台
-- 复杂云端控制面
-- 过度自动化体系
+- 重云端平台。
+- 企业治理后台。
+- 一次性接入所有 Agent。
+- 插件市场。
+- 复杂商业化工作流。
 
-## 从竞品学到的轻核心
+这些能力属于更后面的控制平面阶段。当前轻核心先保证真实 runtime entry、清晰 session surface 和稳定 adapter boundary。
 
-### amux
+## 设计标准
 
-学它：
+一个新能力进入 LunaAgentOS 时，需要满足：
 
-- watchdog 思维
+- 能通过 Adapter Contract 表达。
+- 能进入 Runtime Session Model。
+- 能被 App 清晰展示。
+- 不破坏外部 Agent 的原生优势。
+- 不把 runtime-specific 逻辑泄漏到通用 UI。
 
-不学它第一版就做得太重的部分：
+## 结论
 
-- 完整 control plane 运营台
-
-### Goose
-
-学它：
-
-- 统一入口
-- 不强迫用户换已有订阅
-
-不学它第一版就做得太满的部分：
-
-- 完整 Agent 产品大生态
-
-### Fusion
-
-学它：
-
-- 任务状态清晰
-- 流程可见
-
-不学它第一版就做得太重的部分：
-
-- 多节点工厂化编排
-- 大型任务层级体系
-
-## 当前轻核心落地口径
-
-LunaAgentOS 第一版只需要先证明这件事：
-
-**普通懂点开发的人，可以通过轻量 LunaAgentOS App，统一看见多个 Agent 的工作状态，并完成任务闭环。**
-
-## 做与不做
-
-### 做
-
-- 统一入口
-- 状态可见
-- 任务闭环
-- 轻量 App
-- 协议和 Adapter 边界清晰
-
-### 不做
-
-- 重平台
-- 重企业治理
-- 大而全生态
-- 一次性兼容所有 Agent
+轻核心让 LunaAgentOS 在保持可运行、可理解、可扩展的同时，为未来的 adapter ecosystem、collaboration workspace 和 control plane 留出空间。

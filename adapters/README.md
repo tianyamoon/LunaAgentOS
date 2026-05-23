@@ -8,7 +8,7 @@ A LunaAgentOS adapter declares an agent product's runtime surfaces, targets, cap
 
 - [`first-party/claude-code/`](./first-party/claude-code/) describes Claude Code.
 - [`first-party/hermes/`](./first-party/hermes/) describes Hermes.
-- [`first-party/trae-ide/`](./first-party/trae-ide/) describes the Trae IDE bridge direction.
+- [`first-party/trae-ide/`](./first-party/trae-ide/) describes the Trae IDE bridge adapter.
 
 ## Adapter contract
 
@@ -18,6 +18,6 @@ The public contract starts in [`../protocol/`](../protocol/):
 adapter manifest -> adapter host -> Runtime Session Model -> App
 ```
 
-## Legacy POC
+## Stdio adapter reference
 
-[`legacy/stdio-poc/`](./legacy/stdio-poc/) preserves the early stdio proof of concept as historical material. New adapter work starts from the protocol schemas and first-party adapter manifests.
+[`reference/stdio/`](./reference/stdio/) contains stdio adapter reference files for manifest loading, process lifecycle, stream handling, and normalized event translation. New adapter work starts from the protocol schemas and first-party adapter manifests.

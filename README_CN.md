@@ -28,7 +28,7 @@ LunaAgentOS 要做的是这些 Agent 之上的协议与控制层：
 | LunaAgentOS App | 已可用 | Tauri 2 + Rust Core + 前端工作台 |
 | Claude Code | 已接入 | 真实 runtime 入口 |
 | Hermes | 已接入 | Windows / WSL ACP runtime instance 与 profile |
-| Trae IDE | 规划中 | 保留 Bridge 路线，不伪装已接入 |
+| Trae IDE | Bridge | IDE-first Adapter 路线 |
 | Runtime Session Card | 已可用 | 输出流、思考流、运行流、最终响应 |
 | 多会话工作台 | 已可用 | 当前发送目标、当前会话、活会话、归档会话和一致生命周期色彩 |
 | 本地历史 | 已可用 | JSON 历史、恢复、只读归档和错误态 |
@@ -110,7 +110,7 @@ App 是当前官方推荐使用方式。新增 Agent 产品通过 Adapter Contra
 
 ### Trae IDE
 
-代表 IDE Bridge 方向。当前只作为桥接目标保留，不伪装成已经原生接入。
+代表 IDE-first Agent 产品的 Bridge 接入路线。
 
 ## 文档入口
 
@@ -136,8 +136,8 @@ App 是当前官方推荐使用方式。新增 Agent 产品通过 Adapter Contra
 - Hermes thought/tool/plan/usage 事件 UI
 - Runtime Session Card 视觉与可用性
 - 本地历史、恢复和错误态验证
-- Trae IDE Bridge 调研
-- 文档、截图和首发材料
+- Trae IDE Bridge 设计与接入
+- 文档、截图和发布材料
 
 请先阅读：
 

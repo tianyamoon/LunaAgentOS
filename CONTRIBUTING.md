@@ -1,6 +1,6 @@
 ﻿# 贡献指南
 
-LunaAgentOS 正在建设一个以协议为核心的异构 Coding Agent 操作层。当前最需要的是把产品定义、Adapter Contract 和 Claude Code + Hermes 的最小异构工作台同时讲清楚、做稳定、做可信。
+LunaAgentOS 正在建设一个以协议为核心的异构 Coding Agent 操作层。当前重点是稳定 Adapter Contract、Runtime Session Model、LunaAgentOS App，以及 Claude Code / Hermes first-party runtime entries。
 
 ## 当前产品边界
 
@@ -19,25 +19,25 @@ LunaAgentOS 正在建设一个以协议为核心的异构 Coding Agent 操作层
 - Hermes thought / tool / plan / usage 事件 UI。
 - Runtime Session Card 视觉与可用性。
 - 本地历史、恢复、删除、错误态验证。
-- Trae IDE Bridge 研究。
+- Trae IDE Bridge 设计与接入。
 - Runtime surface / Adapter 协议收敛。
 - Adapter manifest / capability model / unified JSON contract。
-- 文档、截图、Demo 和首发材料。
+- 文档、截图、Demo 和发布材料。
 - 测试与回归验证。
 
-## 当前最缺什么
+## 当前优先方向
 
 ### Runtime 稳定性
 
-- Claude Code 会话路径继续打磨。
-- Hermes WSL / ACP 路径继续打磨。
-- runtime 退出、恢复、错误态、只读归档的验证。
+- Claude Code 会话路径稳定性。
+- Hermes WSL / ACP 路径稳定性。
+- runtime 退出、恢复、错误态、只读归档验证。
 
 ### Adapter Contract
 
 - 明确 adapter manifest 应该描述什么。
 - 明确不同 runtime surface 如何映射到统一 Runtime Session Event。
-- 把 Claude Code / Hermes 逐步表达成 first-party adapters。
+- 强化 Claude Code / Hermes first-party adapter 表达。
 - 让新增 Agent 产品通过 Adapter Contract 接入。
 
 ### 会话卡片体验
@@ -49,9 +49,9 @@ LunaAgentOS 正在建设一个以协议为核心的异构 Coding Agent 操作层
 - 更稳定的滚动、复制、全屏、只看最新等操作。
 - 更接近 Hermes TUI 的“活会话”过程感。
 
-### Bridge 方案探索
+### Bridge 方案
 
-尤其是 `Trae IDE`。目标是把 IDE-first agent 产品纳入清晰的 Bridge 路径。
+`Trae IDE` 代表 IDE-first Agent 产品的 Bridge 路径。
 
 ## 协作原则
 
@@ -74,18 +74,18 @@ LunaAgentOS 正在建设一个以协议为核心的异构 Coding Agent 操作层
 
 LunaAgentOS 的核心是统一协议、Adapter / Plugin Contract 和 Runtime Session Model。LunaAgentOS App 是这套协议的具象化控制台和官方推荐使用方式。
 
-### 不过早做大全
+### 保持轻核心
 
-当前不鼓励：
+当前优先级之外：
 
-- 一次性接很多 Agent。
-- 为了“完整”而做过重 GUI 或复杂平台。
-- 先做复杂商业功能。
-- 在当前工作台基础还不稳时提前做复杂调用流。
+- 一次性接入大量 Agent。
+- 重 GUI 平台。
+- 复杂商业功能。
+- 超出 Runtime Session workspace 的复杂调用流。
 
 ### 对外部 Agent 保持尊重
 
-LunaAgentOS 的目标是接入、观测、沉淀现有 Agent，并逐步形成控制层。
+LunaAgentOS 的目标是接入、观测、沉淀现有 Agent，并形成可扩展控制层。
 
 ## 参与建议
 
@@ -107,18 +107,18 @@ LunaAgentOS 的目标是接入、观测、沉淀现有 Agent，并逐步形成�
 - Runtime Session Card。
 - 思考流 / 运行流 / 最终响应层级。
 - Markdown、代码块、表格、全屏阅读。
-- 截图 / Demo Mode / 首发视觉。
+- 截图 / Demo Mode / 发布视觉。
 
 ### 如果你偏产品 / 研究
 
 适合参与：
 
-- Agent 接入调研。
+- Agent 接入设计。
 - Trae IDE Bridge 路线。
-- 竞品与路线分析。
+- 产品路线与架构分析。
 - 文档与架构说明。
 
-## 当前优先模块
+## 优先模块
 
 ### P0
 
@@ -126,28 +126,28 @@ LunaAgentOS 的目标是接入、观测、沉淀现有 Agent，并逐步形成�
 - Claude Code / Hermes runtime hardening。
 - Hermes 过程事件 UI。
 - 本地历史与恢复路径验证。
-- GitHub 首发 README / 截图 / 快速开始。
+- README / 截图 / 快速开始。
 
 ### P1
 
 - `Trae IDE` Bridge。
 - 调用流设计。
-- 更完整的协作工作台。
+- 协作工作台。
 - 更清晰的控制平面边界。
 
-## 当前不要求
+## 当前边界
 
-- 一开始就完全统一技术栈。
-- 一开始就锁死所有架构细节。
-- 一开始就支持所有 Agent。
-- 一开始就做插件市场或商业化平台。
+- 完全统一技术栈。
+- 锁死所有架构细节。
+- 支持所有 Agent。
+- 插件市场或商业化平台。
 
 当前更重要的是：
 
 - 保持方向一致。
 - 保持协议清晰。
 - 保持边界诚实。
-- 让 Claude + Hermes 的最小异构工作台足够可信。
+- 让 Claude Code + Hermes 的异构工作台稳定可信。
 
 ## 交流标准
 
@@ -155,4 +155,4 @@ LunaAgentOS 的目标是接入、观测、沉淀现有 Agent，并逐步形成�
 
 1. 你理解 LunaAgentOS 是“控制层”，不是另一个底层 Agent。
 2. 你认可“协议优先、Adapter 优先、Runtime Session 优先”的推进方式。
-3. 你接受当前目标是最小异构闭环，而不是一开始追求大全。
+3. 你认可当前目标是稳定异构 runtime workspace，并逐步扩展到 Adapter ecosystem 和 control plane。

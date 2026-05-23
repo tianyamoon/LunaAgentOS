@@ -4,17 +4,17 @@ Hermes is valuable in LunaAgentOS because it can make runtime work feel alive, n
 
 ## Product direction
 
-The right direction for Hermes is not simply “make it faster.”
+Hermes in LunaAgentOS focuses on visible process, not final-only output.
 
 The product goal is:
 
 > Make slow work visible.
 
-A Hermes session card should preserve the feeling of a live TUI while using the desktop workspace to improve readability, persistence, and control.
+A Hermes session card preserves the feeling of a live TUI while using the desktop workspace to improve readability, persistence, and control.
 
-## What the card should show
+## Card surface
 
-The Hermes card should prioritize process visibility:
+The Hermes card prioritizes process visibility:
 
 - Current profile / runtime identity
 - Current task
@@ -24,7 +24,7 @@ The Hermes card should prioritize process visibility:
 - Output stream
 - Final response
 
-The user should see “Hermes is working” instead of “the app is stuck.”
+The user sees “Hermes is working” instead of “the app is stuck.”
 
 ## Runtime event surface
 
@@ -41,12 +41,12 @@ The desktop shell listens to runtime session updates and appends them to the mat
 
 ## UI principle
 
-Hermes should not be forced to look exactly like Claude Code. LunaAgentOS should let each runtime keep its useful shape while normalizing the workspace around Runtime Session Cards.
+Hermes keeps its useful runtime shape while LunaAgentOS normalizes the workspace around Runtime Session Cards.
 
 For Hermes, that means:
 
 - Process first, final answer second.
-- Clear runtime state over silent waiting.
+- Visible runtime state over silent gaps.
 - Tool and plan events visible enough to be useful.
 - Noise reduced without hiding the work.
 

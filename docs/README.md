@@ -23,13 +23,13 @@
 - [Apps](../apps/README.md)：LunaAgentOS App 入口
 - [Hermes ACP runtime](./hermes-acp-profile-runtime.md)：Hermes ACP / profile runtime 接入说明
 - [Hermes TUI direction](./hermes-tui-direction.md)：Hermes 过程可见和活会话体验
-- [Trae IDE bridge notes](../bridges/trae-ide/README.md)：Trae IDE Bridge 边界
+- [Trae IDE bridge](../bridges/trae-ide/README.md)：Trae IDE Bridge 边界
 
 ## Code entry points
 
 - [`protocol/`](../protocol/)：Adapter manifest、Runtime Session 和 Runtime Event contract
-- [`core/`](../core/)：Adapter Host、Runtime Session 和 Capability Model 目标 seam
-- [`adapters/`](../adapters/)：first-party adapters、legacy POC 和 adapter 入口
+- [`core/`](../core/)：Adapter Host、Runtime Session 和 Capability Model
+- [`adapters/`](../adapters/)：first-party adapters、stdio adapter reference 和 adapter 入口
 - [`apps/desktop-shell/`](../apps/desktop-shell/)：LunaAgentOS App 工程
 - [`apps/desktop-shell/src/`](../apps/desktop-shell/src/)：前端工作台
 - [`apps/desktop-shell/src-tauri/src/`](../apps/desktop-shell/src-tauri/src/)：Rust runtime / history / ACP 命令

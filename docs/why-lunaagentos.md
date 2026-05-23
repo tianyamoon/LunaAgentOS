@@ -1,112 +1,76 @@
 # 为什么做 LunaAgentOS
 
-## Agent 越来越强，控制层仍然稀缺
+## Agent 需要统一控制层
 
-今天的关键问题是 Agent 入口、协议和过程状态正在快速分散。
+Coding Agent 正在进入多个形态：
 
-真正的问题是：
+- CLI Agent
+- TUI Agent
+- IDE Agent
+- Gateway / 服务型 Agent
+- SDK / 可编程 Agent
 
-- Agent 越来越多
-- 协议越来越碎
-- 工具越来越强
-- 控制层几乎没有统一标准
+这些 Agent 的能力越来越强，但入口、协议、运行状态、历史和权限模型仍然分散。LunaAgentOS 解决的是这些 Agent 之上的统一控制问题。
 
-结果就是：
+## LunaAgentOS 的定位
 
-- 每个 Agent 都能干活
-- 多个 Agent 很难被统一编排
-- 人类也很难真正掌控全局
+LunaAgentOS 是一个以协议为核心的异构 Coding Agent 操作层。
 
-## LunaAgentOS 解决上层控制问题
+它提供：
 
-LunaAgentOS 想解决的是更上层的问题：
+- **统一入口**：把不同 Agent 产品呈现为可选择、可配置、可观察的 runtime entries。
+- **统一协议**：用 Adapter Contract 描述 runtime surface、capability、target/profile 和 session behavior。
+- **统一会话模型**：用 Runtime Session Model 承载 output、thought、runtime events、final response、history 和 restore state。
+- **统一工作台**：用 LunaAgentOS App 把协议变成可运行、可观察、可恢复的产品体验。
 
-- 如何让多个现成 Agent 被统一接入
-- 如何让它们拥有统一状态流
-- 如何让工具调用可见
-- 如何让任务可以被分发、审批、归档
+## 当前已经具备的基础
 
-一句话：
+LunaAgentOS 当前包含：
 
-LunaAgentOS 做多个 Agent 之上的控制层。
+- 可运行的 Tauri 桌面 App。
+- Claude Code first-party adapter entry。
+- Hermes Windows / WSL ACP runtime instances and profiles。
+- Trae IDE bridge entry。
+- Agent Fleet、当前发送目标和 provider/runtime/profile 状态。
+- Runtime Session Cards。
+- 活会话 / 归档会话列表。
+- 本地 JSON history、恢复和错误态。
+- 协议、adapter、core、app 的清晰仓库边界。
 
-## 为什么这件事值得做
+## 为什么协议是核心
 
-### 1. 市场已经证明“统一接入”有需求
+统一协议让 LunaAgentOS 可以把不同产品映射到同一个操作模型：
 
-已经有产品在做多 Agent 或多 Provider 的统一入口，这说明统一接入是明确需求。
+```text
+agent product
+  -> adapter manifest
+  -> adapter implementation
+  -> normalized Runtime Session events
+  -> App workspace
+```
 
-### 2. 接入之后是控制层
+这个模型让 LunaAgentOS 可以持续接入新的 Agent 产品，同时保持 App 体验一致。
 
-真正更有价值的是：
+## First-party adapters 的作用
 
-- 控制台
-- 控制平面
-- 协作与审批
-- 历史与观测
-- 任务编排
+Claude Code 和 Hermes 是当前 first-party adapters：
 
-### 3. 这比单个模型能力更耐久
+- Claude Code 验证长文本、Markdown、代码输出和 resumable coding sessions。
+- Hermes 验证 profile identity、WSL routing、ACP events、thought/tool/plan/usage stream 和过程可见体验。
 
-模型会变，Provider 会变，CLI 会变。  
-但“如何统一掌控多个 Agent”这个问题，会长期存在。
+Trae IDE 代表 IDE-first bridge path，用于把 IDE-native Agent 产品纳入同一个 Adapter Contract。
 
-## 第一版为了建立可信起点
+## 未来方向
 
-第一版真正的意义是：
+LunaAgentOS 的未来方向是成为异构 Agent 的控制平面：
 
-- 吸引参与者
-- 形成共识
-- 建立骨架
-- 证明方向
-
-第一版要让贡献者看到清晰目标、可信骨架和可运行入口。
-
-## 为什么选“强大 / 通用 / 免费”三家样板
-
-因为这三个技术目标代表不同产品价值位置：
-
-- `Claude Code`：强大
-- `Hermes`：通用
-- `Trae IDE`：免费
-
-这三者共同构成 LunaAgentOS 的初始叙事：
-
-- 能接强 Agent
-- 能接现实可用 Agent
-- 能覆盖免费入口
-
-## 为什么协议很重要
-
-如果没有统一协议，LunaAgentOS 就只是一个项目名。
-
-真正让这个项目成立的，是这些核心契约：
-
-- `manifest`
-- 生命周期状态机
-- 统一消息格式
-
-这套协议决定了未来是否能形成：
-
-- 插件生态
-- 可扩展 Adapter
-- 统一 UI 与控制逻辑
-
-## App 与协议内核
-
-App 很重要，因为它让协议和 runtime session 变得可见、可验证、可使用。
-
-LunaAgentOS 的灵魂是：
-
-- 统一 JSON Contract
-- Runtime Adapter / Plugin Contract
-- Runtime Session Model
-- tools / models / skills / MCP 等共用能力层
-
-真正的目标是：未来出现新的 Agent 产品时，通过 adapter manifest 和 adapter implementation 接入 LunaAgentOS。
-
-Claude Code 和 Hermes 是 first-party adapters，是样板和验证路径。
+- 更稳定的 Adapter Host。
+- 更清晰的 Capability Model。
+- 更强的 Runtime Session replay、restore 和 observation。
+- 可选择内容并发送到其他 entry 或 session 的 call flow。
+- 多 Agent 协作工作台。
+- tools、models、skills、MCP resources、permissions 和 routing 的统一能力层。
 
 ## 结论
 
-LunaAgentOS 值得做，因为世界需要一个真正可扩展的 Agent 控制层。
+LunaAgentOS 值得做，因为 Agent 产品会持续增加，用户需要一个稳定、开放、可扩展的控制层来统一入口、过程、历史和协作。

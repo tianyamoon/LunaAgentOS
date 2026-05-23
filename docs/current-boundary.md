@@ -5,9 +5,9 @@ LunaAgentOS is a protocol-centered control layer with a working App for heteroge
 ## What LunaAgentOS is
 
 - **A control layer above existing agents**: it connects to external runtimes and keeps their native strengths visible.
-- **A Runtime Adapter / Plugin contract direction**: new agent products enter through adapters and normalized runtime events.
+- **A Runtime Adapter / Plugin contract**: new agent products enter through adapters and normalized runtime events.
 - **A Runtime Session workspace**: the central object is a session card, not a chat bubble list.
-- **A neutral console**: Claude Code, Hermes, and future IDE agents are modeled as external entries.
+- **A neutral console**: Claude Code, Hermes, and IDE Bridge entries are modeled as external entries.
 - **A local-first App**: the App is the protocol's concrete control console and official recommended use path.
 
 ## What works now
@@ -16,11 +16,11 @@ LunaAgentOS is a protocol-centered control layer with a working App for heteroge
 - Hermes can be used through Windows / WSL ACP runtime instances and profiles.
 - The left side shows the Agent Fleet and current send target.
 - The center workspace shows active Runtime Session Cards.
-- Each card can hold output stream, thought stream, runtime stream, and final response.
+- Each card holds output stream, thought stream, runtime stream, and final response.
 - The right side separates live sessions from archived sessions.
 - Local JSON history stores session turns and supports restore/read-only states.
 - Demo mode shows the intended Claude + Hermes workspace without writing real history.
-- The product definition now treats protocol, adapters, and Runtime Session Model as the architecture guide for future refactors.
+- Protocol, adapters, and Runtime Session Model guide the current architecture.
 
 ## Current scope
 
@@ -37,7 +37,7 @@ The left fleet represents external entry objects:
 
 - Claude Code
 - Hermes
-- Trae IDE bridge target
+- Trae IDE bridge entry
 
 Claude internal subagents or delegation workers remain part of Claude's own internal mechanism.
 
@@ -45,7 +45,7 @@ Claude internal subagents or delegation workers remain part of Claude's own inte
 
 Claude Code and Hermes are first-party adapters that validate the contract.
 
-The long-term rule is:
+The adapter rule is:
 
 ```text
 new agent product -> adapter manifest + adapter implementation -> LunaAgentOS unified JSON contract

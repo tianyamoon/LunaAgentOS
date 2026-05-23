@@ -32,7 +32,7 @@ It defines a unified adapter contract and Runtime Session Model, connects to ext
 
 The product center is the contract between LunaAgentOS and external agent products.
 
-The contract should cover:
+The contract covers:
 
 - Adapter manifest.
 - Capability declaration.
@@ -77,7 +77,7 @@ Current primary surface:
 
 - **ACP / protocol** for structured runtime sessions and updates.
 
-Important future surfaces:
+Planned runtime surfaces:
 
 - **PTY / terminal** for native CLI/TUI compatibility.
 - **Gateway / messaging** for background and channel-based agents.
@@ -88,7 +88,7 @@ Important future surfaces:
 
 ### Claude Code
 
-Claude Code represents a high-value coding runtime. LunaAgentOS should model it as a first-party adapter and real external runtime entry.
+Claude Code represents a high-value coding runtime. LunaAgentOS models it as a first-party adapter and real external runtime entry.
 
 ### Hermes
 
@@ -96,7 +96,7 @@ Hermes represents profile-based runtime entries and process visibility. Its ACP 
 
 ### Trae IDE
 
-Trae IDE is a bridge target and future adapter direction. LunaAgentOS keeps it visible without pretending it is already a native runtime entry.
+Trae IDE is the IDE-first bridge adapter path. LunaAgentOS keeps it visible as a real bridge entry in the Agent Fleet.
 
 ## Direction
 
