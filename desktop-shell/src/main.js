@@ -60,6 +60,7 @@ import {
   formatCompactHistoryNotice,
   upsertHistoryEntry,
 } from "./history/payload.js";
+import { createProvidersStore } from "./state/providersStore.js";
 import { createSessionsStore } from "./state/sessionsStore.js";
 import {
   availableRuntimeInstancesForProvider as availableRuntimeInstancesForProviderRaw,
@@ -177,57 +178,6 @@ const fallbackSessions = {
   },
 };
 
-const providers = [
-  {
-    id: "claude",
-    name: "Claude Code",
-    lane: "",
-    noteKey: "provider.claude.note",
-    agents: [
-      {
-        id: "claude-main",
-        providerId: "claude",
-        nameKey: "agent.main",
-        subtitle: "Windows CLI",
-        noteKey: "agent.claude.note",
-        state: 1,
-      },
-    ],
-  },
-  {
-    id: "hermes",
-    name: "Hermes",
-    lane: "",
-    noteKey: "provider.hermes.note",
-    agents: [
-      {
-        id: "hermes-main",
-        providerId: "hermes",
-        nameKey: "agent.main",
-        subtitle: "WSL Runtime",
-        noteKey: "agent.hermes.note",
-        state: 1,
-      },
-    ],
-  },
-  {
-    id: "trae",
-    name: "Trae IDE",
-    lane: "",
-    noteKey: "provider.trae.note",
-    agents: [
-      {
-        id: "trae-main",
-        providerId: "trae",
-        nameKey: "agent.main",
-        subtitle: "IDE Bridge",
-        noteKey: "agent.trae.note",
-        state: 1,
-      },
-    ],
-  },
-];
-
 const LEGACY_TARGET_AGENT_KEY = "lunaagentos.currentTargetAgentId";
 const CURRENT_TARGET_AGENT_KEY = "lunaagentos.currentTargetId";
 const CURRENT_SESSION_KEY = "lunaagentos.currentSessionId";
@@ -286,6 +236,11 @@ const confirmDialog = document.getElementById("confirmDialog");
 localStorage.removeItem(CURRENT_SESSION_KEY);
 
 let currentTargetAgentId = localStorage.getItem(CURRENT_TARGET_AGENT_KEY) || localStorage.getItem(LEGACY_TARGET_AGENT_KEY) || "claude-main";
+const providersStore = createProvidersStore();
+const providers = providersStore.getProvidersRef();
+const runtimeAvailability = providersStore.getRuntimeAvailabilityRef();
+const runtimeInstances = providersStore.getRuntimeInstancesRef();
+const hermesProfilesByInstance = providersStore.getHermesProfilesByInstanceRef();
 const sessionsStore = createSessionsStore();
 const sessions = sessionsStore.getSessionsRef();
 const activeSessionIds = sessionsStore.getActiveSessionIdsRef();
@@ -298,13 +253,6 @@ let isLaunchDemoScene = false;
 let sendAsNewSession = false;
 let sendMode = localStorage.getItem(SEND_MODE_KEY) || "enter";
 let fontScaleId = localStorage.getItem(FONT_SCALE_KEY) || "default";
-let runtimeAvailability = {
-  claude: { summary: "probing", configured: false, available: false, command: "" },
-  hermes: { summary: "probing", configured: false, available: false, command: "" },
-  trae: { summary: "planned", configured: false, available: false, command: "IDE Bridge" },
-};
-let runtimeInstances = [];
-let hermesProfilesByInstance = {};
 let demoHistoryEntries = [];
 const deletedSessionIds = sessionsStore.getDeletedSessionIdsRef();
 const stoppedSessionIds = sessionsStore.getStoppedSessionIdsRef();
@@ -326,7 +274,7 @@ function allAgents() {
 }
 
 function providerById(id) {
-  return providers.find((provider) => provider.id === id);
+  return providersStore.providerById(id);
 }
 
 function runtimeInstancesForProvider(providerId) {
@@ -946,17 +894,15 @@ function showProviderAgents(provider) {
 async function refreshRuntimeProbe() {
   try {
     const result = await invoke("runtime_probe");
-    const next = { ...runtimeAvailability };
-    (result?.providers || []).forEach((item) => {
-      next[item.providerId] = item;
+    providersStore.batch(() => {
+      providersStore.patchRuntimeAvailability(
+        Object.fromEntries((result?.providers || []).map((item) => [item.providerId, item])),
+      );
+      providersStore.replaceRuntimeInstances(Array.isArray(result?.instances) ? result.instances : []);
+      providersStore.pruneHermesProfilesByInstanceIds(
+        runtimeInstances.filter((instance) => instance.available).map((instance) => instance.id),
+      );
     });
-    runtimeAvailability = next;
-    runtimeInstances = Array.isArray(result?.instances) ? result.instances : [];
-    hermesProfilesByInstance = Object.fromEntries(
-      Object.entries(hermesProfilesByInstance).filter(([instanceId]) =>
-        runtimeInstances.some((instance) => instance.id === instanceId && instance.available),
-      ),
-    );
     ensureCurrentTargetAgentExists();
     renderProviders();
     renderWorkspaceStatus();
@@ -1083,29 +1029,33 @@ function renderProviders() {
 function applyHermesProfiles(profiles) {
   const hermesProvider = providerById("hermes");
   if (!hermesProvider || !Array.isArray(profiles) || !profiles.length) return;
-  hermesProvider.agents = profiles.map((profile) => ({
-    id: profile.id,
-    providerId: "hermes",
-    name: profile.displayName,
-    subtitle: profile.subtitle || "WSL Profile",
-    note: profile.note || "Hermes profile",
-    state: typeof profile.state === "number" ? profile.state : 1,
-    profileName: profile.profileName,
-    model: profile.model,
-    gateway: profile.gateway,
-    alias: profile.alias,
-    profileAlias: profile.alias,
-    profileExecutable: profile.alias || null,
-    path: profile.path,
-    profilePath: profile.path,
-    skillCount: profile.skillCount,
-    hasEnv: profile.hasEnv,
-    hasSoul: profile.hasSoul,
-    isDefault: Boolean(profile.isDefault),
-  }));
-  hermesProvider.note = null;
-  hermesProvider.noteKey = "provider.hermes.loadedNote";
-  hermesProvider.noteParams = { count: profiles.length };
+  providersStore.batch(() => {
+    providersStore.setProviderAgents("hermes", profiles.map((profile) => ({
+      id: profile.id,
+      providerId: "hermes",
+      name: profile.displayName,
+      subtitle: profile.subtitle || "WSL Profile",
+      note: profile.note || "Hermes profile",
+      state: typeof profile.state === "number" ? profile.state : 1,
+      profileName: profile.profileName,
+      model: profile.model,
+      gateway: profile.gateway,
+      alias: profile.alias,
+      profileAlias: profile.alias,
+      profileExecutable: profile.alias || null,
+      path: profile.path,
+      profilePath: profile.path,
+      skillCount: profile.skillCount,
+      hasEnv: profile.hasEnv,
+      hasSoul: profile.hasSoul,
+      isDefault: Boolean(profile.isDefault),
+    })));
+    providersStore.setProviderNote("hermes", {
+      note: null,
+      noteKey: "provider.hermes.loadedNote",
+      noteParams: { count: profiles.length },
+    });
+  });
   if (isLaunchDemoScene) {
     ensureLaunchDemoHermesAgent();
     currentTargetAgentId = "hermes-demo-ailearning";
@@ -1116,17 +1066,17 @@ function applyHermesProfiles(profiles) {
 }
 
 function applyHermesProfilesForInstance(runtimeInstanceId, profiles) {
-  hermesProfilesByInstance = {
-    ...hermesProfilesByInstance,
-    [runtimeInstanceId]: Array.isArray(profiles) ? profiles : [],
-  };
-  const count = Object.values(hermesProfilesByInstance).reduce((sum, items) => sum + items.length, 0);
-  const hermesProvider = providerById("hermes");
-  if (hermesProvider && count > 0) {
-    hermesProvider.note = null;
-    hermesProvider.noteKey = "provider.hermes.loadedNote";
-    hermesProvider.noteParams = { count };
-  }
+  providersStore.batch(() => {
+    providersStore.setHermesProfilesForInstance(runtimeInstanceId, profiles);
+    const count = providersStore.totalHermesProfileCount();
+    if (providerById("hermes") && count > 0) {
+      providersStore.setProviderNote("hermes", {
+        note: null,
+        noteKey: "provider.hermes.loadedNote",
+        noteParams: { count },
+      });
+    }
+  });
 }
 
 async function loadHermesProfiles(runtimeInstanceIds = null) {
@@ -1401,14 +1351,14 @@ function ensureLaunchDemoHermesAgent() {
     skillCount: 4,
     hasSoul: true,
   };
-  hermesProvider.agents.push(agent);
+  providersStore.appendProviderAgent("hermes", agent);
   return agent;
 }
 
 function removeLaunchDemoHermesAgent() {
   const hermesProvider = providerById("hermes");
   if (!hermesProvider) return;
-  hermesProvider.agents = hermesProvider.agents.filter((agent) => agent.id !== "hermes-demo-ailearning");
+  providersStore.removeProviderAgent("hermes", "hermes-demo-ailearning");
 }
 
 
@@ -2617,7 +2567,7 @@ function ensureArchivedAgent(archived) {
       state: 5,
       isArchivedAgent: true,
     };
-    provider.agents.push(agent);
+    providersStore.appendProviderAgent(provider.id, agent);
   }
   if (provider.id === "hermes") {
     const hermesProfile = hermesProfileMetaFromArchived(archived);
