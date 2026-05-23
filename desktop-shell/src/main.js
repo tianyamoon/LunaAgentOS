@@ -12,6 +12,20 @@ import {
   createStickToBottomRegistry,
   isAtBottom,
 } from "./ui/stickToBottom.js";
+import {
+  LIFECYCLE,
+  InvalidLifecycleTransition,
+  canSendLifecycle,
+  canRestoreLifecycle,
+  canTransition,
+  isArchivedLifecycle,
+  isDeletedLifecycle,
+  isLiveLifecycle,
+  isRestoringLifecycle,
+  isStoppedLifecycle,
+  lifecycleFromLegacy,
+  nextLifecycle,
+} from "./state/sessionLifecycle.js";
 
 const { invoke } = window.__TAURI__.core;
 const listenRuntimeEvent = window.__TAURI__?.event?.listen?.bind(window.__TAURI__.event);
@@ -1028,17 +1042,68 @@ function formatSessionStatus(session) {
   return stateNames[session.state] || "UNKNOWN";
 }
 
+function sessionLifecycle(session) {
+  if (!session) return LIFECYCLE.live;
+  if (session.lifecycle) return session.lifecycle;
+  return lifecycleFromLegacy({
+    runtimeState: session.runtimeState,
+    isStopped: stoppedSessionIds.has(session.id),
+    isDeleted: deletedSessionIds.has(session.id),
+  });
+}
+
 function sessionRuntimeState(session) {
-  return session.runtimeState || "live";
+  return sessionLifecycle(session);
+}
+
+function setSessionLifecycle(session, target) {
+  if (!session) return null;
+  const from = sessionLifecycle(session);
+  let next;
+  try {
+    next = nextLifecycle(from, target);
+  } catch (error) {
+    if (error instanceof InvalidLifecycleTransition) {
+      console.error(
+        `[lifecycle] illegal transition for session ${session.id}: ${from} -> ${target}; ignoring`,
+        error,
+      );
+      return from;
+    }
+    throw error;
+  }
+  session.lifecycle = next;
+  session.runtimeState = next;
+  if (isStoppedLifecycle(next)) {
+    if (session.id) stoppedSessionIds.add(session.id);
+  } else if (next !== LIFECYCLE.deleted) {
+    if (session.id) stoppedSessionIds.delete(session.id);
+  }
+  if (isDeletedLifecycle(next) && session.id) {
+    deletedSessionIds.add(session.id);
+  }
+  return next;
+}
+
+function markSessionDeletedTombstone(sessionId) {
+  if (!sessionId) return;
+  deletedSessionIds.add(sessionId);
+}
+
+function isSessionDeletedTombstone(sessionId) {
+  return Boolean(sessionId) && deletedSessionIds.has(sessionId);
+}
+
+function isSessionStoppedTombstone(sessionId) {
+  return Boolean(sessionId) && stoppedSessionIds.has(sessionId);
 }
 
 function canSendToSession(session) {
-  return sessionRuntimeState(session) === "live";
+  return canSendLifecycle(sessionLifecycle(session));
 }
 
 function canRestoreSession(session) {
-  const state = sessionRuntimeState(session);
-  return state === "archived" || state === "resume_failed";
+  return canRestoreLifecycle(sessionLifecycle(session));
 }
 
 function isArchivedSessionListItem(item) {
@@ -1740,7 +1805,8 @@ function createSession(firstTask) {
     runtimeCommand: agent.runtimeCommand || null,
     task: firstTask,
     state: 2,
-    runtimeState: "live",
+    lifecycle: LIFECYCLE.live,
+    runtimeState: LIFECYCLE.live,
     turns: [],
     createdAt: new Date().toISOString(),
     fullscreen: false,
@@ -1896,7 +1962,8 @@ function buildLaunchDemoSessions() {
       agentName: "Hermes / ailearning",
       task: hermesTurn.task,
       state: 3,
-      runtimeState: "live",
+      lifecycle: LIFECYCLE.live,
+      runtimeState: LIFECYCLE.live,
       turns: [hermesTurn],
       createdAt: demoTimestamp(7),
       fullscreen: false,
@@ -1917,7 +1984,8 @@ function buildLaunchDemoSessions() {
       agentName: "Claude Code / 主会话",
       task: claudeTurn.task,
       state: 5,
-      runtimeState: "live",
+      lifecycle: LIFECYCLE.live,
+      runtimeState: LIFECYCLE.live,
       turns: [claudeTurn],
       createdAt: demoTimestamp(18),
       fullscreen: false,
@@ -2032,7 +2100,7 @@ function updateTurnFromEvents(sessionId, turnId, events) {
 }
 
 function appendStreamEventToTurn(sessionId, event) {
-  if (deletedSessionIds.has(sessionId) || stoppedSessionIds.has(sessionId)) return;
+  if (isSessionDeletedTombstone(sessionId) || isSessionStoppedTombstone(sessionId)) return;
   const session = sessions.find((item) => item.id === sessionId);
   if (!session) return;
   const turn = session.turns.find((item) => item.id === session.activeTurnId) || session.turns.at(-1);
@@ -2094,7 +2162,7 @@ function appendErrorToTurn(sessionId, turnId, message) {
   turn.logs = [message, ...turn.logs];
   session.state = 9;
   if (session.acpSessionId) {
-    session.runtimeState = "resume_failed";
+    setSessionLifecycle(session, LIFECYCLE.resume_failed);
     markSessionInactive(session.id);
   }
   renderWorkspace();
@@ -2797,14 +2865,14 @@ async function archiveLiveSession(sessionId) {
   const session = sessions.find((item) => item.id === sessionId);
   if (!session) return;
   const shouldMarkStopped = isSessionExecuting(session);
-  if (shouldMarkStopped) stoppedSessionIds.add(sessionId);
+  if (shouldMarkStopped) setSessionLifecycle(session, LIFECYCLE.stopped);
   try {
     await shutdownRuntimeSession(session);
   } catch (error) {
     console.error(error);
   }
   const stoppedTurn = shouldMarkStopped ? markSessionStopped(session) : null;
-  session.runtimeState = "archived";
+  setSessionLifecycle(session, LIFECYCLE.archived);
   try {
     await invoke("archive_history_session_entries", { sessionId });
     if (stoppedTurn) await saveTurnToHistory(session, stoppedTurn);
@@ -2824,7 +2892,7 @@ async function detachRuntimeKeepActive(session) {
   } catch (error) {
     console.error(error);
   }
-  session.runtimeState = "live";
+  setSessionLifecycle(session, LIFECYCLE.live);
 }
 
 async function stopSession(sessionId) {
@@ -2839,7 +2907,7 @@ async function stopSession(sessionId) {
     setAppNotice("该会话当前没有可停止的 live runtime。", "busy");
     return;
   }
-  stoppedSessionIds.add(sessionId);
+  setSessionLifecycle(session, LIFECYCLE.stopped);
   await detachRuntimeKeepActive(session);
   const stoppedTurn = markSessionStopped(session);
   try {
@@ -2911,7 +2979,11 @@ async function deleteSession(sessionId) {
     return;
   }
   try {
-    deletedSessionIds.add(sessionId);
+    if (session) {
+      setSessionLifecycle(session, LIFECYCLE.deleted);
+    } else {
+      markSessionDeletedTombstone(sessionId);
+    }
     if (session && runtimeState === "live") {
       try {
         await shutdownRuntimeSession(session);
@@ -3360,7 +3432,8 @@ async function restoreArchivedSession(sessionId) {
     createdAt: archived.createdAt,
     fullscreen: false,
     acpSessionId: archived.acpSessionId,
-    runtimeState: "archived",
+    lifecycle: LIFECYCLE.archived,
+    runtimeState: LIFECYCLE.archived,
     profileName: archived.hermesProfile?.profileName || null,
     profileAlias: archived.hermesProfile?.profileAlias || null,
     profileExecutable: archived.profileExecutable || archived.hermesProfile?.profileExecutable || null,
@@ -3405,19 +3478,19 @@ async function restoreArchivedSession(sessionId) {
   renderWorkspace();
   renderHistory();
   if (!restored.acpSessionId) {
-    restored.runtimeState = "archived";
+    setSessionLifecycle(restored, LIFECYCLE.archived);
     renderWorkspace();
     renderHistory();
     setAppNotice("已从历史归档恢复会话。缺少 ACP sessionId，当前为只读 transcript。");
     return;
   }
-  restored.runtimeState = "restoring";
+  setSessionLifecycle(restored, LIFECYCLE.restoring);
   renderWorkspace();
   renderHistory();
   setAppNotice("已恢复历史 transcript，正在尝试加载 ACP runtime...", "busy");
   const commands = acpCommandsForProvider(restored.providerId);
   if (!commands) {
-    restored.runtimeState = "archived";
+    setSessionLifecycle(restored, LIFECYCLE.archived);
     markSessionInactive(restored.id);
     saveCurrentSession(restored.id);
     renderWorkspace();
@@ -3434,7 +3507,7 @@ async function restoreArchivedSession(sessionId) {
       runtimeCommand: restored.runtimeCommand || null,
       profileExecutable: restored.profileExecutable || null,
     });
-    restored.runtimeState = "live";
+    setSessionLifecycle(restored, LIFECYCLE.live);
     markSessionActive(restored.id);
     saveCurrentSession(restored.id);
     renderWorkspace();
@@ -3451,7 +3524,7 @@ async function restoreArchivedSession(sessionId) {
         runtimeCommand: restored.runtimeCommand || null,
         profileExecutable: restored.profileExecutable || null,
       });
-      restored.runtimeState = "live";
+      setSessionLifecycle(restored, LIFECYCLE.live);
       markSessionActive(restored.id);
       saveCurrentSession(restored.id);
       renderWorkspace();
@@ -3468,7 +3541,7 @@ async function restoreArchivedSession(sessionId) {
         ].join("\n"),
         9,
       );
-      restored.runtimeState = "resume_failed";
+      setSessionLifecycle(restored, LIFECYCLE.resume_failed);
       markSessionInactive(restored.id);
       saveCurrentSession(restored.id);
       renderWorkspace();
@@ -3551,15 +3624,15 @@ async function runFallbackSession(session, turn) {
   }
   setAppNotice(`已将任务送入 ${session.agentName}，正在等待返回内容...`, "busy");
   try {
-    if (deletedSessionIds.has(session.id) || stoppedSessionIds.has(session.id)) return;
+    if (isSessionDeletedTombstone(session.id) || isSessionStoppedTombstone(session.id)) return;
     const saved = updateTurnFromEvents(session.id, turn.id, fallback.events);
-    if (deletedSessionIds.has(session.id) || stoppedSessionIds.has(session.id)) return;
+    if (isSessionDeletedTombstone(session.id) || isSessionStoppedTombstone(session.id)) return;
     if (saved) {
       await saveTurnToHistory(session, saved);
       setAppNotice(`${session.agentName} 会话已完成并写入历史。`);
     }
   } catch (error) {
-    if (deletedSessionIds.has(session.id) || stoppedSessionIds.has(session.id)) return;
+    if (isSessionDeletedTombstone(session.id) || isSessionStoppedTombstone(session.id)) return;
     appendErrorToTurn(session.id, turn.id, formatBackendError(error));
     await saveTurnToHistory(session, turn);
   } finally {
@@ -3593,9 +3666,9 @@ async function startAcpSession(session, turn) {
       runtimeCommand: session.runtimeCommand || null,
       profileExecutable: session.profileExecutable || null,
     });
-    if (deletedSessionIds.has(session.id) || stoppedSessionIds.has(session.id)) return;
+    if (isSessionDeletedTombstone(session.id) || isSessionStoppedTombstone(session.id)) return;
     const saved = updateTurnFromEvents(session.id, turn.id, events);
-    if (deletedSessionIds.has(session.id) || stoppedSessionIds.has(session.id)) return;
+    if (isSessionDeletedTombstone(session.id) || isSessionStoppedTombstone(session.id)) return;
     if (saved) {
       const agent = agentById(session.agentId);
       if (agent) {
@@ -3606,7 +3679,7 @@ async function startAcpSession(session, turn) {
       setAppNotice(`${session.agentName} 会话已完成并写入历史。`);
     }
   } catch (error) {
-    if (deletedSessionIds.has(session.id) || stoppedSessionIds.has(session.id)) return;
+    if (isSessionDeletedTombstone(session.id) || isSessionStoppedTombstone(session.id)) return;
     appendErrorToTurn(session.id, turn.id, formatBackendError(error));
     await saveTurnToHistory(session, turn);
   } finally {
@@ -3752,7 +3825,7 @@ async function syncRuntimeAliveStates() {
       const hasStartedRuntime = Boolean(session.acpSessionId);
       const aliveIds = aliveByProvider[session.providerId];
       if (declaredLive && hasStartedRuntime && aliveIds && !aliveIds.has(session.id)) {
-        session.runtimeState = "resume_failed";
+        setSessionLifecycle(session, LIFECYCLE.resume_failed);
         activeSessionIds.delete(session.id);
         mutated = true;
       }
