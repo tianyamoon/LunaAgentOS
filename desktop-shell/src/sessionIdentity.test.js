@@ -154,6 +154,31 @@ test("keeps Claude WSL card identity independent from selected Claude Win target
   assert.equal(normalized.agentName, "Claude Code · WSL");
 });
 
+test("hides Hermes profile path from card title while preserving it for identity", () => {
+  const normalized = normalizeSessionIdentity(
+    {
+      id: "session-hermes-path-alias",
+      providerId: "hermes",
+      providerName: "Hermes",
+      agentId: "hermes-wsl:profile:ailearing",
+      targetId: "hermes-wsl:profile:ailearing",
+      agentName: "Hermes · WSL / /root/.local/bin/ailearing",
+      runtimeInstanceId: "hermes-wsl",
+      runtimeLabel: "WSL",
+      profileAlias: "/root/.local/bin/ailearing",
+      profileExecutable: "/root/.local/bin/ailearing",
+      profilePath: "/root/hermes-agent/profiles/ailearing",
+      turns: [],
+    },
+    { providers, runtimeInstances, runtimeTargets: [] },
+  );
+
+  assert.equal(normalized.agentName, "Hermes · WSL / ailearing");
+  assert.equal(normalized.profileAlias, "/root/.local/bin/ailearing");
+  assert.equal(normalized.profileExecutable, "/root/.local/bin/ailearing");
+  assert.equal(normalized.profilePath, "/root/hermes-agent/profiles/ailearing");
+});
+
 test("keeps Claude Win runtime visible in session title", () => {
   const normalized = normalizeSessionIdentity(
     {

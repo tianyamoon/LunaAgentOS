@@ -96,15 +96,26 @@ export function displayProviderName(providerId, providerName, providers = []) {
   return providers.find((provider) => provider.id === providerId)?.name || providerName || "";
 }
 
+function pathBasename(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  return text.split(/[\\/]/).filter(Boolean).at(-1) || text;
+}
+
+function hermesProfileDisplayName(session = {}) {
+  return session.profileName
+    || pathBasename(session.profileAlias)
+    || pathBasename(session.profileExecutable)
+    || hermesProfileNameFromAgentId(session.targetId)
+    || hermesProfileNameFromAgentId(session.agentId)
+    || pathBasename(session.agentName?.split("/").at(-1));
+}
+
 export function normalizedSessionTitle(session, providers = []) {
   const providerName = displayProviderName(session.providerId, session.providerName, providers);
   if (session.providerId === "hermes") {
     const runtimeName = session.runtimeLabel ? ` · ${session.runtimeLabel}` : "";
-    const profileName = session.profileAlias
-      || session.profileName
-      || hermesProfileNameFromAgentId(session.targetId)
-      || hermesProfileNameFromAgentId(session.agentId)
-      || session.agentName?.split("/").at(-1)?.trim();
+    const profileName = hermesProfileDisplayName(session);
     return [`${providerName || "Hermes"}${runtimeName}`, profileName].filter(Boolean).join(" / ");
   }
   if (session.providerId === "claude") {
