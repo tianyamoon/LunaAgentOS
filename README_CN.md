@@ -1,8 +1,8 @@
 ﻿# LunaAgentOS
 
-LunaAgentOS 是一个面向异构 Coding Agent 的桌面控制台。
+LunaAgentOS 是一个以协议为核心的异构 Coding Agent 操作层。
 
-它不是另一个底层 Agent，也不是 Claude Code 的桌面套壳。它站在 Claude Code、Hermes、未来的 IDE Agent 之上，提供统一入口、Runtime Session 工作台、过程可见性和本地历史。
+它的核心不是桌面壳，而是统一 JSON Contract、Runtime Adapter / Plugin Contract 和 Runtime Session Model。当前桌面壳是消费这套协议的第一个参考 App：选择目标、把任务送入真实 runtime、观察过程，并沉淀本地历史。
 
 ![LunaAgentOS 桌面预览图](./docs/assets/lunaagentos-stage1-preview-cn.svg)
 
@@ -14,16 +14,17 @@ Agent 会越来越强，也会越来越分散：
 - **过程可见性不一致**：有的 runtime 能看到 thought/tool/plan/usage，有的只给最终响应。
 - **历史割裂**：不同工具里的会话很难统一归档、恢复、对比和复盘。
 
-LunaAgentOS 要做的是这些 Agent 之上的控制层：
+LunaAgentOS 要做的是这些 Agent 之上的协议与控制层：
 
 > 把每个外部 Agent 当作 runtime entry，把会话卡片做成统一承载输出流、思考流、运行流、最终响应和本地历史的 Runtime Session Surface。
 
-当前先做轻量桌面工作台，下一步走向调用流、协作工作台和更完整的控制平面。
+长期方向是 adapter-driven operating layer：Protocol first，Adapter/plugin second，Runtime Session Model third，Apps last。
 
 ## 当前能力
 
 | 模块 | 状态 | 说明 |
 |---|---:|---|
+| 产品定义 | 已明确 | Protocol / Adapter Contract / Runtime Session Model |
 | 桌面壳 | 已可用 | Tauri 2 + Rust Core + 前端工作台 |
 | Claude Code | 已接入 | 真实 runtime 入口 |
 | Hermes | 已接入 | Windows / WSL ACP runtime instance 与 profile |
@@ -90,6 +91,7 @@ desktop-shell/src-tauri/target/release/desktop-shell.exe
 LunaAgentOS 当前是：
 
 - **外部 Agent 之上的控制层**
+- **异构 runtime entry 的协议与 Adapter Contract**
 - **Runtime Session Card 工作台**
 - **异构入口的中立桌面控制台**
 - **走向调用流、协作工作台和控制平面的起点**
@@ -97,6 +99,7 @@ LunaAgentOS 当前是：
 LunaAgentOS 当前不是：
 
 - Claude Code 的桌面壳
+- 以 desktop-shell 为中心、adapter 只是内部 UI 配置的项目
 - 又一个聊天器
 - 伪造多 Agent 的内部角色系统
 - 已完成的商业平台
@@ -119,6 +122,7 @@ LunaAgentOS 当前不是：
 ## 文档入口
 
 - [docs/README.md](./docs/README.md)：文档总入口
+- [docs/product-definition.md](./docs/product-definition.md)：产品定义、协议与 Adapter 方向
 - [docs/getting-started.md](./docs/getting-started.md)：快速开始
 - [docs/current-boundary.md](./docs/current-boundary.md)：当前产品边界
 - [docs/why-lunaagentos.md](./docs/why-lunaagentos.md)：为什么做

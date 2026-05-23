@@ -92,6 +92,21 @@ LunaAgentOS 不做“更强的某一个 Agent”，而做“多个 Agent 之上�
 - 可扩展 Adapter
 - 统一 UI 与控制逻辑
 
+## 为什么 App 不是灵魂
+
+桌面壳很重要，因为它让协议和 runtime session 变得可见、可验证、可使用。
+
+但 LunaAgentOS 的灵魂不是某一个 App，而是：
+
+- 统一 JSON Contract
+- Runtime Adapter / Plugin Contract
+- Runtime Session Model
+- tools / models / skills / MCP 等共用能力层
+
+真正的目标是：未来出现新的 Agent 产品时，不需要修改 LunaAgentOS core 或 app，而是通过 adapter manifest 和 adapter implementation 接入。
+
+Claude Code 和 Hermes 是 first-party adapters，是样板和验证路径，不是 LunaAgentOS 的产品定义本身。
+
 ## 结论
 
 LunaAgentOS 值得做，不是因为世界上缺一个 Agent，而是因为世界上缺一个真正可扩展的 Agent 控制层。

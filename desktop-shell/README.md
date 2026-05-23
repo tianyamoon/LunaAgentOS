@@ -1,10 +1,10 @@
 ﻿# LunaAgentOS Desktop Shell
 
-This directory contains the LunaAgentOS desktop application.
+This directory contains the LunaAgentOS desktop reference application.
 
 ## Role
 
-The desktop shell provides:
+The desktop shell consumes the protocol/core layer and provides:
 
 - A native Tauri window.
 - The Agent Fleet, Runtime Session workspace, and session list UI.
@@ -48,10 +48,11 @@ The Windows helper scripts are kept for convenience:
 
 ## Product principle
 
-The desktop shell should stay light:
+The desktop shell should stay light and should not become the product center:
 
 - Fast to open.
 - Low overhead around heavy external agents.
 - Runtime state visible.
 - Session cards as the center of the workspace.
 - No fake internal agents just to make the UI look fuller.
+- No adapter model that only exists as internal UI configuration.

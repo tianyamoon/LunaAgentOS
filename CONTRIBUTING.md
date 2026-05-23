@@ -1,12 +1,14 @@
 ﻿# 贡献指南
 
-LunaAgentOS 正在建设一个面向异构 Coding Agent 的轻量桌面控制台。当前最需要的是让 Claude Code + Hermes 的最小异构工作台足够稳定、清楚、可参与。
+LunaAgentOS 正在建设一个以协议为核心的异构 Coding Agent 操作层。当前最需要的是把产品定义、Adapter Contract 和 Claude Code + Hermes 的最小异构工作台同时讲清楚、做稳定、做可信。
 
 ## 当前产品边界
 
 - `Claude Code` 是真实外部入口。
 - `Hermes` 是真实外部入口。
 - `Trae IDE` 是 Bridge 目标，不伪装成当前已原生接入。
+- `desktop-shell` 是当前参考 App，不是产品灵魂。
+- 长期目标是新增 Agent 通过 adapter/plugin 接入，而不是修改 app 内部逻辑。
 - 中间工作台的核心对象是 `Runtime Session Card`。
 - 左侧是入口舰队和配置区，不是主工作区切换器。
 - 右侧是活会话 / 归档会话列表和本地历史。
@@ -19,6 +21,7 @@ LunaAgentOS 正在建设一个面向异构 Coding Agent 的轻量桌面控制台
 - 本地历史、恢复、删除、错误态验证。
 - Trae IDE Bridge 研究。
 - Runtime surface / Adapter 协议收敛。
+- Adapter manifest / capability model / unified JSON contract。
 - 文档、截图、Demo 和首发材料。
 - 测试与回归验证。
 
@@ -29,6 +32,13 @@ LunaAgentOS 正在建设一个面向异构 Coding Agent 的轻量桌面控制台
 - Claude Code 会话路径继续打磨。
 - Hermes WSL / ACP 路径继续打磨。
 - runtime 退出、恢复、错误态、只读归档的验证。
+
+### Adapter Contract
+
+- 明确 adapter manifest 应该描述什么。
+- 明确不同 runtime surface 如何映射到统一 Runtime Session Event。
+- 把 Claude Code / Hermes 逐步表达成 first-party adapters。
+- 避免新增 Agent 产品时继续修改 app-specific switch statements。
 
 ### 会话卡片体验
 
@@ -59,6 +69,10 @@ LunaAgentOS 正在建设一个面向异构 Coding Agent 的轻量桌面控制台
 
 - Claude Code 的长 Markdown / 代码输出。
 - Hermes 的 thought / tool / plan / usage / state 过程事件。
+
+### Protocol / Adapter 优先
+
+LunaAgentOS 的核心不是 desktop shell，而是统一协议、Adapter / Plugin Contract 和 Runtime Session Model。桌面壳是第一个消费这套协议的参考 App。
 
 ### 不过早做大全
 
@@ -140,5 +154,5 @@ LunaAgentOS 的目标不是重写现有 Agent，而是接入、观测、沉淀�
 如果你要参与，希望先确认 3 件事：
 
 1. 你理解 LunaAgentOS 是“控制层”，不是另一个底层 Agent。
-2. 你认可“真实入口优先、会话卡片优先”的推进方式。
+2. 你认可“协议优先、Adapter 优先、Runtime Session 优先”的推进方式。
 3. 你接受当前目标是最小异构闭环，而不是一开始追求大全。

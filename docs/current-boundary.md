@@ -1,13 +1,14 @@
 ﻿# Current Product Boundary
 
-LunaAgentOS is currently a lightweight desktop workspace for heterogeneous coding-agent runtime sessions.
+LunaAgentOS is currently a protocol-centered control layer with a working desktop reference app for heterogeneous coding-agent runtime sessions.
 
 ## What LunaAgentOS is
 
 - **A control layer above existing agents**: it connects to external runtimes instead of replacing them.
+- **A Runtime Adapter / Plugin contract direction**: new agent products should eventually enter through adapters rather than app-specific code changes.
 - **A Runtime Session workspace**: the central object is a session card, not a chat bubble list.
 - **A neutral console**: Claude Code, Hermes, and future IDE agents are modeled as external entries.
-- **A local-first desktop shell**: runtime visibility and session history stay close to the developer workstation.
+- **A local-first reference app**: the desktop shell proves the protocol and session model, but it is not the product soul.
 
 ## What works now
 
@@ -19,12 +20,14 @@ LunaAgentOS is currently a lightweight desktop workspace for heterogeneous codin
 - The right side separates live sessions from archived sessions.
 - Local JSON history stores session turns and supports restore/read-only states.
 - Demo mode shows the intended Claude + Hermes workspace without writing real history.
+- The product definition now treats protocol, adapters, and Runtime Session Model as the architecture guide for future refactors.
 
 ## What LunaAgentOS is not
 
 - It is not a replacement for Claude Code, Hermes, or Trae IDE.
 - It is not a fake multi-agent system made from internal roles.
 - It is not a normal chatbot container.
+- It is not a desktop-shell-centered project where adapters are just internal UI configuration.
 - It is not a full orchestration platform yet.
 - It is not a plugin market or commercial platform.
 
@@ -39,6 +42,18 @@ The left fleet represents external entry objects:
 - Trae IDE bridge target
 
 Claude internal subagents or delegation workers are treated as Claude's own internal mechanism, not as independent LunaAgentOS entries.
+
+### Adapter boundary
+
+Claude Code and Hermes are first-party adapters that validate the contract. They are not the definition of LunaAgentOS itself.
+
+The long-term rule is:
+
+```text
+new agent product -> adapter manifest + adapter implementation -> LunaAgentOS unified JSON contract
+```
+
+Adding a new agent product should move toward adapter/plugin installation, not editing the desktop app.
 
 ### Current send target
 

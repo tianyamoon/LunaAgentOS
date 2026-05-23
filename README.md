@@ -2,9 +2,9 @@
 
 [中文说明](./README_CN.md)
 
-LunaAgentOS is a desktop control console for heterogeneous coding agents.
+LunaAgentOS is a protocol-centered operating layer for heterogeneous coding agents.
 
-It sits above Claude Code, Hermes, and future IDE agents as a neutral runtime-session workspace: choose a target, send work into a real runtime, watch the process, and keep local session history in one place.
+Its core is a unified JSON contract, a Runtime Adapter / Plugin Contract, and a Runtime Session Model. The desktop shell is the first reference app that consumes this layer: choose a target, send work into a real runtime, watch the process, and keep local session history in one place.
 
 ![LunaAgentOS desktop preview](./docs/assets/lunaagentos-stage1-preview.svg)
 
@@ -20,12 +20,13 @@ LunaAgentOS focuses on the layer above those runtimes:
 
 > Treat each external agent as a runtime entry, and make the session card the shared surface for output, thought stream, runtime stream, final response, and local history.
 
-The long-term direction is an operating layer for heterogeneous agents: lightweight today, collaborative next, and eventually a broader control plane.
+The long-term direction is an adapter-driven operating layer for heterogeneous agents: protocol first, adapters second, Runtime Session Model third, apps last.
 
 ## What works now
 
 | Area | Status | Notes |
 |---|---:|---|
+| Product definition | Active | Protocol / Adapter Contract / Runtime Session Model |
 | Desktop shell | Working | Tauri 2 + Rust core + web workspace |
 | Claude Code | Working | Real runtime entry |
 | Hermes | Working | Windows / WSL ACP runtime instances and profiles |
@@ -89,6 +90,7 @@ The demo scene is for orientation and screenshots only. It does not write to rea
 LunaAgentOS is:
 
 - **A control layer** above existing agents.
+- **A protocol and adapter contract** for heterogeneous runtime entries.
 - **A runtime-session workspace**, not a normal chatbot UI.
 - **A neutral console** for heterogeneous entries.
 - **A path toward agent collaboration and a broader control plane.**
@@ -96,6 +98,7 @@ LunaAgentOS is:
 LunaAgentOS is not:
 
 - A replacement for Claude Code, Hermes, or Trae.
+- A desktop shell whose adapters are only internal UI configuration.
 - A fake multi-agent demo made from internal roles.
 - A plugin market or commercial platform.
 - A full orchestration system yet.
@@ -103,6 +106,7 @@ LunaAgentOS is not:
 ## Documentation
 
 - [Docs index](./docs/README.md)
+- [Product definition](./docs/product-definition.md)
 - [Getting Started](./docs/getting-started.md)
 - [Current product boundary](./docs/current-boundary.md)
 - [Why LunaAgentOS](./docs/why-lunaagentos.md)

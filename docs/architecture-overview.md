@@ -1,23 +1,26 @@
 ﻿# LunaAgentOS Architecture Overview
 
-LunaAgentOS is a control layer above external coding-agent runtimes.
+LunaAgentOS is a protocol-centered control layer above external coding-agent runtimes.
 
-It does not rewrite the agents. It connects to them, observes their runtime sessions, normalizes their process visibility, and gives the developer one desktop workspace for active and archived work.
+It does not rewrite the agents. It defines a unified adapter contract and Runtime Session Model, connects to external runtimes through adapters, observes their sessions, normalizes their process visibility, and lets apps render active and archived work.
 
 ## Layers
 
 ```text
 ┌──────────────────────────────────────────────┐
-│                Desktop Shell                 │
-│        Tauri window / system integration      │
+│                    Apps                      │
+│       Desktop Shell / future consoles         │
 ├──────────────────────────────────────────────┤
-│                  UI Layer                    │
-│   Agent Fleet / Session Cards / History       │
+│             Runtime Session Model            │
+│       Session / Turn / Event / History        │
 ├──────────────────────────────────────────────┤
-│                Runtime Core                  │
-│   ACP sessions / process control / history    │
+│             Adapter Host / Core              │
+│ Discovery / lifecycle / routing / approval    │
 ├──────────────────────────────────────────────┤
-│              Runtime Surfaces                │
+│         Runtime Adapter / Plugin Contract     │
+│ Manifest / capabilities / normalized events   │
+├──────────────────────────────────────────────┤
+│              Runtime Surfaces                 │
 │      ACP / CLI / Gateway / IDE Bridge         │
 ├──────────────────────────────────────────────┤
 │              External Runtimes               │
@@ -25,45 +28,50 @@ It does not rewrite the agents. It connects to them, observes their runtime sess
 └──────────────────────────────────────────────┘
 ```
 
-## Desktop Shell
+## Protocol and adapter contract
 
-The desktop shell provides:
+The product center is the contract between LunaAgentOS and external agent products.
 
-- Native app window.
-- Local runtime configuration.
-- Local history storage.
-- Bridge between the web workspace and Rust runtime commands.
+The contract should cover:
 
-Current stack:
+- Adapter manifest.
+- Capability declaration.
+- Runtime targets and profiles.
+- Runtime sessions and turns.
+- Normalized event stream.
+- Tools, models, skills, MCP resources, permissions, routing metadata, and history.
 
-- Tauri 2
-- Rust core commands
-- Lightweight web UI
+Adding a new agent product should move toward installing an adapter manifest plus adapter implementation, not editing app-specific switch statements.
 
-## UI Layer
+## Apps
 
-The UI is organized around three areas:
+Apps consume the normalized state produced by the protocol/core layer.
 
-- **Left**: Agent Fleet and configuration.
-- **Center**: active Runtime Session Cards.
-- **Right**: live sessions and archived sessions.
+The current app is `desktop-shell/`, which provides:
 
-The center workspace is the product core. A session card is responsible for output, thought stream, runtime/tool/plan/usage stream, final response, scrolling, copy, fullscreen, restore, and archive actions.
+- Native Tauri window.
+- Agent Fleet and configuration.
+- Runtime Session Cards.
+- Live sessions and archived sessions.
+- Local history and restore actions.
 
-## Runtime Core
+The desktop shell is a reference app and proof surface. It is not the product soul.
 
-The Rust side owns runtime-facing responsibilities:
+## Adapter Host / Core
 
-- Runtime availability probing.
-- ACP process startup.
+The core layer owns runtime-facing responsibilities:
+
+- Adapter discovery and lifecycle.
+- Runtime availability probing through adapters.
+- Runtime process startup.
 - Session prompt / load / resume / shutdown commands.
-- Runtime event streaming into the frontend.
-- Local JSON history read/write/archive/delete.
-- Windows / WSL command routing.
+- Normalized event streaming into apps.
+- Local history read/write/archive/delete.
+- Windows / WSL / remote command routing.
 
 ## Runtime Surfaces
 
-Different external agents expose different surfaces. LunaAgentOS treats these as runtime surfaces, not as product boundaries.
+Different external agents expose different surfaces. LunaAgentOS treats these as runtime surfaces behind adapters, not as product boundaries.
 
 Current primary surface:
 
@@ -76,20 +84,20 @@ Important future surfaces:
 - **SDK** for official programmable runtimes.
 - **IDE Bridge** for IDE-first products such as Trae IDE.
 
-## External Runtimes
+## First-party adapters
 
 ### Claude Code
 
-Claude Code represents a high-value coding runtime. LunaAgentOS models it as one external entry that can own multiple sessions.
+Claude Code represents a high-value coding runtime. LunaAgentOS should model it as a first-party adapter and real external runtime entry.
 
 ### Hermes
 
-Hermes represents profile-based runtime entries and process visibility. Its ACP updates can expose thought, message, tool, plan, and usage events.
+Hermes represents profile-based runtime entries and process visibility. Its ACP updates can expose thought, message, tool, plan, and usage events. LunaAgentOS should model it as a first-party adapter, not as product identity.
 
 ### Trae IDE
 
-Trae IDE is a bridge target. LunaAgentOS keeps it visible as a future integration direction without pretending it is already a native runtime entry.
+Trae IDE is a bridge target and future adapter direction. LunaAgentOS keeps it visible without pretending it is already a native runtime entry.
 
 ## Direction
 
-The architecture is designed to stay light at the control layer and let external agents remain powerful at the runtime layer. The next architecture pressure will come from targetable call flow between entries and sessions.
+The architecture is designed to stay light at the control layer and let external agents remain powerful at the runtime layer. The next architecture work should follow [Product Definition](./product-definition.md): protocol first, adapter/plugin second, Runtime Session Model third, apps last.

@@ -1,6 +1,6 @@
 ﻿# LunaAgentOS Docs
 
-这里是 LunaAgentOS 面向外部开发者的公开文档入口。文档重点放在当前产品形态、运行方式、架构边界和未来方向。
+这里是 LunaAgentOS 面向外部开发者的公开文档入口。文档重点放在产品定义、协议/Adapter 方向、当前运行方式、架构边界和未来路线。
 
 ## Start
 
@@ -10,6 +10,7 @@
 
 ## Concepts
 
+- [Product definition](./product-definition.md)：协议、Adapter / Plugin、Runtime Session Model 与 App 壳的关系
 - [Why LunaAgentOS](./why-lunaagentos.md)：为什么需要异构 Agent 控制层
 - [Light core principles](./light-core-principles.md)：轻核心原则
 - [Roadmap](./roadmap.md)：从桌面工作台走向调用流、协作工作台和控制平面
