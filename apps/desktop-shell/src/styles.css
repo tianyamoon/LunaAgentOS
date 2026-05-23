@@ -195,22 +195,19 @@ body {
 .brand-title-row {
   display: flex;
   align-items: center;
-  gap: 8px;
   min-width: 0;
 }
 
 .brand-logo {
-  width: 28px;
-  height: 28px;
+  display: block;
+  width: 220px;
+  height: auto;
   object-fit: contain;
-  flex: 0 0 auto;
 }
 
-.brand h1 {
+.brand-title {
   margin: 0;
-  font-size: 1.42rem;
-  line-height: 1.08;
-  letter-spacing: -0.04em;
+  line-height: 0;
 }
 
 .app-notice {
