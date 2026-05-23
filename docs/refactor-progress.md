@@ -14,7 +14,8 @@
 | `e69d813` | C5 | launch demo 纯数据函数拆出 `src/launchDemo/`（8 个单测） |
 | `cc15fc0` | C7 (partial) | history 归档辅助函数拆出 `src/history/`（9 个单测） |
 | `e7b9ca8` | C9 + UX | sessions store 抽出 + main.js 接入 + 空 deck 占位文案智能切换（15 个单测） |
-| _本轮_ | C7 (rest) | `saveTurnToHistory` / `loadHistory` 纯逻辑拆到 `src/history/payload.js`（11 个单测） |
+| `8931264` | C7 (rest) | `saveTurnToHistory` / `loadHistory` 纯逻辑拆到 `src/history/payload.js`（11 个单测） |
+| _本轮_ | C4 (partial) | runtime view 派生函数拆到 `src/providers/runtimeView.js`（10 个单测） |
 
 ## main.js 体量变化
 
@@ -28,13 +29,14 @@
 | C5 (demo) 后 | 3127 |
 | C7-partial (history) 后 | 3068 |
 | C9 + UX 后 | 2894 |
-| C7 (rest) 后 | **2870** |
+| C7 (rest) 后 | 2870 |
+| C4 (partial) 后 | **2833** |
 
-净减约 17% / 拆出 5 个独立模块 + 1 个状态机 + 1 个 UI 控制器 + 1 个 sessions store + 1 个 history payload。
+净减约 18% / 拆出 6 个独立模块 + 1 个状态机 + 1 个 UI 控制器 + 1 个 sessions store + 1 个 history payload + 1 个 runtime view。
 
 ## 测试基线
 
-`npm run test:all` 当前 **118 个测试全过**：
+`npm run test:all` 当前 **128 个测试全过**：
 
 | 模块 | 测试 |
 |---|---|
@@ -47,9 +49,10 @@
 | `src/launchDemo/index.test.js` | 8 |
 | `src/history/entries.test.js` | 9 |
 | `src/history/payload.test.js` | 11 |
+| `src/providers/runtimeView.test.js` | 10 |
 | `src/ui/stickToBottom.test.js` | 11 |
 
-每个模块也有独立 `npm run test:<name>`：`identity / stick / lifecycle / store / i18n / markdown / demo / history`。
+每个模块也有独立 `npm run test:<name>`：`identity / stick / lifecycle / store / i18n / markdown / demo / history / providers`。
 
 ## 关键产物
 
@@ -85,6 +88,7 @@
 - `src/history/payload.js` — `buildHistoryEntryPayload / upsertHistoryEntry / formatCompactHistoryNotice`，把 `saveTurnToHistory` / `loadHistory` 中的纯部分挪出来
 - `src/state/sessionLifecycle.js` — 上面状态机
 - `src/state/sessionsStore.js` — 工作台核心 mutable state（sessions / currentSessionId / activeSessionIds / 墓碑 Set / 三个 UI flag 容器），暴露 stable references + 显式 mutation API + subscribe / batch
+- `src/providers/runtimeView.js` — 纯派生：`runtimeInstancesForProvider / availableRuntimeInstancesForProvider / runtimeInstanceById / providerRuntimeLabel / targetsForRuntimeInstance / runtimeTargets`，函数签名注入 `(providers / runtimeInstances / hermesProfilesByInstance)`
 - `src/ui/stickToBottom.js` — 上面控制器
 - 已存在的 `src/sessionIdentity.js`（前序工作） — 保留并被新结构使用
 
@@ -92,9 +96,9 @@
 
 ### Phase C 剩余
 
-- **C4 providers**
-  - 涉及 `providers / runtimeAvailability / runtimeInstances / hermesProfilesByInstance / runtimeTargets / targetsForProvider / etc.`
-  - 跟 `currentTargetAgentId` 强耦合。C9 store 已就绪，下一步可以基于 store API 注入。
+- **C4 providers (partial done)**
+  - runtime view 派生（`runtimeInstancesForProvider / availableRuntimeInstancesForProvider / runtimeInstanceById / providerRuntimeLabel / targetsForRuntimeInstance / runtimeTargets`）已拆到 `src/providers/runtimeView.js`。
+  - 还剩 `providers` 静态注册表 + `runtimeAvailability / hermesProfilesByInstance` mutable state + `providerAvailability / targetsForProvider / agentById / displayAgentName / targetDisplayName / providerById` 等需要后续做 providersStore 时一起搬。
 - **C6 runtime (ACP / fallback / streamEvents)**
   - `runFallbackSession / startAcpSession / appendStreamEventToTurn / updateTurnFromEvents / sessionSectionsFromEvents`
   - 仍然重度依赖 `sessions / activeSessionIds / 墓碑 Set / setSessionLifecycle / scheduleSessionCardRender`，但现在它们都已经在 `sessionsStore` 后面。

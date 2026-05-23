@@ -57,6 +57,14 @@ import {
   upsertHistoryEntry,
 } from "./history/payload.js";
 import { createSessionsStore } from "./state/sessionsStore.js";
+import {
+  availableRuntimeInstancesForProvider as availableRuntimeInstancesForProviderRaw,
+  providerRuntimeLabel as providerRuntimeLabelRaw,
+  runtimeInstanceById as runtimeInstanceByIdRaw,
+  runtimeInstancesForProvider as runtimeInstancesForProviderRaw,
+  runtimeTargets as runtimeTargetsRaw,
+  targetsForRuntimeInstance as targetsForRuntimeInstanceRaw,
+} from "./providers/runtimeView.js";
 
 const { invoke } = window.__TAURI__.core;
 const listenRuntimeEvent = window.__TAURI__?.event?.listen?.bind(window.__TAURI__.event);
@@ -318,21 +326,19 @@ function providerById(id) {
 }
 
 function runtimeInstancesForProvider(providerId) {
-  return runtimeInstances.filter((instance) => instance.providerId === providerId);
+  return runtimeInstancesForProviderRaw(runtimeInstances, providerId);
 }
 
 function availableRuntimeInstancesForProvider(providerId) {
-  return runtimeInstancesForProvider(providerId).filter((instance) => instance.available);
+  return availableRuntimeInstancesForProviderRaw(runtimeInstances, providerId);
 }
 
 function runtimeInstanceById(id) {
-  return runtimeInstances.find((instance) => instance.id === id) || null;
+  return runtimeInstanceByIdRaw(runtimeInstances, id);
 }
 
 function providerRuntimeLabel(provider, instance, availableCount) {
-  if (!instance?.runtimeLabel) return provider.name;
-  if (availableCount === 1 && instance.runtimeLabel === "Win") return provider.name;
-  return `${provider.name} · ${instance.runtimeLabel}`;
+  return providerRuntimeLabelRaw(provider, instance, availableCount);
 }
 
 function runtimeHostForInstance(instance) {
@@ -369,58 +375,15 @@ function sessionIdentityTitle(session) {
 }
 
 function targetsForRuntimeInstance(instance) {
-  const provider = providerById(instance.providerId);
-  if (!provider || !instance.available) return [];
-  const availableCount = availableRuntimeInstancesForProvider(instance.providerId).length;
-  if (instance.providerId === "claude") {
-    const label = providerRuntimeLabel(provider, instance, availableCount);
-    return [{
-      id: instance.id,
-      providerId: provider.id,
-      runtimeInstanceId: instance.id,
-      runtimeLabel: instance.runtimeLabel,
-      runtimeHost: runtimeHostForInstance(instance),
-      runtimeCommand: instance.command,
-      kind: "runtime",
-      name: label,
-      subtitle: instance.runtimeLabel || "Runtime",
-      state: 1,
-      available: true,
-    }];
-  }
-  if (instance.providerId === "hermes") {
-    return (hermesProfilesByInstance[instance.id] || []).map((profile) => ({
-      id: profile.id,
-      providerId: "hermes",
-      runtimeInstanceId: instance.id,
-      runtimeLabel: instance.runtimeLabel,
-      runtimeHost: runtimeHostForInstance(instance),
-      runtimeCommand: instance.command,
-      kind: "profile",
-      name: profile.displayName,
-      subtitle: profile.subtitle || `${instance.runtimeLabel || "Runtime"} Profile`,
-      note: profile.note || "Hermes profile",
-      state: typeof profile.state === "number" ? profile.state : 1,
-      available: true,
-      profileName: profile.profileName,
-      model: profile.model,
-      gateway: profile.gateway,
-      alias: profile.alias,
-      profileAlias: profile.alias,
-      profileExecutable: profile.alias || null,
-      path: profile.path,
-      profilePath: profile.path,
-      skillCount: profile.skillCount,
-      hasEnv: profile.hasEnv,
-      hasSoul: profile.hasSoul,
-      isDefault: Boolean(profile.isDefault),
-    }));
-  }
-  return [];
+  return targetsForRuntimeInstanceRaw(instance, {
+    providers,
+    runtimeInstances,
+    hermesProfilesByInstance,
+  });
 }
 
 function runtimeTargets() {
-  return runtimeInstances.flatMap(targetsForRuntimeInstance);
+  return runtimeTargetsRaw({ providers, runtimeInstances, hermesProfilesByInstance });
 }
 
 function normalizeWorkspaceSession(session) {

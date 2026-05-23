@@ -14,6 +14,7 @@
     "test:markdown": "node --test src/markdown/normalize.test.js src/markdown/escape.test.js",
     "test:demo": "node --test src/launchDemo/index.test.js",
     "test:history": "node --test src/history/entries.test.js src/history/payload.test.js",
+    "test:providers": "node --test src/providers/runtimeView.test.js",
     "test:all": "node --test \"src/**/*.test.js\"",
     "tauri": "tauri"
   },

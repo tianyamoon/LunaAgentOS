@@ -1,0 +1,150 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {
+  runtimeInstancesForProvider,
+  availableRuntimeInstancesForProvider,
+  runtimeInstanceById,
+  providerRuntimeLabel,
+  targetsForRuntimeInstance,
+  runtimeTargets,
+} from "./runtimeView.js";
+
+const claudeProvider = { id: "claude", name: "Claude Code" };
+const hermesProvider = { id: "hermes", name: "Hermes" };
+
+const claudeWin = {
+  id: "claude-win",
+  providerId: "claude",
+  runtimeLabel: "Win",
+  available: true,
+  command: "claude.cmd",
+};
+const claudeWsl = {
+  id: "claude-wsl",
+  providerId: "claude",
+  runtimeLabel: "WSL",
+  available: true,
+  command: "wsl.exe",
+};
+const hermesWsl = {
+  id: "hermes-wsl",
+  providerId: "hermes",
+  runtimeLabel: "WSL",
+  available: true,
+  command: "hermes",
+};
+const hermesUnavailable = {
+  id: "hermes-win",
+  providerId: "hermes",
+  runtimeLabel: "Win",
+  available: false,
+  command: "hermes.exe",
+};
+
+test("runtimeInstancesForProvider filters by providerId", () => {
+  const instances = [claudeWin, claudeWsl, hermesWsl];
+  assert.deepEqual(
+    runtimeInstancesForProvider(instances, "claude").map((i) => i.id),
+    ["claude-win", "claude-wsl"],
+  );
+  assert.deepEqual(runtimeInstancesForProvider(instances, "hermes").map((i) => i.id), ["hermes-wsl"]);
+  assert.deepEqual(runtimeInstancesForProvider(null, "claude"), []);
+});
+
+test("availableRuntimeInstancesForProvider drops unavailable instances", () => {
+  const instances = [claudeWin, hermesUnavailable, hermesWsl];
+  const available = availableRuntimeInstancesForProvider(instances, "hermes");
+  assert.deepEqual(available.map((i) => i.id), ["hermes-wsl"]);
+});
+
+test("runtimeInstanceById returns null when missing or empty input", () => {
+  assert.equal(runtimeInstanceById([claudeWin], "claude-win").id, "claude-win");
+  assert.equal(runtimeInstanceById([claudeWin], "missing"), null);
+  assert.equal(runtimeInstanceById(null, "claude-win"), null);
+  assert.equal(runtimeInstanceById([claudeWin], null), null);
+});
+
+test("providerRuntimeLabel collapses solo Win instance to provider name", () => {
+  assert.equal(providerRuntimeLabel(claudeProvider, claudeWin, 1), "Claude Code");
+  assert.equal(providerRuntimeLabel(claudeProvider, claudeWin, 2), "Claude Code · Win");
+  assert.equal(providerRuntimeLabel(claudeProvider, claudeWsl, 2), "Claude Code · WSL");
+  assert.equal(providerRuntimeLabel(claudeProvider, { runtimeLabel: null }, 1), "Claude Code");
+});
+
+test("targetsForRuntimeInstance: claude produces a runtime kind row", () => {
+  const targets = targetsForRuntimeInstance(claudeWin, {
+    providers: [claudeProvider],
+    runtimeInstances: [claudeWin],
+    hermesProfilesByInstance: {},
+  });
+  assert.equal(targets.length, 1);
+  assert.equal(targets[0].kind, "runtime");
+  assert.equal(targets[0].providerId, "claude");
+  assert.equal(targets[0].runtimeInstanceId, "claude-win");
+});
+
+test("targetsForRuntimeInstance: hermes expands hermes profiles", () => {
+  const profiles = [
+    {
+      id: "hermes-wsl:profile:default",
+      displayName: "default",
+      profileName: "default",
+      alias: null,
+      model: "qwen3.6-plus",
+      isDefault: true,
+    },
+    {
+      id: "hermes-wsl:profile:ailearing",
+      displayName: "ailearing",
+      profileName: "ailearing",
+      alias: "ailearing",
+      model: "qwen3.6-plus",
+    },
+  ];
+  const targets = targetsForRuntimeInstance(hermesWsl, {
+    providers: [hermesProvider],
+    runtimeInstances: [hermesWsl],
+    hermesProfilesByInstance: { "hermes-wsl": profiles },
+  });
+  assert.equal(targets.length, 2);
+  assert.equal(targets[0].kind, "profile");
+  assert.equal(targets[0].profileExecutable, null); // default has alias=null
+  assert.equal(targets[1].profileExecutable, "ailearing");
+  assert.equal(targets[0].isDefault, true);
+});
+
+test("targetsForRuntimeInstance: unavailable instances yield no targets", () => {
+  const targets = targetsForRuntimeInstance(hermesUnavailable, {
+    providers: [hermesProvider],
+    runtimeInstances: [hermesUnavailable],
+    hermesProfilesByInstance: { "hermes-win": [{ id: "hermes-win:profile:x", displayName: "x" }] },
+  });
+  assert.deepEqual(targets, []);
+});
+
+test("targetsForRuntimeInstance: unknown provider yields no targets", () => {
+  const targets = targetsForRuntimeInstance(
+    { id: "unknown", providerId: "trae", available: true, runtimeLabel: "IDE" },
+    { providers: [claudeProvider], runtimeInstances: [], hermesProfilesByInstance: {} },
+  );
+  assert.deepEqual(targets, []);
+});
+
+test("runtimeTargets: flattens across all instances", () => {
+  const profiles = [{ id: "hermes-wsl:profile:default", displayName: "default" }];
+  const all = runtimeTargets({
+    providers: [claudeProvider, hermesProvider],
+    runtimeInstances: [claudeWin, hermesWsl, hermesUnavailable],
+    hermesProfilesByInstance: { "hermes-wsl": profiles },
+  });
+  assert.equal(all.length, 2);
+  const ids = all.map((target) => target.id).sort();
+  assert.deepEqual(ids, ["claude-win", "hermes-wsl:profile:default"]);
+});
+
+test("runtimeTargets: empty input yields empty result", () => {
+  assert.deepEqual(
+    runtimeTargets({ providers: [], runtimeInstances: null, hermesProfilesByInstance: null }),
+    [],
+  );
+});
