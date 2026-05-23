@@ -24,17 +24,22 @@ fn history_schema_version() -> u32 {
 
 fn classify_backend_error(error: String) -> String {
     let lower = error.to_lowercase();
-    let code = if lower.contains("启动 claude acp adapter 失败")
+    let code = if lower.contains("session")
+        && (lower.contains("not found") || lower.contains("不存在"))
+    {
+        "SESSION_NOT_FOUND"
+    } else if lower.contains("permission") || lower.contains("denied") || lower.contains("权限") {
+        "PERMISSION_DENIED"
+    } else if lower.contains("missing executable") || lower.contains("no such file or directory") {
+        "RUNTIME_DEPENDENCY_MISSING"
+    } else if lower.contains("启动 claude acp adapter 失败")
+        || lower.contains("启动 hermes acp adapter 失败")
         || lower.contains("not recognized")
         || lower.contains("not found")
+        || lower.contains("cannot find")
         || lower.contains("找不到")
     {
         "RUNTIME_NOT_FOUND"
-    } else if lower.contains("permission") || lower.contains("denied") || lower.contains("权限") {
-        "PERMISSION_DENIED"
-    } else if lower.contains("session") && (lower.contains("not found") || lower.contains("不存在"))
-    {
-        "SESSION_NOT_FOUND"
     } else if lower.contains("json") || lower.contains("parse") || lower.contains("解析") {
         "PROTOCOL_PARSE_FAILED"
     } else if lower.contains("broken pipe")

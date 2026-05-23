@@ -396,14 +396,18 @@ fn start_acp_session(
         });
     }
 
-    let mut stdin = child
-        .stdin
-        .take()
-        .ok_or_else(|| format!("{} adapter stdin 不可用。", runtime.display()))?;
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| format!("{} adapter stdout 不可用。", runtime.display()))?;
+    let mut stdin = child.stdin.take().ok_or_else(|| {
+        abort_started_child(
+            &mut child,
+            format!("{} adapter stdin 不可用。", runtime.display()),
+        )
+    })?;
+    let stdout = child.stdout.take().ok_or_else(|| {
+        abort_started_child(
+            &mut child,
+            format!("{} adapter stdout 不可用。", runtime.display()),
+        )
+    })?;
     let mut reader = BufReader::new(stdout);
     let mut next_id: i64 = 0;
 
@@ -426,8 +430,10 @@ fn start_acp_session(
             }
         }
     });
-    write_message(&mut stdin, &init)?;
-    let init_result = read_response(
+    if let Err(error) = write_message(&mut stdin, &init) {
+        return Err(abort_started_child(&mut child, error));
+    }
+    let init_result = match read_response(
         runtime,
         &mut reader,
         &mut stdin,
@@ -435,7 +441,10 @@ fn start_acp_session(
         Some(&stderr_log),
         &mut events,
         on_event,
-    )?;
+    ) {
+        Ok(result) => result,
+        Err(error) => return Err(abort_started_child(&mut child, error)),
+    };
     push_event(
         &mut events,
         json!({
@@ -483,8 +492,10 @@ fn start_acp_session(
         }),
     };
     let method = session_request["method"].as_str().unwrap_or("session/new");
-    write_message(&mut stdin, &session_request)?;
-    let session_result = read_response(
+    if let Err(error) = write_message(&mut stdin, &session_request) {
+        return Err(abort_started_child(&mut child, error));
+    }
+    let session_result = match read_response(
         runtime,
         &mut reader,
         &mut stdin,
@@ -492,7 +503,10 @@ fn start_acp_session(
         Some(&stderr_log),
         &mut events,
         on_event,
-    )?;
+    ) {
+        Ok(result) => result,
+        Err(error) => return Err(abort_started_child(&mut child, error)),
+    };
     let session_id = session_request["params"]["sessionId"]
         .as_str()
         .map(ToString::to_string)
@@ -502,7 +516,12 @@ fn start_acp_session(
                 .and_then(|value| value.as_str())
                 .map(ToString::to_string)
         })
-        .ok_or_else(|| format!("{} 未返回 sessionId。", runtime.display()))?;
+        .ok_or_else(|| {
+            abort_started_child(
+                &mut child,
+                format!("{} 未返回 sessionId。", runtime.display()),
+            )
+        })?;
 
     let content = match method {
         "session/resume" => format!("{} 会话已恢复。", runtime.display()),
@@ -531,6 +550,12 @@ fn start_acp_session(
         next_id,
         session_id,
     })
+}
+
+fn abort_started_child(child: &mut Child, error: String) -> String {
+    let _ = child.kill();
+    let _ = child.wait();
+    error
 }
 
 fn send_prompt(

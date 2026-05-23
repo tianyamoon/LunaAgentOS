@@ -2032,6 +2032,11 @@ textarea {
   box-shadow: 0 0 0 3px rgba(99, 82, 63, 0.06);
 }
 
+.history-signal.signal-failed {
+  background: var(--error);
+  box-shadow: 0 0 0 3px rgba(192, 58, 58, 0.1);
+}
+
 .history-state-pill {
   display: inline-flex;
   align-items: center;
@@ -2045,6 +2050,18 @@ textarea {
   font-weight: 800;
   line-height: 1;
   white-space: nowrap;
+}
+
+.history-state-pill.runtime-restoring {
+  background: rgba(88, 112, 190, 0.12);
+  border-color: rgba(88, 112, 190, 0.16);
+  color: #3e5fa8;
+}
+
+.history-state-pill.runtime-failed {
+  background: rgba(191, 74, 74, 0.12);
+  border-color: rgba(191, 74, 74, 0.14);
+  color: #9c3434;
 }
 
 .history-item-meta {

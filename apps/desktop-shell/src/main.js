@@ -600,7 +600,7 @@ function canRestoreSession(session) {
 }
 
 function isArchivedSessionListItem(item) {
-  return item.runtimeState === "archived";
+  return isArchivedLifecycle(item.runtimeState || LIFECYCLE.live);
 }
 
 function isActiveSessionListItem(item) {
@@ -621,10 +621,16 @@ function formatBackendError(error) {
     PERMISSION_DENIED: "权限被拒绝，请检查授权或目录权限",
     SESSION_NOT_FOUND: "远端 session 不存在或已失效",
     PROTOCOL_PARSE_FAILED: "协议响应解析失败",
+    RUNTIME_DEPENDENCY_MISSING: "运行时依赖缺失",
     RUNTIME_EXITED: "运行时进程已退出",
     UNKNOWN: "未知运行时错误",
   };
   return `${labels[code] || code}：${message}`;
+}
+
+function compactNoticeText(value, maxLength = 180) {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
 }
 
 function setAppNotice(message, tone = "muted") {
@@ -2381,12 +2387,17 @@ function renderSessionListSection(sectionId, title, note, items, emptyText) {
 function renderSessionListItem(item) {
   const isActiveHistoryItem = sessionsStore.getCurrentSessionId() === item.id;
   const isArchived = isArchivedSessionListItem(item);
-  const signalClass = isActiveHistoryItem || item.isInWorkspace
+  const isResumeFailed = item.runtimeState === LIFECYCLE.resume_failed;
+  const signalClass = isResumeFailed
+    ? "signal-failed"
+    : isActiveHistoryItem || item.isInWorkspace
     ? "signal-workspace"
     : isArchived
       ? "signal-archive"
       : "signal-active";
-  const signalLabel = isActiveHistoryItem
+  const signalLabel = isResumeFailed
+    ? t("history.signal.failed")
+    : isActiveHistoryItem
     ? t("history.signal.current")
     : item.isInWorkspace
       ? t("history.signal.workspace")
@@ -2401,7 +2412,7 @@ function renderSessionListItem(item) {
       <div class="history-item-top">
         <strong class="history-tool-name"><span class="history-signal ${signalClass}" title="${escapeHtml(signalLabel)}" aria-label="${escapeHtml(signalLabel)}"></span>${escapeHtml(item.providerName)}</strong>
         <div class="history-item-actions">
-          ${shouldShowState ? `<span class="history-state-pill">${escapeHtml(stateLabel)}</span>` : ""}
+          ${shouldShowState ? `<span class="history-state-pill ${runtimeStateClasses[item.runtimeState] || ""}">${escapeHtml(stateLabel)}</span>` : ""}
           <button type="button" class="history-delete-btn" data-session-id="${item.id}" title="${t("history.delete")}" aria-label="${t("history.delete")}">${renderSessionActionIcon("delete")}</button>
         </div>
       </div>
@@ -2602,6 +2613,11 @@ async function restoreArchivedSession(sessionId) {
   } catch (loadError) {
     const formattedLoadError = formatBackendError(loadError);
     try {
+      await invoke(commands.shutdown, { runtimeSessionId: restored.id });
+    } catch (shutdownError) {
+      console.error(shutdownError);
+    }
+    try {
       await invoke(commands.resume, {
         runtimeSessionId: restored.id,
         acpSessionId: restored.acpSessionId,
@@ -2632,7 +2648,7 @@ async function restoreArchivedSession(sessionId) {
       saveCurrentSession(restored.id);
       renderWorkspace();
       renderHistory();
-      setAppNotice("ACP runtime 重连失败，已保留只读 transcript。", "error");
+      setAppNotice(`ACP runtime 重连失败：${compactNoticeText(formattedResumeError)}。已保留只读 transcript。`, "error");
     }
   }
 }
