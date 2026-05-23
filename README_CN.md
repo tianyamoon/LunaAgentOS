@@ -1,4 +1,8 @@
-﻿# LunaAgentOS
+﻿<p align="center">
+  <img src="./docs/assets/logo2.png" alt="LunaAgentOS" width="560" />
+</p>
+
+<h1 align="center">LunaAgentOS</h1>
 
 LunaAgentOS 是一个以协议为核心的异构 Coding Agent 操作层。
 

@@ -1,6 +1,12 @@
-﻿# LunaAgentOS
+﻿<p align="center">
+  <img src="./docs/assets/logo2.png" alt="LunaAgentOS" width="560" />
+</p>
 
-[中文说明](./README_CN.md)
+<h1 align="center">LunaAgentOS</h1>
+
+<p align="center">
+  <a href="./README_CN.md">中文说明</a>
+</p>
 
 LunaAgentOS is a protocol-centered operating layer for heterogeneous coding agents.
 
