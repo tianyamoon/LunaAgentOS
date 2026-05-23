@@ -1,5 +1,12 @@
-﻿import DOMPurify from "dompurify";
-import MarkdownIt from "markdown-it";
+﻿import {
+  escapeHtml,
+  renderMermaidDiagrams,
+  renderRichText,
+  renderCodeFence,
+  renderInlineMarkdown,
+  renderMarkdownTable,
+  isMarkdownTable,
+} from "./markdown/index.js";
 import {
   hermesProfileNameFromAgentId,
   normalizeSessionIdentity,
@@ -120,185 +127,6 @@ const acpRuntimeCommands = {
     aliveIds: "runtime_acp_hermes_alive_ids",
   },
 };
-
-const markdownRenderer = new MarkdownIt({
-  html: false,
-  linkify: true,
-  breaks: false,
-  typographer: false,
-});
-
-
-markdownRenderer.renderer.rules.fence = (tokens, index) => {
-  const token = tokens[index];
-  const lang = token.info.trim().split(/\s+/)[0] || "";
-  return renderCodeFence(lang, token.content);
-};
-
-markdownRenderer.renderer.rules.table_open = () => "<div class=\"md-table-wrap\"><table class=\"md-table\">\n";
-markdownRenderer.renderer.rules.table_close = () => "</table></div>\n";
-
-function transformOutsideCodeFences(text, transformLine) {
-  const lines = String(text || "").replace(/\r\n/g, "\n").split("\n");
-  const output = [];
-  let inFence = false;
-  lines.forEach((line) => {
-    if (line.trim().startsWith("```")) {
-      inFence = !inFence;
-      output.push(line);
-      return;
-    }
-    output.push(inFence ? line : transformLine(line));
-  });
-  return output.join("\n");
-}
-
-function splitCollapsedMarkdownTableRows(line) {
-  return String(line || "")
-    .replace(/\|\s*(?=\|\s*:?-{3,}:?\s*\|)/g, "|\n")
-    .replace(/\|\s*(?=\|[^|\n]{1,80}\|[^|\n]{0,120}\|[^|\n]{0,120}\|)/g, "|\n");
-}
-
-function normalizeRuntimeMarkdown(text) {
-  return transformOutsideCodeFences(text, (line) => {
-    let value = splitCollapsedMarkdownTableRows(line)
-      .replace(/(\|)\s*(?=\*\*[^*\n]{1,80}\*\*[^|\n]*(?:#{1,6}\s|$))/gu, "$1\n\n")
-      .replace(/([^\n#])(?=#{1,6}\s+\S)/g, "$1\n\n")
-      .replace(/(#{1,6}\s*[^\n|]{1,180}?)\s*(\|)/g, "$1\n$2")
-      .replace(/(^|\n)(#{1,6}\s+\d+(?:\.\d+)?\s+[^-\n]{2,50})\s*-\s*/gu, "$1$2\n\n- ")
-      .replace(/([^\n])-\s*(?=\s*\*\*[^*\n]{1,40}\*\*)/gu, "$1\n- ")
-      .replace(/(^|\n)-(?=\*\*)/gu, "$1- ")
-      .replace(/(^|\n)---(?=\*\*)/gu, "$1---\n\n");
-    if (!value.trimStart().startsWith("|") && (value.match(/\|/g) || []).length >= 2) {
-      value = value.replace(/^(.{1,180}?)(\|[^|\n]+\|[^|\n]*\|.*)$/, (_, prefix, table) => `${prefix.trimEnd()}\n${table}`);
-    }
-    return value;
-  });
-}
-
-function markdownTableCellCount(line) {
-  const value = String(line || "").trim().replace(/^\|/, "").replace(/\|$/, "");
-  return value ? value.split("|").length : 0;
-}
-
-function isMarkdownTableSeparator(line) {
-  return /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(String(line || "").trim());
-}
-
-function hasMarkdownTable(text) {
-  const lines = String(text || "").split(/\r?\n/);
-  return lines.some((line, index) => line.includes("|")
-    && isMarkdownTableSeparator(lines[index + 1]));
-}
-
-function closeStreamingMarkdown(text) {
-  let value = String(text || "");
-  const fenceCount = (value.match(/```/g) || []).length;
-  if (fenceCount % 2 === 1) value += "\n```";
-  const inlineTickCount = (value.match(/(?<!`)`(?!`)/g) || []).length;
-  if (inlineTickCount % 2 === 1) value += "`";
-  const strongCount = (value.match(/\*\*/g) || []).length;
-  if (strongCount % 2 === 1) value += "**";
-  const strikeCount = (value.match(/~~/g) || []).length;
-  if (strikeCount % 2 === 1) value += "~~";
-  return value;
-}
-
-function normalizeLooseMarkdownTables(text) {
-  const lines = String(text || "").split(/\r?\n/);
-  const output = [];
-  let index = 0;
-  let inFence = false;
-  let inExistingTable = false;
-
-  while (index < lines.length) {
-    const current = lines[index];
-    if (current.trim().startsWith("```")) {
-      inFence = !inFence;
-      inExistingTable = false;
-      output.push(current);
-      index += 1;
-      continue;
-    }
-    if (inFence) {
-      output.push(current);
-      index += 1;
-      continue;
-    }
-    if (!current.trim() || !current.includes("|")) {
-      inExistingTable = false;
-    }
-    if (inExistingTable && current.includes("|") && current.trim()) {
-      output.push(current);
-      index += 1;
-      continue;
-    }
-    if (isMarkdownTableSeparator(current)) {
-      output.push(current);
-      inExistingTable = true;
-      index += 1;
-      continue;
-    }
-    const next = lines[index + 1];
-    const looksLikeTableHeader = current?.includes("|")
-      && next?.includes("|")
-      && !isMarkdownTableSeparator(next);
-
-    if (!looksLikeTableHeader) {
-      output.push(current);
-      index += 1;
-      continue;
-    }
-
-    const tableLines = [];
-    while (index < lines.length && lines[index].includes("|") && lines[index].trim()) {
-      tableLines.push(lines[index]);
-      index += 1;
-    }
-
-    if (tableLines.length < 2) {
-      output.push(...tableLines);
-      continue;
-    }
-
-    const columnCount = Math.max(...tableLines.map(markdownTableCellCount));
-    if (columnCount < 2) {
-      output.push(...tableLines);
-      continue;
-    }
-
-    output.push(tableLines[0]);
-    output.push(Array.from({ length: columnCount }, () => "---").join("|"));
-    output.push(...tableLines.slice(1));
-  }
-
-  return output.join("\n");
-}
-
-let mermaidRuntimePromise = null;
-
-async function loadMermaidRuntime() {
-  if (!mermaidRuntimePromise) {
-    mermaidRuntimePromise = import("mermaid").then((module) => {
-      const runtime = module.default;
-      runtime.initialize({
-        startOnLoad: false,
-        securityLevel: "strict",
-        theme: "base",
-        themeVariables: {
-          primaryColor: "#fbf6ec",
-          primaryTextColor: "#2f2a24",
-          primaryBorderColor: "#c7ad82",
-          lineColor: "#7b6240",
-          secondaryColor: "#f3ead9",
-          tertiaryColor: "#fffaf0",
-        },
-      });
-      return runtime;
-    });
-  }
-  return mermaidRuntimePromise;
-}
 
 const fallbackSessions = {
   hermes: {
@@ -1909,123 +1737,9 @@ function renderWorkspaceStatus() {
   `;
 }
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
 
-function safeLinkHref(value) {
-  const href = String(value || "").trim();
-  if (!/^(https?:|mailto:|file:)/i.test(href)) return "";
-  return escapeHtml(href);
-}
 
-function renderInlineMarkdown(text) {
-  return escapeHtml(text)
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
-    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-    .replace(/~~([^~]+)~~/g, "<del>$1</del>")
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, href) => {
-      const safeHref = safeLinkHref(href);
-      return safeHref ? `<a href="${safeHref}" target="_blank" rel="noreferrer">${label}</a>` : label;
-    });
-}
 
-function isMarkdownTable(lines, index) {
-  return lines[index]?.trim().startsWith("|")
-    && lines[index + 1]?.trim().startsWith("|")
-    && /^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$/.test(lines[index + 1].trim());
-}
-
-function renderMarkdownTable(lines) {
-  const cells = (line) => line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
-  const header = cells(lines[0]);
-  const alignments = cells(lines[1]).map((cell) => {
-    const left = cell.startsWith(":");
-    const right = cell.endsWith(":");
-    if (left && right) return "center";
-    if (right) return "right";
-    return "left";
-  });
-  const rows = lines.slice(2).map(cells);
-  const alignAttr = (index) => ` style="text-align: ${alignments[index] || "left"}"`;
-  return `
-    <div class="md-table-wrap">
-      <table class="md-table">
-        <thead><tr>${header.map((cell, index) => `<th${alignAttr(index)}>${renderInlineMarkdown(cell)}</th>`).join("")}</tr></thead>
-        <tbody>${rows.map((row) => `<tr>${row.map((cell, index) => `<td${alignAttr(index)}>${renderInlineMarkdown(cell)}</td>`).join("")}</tr>`).join("")}</tbody>
-      </table>
-    </div>
-  `;
-}
-
-function renderRichText(text) {
-  const normalized = normalizeLooseMarkdownTables(normalizeRuntimeMarkdown(text));
-  const html = markdownRenderer.render(normalized);
-  return DOMPurify.sanitize(html, {
-    ADD_ATTR: ["target", "rel"],
-  });
-}
-
-function renderCodeFence(lang, code) {
-  const normalizedLang = lang.trim().toLowerCase();
-  if (normalizedLang === "mermaid") {
-    return `
-      <div class="md-diagram-block">
-        <div class="md-code-toolbar">
-          <span class="md-code-lang">mermaid</span>
-          <button type="button" class="mini-btn ghost-btn md-code-copy-btn">${t("markdown.copySource")}</button>
-        </div>
-        <div class="md-diagram-render" aria-label="${t("markdown.diagramPreview")}">
-          <span class="caption">${t("markdown.diagramRendering")}</span>
-        </div>
-        <div class="md-diagram-fallback">
-          <strong>${t("markdown.diagramSource")}</strong>
-          <p>${t("markdown.diagramFallback")}</p>
-        </div>
-        <pre class="md-code"><code>${escapeHtml(code)}</code></pre>
-      </div>
-    `;
-  }
-  return `
-    <div class="md-code-block">
-      <div class="md-code-toolbar">
-        ${lang ? `<span class="md-code-lang">${escapeHtml(lang)}</span>` : "<span></span>"}
-        <button type="button" class="mini-btn ghost-btn md-code-copy-btn">${t("markdown.copyCode")}</button>
-      </div>
-      <pre class="md-code"><code>${escapeHtml(code)}</code></pre>
-    </div>
-  `;
-}
-
-async function renderMermaidDiagrams(root = sessionDeck) {
-  const blocks = [...root.querySelectorAll(".md-diagram-block:not([data-rendered])")];
-  if (!blocks.length) return;
-  const mermaid = await loadMermaidRuntime();
-  for (const [index, block] of blocks.entries()) {
-    const source = block.querySelector("code")?.textContent || "";
-    const target = block.querySelector(".md-diagram-render");
-    if (!source.trim() || !target) continue;
-    try {
-      const id = `luna-mermaid-${Date.now()}-${index}`;
-      const { svg } = await mermaid.render(id, source);
-      target.innerHTML = DOMPurify.sanitize(svg, {
-        USE_PROFILES: { svg: true, svgFilters: true },
-      });
-      block.dataset.rendered = "true";
-      block.classList.add("is-rendered");
-    } catch (error) {
-      console.error(error);
-      target.innerHTML = `<span class="caption">${t("markdown.diagramFailed")}</span>`;
-      block.dataset.rendered = "failed";
-      block.classList.add("is-render-failed");
-    }
-  }
-}
 
 function sessionCardStats(session) {
   const thoughtCount = session.turns.reduce((count, turn) => count + turn.thoughts.length, 0);
@@ -2734,7 +2448,7 @@ function renderWorkspace(options = {}) {
   sessionDeck.classList.toggle("is-many-sessions", visibleSessions.length > 2);
   sessionDeck.innerHTML = visibleSessions.map(renderSessionCard).join("");
   bindSessionActions();
-  renderMermaidDiagrams().catch((error) => console.error(error));
+  renderMermaidDiagrams(sessionDeck).catch((error) => console.error(error));
   requestAnimationFrame(() => {
     const activeCard = currentSessionId
       ? sessionDeck.querySelector(`.session-card[data-session-id="${currentSessionId}"]`)
