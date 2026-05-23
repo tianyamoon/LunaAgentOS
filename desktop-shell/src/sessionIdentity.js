@@ -108,7 +108,7 @@ export function normalizedSessionTitle(session, providers = []) {
     return [`${providerName || "Hermes"}${runtimeName}`, profileName].filter(Boolean).join(" / ");
   }
   if (session.providerId === "claude") {
-    const runtimeName = session.runtimeLabel && session.runtimeLabel !== "Win" ? session.runtimeLabel : "";
+    const runtimeName = session.runtimeLabel || "";
     return [providerName || "Claude Code", runtimeName].filter(Boolean).join(" · ");
   }
   return session.agentName || providerName || "当前会话";

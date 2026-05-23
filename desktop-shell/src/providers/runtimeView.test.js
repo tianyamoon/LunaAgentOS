@@ -64,8 +64,8 @@ test("runtimeInstanceById returns null when missing or empty input", () => {
   assert.equal(runtimeInstanceById([claudeWin], null), null);
 });
 
-test("providerRuntimeLabel collapses solo Win instance to provider name", () => {
-  assert.equal(providerRuntimeLabel(claudeProvider, claudeWin, 1), "Claude Code");
+test("providerRuntimeLabel keeps runtime label visible", () => {
+  assert.equal(providerRuntimeLabel(claudeProvider, claudeWin, 1), "Claude Code · Win");
   assert.equal(providerRuntimeLabel(claudeProvider, claudeWin, 2), "Claude Code · Win");
   assert.equal(providerRuntimeLabel(claudeProvider, claudeWsl, 2), "Claude Code · WSL");
   assert.equal(providerRuntimeLabel(claudeProvider, { runtimeLabel: null }, 1), "Claude Code");
@@ -81,6 +81,7 @@ test("targetsForRuntimeInstance: claude produces a runtime kind row", () => {
   assert.equal(targets[0].kind, "runtime");
   assert.equal(targets[0].providerId, "claude");
   assert.equal(targets[0].runtimeInstanceId, "claude-win");
+  assert.equal(targets[0].name, "Claude Code · Win");
 });
 
 test("targetsForRuntimeInstance: hermes expands hermes profiles", () => {

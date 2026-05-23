@@ -26,7 +26,6 @@ export function runtimeInstanceById(runtimeInstances, id) {
 
 export function providerRuntimeLabel(provider, instance, availableCount) {
   if (!instance?.runtimeLabel) return provider?.name || "";
-  if (availableCount === 1 && instance.runtimeLabel === "Win") return provider?.name || "";
   return `${provider?.name || ""} · ${instance.runtimeLabel}`;
 }
 

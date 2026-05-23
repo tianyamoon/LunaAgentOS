@@ -153,3 +153,23 @@ test("keeps Claude WSL card identity independent from selected Claude Win target
   assert.equal(normalized.runtimeHost, "wsl");
   assert.equal(normalized.agentName, "Claude Code · WSL");
 });
+
+test("keeps Claude Win runtime visible in session title", () => {
+  const normalized = normalizeSessionIdentity(
+    {
+      id: "session-claude-win",
+      providerId: "claude",
+      providerName: "Claude Code",
+      agentId: "claude-win",
+      agentName: "Claude Code",
+      runtimeInstanceId: "claude-win",
+      runtimeLabel: null,
+      turns: [],
+    },
+    { providers, runtimeInstances, runtimeTargets },
+  );
+
+  assert.equal(normalized.runtimeInstanceId, "claude-win");
+  assert.equal(normalized.runtimeHost, "native");
+  assert.equal(normalized.agentName, "Claude Code · Win");
+});
