@@ -1305,16 +1305,20 @@ body.is-launch-demo .layout {
 
 .user-message {
   align-self: flex-end;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   width: fit-content;
   max-width: min(86%, 720px);
   background: rgba(217, 108, 58, 0.055);
 }
 
 .user-message p {
-  text-align: right;
+  text-align: left;
 }
 
 .user-inline-label {
+  align-self: flex-end;
   color: var(--muted);
   font-size: 0.72rem;
   font-weight: 700;

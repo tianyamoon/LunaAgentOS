@@ -1880,7 +1880,8 @@ function renderTurn(turn, index) {
         ? `<div class="turn-collapsed-summary">${escapeHtml(turnCollapsedSummary(turn))}</div>`
         : `
           <div class="terminal-message user-message">
-            <p>${escapeHtml(turn.task)}<span class="user-inline-label">：User</span></p>
+            <p>${escapeHtml(turn.task)}</p>
+            <span class="user-inline-label">User</span>
           </div>
           ${turn.thoughts.length
             ? `
