@@ -3,6 +3,7 @@
 
 export const translations = {
   "zh-CN": {
+    "topbar.eyebrow": "真实 AI Agent 会话工作台",
     "topbar.demo": "演示场景",
     "topbar.clearDemo": "清除演示",
     "topbar.language": "语言：中文",
@@ -167,6 +168,7 @@ export const translations = {
     "availability.copyReport": "复制诊断报告",
   },
   "en-US": {
+    "topbar.eyebrow": "Neutral Desktop Workspace",
     "topbar.demo": "Demo scene",
     "topbar.clearDemo": "Clear demo",
     "topbar.language": "Language: English",
