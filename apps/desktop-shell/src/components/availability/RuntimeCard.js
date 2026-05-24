@@ -1,6 +1,8 @@
+import { t } from "../../i18n/index.js";
+
 export function RuntimeCard(instance) {
   const statusClass = instance.available ? "state-ok" : "state-error";
-  const statusText = instance.available ? "可用" : "不可用";
+  const statusText = instance.available ? t("provider.available") : t("provider.unavailable");
 
   const detailHtml = instance.detail
     ? `<small>${escapeHtml(instance.detail)}</small>`

@@ -39,14 +39,13 @@ export function createAvailabilityStore() {
   };
 
   const compactTargetSubtitle = (target) => {
-    if (!target) return "";
-    const parts = [];
+    if (!target) return { text: "", key: "" };
     if (target.providerId === "hermes") {
-      if (target.gateway === "running") parts.push("Gateway 运行中");
-      else if (target.gateway) parts.push("Gateway 已停止");
-      else if (target.model) parts.push(target.model);
+      if (target.gateway === "running") return { text: "", key: "availability.gatewayRunning" };
+      if (target.gateway) return { text: "", key: "availability.gatewayStopped" };
+      if (target.model) return { text: target.model, key: "" };
     }
-    return parts.filter(Boolean).join(" · ");
+    return { text: "", key: "" };
   };
 
   const refresh = (providersInput, runtimeInstancesInput, currentTargetAgent) => {
@@ -108,16 +107,20 @@ export function createAvailabilityStore() {
           commandKind: instance.commandKind,
           command: instance.command,
         })),
-        targets: targets.map((target) => ({
-          id: target.id,
-          name: displayAgentName(target),
-          displayName: target.name || provider.name,
-          subtitle: compactTargetSubtitle(target),
-          sendable: isTargetSendable(target),
-          state: target.state,
-          runtimeInstanceId: target.runtimeInstanceId,
-          isCurrent: currentTarget && target.id === currentTarget.id,
-        })),
+        targets: targets.map((target) => {
+          const subtitle = compactTargetSubtitle(target);
+          return {
+            id: target.id,
+            name: displayAgentName(target),
+            displayName: target.name || provider.name,
+            subtitle: subtitle.text,
+            subtitleKey: subtitle.key,
+            sendable: isTargetSendable(target),
+            state: target.state,
+            runtimeInstanceId: target.runtimeInstanceId,
+            isCurrent: currentTarget && target.id === currentTarget.id,
+          };
+        }),
       };
     });
 
@@ -130,7 +133,7 @@ export function createAvailabilityStore() {
             type: "target",
             provider: p.name,
             target: t.name,
-            reason: t.state === 9 ? "不可用" : "Gateway 已停止",
+            reasonKey: t.state === 9 ? "availability.unavailable" : "availability.gatewayStopped",
           });
         }
       });
@@ -140,7 +143,7 @@ export function createAvailabilityStore() {
             type: "runtime",
             provider: p.name,
             runtime: i.runtimeLabel,
-            reason: "有更新可用",
+            reasonKey: "availability.updateAvailable",
           });
         }
       });
@@ -149,6 +152,7 @@ export function createAvailabilityStore() {
     // Format current target data
     const currentTargetData = currentTarget
       ? {
+          subtitleInfo: compactTargetSubtitle(currentTarget),
           id: currentTarget.id,
           name: displayAgentName(currentTarget),
           displayName: currentTarget.name || currentTarget.providerName,
@@ -156,9 +160,13 @@ export function createAvailabilityStore() {
           providerName: providerList.find((p) => p.id === currentTarget.providerId)?.name,
           sendable: isTargetSendable(currentTarget),
           state: currentTarget.state,
-          subtitle: compactTargetSubtitle(currentTarget),
         }
       : null;
+    if (currentTargetData) {
+      currentTargetData.subtitle = currentTargetData.subtitleInfo.text;
+      currentTargetData.subtitleKey = currentTargetData.subtitleInfo.key;
+      delete currentTargetData.subtitleInfo;
+    }
 
     data = {
       currentTarget: currentTargetData,

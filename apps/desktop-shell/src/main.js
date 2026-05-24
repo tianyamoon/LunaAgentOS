@@ -101,14 +101,14 @@ const stateNames = {
 };
 
 const stateDisplayNames = {
-  0: "启动中",
-  1: "待命",
-  2: "思考中",
-  3: "调用工具",
-  4: "响应中",
-  5: "完成",
-  6: "已停止",
-  9: "异常",
+  0: "Starting",
+  1: "Ready",
+  2: "Thinking",
+  3: "Using tools",
+  4: "Responding",
+  5: "Done",
+  6: "Stopped",
+  9: "Error",
 };
 
 const stateDisplayKeys = {
@@ -134,10 +134,10 @@ const stateClasses = {
 };
 
 const runtimeStateLabels = {
-  live: "可续聊",
-  archived: "只读",
-  restoring: "重连中",
-  resume_failed: "重连失败",
+  live: "Live",
+  archived: "Read-only",
+  restoring: "Reconnecting",
+  resume_failed: "Reconnect failed",
 };
 
 const runtimeStateKeys = {
@@ -155,23 +155,22 @@ const runtimeStateClasses = {
 };
 
 const executingSessionStates = new Set([0, 2, 3, 4]);
-const HERMES_ACP_STARTUP_NOTICE = "正在启动 ACP 运行时，首次响应可能较慢。";
 
 const fallbackSessions = {
   hermes: {
     events: [
-      { type: "state", state: 0, payload: { content: "Hermes 运行时已探测到，等待真实接线。" } },
-      { type: "thought", state: 2, payload: { content: "主 Agent 已切换到 Hermes，但当前版本尚未把任务真正送入 WSL 会话。" } },
-      { type: "response", state: 4, payload: { content: "本次只生成了占位会话卡片，下一步将推进 WSL Hermes 的真实执行链路。" } },
-      { type: "state", state: 5, payload: { content: "Hermes 占位会话已结束。" } },
+      { type: "state", state: 0, contentKey: "fallback.hermes.stateStart" },
+      { type: "thought", state: 2, contentKey: "fallback.hermes.thought" },
+      { type: "response", state: 4, contentKey: "fallback.hermes.response" },
+      { type: "state", state: 5, contentKey: "fallback.hermes.stateDone" },
     ],
   },
   trae: {
     events: [
-      { type: "state", state: 0, payload: { content: "Trae IDE Bridge 入口已预留。" } },
-      { type: "thought", state: 2, payload: { content: "当前版本只确认产品位，不把 Trae 伪装成原生 CLI。" } },
-      { type: "response", state: 4, payload: { content: "Trae 会在后续通过 IDE Bridge 方式进入工作台。" } },
-      { type: "state", state: 5, payload: { content: "Trae 占位会话已结束。" } },
+      { type: "state", state: 0, contentKey: "fallback.trae.stateStart" },
+      { type: "thought", state: 2, contentKey: "fallback.trae.thought" },
+      { type: "response", state: 4, contentKey: "fallback.trae.response" },
+      { type: "state", state: 5, contentKey: "fallback.trae.stateDone" },
     ],
   },
 };
@@ -417,8 +416,8 @@ function compactTargetSubtitle(target) {
   if (!target) return "";
   const parts = [];
   if (target.providerId === "hermes") {
-    if (target.gateway === "running") parts.push("Gateway 运行中");
-    else if (target.gateway) parts.push("Gateway 已停止");
+    if (target.gateway === "running") parts.push(t("availability.gatewayRunning"));
+    else if (target.gateway) parts.push(t("availability.gatewayStopped"));
     else if (target.model) parts.push(target.model);
   }
   return parts.filter(Boolean).join(" · ");
@@ -655,16 +654,8 @@ function formatBackendError(error) {
   const match = raw.match(/^\[([A-Z_]+)\]\s*(.*)$/);
   if (!match) return raw;
   const [, code, message] = match;
-  const labels = {
-    RUNTIME_NOT_FOUND: "未找到运行时，请确认对应 ACP adapter 可用",
-    PERMISSION_DENIED: "权限被拒绝，请检查授权或目录权限",
-    SESSION_NOT_FOUND: "远端 session 不存在或已失效",
-    PROTOCOL_PARSE_FAILED: "协议响应解析失败",
-    RUNTIME_DEPENDENCY_MISSING: "运行时依赖缺失",
-    RUNTIME_EXITED: "运行时进程已退出",
-    UNKNOWN: "未知运行时错误",
-  };
-  return `${labels[code] || code}：${message}`;
+  const label = t(`backend.${code}`);
+  return `${label === `backend.${code}` ? code : label}: ${message}`;
 }
 
 function compactNoticeText(value, maxLength = 180) {
@@ -683,7 +674,7 @@ function applyStaticTranslations() {
   const lang = getLanguage();
   document.documentElement.lang = lang;
   applyDataI18n(document);
-  document.title = lang === "en-US" ? "LunaAgentOS Console" : "LunaAgentOS 控制台";
+  document.title = t("app.title");
   if (providerManagerBtn) providerManagerBtn.textContent = t("availability.button");
   if (languageBtn) languageBtn.textContent = t("topbar.language");
   applyFontScale();
@@ -707,7 +698,7 @@ function closeConfirmDialog() {
   confirmDialog.innerHTML = "";
 }
 
-function openConfirmDialog({ title, message, confirmLabel = "删除", onConfirm }) {
+function openConfirmDialog({ title, message, confirmLabel = t("common.delete"), onConfirm }) {
   if (!confirmDialog) return;
   pendingConfirmAction = onConfirm;
   confirmDialog.hidden = false;
@@ -716,11 +707,11 @@ function openConfirmDialog({ title, message, confirmLabel = "删除", onConfirm 
       <div class="confirm-dialog-header">
         <span class="confirm-dialog-icon" aria-hidden="true">!</span>
         <h3 id="confirmDialogTitle">${escapeHtml(title)}</h3>
-        <button type="button" class="confirm-dialog-close" aria-label="关闭">×</button>
+        <button type="button" class="confirm-dialog-close" aria-label="${t("common.close")}">×</button>
       </div>
       <p class="confirm-dialog-message">${escapeHtml(message)}</p>
       <div class="confirm-dialog-actions">
-        <button type="button" class="mini-btn confirm-dialog-cancel">取消</button>
+        <button type="button" class="mini-btn confirm-dialog-cancel">${t("common.cancel")}</button>
         <button type="button" class="mini-btn confirm-dialog-confirm">${escapeHtml(confirmLabel)}</button>
       </div>
     </div>
@@ -878,13 +869,13 @@ function toggleSendMode() {
 async function openProviderManagerPrompt() {
   try {
     const current = await invoke("load_runtime_config");
-    const claudeCommand = window.prompt("Claude adapter command（留空使用默认 npx/npx.cmd）", current?.claudeCommand || "");
+    const claudeCommand = window.prompt(t("runtimeConfig.promptClaudeCommand"), current?.claudeCommand || "");
     if (claudeCommand === null) return;
-    const claudeArgs = window.prompt("Claude adapter args（空格分隔；留空使用默认 -y @agentclientprotocol/claude-agent-acp）", (current?.claudeArgs || []).join(" "));
+    const claudeArgs = window.prompt(t("runtimeConfig.promptClaudeArgs"), (current?.claudeArgs || []).join(" "));
     if (claudeArgs === null) return;
-    const hermesHost = window.prompt("Hermes host：wsl 或 native", current?.hermesHost || "wsl");
+    const hermesHost = window.prompt(t("runtimeConfig.promptHermesHost"), current?.hermesHost || "wsl");
     if (hermesHost === null) return;
-    const hermesCommand = window.prompt("Hermes executable/profile alias（留空使用 hermes 或已探测 profile）", current?.hermesCommand || "");
+    const hermesCommand = window.prompt(t("runtimeConfig.promptHermesCommand"), current?.hermesCommand || "");
     if (hermesCommand === null) return;
     await invoke("save_runtime_config", {
       config: {
@@ -895,11 +886,11 @@ async function openProviderManagerPrompt() {
         hermesCommand: hermesCommand.trim() || null,
       },
     });
-    setAppNotice("Runtime 配置已保存。后续新建/恢复 ACP 会话会使用该配置。");
+    setAppNotice(t("runtimeConfig.saved"));
     await refreshRuntimeProbe();
   } catch (error) {
     console.error(error);
-    setAppNotice(`Runtime 配置读取或保存失败：${formatBackendError(error)}`, "error");
+    setAppNotice(t("runtimeConfig.failed", { error: formatBackendError(error) }), "error");
   }
 }
 
@@ -989,12 +980,12 @@ async function openProviderManager(providerId = currentTargetProvider()?.id || "
       event.preventDefault();
       const saveButton = event.currentTarget.querySelector(".runtime-config-save");
       saveButton.disabled = true;
-      setAppNotice("正在重新检查连接...", "busy");
+      setAppNotice(t("connection.rechecking"), "busy");
       try {
         await refreshRuntimeProbe();
         if (selectedProviderId === "hermes") await loadHermesProfiles();
         closeConfirmDialog();
-        setAppNotice("连接检查已完成。");
+        setAppNotice(t("connection.checkComplete"));
       } catch (error) {
         console.error(error);
         saveButton.disabled = false;
@@ -1049,9 +1040,9 @@ function openAvailabilityModal() {
   confirmDialog.querySelector(".availability-copy")?.addEventListener("click", () => {
     const report = JSON.stringify(freshData, null, 2);
     navigator.clipboard?.writeText(report).then(() => {
-      setAppNotice("诊断报告已复制到剪贴板");
+      setAppNotice(t("availability.reportCopied"));
     }).catch(() => {
-      setAppNotice("复制失败", "error");
+      setAppNotice(t("common.copyFailed"), "error");
     });
   });
 
@@ -1059,16 +1050,16 @@ function openAvailabilityModal() {
     event.preventDefault();
     const recheckBtn = event.currentTarget.querySelector(".availability-recheck");
     recheckBtn.disabled = true;
-    setAppNotice("正在重新检查...", "busy");
+    setAppNotice(t("availability.rechecking"), "busy");
     try {
       await refreshRuntimeProbe();
       store.refresh(providers, runtimeInstances, currentTargetAgent());
       const updatedData = store.getData();
       const updatedView = AvailabilityView(updatedData, { showTitle: false, compact: true });
       confirmDialog.querySelector(".availability-dialog-body").innerHTML = updatedView;
-      setAppNotice("检查完成");
+      setAppNotice(t("availability.checkComplete"));
     } catch (error) {
-      setAppNotice(`检查失败：${formatBackendError(error)}`, "error");
+      setAppNotice(t("availability.checkFailed", { error: formatBackendError(error) }), "error");
     } finally {
       recheckBtn.disabled = false;
     }
@@ -1076,8 +1067,8 @@ function openAvailabilityModal() {
 }
 
 function showProviderAgents(provider) {
-  const names = provider.agents.map((agent) => displayAgentName(agent)).join("、");
-  setAppNotice(`${provider.name} 当前已登记的 Agent：${names}。`);
+  const names = provider.agents.map((agent) => displayAgentName(agent)).join(t("common.listSeparator"));
+  setAppNotice(t("provider.agentList", { provider: provider.name, agents: names }));
 }
 
 async function refreshRuntimeProbe() {
@@ -1101,7 +1092,7 @@ async function refreshRuntimeProbe() {
     return result;
   } catch (error) {
     console.error(error);
-    setAppNotice(`Runtime 探测失败：${formatBackendError(error)}`, "error");
+    setAppNotice(t("runtime.probeFailed", { error: formatBackendError(error) }), "error");
     return null;
   }
 }
@@ -1133,7 +1124,7 @@ function setCurrentTargetAgent(agentId) {
   updateActionLabels();
   if (agent && provider) {
     renderWorkspaceStatus();
-    setAppNotice(`已切换到 ${targetDisplayName(agent)}。`);
+    setAppNotice(t("target.switched", { target: targetDisplayName(agent) }));
   }
   renderProviders();
   renderWorkspace();
@@ -1291,10 +1282,10 @@ async function loadRuntimeTargetsForProvider(providerId, runtimeInstanceIds = nu
     ensureCurrentTargetAgentExists();
     renderProviders();
     renderWorkspace();
-    if (!loaded && providerId === "hermes") setAppNotice("未探测到可用的 Hermes profile。");
+    if (!loaded && providerId === "hermes") setAppNotice(t("provider.noHermesProfiles"));
   } catch (error) {
     console.error(error);
-    setAppNotice(`读取 runtime target 失败：${formatBackendError(error)}`, "error");
+    setAppNotice(t("provider.runtimeTargetLoadFailed", { error: formatBackendError(error) }), "error");
   }
 }
 
@@ -1388,8 +1379,8 @@ function createTurn(session, task) {
     state: 0,
     thoughts: [],
     outputs: [],
-    finalResponse: "正在等待运行时返回内容...",
-    logs: ["消息已进入当前会话，等待运行时返回内容。"],
+    finalResponse: t("turn.initialResponse"),
+    logs: [t("turn.initialLog")],
     createdAt: new Date().toISOString(),
     meta: hermesProfile ? { hermesProfile } : {},
   };
@@ -1405,7 +1396,7 @@ function prependHermesStartupNoticeIfNeeded(session, turn) {
   if (session.providerId !== "hermes") return;
   if (session.acpStartupNoticeShown || session.acpSessionId) return;
   const profileName = session.profileName || session.agentName;
-  const message = `Hermes profile ${profileName} ${HERMES_ACP_STARTUP_NOTICE}`;
+  const message = `Hermes profile ${profileName} ${t("runtime.hermesStartupNotice")}`;
   session.acpStartupNoticeShown = true;
   if (!turn.logs.includes(message)) {
     turn.logs = [message, ...turn.logs];
@@ -1424,7 +1415,7 @@ function ensureLaunchDemoHermesAgent() {
     providerId: "hermes",
     name: "ailearning",
     subtitle: "WSL Profile · Gateway",
-    note: "用于展示 Hermes ACP 过程流的演示 profile。",
+    note: t("launchDemo.hermesNote"),
     state: 3,
     profileName: "ailearning",
     model: "MiniMax M2",
@@ -1470,7 +1461,7 @@ function activateLaunchDemoScene() {
   renderWorkspace();
   renderHistory();
   updateActionLabels();
-  setAppNotice("已载入 GitHub 首发演示场景：Claude + Hermes + 活跃会话/归档会话。");
+  setAppNotice(t("launchDemo.loadedNotice"));
 }
 
 
@@ -1494,7 +1485,7 @@ function leaveLaunchDemoScene() {
   renderWorkspace();
   renderHistory();
   updateActionLabels();
-  setAppNotice("已清除首发演示场景，恢复真实工作台。");
+  setAppNotice(t("launchDemo.clearedNotice"));
 }
 
 function getOrCreateActiveSession(task, forceNew = false) {
@@ -1543,7 +1534,7 @@ function appendErrorToTurn(sessionId, turnId, message) {
   }
   renderWorkspace();
   renderHistory();
-  setAppNotice(`会话 ${session.agentName} 执行失败：${message}`, "error");
+  setAppNotice(t("runtime.failed", { agent: session.agentName, message }), "error");
 }
 
 function appendRuntimeLogToSession(session, message, state = null) {
@@ -1557,6 +1548,16 @@ function appendRuntimeLogToSession(session, message, state = null) {
     session.state = state;
   }
   flowDetailOpenState.set(`${turn.id}:logs`, true);
+}
+
+function localizedFallbackEvents(events) {
+  return events.map((event) => ({
+    ...event,
+    payload: {
+      ...(event.payload || {}),
+      content: event.contentKey ? t(event.contentKey) : event.payload?.content,
+    },
+  }));
 }
 
 function updateWorkspaceEmptyCopy() {
@@ -1716,13 +1717,13 @@ function sessionTranscriptText(session) {
 
 function turnTranscriptText(turn, index) {
   const parts = [
-    `# 第 ${index + 1} 轮`,
+    `# ${t("turn.transcriptTitle", { index: index + 1 })}`,
     `user:\n${turn.task}`,
   ];
-  if (turn.thoughts.length) parts.push(`思考流:\n${turn.thoughts.join("\n\n")}`);
+  if (turn.thoughts.length) parts.push(`${t("turn.thoughtStreamLabel")}:\n${turn.thoughts.join("\n\n")}`);
   const response = turnResponseText(turn);
   if (response) parts.push(`assistant:\n${response}`);
-  if (turn.logs.length) parts.push(`运行流:\n${turn.logs.join("\n")}`);
+  if (turn.logs.length) parts.push(`${t("turn.runtimeStreamLabel")}:\n${turn.logs.join("\n")}`);
   return parts.join("\n\n");
 }
 
@@ -1794,7 +1795,7 @@ function turnCollapsedSummary(turn) {
   const response = turnResponseText(turn);
   const source = [turn.task, response].filter(Boolean).join(" · ");
   const compact = source.replace(/\s+/g, " ").trim();
-  if (!compact) return "本轮内容已折叠。";
+  if (!compact) return t("turn.collapsedEmpty");
   return compact.length > 108 ? `${compact.slice(0, 108)}...` : compact;
 }
 
@@ -1818,7 +1819,7 @@ function toggleSessionTurnsCollapsed(sessionId) {
     else collapsedTurnIds.add(turn.id);
   });
   renderWorkspace();
-  setAppNotice(shouldExpand ? "已展开当前会话全部轮次。" : "已折叠当前会话全部轮次。");
+  setAppNotice(shouldExpand ? t("session.allTurnsExpanded") : t("session.allTurnsCollapsed"));
 }
 
 function findTurnById(turnId) {
@@ -1974,7 +1975,7 @@ function renderSessionCard(session) {
       </div>
       <div class="session-card-body">
         ${session.turns.length
-          ? `${hiddenTurnCount ? `<div class="session-hidden-turns">${t("session.hiddenTurns", { count: hiddenTurnCount })}</div>` : ""}${visibleTurnEntries.map(({ turn, index }) => renderTurn(turn, index)).join("")}<div class="session-latest-anchor">${isWaiting ? "streaming..." : "latest"}</div>`
+          ? `${hiddenTurnCount ? `<div class="session-hidden-turns">${t("session.hiddenTurns", { count: hiddenTurnCount })}</div>` : ""}${visibleTurnEntries.map(({ turn, index }) => renderTurn(turn, index)).join("")}<div class="session-latest-anchor">${isWaiting ? t("session.latestAnchorStreaming") : t("session.latestAnchorLatest")}</div>`
           : `<p class='flow-empty'>${t("session.noMessages")}</p>`}
       </div>
     </article>
@@ -1988,7 +1989,7 @@ function exitFullscreenSessions() {
     session.fullscreen = false;
   });
   renderWorkspace();
-  setAppNotice("已退出会话全屏阅读模式。");
+  setAppNotice(t("session.exitFullscreenNotice"));
   return true;
 }
 
@@ -2053,11 +2054,11 @@ function bindSessionActions(root = sessionDeck) {
       const session = sessions.find((item) => item.id === button.dataset.sessionId);
       const text = session ? sessionTranscriptText(session) : "";
       if (!text) {
-        setAppNotice("当前会话还没有可复制的 transcript。", "busy");
+        setAppNotice(t("session.noTranscript"), "busy");
         return;
       }
       const copied = await copyTextToClipboard(text);
-      setAppNotice(copied ? "已复制当前会话 transcript。" : "复制失败，请手动选择内容。", copied ? "muted" : "error");
+      setAppNotice(copied ? t("session.copiedTranscript") : t("copy.selectManually"), copied ? "muted" : "error");
     });
   });
   actionRoot.querySelectorAll(".session-latest-only-btn").forEach((button) => {
@@ -2072,7 +2073,7 @@ function bindSessionActions(root = sessionDeck) {
       if (!session) return;
       const shouldOpen = !areSessionFlowDetailsOpen(session);
       setSessionFlowDetails(session.id, shouldOpen);
-      setAppNotice(shouldOpen ? "已展开当前会话的思考流与运行流。" : "已折叠当前会话的思考流与运行流。");
+      setAppNotice(shouldOpen ? t("session.flowsExpanded") : t("session.flowsCollapsed"));
     });
   });
   actionRoot.querySelectorAll(".turn-collapse-btn").forEach((button) => {
@@ -2083,11 +2084,11 @@ function bindSessionActions(root = sessionDeck) {
       const result = findTurnById(button.dataset.turnId);
       const text = result ? turnResponseText(result.turn) : "";
       if (!text) {
-        setAppNotice("当前轮次还没有可复制的响应。", "busy");
+        setAppNotice(t("turn.noResponseCopy"), "busy");
         return;
       }
       const copied = await copyTextToClipboard(text);
-      setAppNotice(copied ? "已复制当前轮次响应。" : "复制失败，请手动选择内容。", copied ? "muted" : "error");
+      setAppNotice(copied ? t("turn.copiedResponse") : t("copy.selectManually"), copied ? "muted" : "error");
     });
   });
   actionRoot.querySelectorAll(".turn-copy-btn").forEach((button) => {
@@ -2095,22 +2096,22 @@ function bindSessionActions(root = sessionDeck) {
       const result = findTurnById(button.dataset.turnId);
       const text = result ? turnTranscriptText(result.turn, result.turnIndex) : "";
       if (!text) {
-        setAppNotice("当前轮次还没有可复制的 transcript。", "busy");
+        setAppNotice(t("turn.noTranscript"), "busy");
         return;
       }
       const copied = await copyTextToClipboard(text);
-      setAppNotice(copied ? "已复制当前轮次 transcript。" : "复制失败，请手动选择内容。", copied ? "muted" : "error");
+      setAppNotice(copied ? t("turn.copiedTranscript") : t("copy.selectManually"), copied ? "muted" : "error");
     });
   });
   actionRoot.querySelectorAll(".md-code-copy-btn").forEach((button) => {
     button.addEventListener("click", async () => {
       const code = button.closest(".md-code-block, .md-diagram-block")?.querySelector("code")?.textContent || "";
       if (!code) {
-        setAppNotice("当前代码块为空。", "busy");
+        setAppNotice(t("markdown.emptyCode"), "busy");
         return;
       }
       const copied = await copyTextToClipboard(code);
-      setAppNotice(copied ? "已复制代码块。" : "复制失败，请手动选择代码。", copied ? "muted" : "error");
+      setAppNotice(copied ? t("markdown.copiedCode") : t("markdown.copyCodeFailed"), copied ? "muted" : "error");
     });
   });
 }
@@ -2128,10 +2129,10 @@ function activateWorkspaceSession(sessionId, options = {}) {
   renderHistory({ scrollSessionId: session.id });
   const runtimeState = sessionRuntimeState(session);
   setAppNotice(canSendToSession(session)
-    ? `当前工作 session 已切换到：${session.task}`
+    ? t("session.activated", { task: session.task })
     : runtimeState === "restoring"
-      ? "已定位到正在重连的会话，请稍等。"
-      : "已切换到只读会话；继续发送会被阻止，请先恢复或在左侧选择入口另开会话。");
+      ? t("session.restoringFocused")
+      : t("session.readOnlySwitchBlocked"));
 }
 
 async function shutdownRuntimeSession(session) {
@@ -2149,10 +2150,10 @@ function markSessionStopped(session) {
     return null;
   }
   turn.state = 6;
-  if (!turn.finalResponse || turn.finalResponse === "正在等待运行时返回内容...") {
-    turn.finalResponse = "会话已停止。";
+  if (!turn.finalResponse || turn.finalResponse === t("turn.initialResponse")) {
+    turn.finalResponse = t("turn.stoppedResponse");
   }
-  turn.logs = ["用户已停止该会话运行。", ...turn.logs];
+  turn.logs = [t("turn.stoppedLog"), ...turn.logs];
   session.state = 6;
   return turn;
 }
@@ -2179,7 +2180,7 @@ async function archiveLiveSession(sessionId) {
   removeSessionFromWorkspace(session.id);
   renderWorkspace();
   renderHistory();
-  setAppNotice(`${session.agentName} 已归档，ACP runtime 已释放。`);
+  setAppNotice(t("session.archivedNotice", { agent: session.agentName }));
 }
 
 async function detachRuntimeKeepActive(session) {
@@ -2196,11 +2197,11 @@ async function stopSession(sessionId) {
   if (!session) return;
   const runtimeState = sessionRuntimeState(session);
   if (runtimeState === "restoring") {
-    setAppNotice("该会话正在重连中，暂不支持停止。", "busy");
+    setAppNotice(t("session.stopRestoringBlocked"), "busy");
     return;
   }
   if (runtimeState !== "live") {
-    setAppNotice("该会话当前没有可停止的 live runtime。", "busy");
+    setAppNotice(t("session.stopNoLiveRuntime"), "busy");
     return;
   }
   setSessionLifecycle(session, LIFECYCLE.stopped);
@@ -2215,7 +2216,7 @@ async function stopSession(sessionId) {
   renderProviders();
   renderWorkspace();
   renderHistory();
-  setAppNotice(`${session.agentName} 已停止运行，仍保留为活跃会话。`);
+  setAppNotice(t("session.stoppedNotice", { agent: session.agentName }));
 }
 
 function removeSessionFromWorkspace(sessionId) {
@@ -2236,7 +2237,7 @@ async function dismissWorkspaceSession(sessionId) {
   const runtimeState = sessionRuntimeState(session);
   const wasArchived = isArchivedLifecycle(runtimeState);
   if (runtimeState === "restoring") {
-    setAppNotice("该会话正在重连中，请稍后再退出工作台。", "busy");
+    setAppNotice(t("session.dismissRestoringBlocked"), "busy");
     return;
   }
   if (runtimeState === "live") {
@@ -2256,8 +2257,8 @@ async function dismissWorkspaceSession(sessionId) {
   renderWorkspace();
   renderHistory();
   setAppNotice(wasArchived
-    ? `${removed.agentName} 已关闭工作台视图，仍保留在归档会话。`
-    : `${removed.agentName} 已移出工作台，仍保留在活跃会话。`);
+    ? t("session.dismissedArchived", { agent: removed.agentName })
+    : t("session.dismissedActive", { agent: removed.agentName }));
 }
 
 async function deleteSession(sessionId) {
@@ -2265,7 +2266,7 @@ async function deleteSession(sessionId) {
   const archived = archivedSessionsFromHistory(readableHistoryEntries()).find((item) => item.id === sessionId);
   const runtimeState = session ? sessionRuntimeState(session) : archived?.runtimeState || "archived";
   if (runtimeState === "restoring") {
-    setAppNotice("该会话正在重连中，暂不支持删除。", "busy");
+    setAppNotice(t("session.deleteRestoringBlocked"), "busy");
     return;
   }
   if (!session && !archived) return;
@@ -2274,7 +2275,7 @@ async function deleteSession(sessionId) {
     demoHistoryEntries = demoHistoryEntries.filter((entry) => historySessionKey(entry) !== sessionId);
     renderWorkspace();
     renderHistory();
-    setAppNotice("已从演示场景移除该会话。");
+    setAppNotice(t("session.deleteDemoRemoved"));
     return;
   }
   try {
@@ -2296,22 +2297,22 @@ async function deleteSession(sessionId) {
     demoHistoryEntries = demoHistoryEntries.filter((entry) => historySessionKey(entry) !== sessionId);
     renderWorkspace();
     renderHistory();
-    const skipped = result?.skippedFiles ? `，跳过损坏文件 ${result.skippedFiles} 个` : "";
-    setAppNotice(`已删除会话，移除历史轮次 ${result?.removedCount || 0} 条${skipped}。`);
+    const skipped = result?.skippedFiles ? t("session.deleteSkippedFiles", { count: result.skippedFiles }) : "";
+    setAppNotice(t("session.deleted", { count: result?.removedCount || 0, skipped }));
   } catch (error) {
     console.error(error);
-    setAppNotice(`删除会话失败：${formatBackendError(error)}`, "error");
+    setAppNotice(t("session.deleteFailed", { error: formatBackendError(error) }), "error");
   }
 }
 
 function requestDeleteConfirmation(sessionId) {
   const session = sessions.find((item) => item.id === sessionId);
   const archived = archivedSessionsFromHistory(readableHistoryEntries()).find((item) => item.id === sessionId);
-  const title = session?.task || archived?.title || "该会话";
+  const title = session?.task || archived?.title || t("confirm.sessionFallback");
   openConfirmDialog({
-    title: "删除会话",
-    message: `确定要删除「${title}」吗？此操作无法撤销。`,
-    confirmLabel: "删除",
+    title: t("confirm.deleteSessionTitle"),
+    message: t("confirm.deleteSessionMessage", { title }),
+    confirmLabel: t("common.delete"),
     onConfirm: () => deleteSession(sessionId),
   });
 }
@@ -2624,9 +2625,9 @@ function ensureArchivedAgent(archived) {
     agent = {
       id: archived.agentId,
       providerId: provider.id,
-      name: archived.agentName.split(" / ").at(-1) || "历史会话",
-      subtitle: "历史归档",
-      note: "从历史归档恢复的只读会话。",
+      name: archived.agentName.split(" / ").at(-1) || t("session.historyAgentName"),
+      subtitle: t("session.historyAgentSubtitle"),
+      note: t("session.historyAgentNote"),
       state: 5,
       isArchivedAgent: true,
     };
@@ -2734,7 +2735,7 @@ function openArchivedTranscript(sessionId) {
   const existing = sessions.find((item) => item.id === archived.id);
   if (existing && sessionRuntimeState(existing) === "restoring") {
     activateWorkspaceSession(existing.id, { focusWorkspace: true });
-    setAppNotice("该 session 正在重连中，请稍等。", "busy");
+    setAppNotice(t("archive.restoring"), "busy");
     return;
   }
   const restored = workspaceSessionFromArchived(archived, existing);
@@ -2746,8 +2747,8 @@ function openArchivedTranscript(sessionId) {
   renderWorkspace({ focusSessionId: restored.id });
   renderHistory({ scrollSessionId: restored.id });
   setAppNotice(restored.acpSessionId
-    ? "已打开历史归档 transcript。需要续聊时请点击恢复。"
-    : "已打开只读历史 transcript。缺少 ACP sessionId，不能恢复 runtime。");
+    ? t("archive.openedRestorable")
+    : t("archive.openedReadOnly"));
 }
 
 async function restoreArchivedSession(sessionId) {
@@ -2756,7 +2757,7 @@ async function restoreArchivedSession(sessionId) {
   if (!archived) return;
   const existing = sessions.find((item) => item.id === archived.id);
   if (existing && sessionRuntimeState(existing) === "restoring") {
-    setAppNotice("该 session 正在重连中，请稍等。", "busy");
+    setAppNotice(t("archive.restoring"), "busy");
     return;
   }
   const restored = workspaceSessionFromArchived(archived, existing);
@@ -2779,19 +2780,19 @@ async function restoreArchivedSession(sessionId) {
     markSessionInactive(restored.id);
     renderWorkspace();
     renderHistory();
-    setAppNotice("已从历史归档恢复会话。缺少 ACP sessionId，当前为只读 transcript。");
+    setAppNotice(t("restore.readOnlyMissingSession"));
     return;
   }
   setSessionLifecycle(restored, LIFECYCLE.restoring);
   renderWorkspace();
   renderHistory();
-  setAppNotice("已恢复历史 transcript，正在尝试加载 ACP runtime...", "busy");
+  setAppNotice(t("restore.starting"), "busy");
   const commands = acpCommandsForProvider(restored.providerId);
   if (!commands) {
     setSessionLifecycle(restored, LIFECYCLE.archived);
     markSessionInactive(restored.id);
     renderRestoreUpdate();
-    setAppNotice("该 provider 暂不支持 ACP runtime 恢复，当前为只读 transcript。");
+    setAppNotice(t("restore.unsupportedProvider"));
     return;
   }
   try {
@@ -2806,7 +2807,7 @@ async function restoreArchivedSession(sessionId) {
     setSessionLifecycle(restored, LIFECYCLE.live);
     markSessionActive(restored.id);
     renderRestoreUpdate();
-    setAppNotice("历史 session 已重连为可续聊的 ACP runtime。");
+    setAppNotice(t("restore.reconnected"));
   } catch (loadError) {
     const formattedLoadError = formatBackendError(loadError);
     try {
@@ -2826,22 +2827,22 @@ async function restoreArchivedSession(sessionId) {
       setSessionLifecycle(restored, LIFECYCLE.live);
       markSessionActive(restored.id);
       renderRestoreUpdate();
-      setAppNotice("ACP load 失败，已通过 resume 重连为可续聊的 runtime。");
+      setAppNotice(t("restore.loadFailedResumed"));
     } catch (resumeError) {
       const formattedResumeError = formatBackendError(resumeError || loadError);
       appendRuntimeLogToSession(
         restored,
         [
-          "ACP runtime 重连失败，已保留只读 transcript。",
-          `load 失败：${formattedLoadError}`,
-          `resume 失败：${formattedResumeError}`,
+          t("restore.failedLogHeader"),
+          t("restore.loadFailedLine", { error: formattedLoadError }),
+          t("restore.resumeFailedLine", { error: formattedResumeError }),
         ].join("\n"),
         9,
       );
       setSessionLifecycle(restored, LIFECYCLE.resume_failed);
       markSessionInactive(restored.id);
       renderRestoreUpdate();
-      setAppNotice(`ACP runtime 重连失败：${compactNoticeText(formattedResumeError)}。已保留只读 transcript。`, "error");
+      setAppNotice(t("restore.failedNotice", { error: compactNoticeText(formattedResumeError) }), "error");
     }
   }
 }
@@ -2855,7 +2856,7 @@ async function loadHistory() {
   } catch (error) {
     console.error(error);
     historyEntries = [];
-    setAppNotice("历史任务读取失败，已回退为空列表。", "error");
+    setAppNotice(t("history.loadFailed"), "error");
   } finally {
     isHistoryLoading = false;
   }
@@ -2889,14 +2890,14 @@ async function runFallbackSession(session, turn) {
     prependHermesStartupNoticeIfNeeded(session, turn);
     renderWorkspace();
   }
-  setAppNotice(`已将任务送入 ${session.agentName}，正在等待返回内容...`, "busy");
+  setAppNotice(t("runtime.sentNotice", { agent: session.agentName }), "busy");
   try {
     if (isSessionDeletedTombstone(session.id) || isSessionStoppedTombstone(session.id)) return;
-    const saved = updateTurnFromEvents(session.id, turn.id, fallback.events);
+    const saved = updateTurnFromEvents(session.id, turn.id, localizedFallbackEvents(fallback.events));
     if (isSessionDeletedTombstone(session.id) || isSessionStoppedTombstone(session.id)) return;
     if (saved) {
       await saveTurnToHistory(session, saved);
-      setAppNotice(`${session.agentName} 会话已完成并写入历史。`);
+      setAppNotice(t("runtime.completedSaved", { agent: session.agentName }));
     }
   } catch (error) {
     if (isSessionDeletedTombstone(session.id) || isSessionStoppedTombstone(session.id)) return;
@@ -2922,7 +2923,7 @@ async function startAcpSession(session, turn) {
     prependHermesStartupNoticeIfNeeded(session, turn);
     renderWorkspace();
   }
-  setAppNotice(`已将任务送入 ${session.agentName}，正在等待返回内容...`, "busy");
+  setAppNotice(t("runtime.sentNotice", { agent: session.agentName }), "busy");
   try {
     await new Promise((resolve) => requestAnimationFrame(resolve));
     const events = await invoke(commands.prompt, acpInvokeArgs(commands, session.providerId, {
@@ -2943,7 +2944,7 @@ async function startAcpSession(session, turn) {
       }
       renderProviders();
       await saveTurnToHistory(session, saved);
-      setAppNotice(`${session.agentName} 会话已完成并写入历史。`);
+      setAppNotice(t("runtime.completedSaved", { agent: session.agentName }));
     }
   } catch (error) {
     if (isSessionDeletedTombstone(session.id) || isSessionStoppedTombstone(session.id)) return;
@@ -2957,7 +2958,7 @@ async function startAcpSession(session, turn) {
 
 function startSessionFromPrompt(forceNewSession = false) {
   if (isLaunchDemoScene) {
-    setAppNotice("演示场景不会写入真实 runtime。请先清除演示再发送任务。", "busy");
+    setAppNotice(t("composer.demoBlocked"), "busy");
     return;
   }
   const task = promptBox.value.trim();
@@ -2969,7 +2970,7 @@ function startSessionFromPrompt(forceNewSession = false) {
   const agent = currentTargetAgent();
   const provider = currentTargetProvider();
   if (!agent || !provider) {
-    setAppNotice("请先在左侧设定当前发送目标，再发送任务。", "error");
+    setAppNotice(t("composer.needTargetBeforeSend"), "error");
     return;
   }
   if (!isTargetSendable(agent)) {
@@ -2980,7 +2981,7 @@ function startSessionFromPrompt(forceNewSession = false) {
   if (!canSendToProvider(provider.id)) {
     const availability = providerAvailability(provider.id);
     const label = providerAvailabilityLabel(availability.summary);
-    setAppNotice(`${provider.name} 当前${label}，请点击“维护”配置或检查本机 runtime。`, "error");
+    setAppNotice(t("composer.providerUnavailable", { provider: provider.name, state: label }), "error");
     return;
   }
 
@@ -3125,7 +3126,7 @@ async function syncRuntimeAliveStates() {
     if (mutated) {
       renderWorkspace();
       renderHistory();
-      setAppNotice("检测到 ACP runtime 已退出，相关会话已转为只读。", "error");
+      setAppNotice(t("runtime.aliveExited"), "error");
     }
   } catch (error) {
     console.error(error);

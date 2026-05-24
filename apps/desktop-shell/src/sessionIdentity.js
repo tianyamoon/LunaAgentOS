@@ -133,7 +133,7 @@ export function normalizedSessionTitle(session, providers = []) {
     const runtimeName = session.runtimeLabel || "";
     return [providerName || "Claude Code", runtimeName].filter(Boolean).join(" · ");
   }
-  return session.agentName || providerName || "当前会话";
+  return session.agentName || providerName || "Current session";
 }
 
 export function normalizedSessionTitleParts(session, providers = []) {
@@ -153,7 +153,7 @@ export function normalizedSessionTitleParts(session, providers = []) {
     };
   }
   return {
-    providerName: session.agentName || providerName || "当前会话",
+    providerName: session.agentName || providerName || "Current session",
     runtimeLabel: "",
     targetName: "",
   };

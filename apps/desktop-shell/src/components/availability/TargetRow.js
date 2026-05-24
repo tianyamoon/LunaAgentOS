@@ -1,7 +1,10 @@
+import { t } from "../../i18n/index.js";
+
 export function TargetRow(target) {
   const statusClass = target.sendable ? "state-ok" : "state-error";
-  const statusText = target.sendable ? "可发送" : "不可用";
-  const currentBadge = target.isCurrent ? `<span class="current-badge">当前</span>` : "";
+  const statusText = target.sendable ? t("availability.sendable") : t("availability.unavailable");
+  const currentBadge = target.isCurrent ? `<span class="current-badge">${t("availability.current")}</span>` : "";
+  const subtitle = target.subtitleKey ? t(target.subtitleKey) : target.subtitle;
 
   return `
     <div class="availability-target-row ${target.isCurrent ? "is-current" : ""}">
@@ -10,7 +13,7 @@ export function TargetRow(target) {
         ${currentBadge}
         <span class="state-pill ${statusClass}">${escapeHtml(statusText)}</span>
       </div>
-      ${target.subtitle ? `<small>${escapeHtml(target.subtitle)}</small>` : ""}
+      ${subtitle ? `<small>${escapeHtml(subtitle)}</small>` : ""}
     </div>
   `;
 }

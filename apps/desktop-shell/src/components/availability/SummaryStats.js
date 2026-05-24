@@ -1,12 +1,14 @@
+import { t } from "../../i18n/index.js";
+
 export function SummaryStats(data) {
   const { summary, currentTarget } = data;
 
   const currentTargetHtml = currentTarget
     ? `<div class="summary-current-target">
-        <span class="summary-label">当前目标</span>
+        <span class="summary-label">${t("availability.currentTarget")}</span>
         <strong>${escapeHtml(currentTarget.displayName)}</strong>
         <span class="state-pill ${currentTarget.sendable ? "state-ok" : "state-error"}">
-          ${currentTarget.sendable ? "可发送" : "不可发送"}
+          ${currentTarget.sendable ? t("availability.sendable") : t("availability.notSendable")}
         </span>
       </div>`
     : "";

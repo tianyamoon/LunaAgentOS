@@ -1,5 +1,6 @@
 import { RuntimeCard } from "./RuntimeCard.js";
 import { TargetRow } from "./TargetRow.js";
+import { t } from "../../i18n/index.js";
 
 export function ProviderSection(provider) {
   const instancesHtml = provider.instances
@@ -11,7 +12,11 @@ export function ProviderSection(provider) {
     .join("");
 
   const statusClass = provider.available ? "state-ok" : "state-error";
-  const statusText = provider.availabilitySummary === "available" ? "可用" : provider.availabilitySummary === "partial" ? "部分可用" : "不可用";
+  const statusText = provider.availabilitySummary === "available"
+    ? t("provider.available")
+    : provider.availabilitySummary === "partial"
+      ? t("provider.partial")
+      : t("provider.unavailable");
 
   return `
     <section class="availability-provider-section">

@@ -31,6 +31,7 @@ const {
   LANGUAGE_KEY,
   SUPPORTED_LANGUAGES,
   DEFAULT_LANGUAGE,
+  translations,
 } = i18nModule;
 
 test("default language is zh-CN when nothing is persisted", () => {
@@ -83,6 +84,13 @@ test("toggleLanguage flips between zh-CN and en-US", () => {
 
 test("SUPPORTED_LANGUAGES exposes both dictionaries", () => {
   assert.deepEqual([...SUPPORTED_LANGUAGES].sort(), ["en-US", "zh-CN"]);
+});
+
+test("translation dictionaries expose identical keys", () => {
+  assert.deepEqual(
+    Object.keys(translations["en-US"]).sort(),
+    Object.keys(translations["zh-CN"]).sort(),
+  );
 });
 
 test("applyDataI18n rewrites textContent for [data-i18n] descendants", () => {

@@ -1,3 +1,5 @@
+import { t } from "../i18n/index.js";
+
 export function sessionSectionsFromEvents(events) {
   const sections = {
     thoughts: [],
@@ -85,31 +87,31 @@ export function contentPartText(part) {
 
 export function eventLogText(event) {
   if (event.type === "tool") {
-    const title = event.payload?.title || event.payload?.kind || event.payload?.id || "工具调用";
-    const status = event.payload?.status ? `：${event.payload.status}` : "";
+    const title = event.payload?.title || event.payload?.kind || event.payload?.id || t("event.toolCall");
+    const status = event.payload?.status ? `${t("event.statusSeparator")}${event.payload.status}` : "";
     const content = contentPartText(event.payload?.content);
     return [title, status, content ? `\n${content}` : ""].join("").trim();
   }
   if (event.type === "plan") {
     const entries = event.payload?.entries;
-    if (!Array.isArray(entries) || !entries.length) return "运行时更新了执行计划。";
+    if (!Array.isArray(entries) || !entries.length) return t("event.planUpdated");
     const lines = entries.map((entry, index) => {
-      const title = entry.title || entry.content || entry.task || entry.description || `步骤 ${index + 1}`;
+      const title = entry.title || entry.content || entry.task || entry.description || t("event.step", { index: index + 1 });
       const status = entry.status || entry.state || "";
       return `${status ? `[${status}] ` : ""}${title}`;
     });
-    return ["运行时更新了执行计划：", ...lines].join("\n");
+    return [t("event.planUpdatedWithDetails"), ...lines].join("\n");
   }
   if (event.type === "usage") {
     const input = event.payload?.inputTokens ?? event.payload?.input_tokens ?? event.payload?.promptTokens;
     const output = event.payload?.outputTokens ?? event.payload?.output_tokens ?? event.payload?.completionTokens;
     const total = event.payload?.totalTokens ?? event.payload?.total_tokens;
     const parts = [
-      input != null ? `输入 ${input}` : "",
-      output != null ? `输出 ${output}` : "",
-      total != null ? `总计 ${total}` : "",
+      input != null ? t("event.usageInput", { count: input }) : "",
+      output != null ? t("event.usageOutput", { count: output }) : "",
+      total != null ? t("event.usageTotal", { count: total }) : "",
     ].filter(Boolean);
-    return parts.length ? `用量更新：${parts.join(" · ")}` : "";
+    return parts.length ? t("event.usageUpdated", { parts: parts.join(" · ") }) : "";
   }
   return "";
 }
@@ -158,12 +160,12 @@ export function applyStreamEventToTurn(session, turn, event) {
       break;
     case "tool":
       turn.logs = [
-        content || `${event.payload?.title || event.payload?.kind || "tool"} ${event.payload?.status || ""}`.trim(),
+        content || `${event.payload?.title || event.payload?.kind || t("event.toolCall")} ${event.payload?.status || ""}`.trim(),
         ...turn.logs,
       ];
       break;
     case "plan":
-      turn.logs = [content || "计划已更新。", ...turn.logs];
+      turn.logs = [content || t("event.planUpdated"), ...turn.logs];
       break;
     case "usage":
       if (content) turn.logs = [content, ...turn.logs];

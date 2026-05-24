@@ -1,5 +1,6 @@
 import { SummaryStats } from "./SummaryStats.js";
 import { ProviderSection } from "./ProviderSection.js";
+import { getLanguage, t } from "../../i18n/index.js";
 
 export function AvailabilityView(data, options = {}) {
   const { summary, providers, problems, lastCheck } = data;
@@ -7,8 +8,8 @@ export function AvailabilityView(data, options = {}) {
 
   const titleHtml = showTitle
     ? `<header class="availability-header">
-        <h2>系统可用性</h2>
-        <p>检查 Provider、Runtime 与 Agent 的可用状态</p>
+        <h2>${t("availability.title")}</h2>
+        <p>${t("availability.subtitle")}</p>
       </header>`
     : "";
 
@@ -20,12 +21,12 @@ export function AvailabilityView(data, options = {}) {
 
   const problemsHtml = problems.length
     ? `<section class="availability-problems">
-        <h4>需要关注 (${problems.length})</h4>
+        <h4>${t("availability.needsAttention")} (${problems.length})</h4>
         <ul>
           ${problems
             .map(
               (p) =>
-                `<li><strong>${escapeHtml(p.provider)}</strong> / ${escapeHtml(p.target || p.runtime)}: ${escapeHtml(p.reason)}</li>`
+                `<li><strong>${escapeHtml(p.provider)}</strong> / ${escapeHtml(p.target || p.runtime)}: ${escapeHtml(p.reasonKey ? t(p.reasonKey) : p.reason)}</li>`
             )
             .join("")}
         </ul>
@@ -34,7 +35,7 @@ export function AvailabilityView(data, options = {}) {
 
   const footerHtml = lastCheck
     ? `<footer class="availability-footer">
-        <span>最后检查: ${new Date(lastCheck).toLocaleTimeString("zh-CN")}</span>
+        <span>${t("availability.lastCheck", { time: new Date(lastCheck).toLocaleTimeString(getLanguage()) })}</span>
       </footer>`
     : "";
 
