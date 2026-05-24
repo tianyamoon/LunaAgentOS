@@ -630,6 +630,7 @@ function canRestoreSession(session) {
 }
 
 function isArchivedSessionListItem(item) {
+  if (!item?.isInWorkspace && !item?.acpSessionId) return true;
   return isArchivedLifecycle(item.runtimeState || LIFECYCLE.live);
 }
 
@@ -1850,6 +1851,7 @@ function renderSessionCard(session) {
   const hiddenTurnCount = turnEntries.length - visibleTurnEntries.length;
   const managementTitleSuffix = isRestoring ? t("action.restoringSuffix") : "";
   const runtimeLabel = runtimeStateLabel(runtimeState);
+  const canArchiveCard = runtimeState !== LIFECYCLE.archived && runtimeState !== LIFECYCLE.resume_failed;
   const turnToggleLabel = turnsCollapsed ? t("action.expandAllTurns") : t("action.collapseAllTurns");
   const latestOnlyLabel = latestOnly ? t("action.showAllTurns") : t("action.latestOnly");
   const flowToggleLabel = flowsOpen ? t("action.collapseFlows") : t("action.expandFlows");
@@ -1877,7 +1879,7 @@ function renderSessionCard(session) {
           <div class="session-card-actions">
             ${isWaiting && runtimeState === "live" ? `<button type="button" class="mini-btn ghost-btn session-action-btn session-stop-btn" data-session-id="${session.id}" title="${t("action.stop")}" aria-label="${t("action.stop")}">${renderSessionActionIcon("stop")}</button>` : ""}
             <button type="button" class="mini-btn ghost-btn session-action-btn session-dismiss-btn" data-session-id="${session.id}" title="${t("action.dismiss")}${managementTitleSuffix}" aria-label="${t("action.dismiss")}" ${managementDisabled}>${renderSessionActionIcon("dismiss")}</button>
-            <button type="button" class="mini-btn ghost-btn session-action-btn session-archive-btn" data-session-id="${session.id}" title="${t("action.archive")}${managementTitleSuffix}" aria-label="${t("action.archive")}" ${managementDisabled}>${renderSessionActionIcon("archive")}</button>
+            ${canArchiveCard ? `<button type="button" class="mini-btn ghost-btn session-action-btn session-archive-btn" data-session-id="${session.id}" title="${t("action.archive")}${managementTitleSuffix}" aria-label="${t("action.archive")}" ${managementDisabled}>${renderSessionActionIcon("archive")}</button>` : ""}
             <button type="button" class="mini-btn ghost-btn session-action-btn danger-btn session-delete-btn" data-session-id="${session.id}" title="${t("action.delete")}${managementTitleSuffix}" aria-label="${t("action.delete")}" ${managementDisabled}>${renderSessionActionIcon("delete")}</button>
             ${canRestoreSession(session) ? `<button type="button" class="mini-btn ghost-btn session-retry-btn" data-session-id="${session.id}">${t("session.restoreRetry")}</button>` : ""}
             <div class="session-tool-group" role="group" aria-label="${t("session.actionsAria")}">
@@ -2151,6 +2153,7 @@ async function dismissWorkspaceSession(sessionId) {
   const session = sessions.find((item) => item.id === sessionId);
   if (!session) return;
   const runtimeState = sessionRuntimeState(session);
+  const wasArchived = isArchivedLifecycle(runtimeState);
   if (runtimeState === "restoring") {
     setAppNotice("该会话正在重连中，请稍后再退出工作台。", "busy");
     return;
@@ -2171,7 +2174,9 @@ async function dismissWorkspaceSession(sessionId) {
   if (!removed) return;
   renderWorkspace();
   renderHistory();
-  setAppNotice(`${removed.agentName} 已移出工作台，仍保留在活跃会话。`);
+  setAppNotice(wasArchived
+    ? `${removed.agentName} 已关闭工作台视图，仍保留在归档会话。`
+    : `${removed.agentName} 已移出工作台，仍保留在活跃会话。`);
 }
 
 async function deleteSession(sessionId) {
@@ -2369,6 +2374,7 @@ function sessionListItems() {
       agentId: identitySession.agentId,
       runtimeInstanceId: identitySession.runtimeInstanceId || null,
       targetId: identitySession.targetId || identitySession.agentId,
+      acpSessionId: session.acpSessionId || null,
       isInWorkspace: true,
       isRuntimeAttached: true,
     };
