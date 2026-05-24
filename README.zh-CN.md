@@ -116,6 +116,11 @@ LunaAgentOS 当前不是：
 - [Apps](./apps/README.md)（暂仅英文）
 - [Trae IDE Bridge](./bridges/trae-ide/README.md)（暂仅英文）
 
+### 社区与政策
+
+- [安全策略](./SECURITY.zh-CN.md)
+- [商标与品牌使用说明](./TRADEMARKS.zh-CN.md)
+
 ### 英文入口
 
 - [English README](./README.md)

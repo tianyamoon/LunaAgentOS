@@ -116,6 +116,11 @@ LunaAgentOS is not:
 - [Apps](./apps/README.md)
 - [Trae IDE Bridge](./bridges/trae-ide/README.md)
 
+### Community and policies
+
+- [Security Policy](./SECURITY.md)
+- [Trademark and Brand Guidelines](./TRADEMARKS.md)
+
 ### Chinese entry
 
 - [Chinese README](./README.zh-CN.md)

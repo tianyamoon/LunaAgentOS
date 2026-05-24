@@ -1,9 +1,9 @@
 ---
-name: Bug report / Bug 报告
-about: Report a reproducible problem / 报告可复现问题
+name: "Bug report / Bug 报告"
+about: "Report a reproducible problem / 报告可复现问题"
 title: "[Bug] "
 labels: bug
-assignees: ''
+assignees: ""
 ---
 
 You can write in English or Chinese.
@@ -44,6 +44,9 @@ Add logs, screenshots, or recordings if they help. Remove secrets before posting
 
 ## Checklist / 检查项
 
-- [ ] I reproduced this more than once / 我已复现不止一次
-- [ ] I checked whether the issue already exists / 我已检查是否已有相同 issue
-- [ ] This is not security-sensitive / 这不是安全敏感问题
+- [ ] I reproduced this more than once
+  我已复现不止一次
+- [ ] I checked whether the issue already exists
+  我已检查是否已有相同 issue
+- [ ] This is not security-sensitive
+  这不是安全敏感问题

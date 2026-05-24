@@ -34,6 +34,11 @@ If you are new here, start with the docs that answer three practical questions f
 - [Apps](../apps/README.md): product surfaces built on the protocol
 - [Trae IDE Bridge](../bridges/trae-ide/README.md): the IDE-first bridge path
 
+## Community and policies
+
+- [Security Policy](../SECURITY.md): how to report security-sensitive issues
+- [Trademark and Brand Guidelines](../TRADEMARKS.md): code license and brand usage boundaries
+
 ## Chinese entry
 
 - [Chinese docs index](./README.zh-CN.md)

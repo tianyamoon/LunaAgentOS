@@ -34,6 +34,11 @@
 - [Apps](../apps/README.md)（暂仅英文）：基于协议构建的产品形态
 - [Trae IDE Bridge](../bridges/trae-ide/README.md)（暂仅英文）：IDE-first bridge 路线
 
+## 社区与政策
+
+- [安全策略](../SECURITY.zh-CN.md)：如何报告安全敏感问题
+- [商标与品牌使用说明](../TRADEMARKS.zh-CN.md)：代码许可与品牌使用边界
+
 ## 英文入口
 
 - [English docs index](./README.md)
