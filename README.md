@@ -5,7 +5,7 @@
 <h1 align="center">LunaAgentOS</h1>
 
 <p align="center">
-  <a href="./README_CN.md">中文说明</a>
+  <a href="./README.zh-CN.md">中文说明</a>
 </p>
 
 LunaAgentOS puts real coding-agent runtimes into one desktop workspace.
@@ -96,7 +96,7 @@ LunaAgentOS is not:
 - [Docs index](./docs/README.md)
 - [Getting Started](./docs/getting-started.md)
 - [Current Product Boundary](./docs/current-boundary.md)
-- [Contributing](./CONTRIBUTING_EN.md)
+- [Contributing](./CONTRIBUTING.md)
 
 ### Product and architecture
 
@@ -113,8 +113,8 @@ LunaAgentOS is not:
 
 ### Chinese docs
 
-- [Chinese README](./README_CN.md)
-- [Chinese docs index](./docs/README_CN.md)
+- [Chinese README](./README.zh-CN.md)
+- [Chinese docs index](./docs/README.zh-CN.md)
 
 ## License
 
@@ -131,4 +131,4 @@ The highest-value contributions right now are:
 - Trae IDE bridge design and integration
 - Documentation, screenshots, and release polish
 
-Read [CONTRIBUTING_EN.md](./CONTRIBUTING_EN.md) before starting.
+Read [CONTRIBUTING.md](./CONTRIBUTING.md) before starting.

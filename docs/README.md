@@ -12,7 +12,7 @@ If you are new here, start with the docs that answer three practical questions f
 
 - [Getting Started](./getting-started.md): install dependencies, run the desktop app, and validate the current workspace
 - [Current Product Boundary](./current-boundary.md): what LunaAgentOS is, what it is not, and what is intentionally out of scope today
-- [Contributing](../CONTRIBUTING_EN.md): development setup, tests, contribution areas, and pull request expectations
+- [Contributing](../CONTRIBUTING.md): development setup, tests, contribution areas, and pull request expectations
 
 ## Product and concepts
 
@@ -33,7 +33,7 @@ If you are new here, start with the docs that answer three practical questions f
 
 ## Chinese docs
 
-- [Chinese docs index](./README_CN.md)
+- [Chinese docs index](./README.zh-CN.md)
 - [Product Definition (Chinese)](./product-definition.zh-CN.md)
 - [Why LunaAgentOS (Chinese)](./why-lunaagentos.zh-CN.md)
 - [Light-Core Principles (Chinese)](./light-core-principles.zh-CN.md)
