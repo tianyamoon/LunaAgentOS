@@ -76,7 +76,7 @@ test("targetsForRuntimeInstance: claude produces a runtime kind row", () => {
   const targets = targetsForRuntimeInstance(claudeWin, {
     providers: [claudeProvider],
     runtimeInstances: [claudeWin],
-    hermesProfilesByInstance: {},
+    runtimeTargetsByInstance: {},
   });
   assert.equal(targets.length, 1);
   assert.equal(targets[0].kind, "runtime");
@@ -106,7 +106,7 @@ test("targetsForRuntimeInstance: hermes expands hermes profiles", () => {
   const targets = targetsForRuntimeInstance(hermesWsl, {
     providers: [hermesProvider],
     runtimeInstances: [hermesWsl],
-    hermesProfilesByInstance: { "hermes-wsl": profiles },
+    runtimeTargetsByInstance: { "hermes-wsl": profiles },
   });
   assert.equal(targets.length, 2);
   assert.equal(targets[0].kind, "profile");
@@ -130,7 +130,7 @@ test("targetsForRuntimeInstance: stopped hermes profiles stay visible but unavai
   const targets = targetsForRuntimeInstance(hermesWsl, {
     providers: [hermesProvider],
     runtimeInstances: [hermesWsl],
-    hermesProfilesByInstance: { "hermes-wsl": profiles },
+    runtimeTargetsByInstance: { "hermes-wsl": profiles },
   });
   assert.equal(targets.length, 1);
   assert.equal(targets[0].gateway, "stopped");
@@ -156,7 +156,7 @@ test("targetsForRuntimeInstance: unavailable instances yield no targets", () => 
   const targets = targetsForRuntimeInstance(hermesUnavailable, {
     providers: [hermesProvider],
     runtimeInstances: [hermesUnavailable],
-    hermesProfilesByInstance: { "hermes-win": [{ id: "hermes-win:profile:x", displayName: "x" }] },
+    runtimeTargetsByInstance: { "hermes-win": [{ id: "hermes-win:profile:x", displayName: "x" }] },
   });
   assert.deepEqual(targets, []);
 });
@@ -164,7 +164,7 @@ test("targetsForRuntimeInstance: unavailable instances yield no targets", () => 
 test("targetsForRuntimeInstance: unknown provider yields no targets", () => {
   const targets = targetsForRuntimeInstance(
     { id: "unknown", providerId: "trae", available: true, runtimeLabel: "IDE" },
-    { providers: [claudeProvider], runtimeInstances: [], hermesProfilesByInstance: {} },
+    { providers: [claudeProvider], runtimeInstances: [], runtimeTargetsByInstance: {} },
   );
   assert.deepEqual(targets, []);
 });
@@ -183,7 +183,7 @@ test("targetsForRuntimeInstance: manifest adapter produces a generic runtime row
   const targets = targetsForRuntimeInstance(codexInstance, {
     providers: [codexProvider],
     runtimeInstances: [codexInstance],
-    hermesProfilesByInstance: {},
+    runtimeTargetsByInstance: {},
   });
   assert.equal(targets.length, 1);
   assert.equal(targets[0].providerId, "codex");
@@ -196,7 +196,7 @@ test("runtimeTargets: flattens across all instances", () => {
   const all = runtimeTargets({
     providers: [claudeProvider, hermesProvider],
     runtimeInstances: [claudeWin, hermesWsl, hermesUnavailable],
-    hermesProfilesByInstance: { "hermes-wsl": profiles },
+    runtimeTargetsByInstance: { "hermes-wsl": profiles },
   });
   assert.equal(all.length, 2);
   const ids = all.map((target) => target.id).sort();
@@ -205,7 +205,7 @@ test("runtimeTargets: flattens across all instances", () => {
 
 test("runtimeTargets: empty input yields empty result", () => {
   assert.deepEqual(
-    runtimeTargets({ providers: [], runtimeInstances: null, hermesProfilesByInstance: null }),
+    runtimeTargets({ providers: [], runtimeInstances: null, runtimeTargetsByInstance: null }),
     [],
   );
 });

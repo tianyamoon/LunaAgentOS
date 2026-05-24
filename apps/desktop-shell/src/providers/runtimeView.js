@@ -1,4 +1,4 @@
-// Pure derivations from (providers, runtimeInstances, hermesProfilesByInstance)
+// Pure derivations from (providers, runtimeInstances, runtimeTargetsByInstance)
 // to runtime-aware UI rows.
 //
 // These functions never read globals; everything flows in by parameter so the
@@ -29,12 +29,6 @@ export function providerRuntimeLabel(provider, instance, availableCount) {
   return `${provider?.name || ""} · ${instance.runtimeLabel}`;
 }
 
-function isHermesProfileAvailable(profile) {
-  const state = typeof profile?.state === "number" ? profile.state : 1;
-  if (profile?.gateway) return profile.gateway === "running";
-  return state !== 9;
-}
-
 function isUnavailableAgentListTarget(target) {
   if (!target) return true;
   if (target.gateway) return target.gateway !== "running";
@@ -51,59 +45,30 @@ export function sortTargetsForAgentList(targets) {
 
 export function targetsForRuntimeInstance(
   instance,
-  { providers, runtimeInstances, hermesProfilesByInstance },
+  { providers, runtimeInstances, runtimeTargetsByInstance },
 ) {
   const provider = (providers || []).find((entry) => entry.id === instance.providerId);
   if (!provider || !instance.available) return [];
   const availableCount = availableRuntimeInstancesForProvider(runtimeInstances, instance.providerId).length;
   const runtimeHost = identityRuntimeHostForInstance(instance);
-  if (instance.providerId === "claude") {
-    const label = providerRuntimeLabel(provider, instance, availableCount);
-    return [{
-      id: instance.id,
-      providerId: provider.id,
-      runtimeInstanceId: instance.id,
-      runtimeLabel: instance.runtimeLabel,
-      runtimeHost,
-      runtimeCommand: instance.command,
-      kind: "runtime",
-      name: label,
-      subtitle: instance.runtimeLabel || "Runtime",
-      state: 1,
-      available: true,
-    }];
-  }
-  if (instance.providerId === "hermes") {
-    const profiles = (hermesProfilesByInstance && hermesProfilesByInstance[instance.id]) || [];
-    return profiles.map((profile) => {
-      const state = typeof profile.state === "number" ? profile.state : 1;
-      return {
-        id: profile.id,
-        providerId: "hermes",
-        runtimeInstanceId: instance.id,
-        runtimeLabel: instance.runtimeLabel,
-        runtimeHost,
-        runtimeCommand: instance.command,
-        kind: "profile",
-        name: profile.displayName,
-        subtitle: profile.subtitle || `${instance.runtimeLabel || "Runtime"} Profile`,
-        note: profile.note || "Hermes profile",
-        state,
-        available: isHermesProfileAvailable(profile),
-        profileName: profile.profileName,
-        model: profile.model,
-        gateway: profile.gateway,
-        alias: profile.alias,
-        profileAlias: profile.alias,
-        profileExecutable: profile.alias || null,
-        path: profile.path,
-        profilePath: profile.path,
-        skillCount: profile.skillCount,
-        hasEnv: profile.hasEnv,
-        hasSoul: profile.hasSoul,
-        isDefault: Boolean(profile.isDefault),
-      };
-    });
+  const extensionTargets = (runtimeTargetsByInstance && runtimeTargetsByInstance[instance.id]) || [];
+  if (extensionTargets.length) {
+    return extensionTargets.map((target) => ({
+      ...target,
+      id: target.id || `${instance.id}:target`,
+      providerId: target.providerId || provider.id,
+      runtimeInstanceId: target.runtimeInstanceId || instance.id,
+      runtimeLabel: target.runtimeLabel || instance.runtimeLabel,
+      runtimeHost: target.runtimeHost || runtimeHost,
+      runtimeCommand: target.runtimeCommand ?? instance.command ?? null,
+      name: target.name || target.displayName || providerRuntimeLabel(provider, instance, availableCount),
+      kind: target.kind || (target.profileName || target.alias || target.gateway ? "profile" : "runtime"),
+      state: typeof target.state === "number" ? target.state : 1,
+      available: target.available !== false && (!target.gateway || target.gateway === "running") && target.state !== 9,
+      profileAlias: target.profileAlias || target.alias || null,
+      profileExecutable: target.profileExecutable || target.alias || null,
+      profilePath: target.profilePath || target.path || null,
+    }));
   }
   return [{
     id: instance.id,
@@ -120,9 +85,13 @@ export function targetsForRuntimeInstance(
   }];
 }
 
-export function runtimeTargets({ providers, runtimeInstances, hermesProfilesByInstance }) {
+export function runtimeTargets({ providers, runtimeInstances, runtimeTargetsByInstance }) {
   if (!Array.isArray(runtimeInstances)) return [];
   return runtimeInstances.flatMap((instance) =>
-    targetsForRuntimeInstance(instance, { providers, runtimeInstances, hermesProfilesByInstance }),
+    targetsForRuntimeInstance(instance, {
+      providers,
+      runtimeInstances,
+      runtimeTargetsByInstance,
+    }),
   );
 }

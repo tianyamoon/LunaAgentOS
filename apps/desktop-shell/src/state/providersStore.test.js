@@ -64,7 +64,7 @@ test("providersStore: appendProviderAgent / removeProviderAgent", () => {
   assert.equal(store.providerById("hermes").agents.length, 0);
 });
 
-test("providersStore: syncAdapterProviders adds and prunes manifest providers", () => {
+test("providersStore: syncAdapterProviders marks built-ins and prunes manifest providers", () => {
   const store = createProvidersStore();
   const ref = store.getProvidersRef();
   store.syncAdapterProviders([
@@ -72,11 +72,12 @@ test("providersStore: syncAdapterProviders adds and prunes manifest providers", 
     { id: "claude", name: "Ignored Claude Manifest", transport: "stdio_json" },
   ]);
   assert.equal(store.getProvidersRef(), ref);
-  assert.equal(store.providerById("claude").dynamicAdapter, undefined);
+  assert.equal(store.providerById("claude").dynamicAdapter, true);
   assert.equal(store.providerById("codex").dynamicAdapter, true);
   assert.deepEqual(store.providerById("codex").agents.map((agent) => agent.id), ["codex-main"]);
   assert.equal(store.getRuntimeAvailabilityFor("codex").configured, true);
   store.syncAdapterProviders([]);
+  assert.equal(store.providerById("claude").dynamicAdapter, undefined);
   assert.equal(store.providerById("codex"), null);
   assert.equal(store.getRuntimeAvailabilityFor("codex"), null);
 });
@@ -107,17 +108,17 @@ test("providersStore: replaceRuntimeInstances mutates in place + isolates from c
   assert.equal(ref.length, 0);
 });
 
-test("providersStore: hermes profiles per instance + prune + total count", () => {
+test("providersStore: runtime targets per instance + prune + total count", () => {
   const store = createProvidersStore();
-  const ref = store.getHermesProfilesByInstanceRef();
-  store.setHermesProfilesForInstance("inst-1", [{ id: "p1" }, { id: "p2" }]);
-  store.setHermesProfilesForInstance("inst-2", [{ id: "p3" }]);
-  assert.equal(store.getHermesProfilesByInstanceRef(), ref);
-  assert.equal(store.totalHermesProfileCount(), 3);
-  store.pruneHermesProfilesByInstanceIds(["inst-2"]);
+  const ref = store.getRuntimeTargetsByInstanceRef();
+  store.setRuntimeTargetsForInstance("inst-1", [{ id: "p1" }, { id: "p2" }]);
+  store.setRuntimeTargetsForInstance("inst-2", [{ id: "p3" }]);
+  assert.equal(store.getRuntimeTargetsByInstanceRef(), ref);
+  assert.equal(store.totalRuntimeTargetCount(), 3);
+  store.pruneRuntimeTargetsByInstanceIds(["inst-2"]);
   assert.deepEqual(Object.keys(ref), ["inst-2"]);
-  assert.equal(store.totalHermesProfileCount(), 1);
-  store.pruneHermesProfilesByInstanceIds(["inst-2"]);
+  assert.equal(store.totalRuntimeTargetCount(), 1);
+  store.pruneRuntimeTargetsByInstanceIds(["inst-2"]);
   assert.deepEqual(Object.keys(ref), ["inst-2"]);
 });
 
@@ -129,7 +130,7 @@ test("providersStore: subscribe is notified on each mutation, batched in batch()
   });
   store.setProviderNote("hermes", { note: "n1" });
   assert.equal(notifyCount, 1);
-  store.setHermesProfilesForInstance("inst-1", []);
+  store.setRuntimeTargetsForInstance("inst-1", []);
   assert.equal(notifyCount, 2);
   store.batch(() => {
     store.replaceRuntimeInstances([{ id: "a", providerId: "claude" }]);
@@ -144,7 +145,7 @@ test("providersStore: subscribe is notified on each mutation, batched in batch()
 test("providersStore: reset restores defaults and notifies", () => {
   const store = createProvidersStore();
   store.replaceRuntimeInstances([{ id: "a", providerId: "claude" }]);
-  store.setHermesProfilesForInstance("inst-1", [{ id: "p1" }]);
+  store.setRuntimeTargetsForInstance("inst-1", [{ id: "p1" }]);
   store.setProviderAgents("hermes", []);
   store.patchRuntimeAvailability({
     claude: { summary: "available", configured: true, available: true, command: "x" },
@@ -156,7 +157,7 @@ test("providersStore: reset restores defaults and notifies", () => {
   store.reset();
   assert.equal(notifyCount, 1);
   assert.equal(store.getRuntimeInstancesRef().length, 0);
-  assert.equal(store.totalHermesProfileCount(), 0);
+  assert.equal(store.totalRuntimeTargetCount(), 0);
   assert.equal(store.getRuntimeAvailabilityFor("claude").summary, "probing");
   assert.equal(store.providerById("hermes").agents.length, 1);
 });

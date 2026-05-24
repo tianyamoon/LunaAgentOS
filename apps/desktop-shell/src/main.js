@@ -39,6 +39,9 @@ import {
   nextLifecycle,
 } from "./state/sessionLifecycle.js";
 import {
+  acpCommandsForProvider as acpCommandsForProviderRaw,
+} from "./runtime/acpCommands.js";
+import {
   applyDataI18n,
   getLanguage,
   t,
@@ -148,31 +151,6 @@ const runtimeStateClasses = {
 const executingSessionStates = new Set([0, 2, 3, 4]);
 const HERMES_ACP_STARTUP_NOTICE = "正在启动 ACP 运行时，首次响应可能较慢。";
 
-const acpRuntimeCommands = {
-  claude: {
-    prompt: "runtime_acp_claude_prompt",
-    load: "runtime_acp_claude_load",
-    resume: "runtime_acp_claude_resume",
-    shutdown: "runtime_acp_claude_shutdown",
-    aliveIds: "runtime_acp_claude_alive_ids",
-  },
-  hermes: {
-    prompt: "runtime_acp_hermes_prompt",
-    load: "runtime_acp_hermes_load",
-    resume: "runtime_acp_hermes_resume",
-    shutdown: "runtime_acp_hermes_shutdown",
-    aliveIds: "runtime_acp_hermes_alive_ids",
-  },
-};
-const genericAcpRuntimeCommands = {
-  prompt: "runtime_acp_adapter_prompt",
-  load: "runtime_acp_adapter_load",
-  resume: "runtime_acp_adapter_resume",
-  shutdown: "runtime_acp_adapter_shutdown",
-  aliveIds: "runtime_acp_adapter_alive_ids",
-  requiresAdapterId: true,
-};
-
 const fallbackSessions = {
   hermes: {
     events: [
@@ -269,7 +247,7 @@ const providersStore = createProvidersStore();
 const providers = providersStore.getProvidersRef();
 const runtimeAvailability = providersStore.getRuntimeAvailabilityRef();
 const runtimeInstances = providersStore.getRuntimeInstancesRef();
-const hermesProfilesByInstance = providersStore.getHermesProfilesByInstanceRef();
+const runtimeTargetsByInstance = providersStore.getRuntimeTargetsByInstanceRef();
 const sessionsStore = createSessionsStore();
 const sessions = sessionsStore.getSessionsRef();
 const activeSessionIds = sessionsStore.getActiveSessionIdsRef();
@@ -398,12 +376,12 @@ function targetsForRuntimeInstance(instance) {
   return targetsForRuntimeInstanceRaw(instance, {
     providers,
     runtimeInstances,
-    hermesProfilesByInstance,
+    runtimeTargetsByInstance,
   });
 }
 
 function runtimeTargets() {
-  return runtimeTargetsRaw({ providers, runtimeInstances, hermesProfilesByInstance });
+  return runtimeTargetsRaw({ providers, runtimeInstances, runtimeTargetsByInstance });
 }
 
 function normalizeWorkspaceSession(session) {
@@ -515,7 +493,7 @@ function currentTargetProvider() {
 
 function acpCommandsForProvider(providerId) {
   if (!providerId) return null;
-  return acpRuntimeCommands[providerId] || (providerById(providerId)?.dynamicAdapter ? genericAcpRuntimeCommands : null);
+  return acpCommandsForProviderRaw(providerById(providerId));
 }
 
 function acpInvokeArgs(commands, providerId, args = {}) {
@@ -916,18 +894,35 @@ async function openProviderManagerPrompt() {
   }
 }
 
+function runtimeInstanceDetailMarkup(instance) {
+  const lines = [];
+  const addLine = (value) => {
+    const text = String(value || "").trim();
+    if (text && !lines.includes(text)) lines.push(text);
+  };
+  String(instance.detail || "")
+    .split(/\r?\n/)
+    .forEach(addLine);
+  addLine(instance.version);
+  return lines.map((line) => `<small>${escapeHtml(line)}</small>`).join("");
+}
+
 async function openProviderManager(providerId = currentTargetProvider()?.id || "claude") {
   if (!confirmDialog) {
     await openProviderManagerPrompt();
     return;
   }
   try {
-    const selectedProviderId = providerId === "hermes" ? "hermes" : "claude";
+    const selectedProviderId = providerId || "claude";
+    const selectedProvider = providerById(selectedProviderId) || { id: selectedProviderId, name: selectedProviderId };
     const selectedAvailability = providerAvailability(selectedProviderId);
     const selectedState = providerAvailabilityLabel(selectedAvailability.summary);
     const selectedStateClass = stateClasses[PROVIDER_AVAILABILITY_STATES[selectedAvailability.summary]?.state] || "state-idle";
-    const isClaude = selectedProviderId === "claude";
-    const title = isClaude ? t("runtimeConfig.claudeTitle") : t("runtimeConfig.hermesTitle");
+    const title = selectedProviderId === "claude"
+      ? t("runtimeConfig.claudeTitle")
+      : selectedProviderId === "hermes"
+        ? t("runtimeConfig.hermesTitle")
+        : selectedProvider.name;
     const instances = runtimeInstancesForProvider(selectedProviderId);
     const instanceMarkup = instances.length
       ? instances.map((instance) => {
@@ -939,8 +934,7 @@ async function openProviderManager(providerId = currentTargetProvider()?.id || "
               <span class="state-pill ${stateClasses[state] || "state-idle"}">${instance.available ? t("provider.available") : t("provider.notConnected")}</span>
             </div>
             <p>${escapeHtml(instance.summary || "")}</p>
-            ${instance.detail ? `<small>${escapeHtml(instance.detail)}</small>` : ""}
-            ${instance.version ? `<small>${escapeHtml(instance.version)}</small>` : ""}
+            ${runtimeInstanceDetailMarkup(instance)}
           </article>
         `;
       }).join("")
@@ -961,7 +955,7 @@ async function openProviderManager(providerId = currentTargetProvider()?.id || "
             <span class="runtime-config-kicker">${selectedProviderId}</span>
             <strong>${title}</strong>
             <span class="state-pill ${selectedStateClass}">${selectedState}</span>
-            <span>${escapeHtml(runtimeConnectionNote(providerById(selectedProviderId) || { id: selectedProviderId, name: title }, instances))}</span>
+            <span>${escapeHtml(runtimeConnectionNote(selectedProvider, instances))}</span>
           </aside>
           <section class="runtime-config-section">
             <h4>${t("connection.detected")}</h4>
@@ -970,7 +964,7 @@ async function openProviderManager(providerId = currentTargetProvider()?.id || "
         </div>
         <div class="confirm-dialog-actions runtime-config-actions">
           <button type="button" class="confirm-dialog-cancel runtime-config-close">${t("common.close")}</button>
-          <button type="button" class="mini-btn ghost-btn runtime-config-legacy">${t("runtimeConfig.legacyPrompt")}</button>
+          ${["claude", "hermes"].includes(selectedProviderId) ? `<button type="button" class="mini-btn ghost-btn runtime-config-legacy">${t("runtimeConfig.legacyPrompt")}</button>` : ""}
           <button type="submit" class="primary runtime-config-save">${t("connection.recheck")}</button>
         </div>
       </form>
@@ -1019,7 +1013,7 @@ async function refreshRuntimeProbe() {
         Object.fromEntries((result?.providers || []).map((item) => [item.providerId, item])),
       );
       providersStore.replaceRuntimeInstances(Array.isArray(result?.instances) ? result.instances : []);
-      providersStore.pruneHermesProfilesByInstanceIds(
+      providersStore.pruneRuntimeTargetsByInstanceIds(
         runtimeInstances.filter((instance) => instance.available).map((instance) => instance.id),
       );
     });
@@ -1186,51 +1180,12 @@ function renderProviders() {
 
 }
 
-function applyHermesProfiles(profiles) {
-  const hermesProvider = providerById("hermes");
-  if (!hermesProvider || !Array.isArray(profiles) || !profiles.length) return;
+function applyRuntimeTargetsForInstance(providerId, runtimeInstanceId, targets) {
   providersStore.batch(() => {
-    providersStore.setProviderAgents("hermes", profiles.map((profile) => ({
-      id: profile.id,
-      providerId: "hermes",
-      name: profile.displayName,
-      subtitle: profile.subtitle || "WSL Profile",
-      note: profile.note || "Hermes profile",
-      state: typeof profile.state === "number" ? profile.state : 1,
-      profileName: profile.profileName,
-      model: profile.model,
-      gateway: profile.gateway,
-      alias: profile.alias,
-      profileAlias: profile.alias,
-      profileExecutable: profile.alias || null,
-      path: profile.path,
-      profilePath: profile.path,
-      skillCount: profile.skillCount,
-      hasEnv: profile.hasEnv,
-      hasSoul: profile.hasSoul,
-      isDefault: Boolean(profile.isDefault),
-    })));
-    providersStore.setProviderNote("hermes", {
-      note: null,
-      noteKey: "provider.hermes.loadedNote",
-      noteParams: { count: profiles.length },
-    });
-  });
-  if (isLaunchDemoScene) {
-    ensureLaunchDemoHermesAgent();
-    currentTargetAgentId = "hermes-demo-ailearning";
-  }
-  ensureCurrentTargetAgentExists();
-  renderProviders();
-  renderWorkspace();
-}
-
-function applyHermesProfilesForInstance(runtimeInstanceId, profiles) {
-  providersStore.batch(() => {
-    providersStore.setHermesProfilesForInstance(runtimeInstanceId, profiles);
-    const count = providersStore.totalHermesProfileCount();
-    if (providerById("hermes") && count > 0) {
-      providersStore.setProviderNote("hermes", {
+    providersStore.setRuntimeTargetsForInstance(runtimeInstanceId, targets);
+    const count = providersStore.totalRuntimeTargetCount();
+    if (providerById(providerId) && count > 0) {
+      providersStore.setProviderNote(providerId, {
         note: null,
         noteKey: "provider.hermes.loadedNote",
         noteParams: { count },
@@ -1239,8 +1194,8 @@ function applyHermesProfilesForInstance(runtimeInstanceId, profiles) {
   });
 }
 
-async function loadHermesProfiles(runtimeInstanceIds = null) {
-  const instances = (runtimeInstanceIds || availableRuntimeInstancesForProvider("hermes").map((instance) => instance.id))
+async function loadRuntimeTargetsForProvider(providerId, runtimeInstanceIds = null) {
+  const instances = (runtimeInstanceIds || availableRuntimeInstancesForProvider(providerId).map((instance) => instance.id))
     .map(runtimeInstanceById)
     .filter(Boolean)
     .filter((instance) => instance.available);
@@ -1248,18 +1203,25 @@ async function loadHermesProfiles(runtimeInstanceIds = null) {
   try {
     let loaded = 0;
     for (const instance of instances) {
-      const profiles = await invoke("runtime_hermes_profiles", { runtimeInstanceId: instance.id });
-      applyHermesProfilesForInstance(instance.id, profiles);
-      loaded += Array.isArray(profiles) ? profiles.length : 0;
+      const targets = await invoke("runtime_adapter_targets", {
+        adapterId: providerId,
+        runtimeInstanceId: instance.id,
+      });
+      applyRuntimeTargetsForInstance(providerId, instance.id, targets);
+      loaded += Array.isArray(targets) ? targets.length : 0;
     }
     ensureCurrentTargetAgentExists();
     renderProviders();
     renderWorkspace();
-    if (!loaded) setAppNotice("未探测到可用的 Hermes profile。");
+    if (!loaded && providerId === "hermes") setAppNotice("未探测到可用的 Hermes profile。");
   } catch (error) {
     console.error(error);
-    setAppNotice(`读取 Hermes profile 失败：${formatBackendError(error)}`, "error");
+    setAppNotice(`读取 runtime target 失败：${formatBackendError(error)}`, "error");
   }
+}
+
+async function loadHermesProfiles(runtimeInstanceIds = null) {
+  return loadRuntimeTargetsForProvider("hermes", runtimeInstanceIds);
 }
 
 function hermesProfileMetaFromAgent(agent) {
@@ -2652,7 +2614,9 @@ async function restoreArchivedSession(sessionId) {
   if (restoredInstance) {
     restored.runtimeLabel = restored.runtimeLabel || restoredInstance.runtimeLabel || null;
     restored.runtimeHost = restored.runtimeHost || runtimeHostForInstance(restoredInstance);
-    restored.runtimeCommand = restored.runtimeCommand || restoredInstance.command || null;
+    restored.runtimeCommand = restored.runtimeCommand
+      || (restoredInstance.commandKind === "manifest" ? null : restoredInstance.command)
+      || null;
   }
   const runtimeDefaults = runtimeDefaultsForProvider(restored.providerId, restored.runtimeInstanceId);
   restored.runtimeInstanceId = restored.runtimeInstanceId || runtimeDefaults.runtimeInstanceId || null;

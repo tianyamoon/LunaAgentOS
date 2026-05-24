@@ -89,7 +89,9 @@ export function createProvidersStore(initial = {}) {
   const providers = (Array.isArray(initial.providers) ? initial.providers : DEFAULT_PROVIDERS).map(cloneProvider);
   const runtimeAvailability = { ...DEFAULT_RUNTIME_AVAILABILITY, ...(initial.runtimeAvailability || {}) };
   const runtimeInstances = Array.isArray(initial.runtimeInstances) ? [...initial.runtimeInstances] : [];
-  const hermesProfilesByInstance = { ...(initial.hermesProfilesByInstance || {}) };
+  const runtimeTargetsByInstance = {
+    ...(initial.runtimeTargetsByInstance || initial.hermesProfilesByInstance || {}),
+  };
 
   const listeners = new Set();
   let suppressNotify = 0;
@@ -154,7 +156,7 @@ export function createProvidersStore(initial = {}) {
     syncAdapterProviders(adapters) {
       const adapterProviders = (Array.isArray(adapters) ? adapters : [])
         .map(providerFromAdapter)
-        .filter((provider) => provider && !BUILTIN_PROVIDER_IDS.has(provider.id));
+        .filter(Boolean);
       const adapterIds = new Set(adapterProviders.map((provider) => provider.id));
       let changed = false;
       for (const provider of adapterProviders) {
@@ -181,7 +183,11 @@ export function createProvidersStore(initial = {}) {
       }
       for (let index = providers.length - 1; index >= 0; index -= 1) {
         const provider = providers[index];
-        if (provider.dynamicAdapter && !adapterIds.has(provider.id)) {
+        if (provider.dynamicAdapter && BUILTIN_PROVIDER_IDS.has(provider.id) && !adapterIds.has(provider.id)) {
+          delete provider.dynamicAdapter;
+          delete provider.adapterManifest;
+          changed = true;
+        } else if (provider.dynamicAdapter && !BUILTIN_PROVIDER_IDS.has(provider.id) && !adapterIds.has(provider.id)) {
           providers.splice(index, 1);
           delete runtimeAvailability[provider.id];
           changed = true;
@@ -228,30 +234,42 @@ export function createProvidersStore(initial = {}) {
       notify();
     },
 
-    getHermesProfilesByInstanceRef() {
-      return hermesProfilesByInstance;
+    getRuntimeTargetsByInstanceRef() {
+      return runtimeTargetsByInstance;
     },
-    setHermesProfilesForInstance(instanceId, profiles) {
+    setRuntimeTargetsForInstance(instanceId, targets) {
       if (!instanceId) return;
-      hermesProfilesByInstance[instanceId] = Array.isArray(profiles) ? profiles : [];
+      runtimeTargetsByInstance[instanceId] = Array.isArray(targets) ? targets : [];
       notify();
     },
-    pruneHermesProfilesByInstanceIds(validIds) {
+    pruneRuntimeTargetsByInstanceIds(validIds) {
       const valid = new Set(validIds || []);
       let changed = false;
-      for (const key of Object.keys(hermesProfilesByInstance)) {
+      for (const key of Object.keys(runtimeTargetsByInstance)) {
         if (!valid.has(key)) {
-          delete hermesProfilesByInstance[key];
+          delete runtimeTargetsByInstance[key];
           changed = true;
         }
       }
       if (changed) notify();
     },
-    totalHermesProfileCount() {
-      return Object.values(hermesProfilesByInstance).reduce(
+    totalRuntimeTargetCount() {
+      return Object.values(runtimeTargetsByInstance).reduce(
         (sum, items) => sum + (Array.isArray(items) ? items.length : 0),
         0,
       );
+    },
+    getHermesProfilesByInstanceRef() {
+      return runtimeTargetsByInstance;
+    },
+    setHermesProfilesForInstance(instanceId, profiles) {
+      this.setRuntimeTargetsForInstance(instanceId, profiles);
+    },
+    pruneHermesProfilesByInstanceIds(validIds) {
+      this.pruneRuntimeTargetsByInstanceIds(validIds);
+    },
+    totalHermesProfileCount() {
+      return this.totalRuntimeTargetCount();
     },
 
     subscribe(listener) {
@@ -267,7 +285,7 @@ export function createProvidersStore(initial = {}) {
       for (const key of Object.keys(runtimeAvailability)) delete runtimeAvailability[key];
       Object.assign(runtimeAvailability, DEFAULT_RUNTIME_AVAILABILITY);
       runtimeInstances.length = 0;
-      for (const key of Object.keys(hermesProfilesByInstance)) delete hermesProfilesByInstance[key];
+      for (const key of Object.keys(runtimeTargetsByInstance)) delete runtimeTargetsByInstance[key];
       notify();
     },
   };
