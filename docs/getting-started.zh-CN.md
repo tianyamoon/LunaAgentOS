@@ -10,7 +10,6 @@
 
 - 打开 Tauri 桌面应用
 - 看到左侧 Agent Fleet、中间 Runtime Session workspace、右侧 session list
-- 从顶部进入非持久化 demo scene
 - 在本机安装 Claude Code 或 Hermes 时，把真实任务发给这些 runtime
 
 ## 环境要求
@@ -63,16 +62,15 @@ apps/desktop-shell/src-tauri/target/release/desktop-shell.exe
 
 如果 Claude Code 或 Hermes 没有安装，对应入口也应该仍然可见，并明确显示不可用或未配置状态。
 
-## 使用演示模式
+## 用真实 runtime session 验证
 
 1. 启动 LunaAgentOS 应用。
-2. 点击顶部 demo 按钮。
-   根据当前语言，按钮可能显示为 `演示场景` 或对应英文。
-3. 工作台会加载一组受控的非持久化场景，其中包含 Claude Code 和 Hermes session card。
-4. 点击清除 demo 的动作返回真实工作台。
-   按钮可能显示为 `清除演示`。
+2. 在 Agent Fleet 中选择 Claude Code 或 Hermes。
+3. 从输入框发送一个小的真实任务。
+4. 确认 Runtime Session Card 展示输出、runtime 活动和最终响应。
+5. 确认该 session 出现在 session list 中，并可以从本地历史恢复。
 
-这个 demo scene 只用于理解产品和截图，不会写入真实本地历史。
+如果两个 runtime 都没有安装，请用界面上可见的不可用或未配置状态确认应用正在检测缺失 runtime，而不是依赖 demo 路径。
 
 ## 可选验证命令
 

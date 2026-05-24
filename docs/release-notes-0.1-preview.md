@@ -20,7 +20,6 @@ This preview is intentionally small. It focuses on making real Claude Code and H
 - The workspace separates active sessions from archived sessions.
 - Local JSON history stores session turns.
 - Restore and read-only history states are available.
-- Demo mode shows the intended Claude + Hermes workspace without writing real history.
 - The UI supports persisted zh-CN / en-US language switching.
 
 ## What is intentionally not in 0.1

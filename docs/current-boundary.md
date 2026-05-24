@@ -24,7 +24,6 @@ This page defines the release boundary: what exists now, what 0.1 Preview is int
 - Each card holds output stream, thought stream, runtime stream, and final response.
 - The right side separates live sessions from archived sessions.
 - Local JSON history stores session turns and supports restore/read-only states.
-- Demo mode shows the intended Claude + Hermes workspace without writing real history.
 
 ## What it is not now
 

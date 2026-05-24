@@ -94,7 +94,7 @@ If you cannot run a relevant check, say so in the pull request and explain why.
 - Local history, restore, delete, and error-state validation
 - Trae IDE bridge design and integration
 - Adapter contract and runtime-surface convergence
-- Documentation, screenshots, demos, and release polish
+- Documentation, screenshots, and release polish
 
 ## Project judgment
 

@@ -22,7 +22,6 @@ LunaAgentOS 0.1 Preview 是真实 AI Agent 会话的中立桌面工作台。
 - 工作台区分 active sessions 和 archived sessions。
 - 本地 JSON history 保存 session turns。
 - 已有 restore 和 read-only history states。
-- Demo mode 可以展示 Claude + Hermes workspace，而不写入真实历史。
 - UI 支持持久化的 zh-CN / en-US 语言切换。
 
 ## What is intentionally not in 0.1

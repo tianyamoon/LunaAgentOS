@@ -10,7 +10,6 @@ After a successful local run, you should be able to:
 
 - Open the Tauri desktop app
 - See the left Agent Fleet, center Runtime Session workspace, and right session list
-- Load the non-persistent demo scene from the top bar
 - Send real tasks to Claude Code or Hermes when those runtimes are installed locally
 
 ## Requirements
@@ -63,16 +62,15 @@ When the app opens, check for these surfaces:
 
 If Claude Code or Hermes is missing, the entry should still appear with a clear unavailable or unconfigured state.
 
-## Use demo mode
+## Validate with a real runtime session
 
 1. Start the LunaAgentOS app.
-2. Click the demo button in the top bar.
-   The label may appear as `演示场景` or its English equivalent, depending on the UI language.
-3. The workspace loads a controlled, non-persistent scene with Claude Code and Hermes session cards.
-4. Click the clear-demo action to return to the real workspace.
-   The label may appear as `清除演示`.
+2. Select Claude Code or Hermes in the Agent Fleet.
+3. Send a small real task from the composer.
+4. Confirm that the Runtime Session Card shows output, runtime activity, and the final response.
+5. Confirm that the session appears in the session list and can be restored from local history.
 
-The demo scene is intended for orientation and screenshots. It does not write to real local history.
+If neither runtime is installed, use the visible unavailable or unconfigured state to confirm that the app is detecting the missing runtime instead of relying on a demo path.
 
 ## Optional validation commands
 

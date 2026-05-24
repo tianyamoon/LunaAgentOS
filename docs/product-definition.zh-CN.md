@@ -37,7 +37,7 @@ LunaAgentOS 0.1 Preview 围绕五个具体部分展开：
 - 面向活会话的 Runtime Session Cards
 - 归档会话与本地历史
 - 恢复动作与只读历史状态
-- 用于理解产品和截图的 demo mode，不写入真实历史
+- 通过 Claude Code 和 Hermes session 验证真实 runtime 路径
 
 ## Adapter 路径
 

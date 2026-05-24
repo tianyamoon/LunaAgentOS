@@ -39,7 +39,6 @@ LunaAgentOS focuses on the desktop workspace around those sessions. It treats ea
 | Runtime Session Cards | Working | Output, thought, runtime, and final response in one surface |
 | Multi-session workspace | Working | Current send target, live sessions, archived sessions |
 | Local history | Working | JSON session history with restore and read-only states |
-| Demo mode | Working | Non-persistent launch scene for orientation and screenshots |
 | UI language | Working | zh-CN / en-US switch persisted locally |
 
 ## Quick start

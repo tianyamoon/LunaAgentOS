@@ -37,7 +37,7 @@ Today the app provides:
 - Runtime Session Cards for live sessions
 - Archived sessions and local history
 - Restore actions and read-only history states
-- Demo mode for orientation and screenshots without writing real history
+- Real runtime validation through Claude Code and Hermes sessions
 
 ## Adapter path
 

@@ -94,7 +94,7 @@ npm run lint:undef
 - 本地历史、恢复、删除和错误态验证
 - Trae IDE bridge 设计与接入
 - Adapter contract 与 runtime surface 收敛
-- 文档、截图、demo 和发布材料
+- 文档、截图和发布材料
 
 ## 项目判断
 
