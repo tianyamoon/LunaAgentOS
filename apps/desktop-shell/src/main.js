@@ -1881,7 +1881,6 @@ function renderTurn(turn, index) {
         : `
           <div class="terminal-message user-message">
             <p>${escapeHtml(turn.task)}</p>
-            <span class="user-inline-label">User</span>
           </div>
           ${turn.thoughts.length
             ? `
