@@ -1,5 +1,7 @@
 # 轻核心原则
 
+[English](./light-core-principles.md)
+
 LunaAgentOS 最有力量的时候，是控制层保持聚焦的时候。
 
 这些原则解释了“轻核心”在实践里到底意味着什么。

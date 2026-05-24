@@ -1,5 +1,7 @@
 # Getting Started
 
+[中文](./getting-started.zh-CN.md)
+
 This guide runs the current LunaAgentOS desktop app locally.
 
 ## What you should expect

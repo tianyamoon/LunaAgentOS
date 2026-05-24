@@ -1,5 +1,7 @@
 # 快速开始
 
+[English](./getting-started.md)
+
 这份文档帮助你在本地运行当前的 LunaAgentOS 桌面应用。
 
 ## 跑起来之后你应该能看到什么

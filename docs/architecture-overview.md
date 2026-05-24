@@ -1,5 +1,7 @@
 ﻿# LunaAgentOS Architecture Overview
 
+[中文](./architecture-overview.zh-CN.md)
+
 LunaAgentOS is a protocol-centered control layer above external coding-agent runtimes.
 
 It defines a unified adapter contract and Runtime Session Model, connects to external runtimes through adapters, observes their sessions, normalizes their process visibility, and lets the App render active and archived work.

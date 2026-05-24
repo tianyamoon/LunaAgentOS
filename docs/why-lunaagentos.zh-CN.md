@@ -1,5 +1,7 @@
 # 为什么做 LunaAgentOS
 
+[English](./why-lunaagentos.md)
+
 ## 问题是什么
 
 Coding Agent 正在演化成多种产品形态：

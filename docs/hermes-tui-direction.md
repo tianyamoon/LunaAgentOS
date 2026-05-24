@@ -1,5 +1,7 @@
 ﻿# Hermes TUI Direction
 
+[中文](./hermes-tui-direction.zh-CN.md)
+
 Hermes is valuable in LunaAgentOS because it can make runtime work feel alive, not just because it returns a final answer.
 
 ## Product direction

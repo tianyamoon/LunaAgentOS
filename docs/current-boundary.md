@@ -1,5 +1,7 @@
 ﻿# Current Product Boundary
 
+[中文](./current-boundary.zh-CN.md)
+
 LunaAgentOS is a protocol-centered control layer with a working App for heterogeneous coding-agent runtime sessions.
 
 ## What LunaAgentOS is

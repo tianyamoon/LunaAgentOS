@@ -1,5 +1,7 @@
 ﻿# Roadmap
 
+[中文](./roadmap.zh-CN.md)
+
 LunaAgentOS is growing from a working protocol console into a protocol-centered adapter layer, Runtime Session Model, collaboration workspace, and broader control plane.
 
 ## Now: Product definition and Runtime Session workspace

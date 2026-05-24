@@ -1,5 +1,7 @@
 # Product Definition
 
+[中文](./product-definition.zh-CN.md)
+
 LunaAgentOS is a protocol-centered control layer for heterogeneous coding-agent runtimes.
 
 The current LunaAgentOS app is the concrete product surface for that layer: choose a target, send work into a real runtime session, observe the process, and keep local history in one place.

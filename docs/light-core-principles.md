@@ -1,5 +1,7 @@
 # Light-Core Principles
 
+[中文](./light-core-principles.zh-CN.md)
+
 LunaAgentOS is strongest when the control layer stays focused.
 
 These principles explain what "light core" means in practice.

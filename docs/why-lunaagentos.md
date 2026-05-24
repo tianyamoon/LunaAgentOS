@@ -1,5 +1,7 @@
 # Why LunaAgentOS
 
+[中文](./why-lunaagentos.zh-CN.md)
+
 ## The problem
 
 Coding agents are expanding into multiple product shapes:

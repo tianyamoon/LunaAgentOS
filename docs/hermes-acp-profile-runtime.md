@@ -1,5 +1,7 @@
 ﻿# Hermes ACP Profile Runtime
 
+[中文](./hermes-acp-profile-runtime.zh-CN.md)
+
 This document explains how LunaAgentOS treats Hermes as a real profile-based runtime entry.
 
 ## Runtime principle

@@ -1,5 +1,7 @@
 # LunaAgentOS Docs
 
+[中文](./README.zh-CN.md)
+
 This directory is the public documentation entry point for LunaAgentOS.
 
 If you are new here, start with the docs that answer three practical questions first:
@@ -24,19 +26,25 @@ If you are new here, start with the docs that answer three practical questions f
 ## Architecture and integration
 
 - [Architecture Overview](./architecture-overview.md): current layering and responsibilities
+- [Hermes ACP Runtime](./hermes-acp-profile-runtime.md): Hermes runtime semantics and profile loading
+- [Hermes TUI Direction](./hermes-tui-direction.md): visibility goals for live sessions
 - [Protocol](../protocol/README.md): schemas, examples, and the public contract
 - [Adapters](../adapters/README.md): adapter registry and built-in extension boundary
 - [Apps](../apps/README.md): product surfaces built on the protocol
-- [Hermes ACP Runtime](./hermes-acp-profile-runtime.md): Hermes runtime semantics and profile loading
-- [Hermes TUI Direction](./hermes-tui-direction.md): visibility goals for live sessions
 - [Trae IDE Bridge](../bridges/trae-ide/README.md): the IDE-first bridge path
 
 ## Chinese docs
 
 - [Chinese docs index](./README.zh-CN.md)
+- [Getting Started (Chinese)](./getting-started.zh-CN.md)
+- [Current Product Boundary (Chinese)](./current-boundary.zh-CN.md)
 - [Product Definition (Chinese)](./product-definition.zh-CN.md)
 - [Why LunaAgentOS (Chinese)](./why-lunaagentos.zh-CN.md)
 - [Light-Core Principles (Chinese)](./light-core-principles.zh-CN.md)
+- [Roadmap (Chinese)](./roadmap.zh-CN.md)
+- [Architecture Overview (Chinese)](./architecture-overview.zh-CN.md)
+- [Hermes ACP Runtime (Chinese)](./hermes-acp-profile-runtime.zh-CN.md)
+- [Hermes TUI Direction (Chinese)](./hermes-tui-direction.zh-CN.md)
 
 ## Code entry points
 

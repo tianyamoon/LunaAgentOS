@@ -1,5 +1,7 @@
 ﻿# 当前产品边界
 
+[English](./current-boundary.md)
+
 LunaAgentOS 现在是一个以协议为核心、已经有可运行 App 的异构 coding-agent runtime 控制层。
 
 ## LunaAgentOS 现在是什么

@@ -1,5 +1,7 @@
 # 产品定义
 
+[English](./product-definition.md)
+
 LunaAgentOS 是一个以协议为核心的异构 Coding Agent 控制层。
 
 当前的 LunaAgentOS App 是这套控制层的产品化界面：选择目标，把任务送进真实 runtime session，观察过程，并把本地历史留在一个地方。
