@@ -30,6 +30,7 @@
 - [Hermes TUI 方向](./hermes-tui-direction.zh-CN.md)：活会话可见性的设计方向
 - [Protocol](../protocol/README.md)（暂仅英文）：schema、示例和公开契约
 - [Adapters](../adapters/README.md)（暂仅英文）：adapter 边界和首批接入
+- [Core](../core/README.md)（暂仅英文）：adapter host、runtime session 和 capability model
 - [Apps](../apps/README.md)（暂仅英文）：基于协议构建的产品形态
 - [Trae IDE Bridge](../bridges/trae-ide/README.md)（暂仅英文）：IDE-first bridge 路线
 
@@ -45,3 +46,11 @@
 - [Architecture Overview](./architecture-overview.md)
 - [Hermes ACP Runtime](./hermes-acp-profile-runtime.md)
 - [Hermes TUI Direction](./hermes-tui-direction.md)
+
+## 代码入口
+
+- [`protocol/`](../protocol/)（暂仅英文）：adapter manifest、Runtime Session 和 Runtime Event contracts
+- [`core/`](../core/)（暂仅英文）：adapter host、runtime session 和 capability model
+- [`adapters/`](../adapters/)（暂仅英文）：plugin manifests、built-in adapter extensions 和 integration boundary
+- [`apps/`](../apps/)（暂仅英文）：基于协议构建的产品形态
+- [`bridges/`](../bridges/)（暂仅英文）：面向 IDE-first integrations 的 bridge 路径

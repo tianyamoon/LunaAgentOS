@@ -30,10 +30,11 @@ If you are new here, start with the docs that answer three practical questions f
 - [Hermes TUI Direction](./hermes-tui-direction.md): visibility goals for live sessions
 - [Protocol](../protocol/README.md): schemas, examples, and the public contract
 - [Adapters](../adapters/README.md): adapter registry and built-in extension boundary
+- [Core](../core/README.md): adapter host, runtime session, and capability model
 - [Apps](../apps/README.md): product surfaces built on the protocol
 - [Trae IDE Bridge](../bridges/trae-ide/README.md): the IDE-first bridge path
 
-## Chinese docs
+## Chinese entry
 
 - [Chinese docs index](./README.zh-CN.md)
 - [Getting Started (Chinese)](./getting-started.zh-CN.md)
@@ -51,6 +52,5 @@ If you are new here, start with the docs that answer three practical questions f
 - [`protocol/`](../protocol/): adapter manifest, Runtime Session, and Runtime Event contracts
 - [`core/`](../core/): adapter host, runtime session, and capability model
 - [`adapters/`](../adapters/): plugin manifests, built-in adapter extensions, and integration boundary
-- [`apps/desktop-shell/`](../apps/desktop-shell/): the current LunaAgentOS desktop app
-- [`apps/desktop-shell/src/`](../apps/desktop-shell/src/): web workspace and UI state
-- [`apps/desktop-shell/src-tauri/src/`](../apps/desktop-shell/src-tauri/src/): Rust runtime, history, and ACP commands
+- [`apps/`](../apps/): product surfaces built on the protocol
+- [`bridges/`](../bridges/): bridge paths for IDE-first integrations

@@ -98,18 +98,23 @@ LunaAgentOS 当前不是：
 - [当前产品边界](./docs/current-boundary.zh-CN.md)
 - [贡献指南](./CONTRIBUTING.zh-CN.md)
 
-### 产品与架构
+### 产品与概念
 
 - [产品定义（中文）](./docs/product-definition.zh-CN.md)
 - [为什么做 LunaAgentOS（中文）](./docs/why-lunaagentos.zh-CN.md)
 - [轻核心原则（中文）](./docs/light-core-principles.zh-CN.md)
-- [Architecture Overview](./docs/architecture-overview.md)（暂仅英文）
-- [Roadmap](./docs/roadmap.md)（暂仅英文）
-- [Protocol](../protocol/README.md)（暂仅英文）
-- [Adapters](../adapters/README.md)（暂仅英文）
-- [Apps](../apps/README.md)（暂仅英文）
-- [Hermes ACP Runtime](./docs/hermes-acp-profile-runtime.md)（暂仅英文）
-- [Trae IDE Bridge](../bridges/trae-ide/README.md)（暂仅英文）
+- [路线图](./docs/roadmap.zh-CN.md)
+
+### 架构与接入
+
+- [架构概览](./docs/architecture-overview.zh-CN.md)
+- [Hermes ACP Runtime](./docs/hermes-acp-profile-runtime.zh-CN.md)
+- [Hermes TUI 方向](./docs/hermes-tui-direction.zh-CN.md)
+- [Protocol](./protocol/README.md)（暂仅英文）
+- [Adapters](./adapters/README.md)（暂仅英文）
+- [Core](./core/README.md)（暂仅英文）
+- [Apps](./apps/README.md)（暂仅英文）
+- [Trae IDE Bridge](./bridges/trae-ide/README.md)（暂仅英文）
 
 ### 英文入口
 

@@ -98,20 +98,25 @@ LunaAgentOS is not:
 - [Current Product Boundary](./docs/current-boundary.md)
 - [Contributing](./CONTRIBUTING.md)
 
-### Product and architecture
+### Product and concepts
 
 - [Product Definition](./docs/product-definition.md)
 - [Why LunaAgentOS](./docs/why-lunaagentos.md)
 - [Light-Core Principles](./docs/light-core-principles.md)
-- [Architecture Overview](./docs/architecture-overview.md)
 - [Roadmap](./docs/roadmap.md)
+
+### Architecture and integration
+
+- [Architecture Overview](./docs/architecture-overview.md)
+- [Hermes ACP Runtime](./docs/hermes-acp-profile-runtime.md)
+- [Hermes TUI Direction](./docs/hermes-tui-direction.md)
 - [Protocol](./protocol/README.md)
 - [Adapters](./adapters/README.md)
+- [Core](./core/README.md)
 - [Apps](./apps/README.md)
-- [Hermes ACP Runtime](./docs/hermes-acp-profile-runtime.md)
 - [Trae IDE Bridge](./bridges/trae-ide/README.md)
 
-### Chinese docs
+### Chinese entry
 
 - [Chinese README](./README.zh-CN.md)
 - [Chinese docs index](./docs/README.zh-CN.md)
