@@ -39,6 +39,10 @@ import {
   nextLifecycle,
 } from "./state/sessionLifecycle.js";
 import {
+  compareActiveSessionListItems,
+  compareArchivedSessionListItems,
+} from "./state/sessionListItems.js";
+import {
   acpCommandsForProvider as acpCommandsForProviderRaw,
 } from "./runtime/acpCommands.js";
 import {
@@ -275,6 +279,7 @@ let scheduledWorkspaceRenderOptions = null;
 let scheduledWorkspaceRenderFrame = 0;
 let scheduledWorkspaceRenderTimer = 0;
 let pendingConfirmAction = null;
+let restoreIntentSeq = 0;
 
 function allAgents() {
   const dynamicTargets = runtimeTargets();
@@ -626,7 +631,7 @@ function canSendToSession(session) {
 }
 
 function canRestoreSession(session) {
-  return canRestoreLifecycle(sessionLifecycle(session));
+  return Boolean(session?.acpSessionId) && canRestoreLifecycle(sessionLifecycle(session));
 }
 
 function isArchivedSessionListItem(item) {
@@ -2388,7 +2393,7 @@ function sessionListItems() {
       isInWorkspace: false,
       isRuntimeAttached: false,
     }));
-  return [...liveItems, ...historyItems].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  return [...liveItems, ...historyItems];
 }
 
 function renderHistory(options = {}) {
@@ -2404,8 +2409,8 @@ function renderHistory(options = {}) {
   }
 
   const sessionItems = sessionListItems();
-  const activeItems = sessionItems.filter(isActiveSessionListItem);
-  const archivedItems = sessionItems.filter(isArchivedSessionListItem);
+  const activeItems = sessionItems.filter(isActiveSessionListItem).sort(compareActiveSessionListItems);
+  const archivedItems = sessionItems.filter(isArchivedSessionListItem).sort(compareArchivedSessionListItems);
   if (!sessionItems.length) {
     historyList.innerHTML = `
       <div class="history-empty">
@@ -2514,7 +2519,7 @@ function bindSessionListActions() {
   });
   historyList.querySelectorAll(".history-item.is-archive").forEach((item) => {
     item.addEventListener("click", () => {
-      restoreArchivedSession(item.dataset.sessionId);
+      openArchivedTranscript(item.dataset.sessionId);
     });
   });
 }
@@ -2567,15 +2572,7 @@ function ensureArchivedAgent(archived) {
   return agent;
 }
 
-async function restoreArchivedSession(sessionId) {
-  if (!sessionId) return;
-  const archived = archivedSessionsFromHistory(readableHistoryEntries()).find((item) => item.id === sessionId);
-  if (!archived) return;
-  const existing = sessions.find((item) => item.id === archived.id);
-  if (existing && sessionRuntimeState(existing) === "restoring") {
-    setAppNotice("该 session 正在重连中，请稍等。", "busy");
-    return;
-  }
+function workspaceSessionFromArchived(archived, existing = null) {
   const restored = existing || {
     id: archived.id,
     providerId: archived.providerId,
@@ -2634,6 +2631,49 @@ async function restoreArchivedSession(sessionId) {
   }
   restored.targetId = restored.targetId || restored.agentId;
   Object.assign(restored, normalizeWorkspaceSession(restored));
+  return restored;
+}
+
+function openArchivedTranscript(sessionId) {
+  if (!sessionId) return;
+  const archived = archivedSessionsFromHistory(readableHistoryEntries()).find((item) => item.id === sessionId);
+  if (!archived) return;
+  const existing = sessions.find((item) => item.id === archived.id);
+  if (existing && sessionRuntimeState(existing) === "restoring") {
+    activateWorkspaceSession(existing.id, { focusWorkspace: true });
+    setAppNotice("该 session 正在重连中，请稍等。", "busy");
+    return;
+  }
+  const restored = workspaceSessionFromArchived(archived, existing);
+  if (!existing) sessionsStore.upsertHead(restored);
+  markSessionInactive(restored.id);
+  saveCurrentTargetAgent(restored.agentId);
+  saveCurrentSession(restored.id);
+  renderProviders();
+  renderWorkspace({ focusSessionId: restored.id });
+  renderHistory({ scrollSessionId: restored.id });
+  setAppNotice(restored.acpSessionId
+    ? "已打开历史归档 transcript。需要续聊时请点击恢复。"
+    : "已打开只读历史 transcript。缺少 ACP sessionId，不能恢复 runtime。");
+}
+
+async function restoreArchivedSession(sessionId) {
+  if (!sessionId) return;
+  const archived = archivedSessionsFromHistory(readableHistoryEntries()).find((item) => item.id === sessionId);
+  if (!archived) return;
+  const existing = sessions.find((item) => item.id === archived.id);
+  if (existing && sessionRuntimeState(existing) === "restoring") {
+    setAppNotice("该 session 正在重连中，请稍等。", "busy");
+    return;
+  }
+  const restored = workspaceSessionFromArchived(archived, existing);
+  const restoreIntentId = ++restoreIntentSeq;
+  const restoreStillFocused = () => restoreIntentId === restoreIntentSeq && sessionsStore.getCurrentSessionId() === restored.id;
+  const renderRestoreUpdate = () => {
+    const focused = restoreStillFocused();
+    renderWorkspace(focused ? {} : { preserveDeckScroll: true });
+    renderHistory(focused ? { scrollSessionId: restored.id } : {});
+  };
   if (!existing) sessionsStore.upsertHead(restored);
   sessionsStore.unmarkStopped(restored.id);
   saveCurrentTargetAgent(restored.agentId);
@@ -2643,6 +2683,7 @@ async function restoreArchivedSession(sessionId) {
   renderHistory();
   if (!restored.acpSessionId) {
     setSessionLifecycle(restored, LIFECYCLE.archived);
+    markSessionInactive(restored.id);
     renderWorkspace();
     renderHistory();
     setAppNotice("已从历史归档恢复会话。缺少 ACP sessionId，当前为只读 transcript。");
@@ -2656,9 +2697,7 @@ async function restoreArchivedSession(sessionId) {
   if (!commands) {
     setSessionLifecycle(restored, LIFECYCLE.archived);
     markSessionInactive(restored.id);
-    saveCurrentSession(restored.id);
-    renderWorkspace();
-    renderHistory();
+    renderRestoreUpdate();
     setAppNotice("该 provider 暂不支持 ACP runtime 恢复，当前为只读 transcript。");
     return;
   }
@@ -2673,9 +2712,7 @@ async function restoreArchivedSession(sessionId) {
     }));
     setSessionLifecycle(restored, LIFECYCLE.live);
     markSessionActive(restored.id);
-    saveCurrentSession(restored.id);
-    renderWorkspace();
-    renderHistory();
+    renderRestoreUpdate();
     setAppNotice("历史 session 已重连为可续聊的 ACP runtime。");
   } catch (loadError) {
     const formattedLoadError = formatBackendError(loadError);
@@ -2695,9 +2732,7 @@ async function restoreArchivedSession(sessionId) {
       }));
       setSessionLifecycle(restored, LIFECYCLE.live);
       markSessionActive(restored.id);
-      saveCurrentSession(restored.id);
-      renderWorkspace();
-      renderHistory();
+      renderRestoreUpdate();
       setAppNotice("ACP load 失败，已通过 resume 重连为可续聊的 runtime。");
     } catch (resumeError) {
       const formattedResumeError = formatBackendError(resumeError || loadError);
@@ -2712,9 +2747,7 @@ async function restoreArchivedSession(sessionId) {
       );
       setSessionLifecycle(restored, LIFECYCLE.resume_failed);
       markSessionInactive(restored.id);
-      saveCurrentSession(restored.id);
-      renderWorkspace();
-      renderHistory();
+      renderRestoreUpdate();
       setAppNotice(`ACP runtime 重连失败：${compactNoticeText(formattedResumeError)}。已保留只读 transcript。`, "error");
     }
   }
