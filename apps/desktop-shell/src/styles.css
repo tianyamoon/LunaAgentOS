@@ -219,22 +219,6 @@ body {
   text-overflow: ellipsis;
 }
 
-.launch-metrics {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.launch-metrics span {
-  padding: 6px 9px;
-  border: 1px solid rgba(99, 82, 63, 0.09);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.58);
-  color: var(--muted);
-  font-size: 0.72rem;
-  font-weight: 800;
-}
-
 .app-notice.is-busy {
   color: var(--accent);
 }

@@ -3,7 +3,6 @@
 
 export const translations = {
   "zh-CN": {
-    "topbar.metricsAria": "当前能力状态",
     "topbar.demo": "演示场景",
     "topbar.clearDemo": "清除演示",
     "topbar.language": "语言：中文",
@@ -168,7 +167,6 @@ export const translations = {
     "availability.copyReport": "复制诊断报告",
   },
   "en-US": {
-    "topbar.metricsAria": "Current capability status",
     "topbar.demo": "Demo scene",
     "topbar.clearDemo": "Clear demo",
     "topbar.language": "Language: English",
