@@ -183,6 +183,7 @@ const SEND_MODE_KEY = "lunaagentos.sendMode";
 const FONT_SCALE_KEY = "lunaagentos.fontScale";
 const PROVIDER_COLLAPSE_KEY = "lunaagentos.providerCollapsedIds";
 const HISTORY_SCHEMA_VERSION = 3;
+const STREAM_CARD_RENDER_INTERVAL_MS = 100;
 const DEFAULT_HERMES_AGENT_ID = "hermes-wsl:profile:default";
 const SEND_MODE_OPTIONS = ["enter", "ctrlEnter"];
 const PROVIDER_AVAILABILITY_STATES = {
@@ -2371,17 +2372,35 @@ function sampleSessionStickyIntent() {
 
 const pendingCardRenders = new Set();
 let pendingCardRenderFrame = 0;
+let pendingCardRenderTimer = 0;
+let lastCardRenderAt = 0;
 
 function scheduleSessionCardRender(sessionId) {
   if (!sessionId) return;
   pendingCardRenders.add(sessionId);
-  if (pendingCardRenderFrame) return;
-  pendingCardRenderFrame = requestAnimationFrame(() => {
-    const targets = [...pendingCardRenders];
-    pendingCardRenders.clear();
-    pendingCardRenderFrame = 0;
-    targets.forEach((id) => renderSessionCardInPlace(id));
-  });
+  if (pendingCardRenderFrame || pendingCardRenderTimer) return;
+  const elapsed = Date.now() - lastCardRenderAt;
+  const delayMs = Math.max(0, STREAM_CARD_RENDER_INTERVAL_MS - elapsed);
+  const requestCardRender = () => {
+    pendingCardRenderTimer = 0;
+    pendingCardRenderFrame = requestAnimationFrame(() => {
+      lastCardRenderAt = Date.now();
+      pendingCardRenderFrame = 0;
+      flushPendingSessionCardRenders();
+    });
+  };
+  if (delayMs > 0) {
+    pendingCardRenderTimer = window.setTimeout(requestCardRender, delayMs);
+    return;
+  }
+  requestCardRender();
+}
+
+function flushPendingSessionCardRenders() {
+  if (!pendingCardRenders.size) return;
+  const targets = [...pendingCardRenders];
+  pendingCardRenders.clear();
+  targets.forEach((id) => renderSessionCardInPlace(id));
 }
 
 function renderSessionCardInPlace(sessionId) {
