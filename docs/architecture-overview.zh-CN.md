@@ -2,16 +2,16 @@
 
 [English](./architecture-overview.md)
 
-LunaAgentOS 是位于外部 coding-agent runtime 之上的、以协议为核心的控制层。
+LunaAgentOS 0.1 Preview 是真实 AI Agent 会话的中立桌面工作台。
 
-它定义统一 adapter contract 和 Runtime Session Model，通过 adapters 连接外部 runtimes，观察它们的 sessions，归一化过程可见性，并让 App 渲染活跃和归档工作。
+它的架构使用统一 adapter contract 和 Runtime Session Model 连接外部 runtimes，观察真实 sessions，归一化过程可见性，并让 App 渲染活跃和归档工作。
 
 ## 分层
 
 ```text
 ┌──────────────────────────────────────────────┐
 │               LunaAgentOS App                │
-│        Protocol console and workspace         │
+│       Neutral session workspace               │
 ├──────────────────────────────────────────────┤
 │             Runtime Session Model            │
 │       Session / Turn / Event / History        │

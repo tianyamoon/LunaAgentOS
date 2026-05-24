@@ -2,13 +2,13 @@
 
 [English](./CONTRIBUTING.md)
 
-LunaAgentOS 是一个以协议为核心的异构 Coding Agent runtime 控制层。最有价值的贡献，是让当前 runtime 入口更可靠、让 Runtime Session 工作台更好用，或让 adapter contract 更清晰。
+LunaAgentOS 0.1 Preview 是真实 AI Agent 会话的中立桌面工作台。最有价值的贡献，是让当前 runtime 入口更可靠、让 Runtime Session 工作台更好用，或让 adapter contract 更清晰。
 
 ## 开始前
 
 在提交 issue 或 pull request 之前，请先对齐这些项目边界：
 
-1. LunaAgentOS 是外部 Agent 之上的控制层，不是替代外部 Agent 的底层 runtime。
+1. LunaAgentOS 是围绕外部 Agent 的中立工作台，不是替代外部 Agent 的底层 runtime。
 2. Claude Code、Hermes 和 Runtime Session 工作台是当前可靠性重点。
 3. runtime 特有行为应尽量留在 adapter 附近，除非协议需要抽象出共享概念。
 4. 仓库仍在快速迭代，命名、文档和边界可能继续收敛。

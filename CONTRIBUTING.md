@@ -2,13 +2,13 @@
 
 [中文](./CONTRIBUTING.zh-CN.md)
 
-LunaAgentOS is a protocol-centered control layer for heterogeneous coding-agent runtimes. Contributions are most useful when they make the current runtime entries more reliable, improve the Runtime Session workspace, or clarify the adapter contract.
+LunaAgentOS 0.1 Preview is a neutral desktop workspace for real AI agent sessions. Contributions are most useful when they make the current runtime entries more reliable, improve the Runtime Session workspace, or clarify the adapter contract.
 
 ## Before you start
 
 Please align on these project boundaries before opening an issue or pull request:
 
-1. LunaAgentOS is a control layer above external agents, not a replacement agent runtime.
+1. LunaAgentOS is a neutral workspace around external agents, not a replacement agent runtime.
 2. Claude Code, Hermes, and the Runtime Session workspace are the current reliability focus.
 3. Runtime-specific behavior should stay near adapters unless the protocol needs a shared concept.
 4. The repository is still evolving quickly, so names, docs, and boundaries may continue to tighten.

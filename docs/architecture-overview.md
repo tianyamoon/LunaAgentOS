@@ -2,16 +2,16 @@
 
 [中文](./architecture-overview.zh-CN.md)
 
-LunaAgentOS is a protocol-centered control layer above external coding-agent runtimes.
+LunaAgentOS 0.1 Preview is a neutral desktop workspace for real AI agent sessions.
 
-It defines a unified adapter contract and Runtime Session Model, connects to external runtimes through adapters, observes their sessions, normalizes their process visibility, and lets the App render active and archived work.
+Its architecture uses a unified adapter contract and Runtime Session Model to connect external runtimes, observe real sessions, normalize process visibility, and let the App render active and archived work.
 
 ## Layers
 
 ```text
 ┌──────────────────────────────────────────────┐
 │               LunaAgentOS App                │
-│        Protocol console and workspace         │
+│       Neutral session workspace               │
 ├──────────────────────────────────────────────┤
 │             Runtime Session Model            │
 │       Session / Turn / Event / History        │

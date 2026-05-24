@@ -8,21 +8,25 @@
   <a href="./README.zh-CN.md">中文说明</a>
 </p>
 
-LunaAgentOS puts real coding-agent runtimes into one desktop workspace.
+**LunaAgentOS 0.1 Preview**
 
-Today it works as a Windows-first app for Claude Code and Hermes: choose a runtime target, send work into a real session, watch thought and runtime events as they arrive, and keep local session history in one place.
+LunaAgentOS is a neutral desktop workspace for real AI agent sessions.
+
+Today it is a Windows-first app for Claude Code and Hermes: choose a runtime entry, send work into a real session, watch output, thought, and runtime events as they arrive, and keep local session history in one place.
+
+Protocol, adapters, and the Runtime Session Model are the supporting structure behind that workspace. They help LunaAgentOS connect real external runtimes without claiming to replace them.
 
 ![LunaAgentOS desktop preview](./docs/assets/lunaagentos-stage1-preview.svg)
 
 ## Why it exists
 
-Coding agents are getting stronger, but the workspace around them is still fragmented:
+AI agents are getting stronger, but the workspace around their real sessions is still fragmented:
 
 - Different products expose different surfaces: CLI, TUI, IDE, gateway, and SDK.
 - Process visibility is inconsistent: some runtimes stream thought, tool, plan, or usage events, while others only show a final answer.
 - Session history is scattered across tools and hard to restore, compare, or review.
 
-LunaAgentOS focuses on the layer above those runtimes. It treats each external agent as a runtime entry and makes the session card the shared surface for output, thought, runtime events, final response, and local history.
+LunaAgentOS focuses on the desktop workspace around those sessions. It treats each external agent product as a runtime entry and makes the Runtime Session Card the shared surface for output, thought, runtime events, final response, and local history.
 
 ## What you can do today
 
@@ -76,16 +80,17 @@ More detail: [Getting Started](./docs/getting-started.md)
 
 ## Product boundary
 
-LunaAgentOS is:
+LunaAgentOS 0.1 Preview is:
 
-- A control layer above existing agent runtimes
-- A runtime adapter and plugin contract for heterogeneous entries
+- A neutral desktop workspace for real AI agent sessions
+- A Windows-first local app for Claude Code and Hermes sessions
 - A Runtime Session workspace centered on durable session cards
-- A local-first app for observing, routing, and restoring real sessions
+- A product surface backed by protocol, adapters, and the Runtime Session Model
 
-LunaAgentOS is not:
+LunaAgentOS 0.1 Preview is not:
 
-- A replacement for Claude Code or Hermes
+- A replacement for AionUi, Claude Code, or Hermes
+- A complete multi-agent orchestration platform
 - A claim that every agent must look the same internally
 - A marketplace or broad commercial platform today
 
@@ -94,6 +99,7 @@ LunaAgentOS is not:
 ### Start here
 
 - [Docs index](./docs/README.md)
+- [0.1 Preview Release Notes](./docs/release-notes-0.1-preview.md)
 - [Getting Started](./docs/getting-started.md)
 - [Current Product Boundary](./docs/current-boundary.md)
 - [Contributing](./CONTRIBUTING.md)

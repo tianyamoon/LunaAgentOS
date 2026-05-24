@@ -8,21 +8,25 @@
   <a href="./README.md">English</a>
 </p>
 
-LunaAgentOS 把真实的 Coding Agent runtime 放进同一个桌面工作台。
+**LunaAgentOS 0.1 Preview**
 
-当前它是一个 Windows 优先的应用，已经接入 Claude Code 和 Hermes：你可以选择目标，把任务发给真实 runtime，实时观察 thought 和 runtime 事件，并把本地会话历史留在一个地方。
+LunaAgentOS 是真实 AI Agent 会话的中立桌面工作台。
+
+当前它是一个 Windows 优先的应用，已经接入 Claude Code 和 Hermes：你可以选择 runtime 入口，把任务发给真实 session，实时观察输出、thought 和 runtime 事件，并把本地会话历史留在一个地方。
+
+Protocol、adapters 和 Runtime Session Model 是这个桌面工作台背后的支撑结构。它们帮助 LunaAgentOS 连接真实外部 runtime，但不宣称替代这些外部产品。
 
 ![LunaAgentOS 桌面预览图](./docs/assets/lunaagentos-stage1-preview-cn.svg)
 
 ## 为什么做
 
-Agent 会越来越强，但它们周围的工作空间仍然很割裂：
+AI Agent 会越来越强，但真实会话周围的工作空间仍然很割裂：
 
 - 不同产品暴露不同入口：CLI、TUI、IDE、gateway、SDK 会长期共存。
 - 过程可见性不一致：有的 runtime 能持续流出 thought、tool、plan、usage，有的只有最终响应。
 - 会话历史分散在不同工具里，很难统一恢复、对比和复盘。
 
-LunaAgentOS 关注的是这些 runtime 之上的控制层。它把每个外部 Agent 视为 runtime entry，把 session card 做成统一承载输出、思考流、运行流、最终响应和本地历史的共享界面。
+LunaAgentOS 关注的是这些真实会话周围的桌面工作台。它把每个外部 Agent 产品视为 runtime entry，把 Runtime Session Card 做成统一承载输出、思考流、运行流、最终响应和本地历史的共享界面。
 
 ## 当前能做什么
 
@@ -76,16 +80,17 @@ apps/desktop-shell/src-tauri/target/release/desktop-shell.exe
 
 ## 产品边界
 
-LunaAgentOS 当前是：
+LunaAgentOS 0.1 Preview 当前是：
 
-- 现有 Agent runtime 之上的控制层
-- 面向异构入口的 runtime adapter / plugin contract
+- 真实 AI Agent 会话的中立桌面工作台
+- 面向 Claude Code 和 Hermes session 的 Windows 优先本地应用
 - 以 Runtime Session Card 为中心的工作台
-- 用于观测、路由、恢复真实 session 的本地优先应用
+- 由 protocol、adapters 和 Runtime Session Model 支撑的产品界面
 
-LunaAgentOS 当前不是：
+LunaAgentOS 0.1 Preview 当前不是：
 
-- Claude Code 或 Hermes 的替代品
+- AionUi、Claude Code 或 Hermes 的替代品
+- 完整的多 Agent orchestration 平台
 - 要把所有 Agent 内部机制强行做成一样
 - 现在就去做插件市场或商业平台
 
@@ -94,6 +99,7 @@ LunaAgentOS 当前不是：
 ### 先看这些
 
 - [文档总览](./docs/README.zh-CN.md)
+- [0.1 Preview 发布说明](./docs/release-notes-0.1-preview.zh-CN.md)
 - [快速开始](./docs/getting-started.zh-CN.md)
 - [当前产品边界](./docs/current-boundary.zh-CN.md)
 - [贡献指南](./CONTRIBUTING.zh-CN.md)

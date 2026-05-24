@@ -71,4 +71,4 @@ The near-term goal is not maximum breadth. It is credibility:
 - strengthen local history and restore behavior
 - make agent-to-agent routing visible when that layer lands
 
-If that foundation is strong, LunaAgentOS can grow into a broader control plane without becoming another thin chat wrapper.
+If that foundation is strong, LunaAgentOS can grow into a stronger session workspace without becoming another thin chat wrapper.

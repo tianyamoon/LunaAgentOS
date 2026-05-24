@@ -2,34 +2,39 @@
 
 [中文](./current-boundary.zh-CN.md)
 
-LunaAgentOS is a protocol-centered control layer with a working App for heterogeneous coding-agent runtime sessions.
+LunaAgentOS 0.1 Preview is a neutral desktop workspace for real AI agent sessions.
 
-## What LunaAgentOS is
+This page defines the release boundary: what exists now, what 0.1 Preview is intentionally not, and what the next layer should make possible.
 
-- **A control layer above existing agents**: it connects to external runtimes and keeps their native strengths visible.
-- **A Runtime Adapter / Plugin contract**: new agent products enter through adapters and normalized runtime events.
-- **A Runtime Session workspace**: the central object is a session card, not a chat bubble list.
-- **A neutral console**: Claude Code, Hermes, and IDE Bridge entries are modeled as external entries.
-- **A local-first App**: the App is the protocol's concrete control console and official recommended use path.
+## What it is now
+
+- **A neutral desktop workspace**: the app gives real AI agent sessions a shared local surface without claiming ownership of the agents themselves.
+- **Windows-first**: the current product path is the Tauri desktop app on Windows.
+- **A real-session workspace**: the central object is a Runtime Session Card, not a generic chat bubble list.
+- **A local-first history surface**: session turns, archived sessions, restore actions, and read-only history states are kept locally.
+- **A product backed by protocol and adapters**: the protocol, adapter boundary, and Runtime Session Model support the workspace experience.
 
 ## What works now
 
 - Claude Code can be used as a real runtime entry.
 - Hermes can be used through Windows / WSL ACP runtime instances and profiles.
+- Trae IDE is represented as an IDE-first bridge path.
 - The left side shows the Agent Fleet and current send target.
 - The center workspace shows active Runtime Session Cards.
 - Each card holds output stream, thought stream, runtime stream, and final response.
 - The right side separates live sessions from archived sessions.
 - Local JSON history stores session turns and supports restore/read-only states.
 - Demo mode shows the intended Claude + Hermes workspace without writing real history.
-- Protocol, adapters, and Runtime Session Model guide the current architecture.
 
-## Current scope
+## What it is not now
 
-- LunaAgentOS controls and observes external runtimes through adapters.
-- LunaAgentOS keeps Claude Code, Hermes, and Trae IDE as external product entries.
-- LunaAgentOS organizes work around Runtime Session Cards.
-- LunaAgentOS grows adapter capability, runtime routing, and collaboration flow before marketplace or commercial-platform features.
+- It is not an AionUi replacement.
+- It is not a Claude Code or Hermes replacement.
+- It is not a complete multi-agent orchestration platform.
+- It is not a marketplace or broad commercial platform.
+- It does not make every agent internally identical.
+- It does not provide a shared memory bus across agents.
+- It does not present remote or team entry points as available 0.1 Preview features.
 
 ## Modeling rules
 
@@ -39,13 +44,13 @@ The left fleet represents external entry objects:
 
 - Claude Code
 - Hermes
-- Trae IDE bridge entry
+- Trae IDE bridge path
 
 Claude internal subagents or delegation workers remain part of Claude's own internal mechanism.
 
 ### Adapter boundary
 
-Claude Code and Hermes are registry adapters that validate the contract.
+Claude Code and Hermes are real runtime entries that validate the contract.
 
 The adapter rule is:
 
@@ -53,7 +58,7 @@ The adapter rule is:
 new agent product -> adapter manifest + adapter implementation -> LunaAgentOS unified JSON contract
 ```
 
-Adding a new agent product follows adapter/plugin installation and normalized Runtime Session events.
+Adding a new agent product should follow adapter/plugin installation and normalized Runtime Session events. That path is the next integration model, not a promise that every possible adapter is already production-ready.
 
 ### Current send target
 
@@ -72,11 +77,12 @@ A session card is the shared surface for:
 - Final response
 - Local history and restore state
 
-## Next direction
+## Next layer
 
-The next product layer is targetable collaboration:
+The next layer is not a rebrand and not a jump to a full orchestration platform. It should focus on:
 
-- Send selected session content to another entry.
-- Send selected content to another existing session.
-- Show the relationship between source session and target session.
-- Keep human control visible while agents collaborate.
+- Hardening Claude Code and Hermes runtime entry reliability.
+- Making local history and restore behavior easier to trust.
+- Clarifying adapter installation and capability boundaries.
+- Strengthening the Trae IDE bridge path.
+- Designing targeted session handoff so users can intentionally move selected context between entries or sessions when that capability is actually implemented.

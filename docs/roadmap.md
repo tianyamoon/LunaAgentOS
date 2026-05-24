@@ -2,7 +2,7 @@
 
 [中文](./roadmap.zh-CN.md)
 
-LunaAgentOS is growing from a working protocol console into a protocol-centered adapter layer, Runtime Session Model, collaboration workspace, and broader control plane.
+LunaAgentOS 0.1 Preview starts as a neutral desktop workspace for real AI agent sessions. The roadmap grows from that workspace toward clearer adapters, stronger Runtime Session behavior, and carefully scoped session handoff.
 
 ## Now: Product definition and Runtime Session workspace
 

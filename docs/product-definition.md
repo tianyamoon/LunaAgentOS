@@ -2,36 +2,46 @@
 
 [中文](./product-definition.zh-CN.md)
 
-LunaAgentOS is a protocol-centered control layer for heterogeneous coding-agent runtimes.
+LunaAgentOS 0.1 Preview is a neutral desktop workspace for real AI agent sessions.
 
-The current LunaAgentOS app is the concrete product surface for that layer: choose a target, send work into a real runtime session, observe the process, and keep local history in one place.
+The product starts from the workspace experience: choose a real runtime entry, send work into a real session, watch the process, and keep local history in one place. Protocol, adapters, and the Runtime Session Model support that experience; they are not the first thing LunaAgentOS asks users to believe.
 
-## The product shape
+## The 0.1 Preview product shape
 
-LunaAgentOS is built from four pieces that reinforce each other:
+LunaAgentOS 0.1 Preview is built around five concrete pieces:
 
-- **Unified JSON contract**: stable public shapes for adapter identity, runtime sessions, runtime events, capabilities, and history
+- **LunaAgentOS App**: a Windows-first Tauri desktop workspace
+- **Runtime Session Cards**: the shared surface for output, thought, runtime events, final response, and restore state
+- **Local history**: JSON-backed session history with restore and read-only archived states
+- **Real runtime entries**: Claude Code and Hermes as real external runtimes
+- **Bridge path**: Trae IDE as an IDE-first bridge direction
+
+## Supporting architecture
+
+The workspace is supported by a small set of contracts:
+
+- **Runtime Session Model**: the shared session, turn, lifecycle, and history model that the app renders consistently
 - **Runtime Adapter / Plugin Contract**: the integration boundary for external agent products
-- **Runtime Session Model**: the shared session, turn, lifecycle, and history model that apps can render consistently
-- **LunaAgentOS App**: the desktop workspace that turns the contract into an actual product experience
+- **Unified JSON contract**: stable shapes for adapter identity, runtime sessions, runtime events, capabilities, and history
 
-## Why the app matters
+The protocol defines the contract. The app proves that the contract is useful as a product experience.
 
-The app is not a separate side project around the protocol. It is the reference product experience for the protocol.
+## What works today
 
 Today the app provides:
 
-- A native desktop window
+- A native Windows-first desktop window
 - Agent Fleet and runtime configuration
-- Runtime Session Cards
-- Live and archived sessions
-- Local history, restore actions, and read-only history states
+- Claude Code as a real runtime entry
+- Hermes through Windows / WSL ACP runtime instances and profiles
+- Runtime Session Cards for live sessions
+- Archived sessions and local history
+- Restore actions and read-only history states
+- Demo mode for orientation and screenshots without writing real history
 
-The protocol defines the contract. The app proves that the contract is usable.
+## Adapter path
 
-## The adapter path
-
-New agent products should enter LunaAgentOS through the adapter boundary:
+The intended integration path remains adapter-based:
 
 ```text
 agent product
@@ -43,43 +53,27 @@ agent product
   -> app rendering
 ```
 
-This keeps the product experience coherent while allowing each runtime to preserve its own strengths.
+This keeps the workspace neutral while allowing each runtime to preserve its own strengths.
 
-## Runtime surfaces
+## Current external entries
 
-Different products expose different runtime surfaces. LunaAgentOS treats those as adapter concerns rather than product boundaries.
+- **Claude Code**: validates real session output, long-form responses, and coding workflows
+- **Hermes**: validates profile-based identity, Windows / WSL routing, ACP sessions, and richer runtime event visibility
+- **Trae IDE**: represents the IDE-first bridge path
 
-Current primary surface:
-
-- **ACP / protocol** for structured runtime sessions and updates
-
-Planned or possible surfaces:
-
-- **PTY / terminal** for native CLI and TUI compatibility
-- **SDK streaming** for official programmable runtimes
-- **Gateway / HTTP / WebSocket** for remote or background agents
-- **IDE Bridge** for IDE-first products
-
-## Registry adapters
-
-Registry adapters exist to validate and sharpen the contract:
-
-- **Claude Code** proves high-value coding workflows and long-form output handling
-- **Hermes** proves profile-based identity, Windows / WSL routing, and rich runtime event visibility
-- **Trae IDE** represents the IDE-first bridge path
-
-These are not fake demo entries. They are real external products entering the system through the same model LunaAgentOS wants to scale.
+These are real external products entering the workspace. LunaAgentOS 0.1 Preview does not claim to replace them.
 
 ## Design constraints
 
 The current product definition follows a few constraints:
 
-- Keep the control layer light
+- Lead with the neutral desktop workspace, then explain the supporting protocol
 - Preserve runtime-native strengths instead of flattening everything into one chat surface
 - Make process visibility a first-class part of the product
 - Keep local history durable and recoverable
-- Grow the adapter contract before chasing marketplace or platform breadth
+- Avoid presenting 0.1 Preview as a complete multi-agent orchestration platform
+- Grow the adapter contract before chasing marketplace or commercial-platform breadth
 
 ## Boundary for the next stage
 
-The current repository already contains a working app and the first real integrations. The next stage is not to rename the idea again; it is to make the adapter boundary clearer, the runtime workspace stronger, and the protocol easier to extend.
+The current repository already contains a working app and the first real integrations. The next layer is to harden runtime entries, make restore more reliable, clarify the adapter boundary, and design targeted session handoff without presenting it as an implemented orchestration platform.

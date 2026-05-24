@@ -71,4 +71,4 @@ LunaAgentOS 不是要抹平所有产品差异。
 - 加强本地历史和恢复能力
 - 在调用流落地时，让 agent-to-agent 路由关系可见
 
-如果这个基础足够扎实，LunaAgentOS 才有机会成长为更广义的 control plane，而不是另一个薄薄的 chat wrapper。
+如果这个基础足够扎实，LunaAgentOS 才有机会成长为更强的 session workspace，而不是另一个薄薄的 chat wrapper。

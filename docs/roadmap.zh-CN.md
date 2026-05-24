@@ -2,7 +2,7 @@
 
 [English](./roadmap.md)
 
-LunaAgentOS 正在从可运行的 protocol console，成长为以协议为核心的 adapter layer、Runtime Session Model、协作工作台和更广义的 control plane。
+LunaAgentOS 0.1 Preview 从真实 AI Agent 会话的中立桌面工作台开始。路线图会沿着这个工作台继续推进 adapter 边界、Runtime Session 行为和谨慎限定的 session handoff。
 
 ## 当前：产品定义和 Runtime Session workspace
 
