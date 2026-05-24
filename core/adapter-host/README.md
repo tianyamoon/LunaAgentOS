@@ -1,10 +1,10 @@
-# Adapter Host
+﻿# Adapter Host
 
 The Adapter Host loads adapter manifests, prepares runtime commands, manages adapter lifecycle, and emits normalized Runtime Session events.
 
 ## Responsibilities
 
-- Discover installed first-party and external adapters.
+- Discover installed registry and external adapters.
 - Validate adapter manifests against the protocol schemas.
 - Resolve runtime surfaces such as ACP stdio, PTY, SDK, gateway, and IDE bridge.
 - Start, resume, load, and stop runtime sessions.

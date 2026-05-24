@@ -58,9 +58,9 @@ agent product
 - **Gateway / HTTP / WebSocket**：远程或后台 agent
 - **IDE Bridge**：IDE-first 产品
 
-## 首批 first-party adapters
+## 首批 registry adapters
 
-first-party adapters 的作用，是验证并打磨 contract：
+registry adapters 的作用，是验证并打磨 contract：
 
 - **Claude Code**：验证高价值 coding workflow 和长文本输出处理
 - **Hermes**：验证 profile 身份、Windows / WSL 路由和丰富的 runtime event 可见性

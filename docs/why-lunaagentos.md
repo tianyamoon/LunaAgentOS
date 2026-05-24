@@ -39,7 +39,7 @@ agent product
 
 That is the difference between a one-off integration and a system that can grow.
 
-## Why first-party adapters matter
+## Why real registry adapters matter
 
 Claude Code and Hermes are the first practical tests of the model.
 

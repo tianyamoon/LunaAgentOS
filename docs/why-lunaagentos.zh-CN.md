@@ -39,7 +39,7 @@ agent product
 
 这也是“一次性集成”和“可持续扩展系统”之间的区别。
 
-## 为什么 first-party adapters 很重要
+## 为什么真实 registry adapters 很重要
 
 Claude Code 和 Hermes 是这套模型的第一批现实检验。
 

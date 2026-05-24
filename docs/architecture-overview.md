@@ -84,15 +84,15 @@ Planned runtime surfaces:
 - **SDK** for official programmable runtimes.
 - **IDE Bridge** for IDE-first products such as Trae IDE.
 
-## First-party adapters
+## Registry adapters
 
 ### Claude Code
 
-Claude Code represents a high-value coding runtime. LunaAgentOS models it as a first-party adapter and real external runtime entry.
+Claude Code represents a high-value coding runtime. LunaAgentOS models it as a registry adapter and real external runtime entry.
 
 ### Hermes
 
-Hermes represents profile-based runtime entries and process visibility. Its ACP updates can expose thought, message, tool, plan, and usage events. LunaAgentOS models it as a first-party adapter.
+Hermes represents profile-based runtime entries and process visibility. Its ACP updates can expose thought, message, tool, plan, and usage events. LunaAgentOS models it as a registry adapter.
 
 ### Trae IDE
 

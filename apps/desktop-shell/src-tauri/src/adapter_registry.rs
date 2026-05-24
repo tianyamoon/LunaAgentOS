@@ -16,6 +16,7 @@ pub struct AdapterLoadResult {
 pub struct AdapterDefinition {
     pub id: String,
     pub name: String,
+    pub extension: Option<String>,
     pub version: Option<String>,
     pub description: Option<String>,
     pub transport: String,
@@ -70,6 +71,7 @@ pub struct ProcessExecPermission {
 struct RawManifest {
     id: String,
     name: String,
+    extension: Option<String>,
     version: Option<String>,
     #[serde(default, alias = "schema_version")]
     schema_version: Option<u32>,
@@ -103,6 +105,7 @@ struct RawContributes {
 struct RawAdapterContribution {
     id: String,
     name: String,
+    extension: Option<String>,
     description: Option<String>,
     transport: String,
     command: CommandSpec,
@@ -158,9 +161,7 @@ pub fn default_plugin_path() -> PathBuf {
         .join("..")
         .join("..")
         .join("adapters")
-        .join("reference")
-        .join("stdio")
-        .join("plugins")
+        .join("registry")
 }
 
 pub fn load_adapters(configured_paths: &[String]) -> AdapterLoadResult {
@@ -244,6 +245,7 @@ fn load_manifest_file(path: &Path) -> Result<Vec<AdapterDefinition>, String> {
     Ok(vec![finalize_adapter(AdapterDefinition {
         id: manifest.id.clone(),
         name: manifest.name.clone(),
+        extension: manifest.extension.clone(),
         version: manifest.version.clone(),
         description: manifest.description.clone(),
         transport,
@@ -270,6 +272,7 @@ fn adapter_from_contribution(
     Ok(finalize_adapter(AdapterDefinition {
         id: adapter.id,
         name: adapter.name,
+        extension: adapter.extension.or_else(|| manifest.extension.clone()),
         version: manifest.version.clone(),
         description: adapter.description.or_else(|| manifest.description.clone()),
         transport: adapter.transport,
@@ -369,15 +372,15 @@ fn normalize_command_for_platform(command: String) -> String {
         .map(|value| value.to_string_lossy().to_string())
         .unwrap_or_else(|| ".COM;.EXE;.BAT;.CMD".to_string());
     for dir in env::split_paths(&paths) {
-        let direct = dir.join(trimmed);
-        if direct.is_file() {
-            return direct.to_string_lossy().to_string();
-        }
         for ext in pathext.split(';').filter(|item| !item.trim().is_empty()) {
             let candidate = dir.join(format!("{trimmed}{}", ext.trim()));
             if candidate.is_file() {
                 return candidate.to_string_lossy().to_string();
             }
+        }
+        let direct = dir.join(trimmed);
+        if direct.is_file() {
+            return direct.to_string_lossy().to_string();
         }
     }
     command
@@ -446,12 +449,15 @@ pub fn find_adapter(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn process_exec_supports_double_star_tail() {
         let adapter = AdapterDefinition {
             id: "codex".to_string(),
             name: "Codex".to_string(),
+            extension: None,
             version: None,
             description: None,
             transport: "stdio_json".to_string(),
@@ -485,5 +491,42 @@ mod tests {
         )
         .is_ok());
         assert!(allow_process_exec(&adapter, "node", &[]).is_err());
+    }
+
+    #[test]
+    fn windows_command_normalization_prefers_pathext_candidate() {
+        if !cfg!(windows) {
+            return;
+        }
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock before unix epoch")
+            .as_nanos();
+        let dir = env::temp_dir().join(format!("lunaagentos-command-normalize-{nonce}"));
+        fs::create_dir_all(&dir).expect("create temp command dir");
+        fs::write(dir.join("npx"), "").expect("write extensionless command");
+        fs::write(dir.join("npx.cmd"), "").expect("write cmd command");
+
+        let original_path = env::var_os("PATH");
+        let original_pathext = env::var_os("PATHEXT");
+        env::set_var("PATH", dir.as_os_str());
+        env::set_var("PATHEXT", ".CMD;.EXE");
+
+        let normalized = normalize_command_for_platform("npx".to_string());
+
+        if let Some(value) = original_path {
+            env::set_var("PATH", value);
+        } else {
+            env::remove_var("PATH");
+        }
+        if let Some(value) = original_pathext {
+            env::set_var("PATHEXT", value);
+        } else {
+            env::remove_var("PATHEXT");
+        }
+        fs::remove_dir_all(&dir).expect("remove temp command dir");
+
+        assert!(normalized.eq_ignore_ascii_case(&dir.join("npx.cmd").to_string_lossy()));
     }
 }

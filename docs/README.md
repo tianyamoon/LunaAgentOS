@@ -25,7 +25,7 @@ If you are new here, start with the docs that answer three practical questions f
 
 - [Architecture Overview](./architecture-overview.md): current layering and responsibilities
 - [Protocol](../protocol/README.md): schemas, examples, and the public contract
-- [Adapters](../adapters/README.md): adapter boundary and first-party integrations
+- [Adapters](../adapters/README.md): adapter registry and built-in extension boundary
 - [Apps](../apps/README.md): product surfaces built on the protocol
 - [Hermes ACP Runtime](./hermes-acp-profile-runtime.md): Hermes runtime semantics and profile loading
 - [Hermes TUI Direction](./hermes-tui-direction.md): visibility goals for live sessions
@@ -42,7 +42,7 @@ If you are new here, start with the docs that answer three practical questions f
 
 - [`protocol/`](../protocol/): adapter manifest, Runtime Session, and Runtime Event contracts
 - [`core/`](../core/): adapter host, runtime session, and capability model
-- [`adapters/`](../adapters/): first-party adapters, stdio adapter reference, and integration boundary
+- [`adapters/`](../adapters/): plugin manifests, built-in adapter extensions, and integration boundary
 - [`apps/desktop-shell/`](../apps/desktop-shell/): the current LunaAgentOS desktop app
 - [`apps/desktop-shell/src/`](../apps/desktop-shell/src/): web workspace and UI state
 - [`apps/desktop-shell/src-tauri/src/`](../apps/desktop-shell/src-tauri/src/): Rust runtime, history, and ACP commands

@@ -1,4 +1,4 @@
-# 当前产品边界
+﻿# 当前产品边界
 
 LunaAgentOS 现在是一个以协议为核心、已经有可运行 App 的异构 coding-agent runtime 控制层。
 
@@ -43,7 +43,7 @@ Claude 内部的 subagent 或 delegation worker 仍然属于 Claude 自身机制
 
 ### Adapter 边界
 
-Claude Code 和 Hermes 是用来验证 contract 的 first-party adapters。
+Claude Code 和 Hermes 是用来验证 contract 的 registry adapters。
 
 adapter 规则是：
 

@@ -3,10 +3,10 @@
   "schemaVersion": "0.1.0-draft",
   "id": "hermes",
   "displayName": "Hermes",
-  "kind": "first_party",
+  "kind": "registry",
   "status": "active",
   "entryRole": "runtime",
-  "description": "First-party adapter for Hermes profile-based coding-agent runtimes.",
+  "description": "Registry adapter for Hermes profile-based coding-agent runtimes.",
   "surfaces": [
     {
       "kind": "acp_stdio",

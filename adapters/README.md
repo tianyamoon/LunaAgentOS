@@ -1,23 +1,56 @@
 # LunaAgentOS Adapters
 
-Adapters are the extension boundary for bringing agent products into LunaAgentOS.
-
-A LunaAgentOS adapter declares an agent product's runtime surfaces, targets, capabilities, and session behavior through the protocol manifest. The adapter implementation translates the native product surface into normalized Runtime Session events for the App.
-
-## First-party adapters
-
-- [`first-party/claude-code/`](./first-party/claude-code/) describes Claude Code.
-- [`first-party/hermes/`](./first-party/hermes/) describes Hermes.
-- [`first-party/trae-ide/`](./first-party/trae-ide/) describes the Trae IDE bridge adapter.
-
-## Adapter contract
-
-The public contract starts in [`../protocol/`](../protocol/):
+Adapters are split into plugin descriptions and optional built-in runtime extension code.
 
 ```text
-adapter manifest -> adapter host -> Runtime Session Model -> App
+adapters/registry   = plugin manifest files scanned by the desktop app
+adapters/extensions = runtime extension code when a manifest is not enough
 ```
 
-## Stdio adapter reference
+## Add an adapter
 
-[`reference/stdio/`](./reference/stdio/) contains stdio adapter reference files for manifest loading, process lifecycle, stream handling, and normalized event translation. New adapter work starts from the protocol schemas and first-party adapter manifests.
+Start with a manifest:
+
+```text
+adapters/registry/<adapter-id>/manifest.json
+```
+
+If the adapter can be described by a command, transport, permissions, and capabilities, stop there.
+
+Use [`registry/codex/manifest.json`](./registry/codex/manifest.json) as the manifest-only example.
+
+## Add a built-in extension
+
+Add extension code only when the adapter needs custom runtime behavior such as:
+
+- OS-specific runtime probing
+- Windows / WSL routing
+- custom launch arguments
+- dynamic runtime targets or profile discovery
+
+Then add:
+
+```text
+adapters/extensions/builtin/<adapter-id>.rs
+```
+
+and register the extension in:
+
+```text
+adapters/extensions/builtin/mod.rs
+```
+
+Use these references:
+
+- [`registry/claude-code/manifest.json`](./registry/claude-code/manifest.json) + [`extensions/builtin/claude.rs`](./extensions/builtin/claude.rs): simple CLI probe and launch logic.
+- [`registry/hermes/manifest.json`](./registry/hermes/manifest.json) + [`extensions/builtin/hermes.rs`](./extensions/builtin/hermes.rs): profile and runtime target discovery.
+
+## Runtime host
+
+The desktop shell is the current adapter host. It loads manifests from `adapters/registry` and bridges built-in extension code from `adapters/extensions`.
+
+Relevant host code:
+
+- `apps/desktop-shell/src-tauri/src/adapter_registry.rs`
+- `apps/desktop-shell/src-tauri/src/adapter_extensions.rs`
+- `apps/desktop-shell/src-tauri/src/acp_runtime.rs`

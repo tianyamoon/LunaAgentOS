@@ -1,0 +1,39 @@
+{
+  "id": "claude",
+  "name": "Claude Code",
+  "extension": "builtin.claude",
+  "transport": "stdio_json",
+  "command": [
+    "npx",
+    "-y",
+    "@agentclientprotocol/claude-agent-acp"
+  ],
+  "requires_pty": false,
+  "permissions": {
+    "processExec": [
+      {
+        "command": "npx",
+        "args": [
+          "-y",
+          "@agentclientprotocol/claude-agent-acp"
+        ]
+      },
+      {
+        "command": "npx.cmd",
+        "args": [
+          "-y",
+          "@agentclientprotocol/claude-agent-acp"
+        ]
+      },
+      {
+        "command": "wsl.exe",
+        "args": [
+          "--exec",
+          "npx",
+          "-y",
+          "@agentclientprotocol/claude-agent-acp"
+        ]
+      }
+    ]
+  }
+}

@@ -58,9 +58,9 @@ Planned or possible surfaces:
 - **Gateway / HTTP / WebSocket** for remote or background agents
 - **IDE Bridge** for IDE-first products
 
-## First-party adapters
+## Registry adapters
 
-The first-party adapters exist to validate and sharpen the contract:
+Registry adapters exist to validate and sharpen the contract:
 
 - **Claude Code** proves high-value coding workflows and long-form output handling
 - **Hermes** proves profile-based identity, Windows / WSL routing, and rich runtime event visibility

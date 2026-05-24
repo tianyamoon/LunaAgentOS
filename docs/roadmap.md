@@ -20,7 +20,7 @@ The current focus is to make the product definition explicit while keeping Claud
 The next architecture layer makes the adapter boundary real:
 
 - Define adapter manifest fields and capability metadata.
-- Treat Claude Code and Hermes as first-party adapters.
+- Treat Claude Code and Hermes as registry adapters with built-in extensions where needed.
 - Keep Trae IDE on the IDE-first bridge path.
 - Route new agent products through Adapter Contract.
 - Keep the App as the protocol's concrete control console and official recommended use path.

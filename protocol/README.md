@@ -21,7 +21,7 @@ The current contract starts with three schemas:
 - [`schemas/runtime-session.schema.json`](./schemas/runtime-session.schema.json)
 - [`schemas/runtime-event.schema.json`](./schemas/runtime-event.schema.json)
 
-The examples show how first-party adapters describe real products:
+The examples show how registry adapters describe real products:
 
 - [`examples/adapter-manifest.claude-code.json`](./examples/adapter-manifest.claude-code.json)
 - [`examples/adapter-manifest.hermes.json`](./examples/adapter-manifest.hermes.json)

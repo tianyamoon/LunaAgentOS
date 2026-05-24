@@ -43,7 +43,7 @@ Claude internal subagents or delegation workers remain part of Claude's own inte
 
 ### Adapter boundary
 
-Claude Code and Hermes are first-party adapters that validate the contract.
+Claude Code and Hermes are registry adapters that validate the contract.
 
 The adapter rule is:
 

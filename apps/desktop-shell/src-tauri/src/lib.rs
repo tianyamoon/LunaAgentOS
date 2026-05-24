@@ -1,7 +1,7 @@
 use chrono::Local;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
@@ -9,6 +9,7 @@ use std::process::{Command, Stdio};
 use tauri::{AppHandle, Emitter, Manager};
 
 mod acp_runtime;
+mod adapter_extensions;
 mod adapter_registry;
 
 #[cfg(windows)]
@@ -136,39 +137,9 @@ struct RuntimeConfigFile {
 }
 
 impl From<RuntimeConfigFile> for acp_runtime::RuntimeConfig {
-    fn from(value: RuntimeConfigFile) -> Self {
-        acp_runtime::RuntimeConfig {
-            claude_command: value.claude_command,
-            claude_args: value.claude_args,
-            hermes_host: value.hermes_host,
-            hermes_command: value.hermes_command,
-            runtime_host: None,
-            runtime_command: None,
-        }
+    fn from(_value: RuntimeConfigFile) -> Self {
+        acp_runtime::RuntimeConfig
     }
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct HermesProfileMeta {
-    id: String,
-    runtime_instance_id: String,
-    runtime_label: String,
-    command_kind: String,
-    command: String,
-    profile_name: String,
-    display_name: String,
-    subtitle: String,
-    note: String,
-    state: u8,
-    model: String,
-    gateway: String,
-    alias: Option<String>,
-    path: String,
-    skill_count: Option<u32>,
-    has_env: bool,
-    has_soul: bool,
-    is_default: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -407,25 +378,27 @@ fn adapter_provider_probe(
     }
 }
 
-fn adapter_launch_spec(
+fn adapter_launch_spec_with_context(
     app: &AppHandle,
     adapter_id: &str,
+    runtime_host: Option<String>,
     runtime_command: Option<String>,
+    profile_executable: Option<String>,
 ) -> Result<acp_runtime::AdapterLaunchSpec, String> {
     let config = load_runtime_config_file(app);
-    let mut adapter = adapter_registry::find_adapter(&config.adapter_plugin_paths, adapter_id)?;
-    if let Some(command) = runtime_command.filter(|value| !value.trim().is_empty()) {
-        adapter.command = command;
+    let adapter = adapter_registry::find_adapter(&config.adapter_plugin_paths, adapter_id)?;
+    if let Some(result) = adapter_extensions::build_launch_spec(
+        &adapter,
+        &config,
+        adapter_extensions::AdapterLaunchContext {
+            runtime_host,
+            runtime_command: runtime_command.clone(),
+            profile_executable,
+        },
+    ) {
+        return result;
     }
-    adapter_registry::allow_process_exec(&adapter, &adapter.command, &adapter.args)?;
-    Ok(acp_runtime::AdapterLaunchSpec {
-        id: adapter.id,
-        name: adapter.name,
-        command: adapter.command,
-        args: adapter.args,
-        env: adapter.env,
-        cwd: adapter.cwd,
-    })
+    adapter_extensions::generic_launch_spec(adapter, runtime_command)
 }
 
 #[tauri::command]
@@ -441,134 +414,19 @@ fn runtime_adapter_probe(
 ) -> Result<RuntimeProviderProbe, String> {
     let config = load_runtime_config_file(&app);
     let adapter = adapter_registry::find_adapter(&config.adapter_plugin_paths, &adapter_id)?;
-    let instance = adapter_instance_probe(&adapter);
-    Ok(adapter_provider_probe(&adapter, &instance))
+    Ok(adapter_extensions::probe_adapter(&adapter, &config).provider)
 }
 
 #[tauri::command]
 fn runtime_probe(app: AppHandle) -> RuntimeProbeResult {
     let config = load_runtime_config_file(&app);
-    let claude_configured = is_configured(&config.claude_command) || !config.claude_args.is_empty();
-    let hermes_command = config
-        .hermes_command
-        .clone()
-        .unwrap_or_else(|| "hermes".to_string());
-    let hermes_configured =
-        is_configured(&config.hermes_host) || is_configured(&config.hermes_command);
-
+    let mut providers = Vec::new();
     let mut instances = Vec::new();
-    if cfg!(windows) {
-        instances.push(runtime_instance_probe(
-            "claude-win",
-            "claude",
-            "Win",
-            "native",
-            "npx.cmd",
-            claude_configured,
-            run_shell("claude.cmd", &["--version"]),
-        ));
-        instances.push(runtime_instance_probe(
-            "claude-wsl",
-            "claude",
-            "WSL",
-            "wsl",
-            "npx",
-            false,
-            run_shell(
-                "wsl.exe",
-                &["--exec", "bash", "-lc", "command -v claude >/dev/null && claude --version && command -v npx >/dev/null && npx --version"],
-            ),
-        ));
-        instances.push(runtime_instance_probe(
-            "hermes-win",
-            "hermes",
-            "Win",
-            "native",
-            &hermes_command,
-            hermes_configured,
-            run_shell(&hermes_command, &["--version"]),
-        ));
-        instances.push(runtime_instance_probe(
-            "hermes-wsl",
-            "hermes",
-            "WSL",
-            "wsl",
-            &hermes_command,
-            hermes_configured,
-            run_shell(
-                "wsl.exe",
-                &[
-                    "--exec",
-                    "bash",
-                    "-lc",
-                    &format!(
-                        "command -v {hermes_command} >/dev/null && {hermes_command} --version"
-                    ),
-                ],
-            ),
-        ));
-    } else {
-        let claude_command = config
-            .claude_command
-            .clone()
-            .unwrap_or_else(|| "claude".to_string());
-        instances.push(runtime_instance_probe(
-            "claude-native",
-            "claude",
-            "",
-            "native",
-            &claude_command,
-            claude_configured,
-            run_shell(&claude_command, &["--version"]),
-        ));
-        instances.push(runtime_instance_probe(
-            "hermes-native",
-            "hermes",
-            "",
-            "native",
-            &hermes_command,
-            hermes_configured,
-            run_shell(&hermes_command, &["--version"]),
-        ));
-    }
-
-    let claude_instances: Vec<RuntimeInstanceProbe> = instances
-        .iter()
-        .filter(|item| item.provider_id == "claude")
-        .cloned()
-        .collect();
-    let hermes_instances: Vec<RuntimeInstanceProbe> = instances
-        .iter()
-        .filter(|item| item.provider_id == "hermes")
-        .cloned()
-        .collect();
-
-    let mut providers = vec![
-        provider_probe_from_instances(
-            "claude",
-            claude_configured,
-            "Claude Code",
-            &claude_instances,
-        ),
-        provider_probe_from_instances("hermes", hermes_configured, "Hermes", &hermes_instances),
-        RuntimeProviderProbe {
-            provider_id: "trae".to_string(),
-            configured: false,
-            available: false,
-            command: "IDE Bridge".to_string(),
-            summary: "planned".to_string(),
-            detail: "Trae IDE bridge is reserved for a later integration.".to_string(),
-        },
-    ];
-
     let adapter_result = adapter_registry::load_adapters(&config.adapter_plugin_paths);
     for adapter in adapter_result.adapters {
-        if adapter.id == "claude" || adapter.id == "hermes" || adapter.id == "trae" {
-            continue;
-        }
-        let instance = adapter_instance_probe(&adapter);
-        providers.push(adapter_provider_probe(&adapter, &instance));
-        instances.push(instance);
+        let probe = adapter_extensions::probe_adapter(&adapter, &config);
+        providers.push(probe.provider);
+        instances.extend(probe.instances);
     }
 
     RuntimeProbeResult {
@@ -577,260 +435,24 @@ fn runtime_probe(app: AppHandle) -> RuntimeProbeResult {
     }
 }
 
-fn clean_hermes_output(raw: &str) -> Vec<String> {
-    raw.lines()
-        .map(|line| line.replace('\u{0000}', "").trim().to_string())
-        .filter(|line| {
-            !line.is_empty()
-                && !line.starts_with("wsl:")
-                && !line.contains("localhost")
-                && !line.contains("WSL")
-                && !line
-                    .chars()
-                    .all(|ch| matches!(ch, 'в' | '”' | 'Ђ' | '—' | '†' | ' '))
-        })
-        .collect()
-}
-
-fn parse_hermes_profile_list(raw: &str) -> Vec<(String, String, String, Option<String>, bool)> {
-    let mut rows = Vec::new();
-    for line in clean_hermes_output(raw) {
-        if line.starts_with("Profile") {
-            continue;
-        }
-        if !line.contains("running") && !line.contains("stopped") {
-            continue;
-        }
-        let gateway = if line.contains("running") {
-            "running"
-        } else {
-            "stopped"
-        };
-        let parts: Vec<&str> = line.split_whitespace().collect();
-        let Some(gateway_index) = parts.iter().position(|part| *part == gateway) else {
-            continue;
-        };
-        if gateway_index < 2 {
-            continue;
-        }
-
-        let raw_profile = parts[0];
-        let is_default = raw_profile.contains("default");
-        let profile_name = if is_default { "default" } else { raw_profile }.to_string();
-        let model = parts[1..gateway_index].join(" ");
-        let alias_raw = parts.get(gateway_index + 1).copied().unwrap_or("");
-        let alias = if alias_raw.is_empty() || alias_raw.contains('в') || alias_raw == "—" {
-            None
-        } else {
-            Some(alias_raw.to_string())
-        };
-        rows.push((profile_name, model, gateway.to_string(), alias, is_default));
-    }
-    rows
-}
-
-fn parse_hermes_profile_show(raw: &str) -> std::collections::HashMap<String, String> {
-    let mut details = std::collections::HashMap::new();
-    for line in clean_hermes_output(raw) {
-        if let Some((key, value)) = line.split_once(':') {
-            details.insert(key.trim().to_lowercase(), value.trim().to_string());
-        }
-    }
-    details
-}
-
-fn sanitize_id_fragment(value: &str) -> String {
-    value
-        .chars()
-        .map(|ch| {
-            if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' {
-                ch
-            } else {
-                '-'
-            }
-        })
-        .collect()
-}
-
-fn hermes_instance_parts(
-    config: &RuntimeConfigFile,
-    runtime_instance_id: Option<&str>,
-) -> (String, String, String, String) {
-    let default_id = if cfg!(windows) && config.hermes_host.as_deref() != Some("native") {
-        "hermes-wsl"
-    } else if cfg!(windows) {
-        "hermes-win"
-    } else {
-        "hermes-native"
-    };
-    let instance_id = runtime_instance_id.unwrap_or(default_id);
-    let command = config
-        .hermes_command
-        .clone()
-        .unwrap_or_else(|| "hermes".to_string());
-    match instance_id {
-        "hermes-win" => (
-            "hermes-win".to_string(),
-            "Win".to_string(),
-            "native".to_string(),
-            command,
-        ),
-        "hermes-wsl" => (
-            "hermes-wsl".to_string(),
-            "WSL".to_string(),
-            "wsl".to_string(),
-            command,
-        ),
-        "hermes-native" => (
-            "hermes-native".to_string(),
-            "".to_string(),
-            "native".to_string(),
-            command,
-        ),
-        value => (
-            value.to_string(),
-            "".to_string(),
-            config
-                .hermes_host
-                .clone()
-                .unwrap_or_else(|| "native".to_string()),
-            command,
-        ),
-    }
-}
-
-fn run_hermes_profile_command(
-    config: &RuntimeConfigFile,
-    runtime_instance_id: Option<&str>,
-    args: &[&str],
-) -> Result<String, String> {
-    let (_, _, command_kind, executable) = hermes_instance_parts(config, runtime_instance_id);
-    if cfg!(windows) && command_kind == "wsl" {
-        let mut command_args = vec!["--exec", executable.as_str()];
-        command_args.extend_from_slice(args);
-        run_shell("wsl.exe", &command_args)
-    } else {
-        run_shell(&executable, args)
-    }
+#[tauri::command]
+fn runtime_adapter_targets(
+    app: AppHandle,
+    adapter_id: String,
+    runtime_instance_id: Option<String>,
+) -> Result<Vec<Value>, String> {
+    let config = load_runtime_config_file(&app);
+    let adapter = adapter_registry::find_adapter(&config.adapter_plugin_paths, &adapter_id)?;
+    adapter_extensions::adapter_targets(&adapter, &config, runtime_instance_id.as_deref())
+        .unwrap_or_else(|| Ok(Vec::new()))
 }
 
 #[tauri::command]
 fn runtime_hermes_profiles(
     app: AppHandle,
     runtime_instance_id: Option<String>,
-) -> Result<Vec<HermesProfileMeta>, String> {
-    let config = load_runtime_config_file(&app);
-    let (instance_id, runtime_label, command_kind, command) =
-        hermes_instance_parts(&config, runtime_instance_id.as_deref());
-    let list_raw = run_hermes_profile_command(&config, Some(&instance_id), &["profile", "list"])?;
-    let list_rows = parse_hermes_profile_list(&list_raw);
-    if list_rows.is_empty() {
-        return Ok(Vec::new());
-    }
-
-    let mut profiles = Vec::new();
-    let mut profile_counts: HashMap<String, usize> = HashMap::new();
-    for (profile_name, _, _, _, _) in &list_rows {
-        *profile_counts.entry(profile_name.clone()).or_default() += 1;
-    }
-    let mut profile_seen: HashMap<String, usize> = HashMap::new();
-    for (profile_name, model, gateway, alias, is_default) in list_rows {
-        let show_raw = run_hermes_profile_command(
-            &config,
-            Some(&instance_id),
-            &["profile", "show", &profile_name],
-        )
-        .unwrap_or_default();
-        let details = parse_hermes_profile_show(&show_raw);
-        let path = details.get("path").cloned().unwrap_or_default();
-        let skill_count = details
-            .get("skills")
-            .and_then(|value| value.parse::<u32>().ok());
-        let has_env = details
-            .get(".env")
-            .map(|value| value.eq_ignore_ascii_case("exists"))
-            .unwrap_or(false);
-        let has_soul = details
-            .get("soul.md")
-            .map(|value| value.eq_ignore_ascii_case("exists"))
-            .unwrap_or(false);
-        let alias_path = details.get("alias").cloned().or(alias.clone());
-        let environment = if runtime_label.is_empty() {
-            "Profile"
-        } else if runtime_label == "Win" {
-            "Win Profile"
-        } else {
-            "WSL Profile"
-        };
-        let subtitle = format!(
-            "{} · {}",
-            environment,
-            if gateway == "running" {
-                "Gateway 运行中"
-            } else {
-                "Gateway 已停止"
-            }
-        );
-        let note = format!(
-            "模型：{} · Skills：{}{}{}",
-            if model.is_empty() {
-                "未配置"
-            } else {
-                &model
-            },
-            skill_count
-                .map(|count| count.to_string())
-                .unwrap_or_else(|| "未知".to_string()),
-            if has_env { " · .env" } else { "" },
-            if has_soul { " · SOUL.md" } else { "" }
-        );
-        let profile_index = profile_seen.entry(profile_name.clone()).or_default();
-        *profile_index += 1;
-        let has_duplicate_name = profile_counts.get(&profile_name).copied().unwrap_or(0) > 1;
-        let profile_id = if has_duplicate_name {
-            format!(
-                "{}:profile:{}-{}",
-                instance_id,
-                sanitize_id_fragment(&profile_name),
-                profile_index
-            )
-        } else {
-            format!(
-                "{}:profile:{}",
-                instance_id,
-                sanitize_id_fragment(&profile_name)
-            )
-        };
-        let display_name = if has_duplicate_name {
-            format!("{} #{}", profile_name, profile_index)
-        } else if is_default {
-            "default".to_string()
-        } else {
-            profile_name.clone()
-        };
-        profiles.push(HermesProfileMeta {
-            id: profile_id,
-            runtime_instance_id: instance_id.clone(),
-            runtime_label: runtime_label.clone(),
-            command_kind: command_kind.clone(),
-            command: command.clone(),
-            profile_name: profile_name.clone(),
-            display_name,
-            subtitle,
-            note,
-            state: if gateway == "running" { 1 } else { 9 },
-            model,
-            gateway,
-            alias: alias_path,
-            path,
-            skill_count,
-            has_env,
-            has_soul,
-            is_default,
-        });
-    }
-
-    Ok(profiles)
+) -> Result<Vec<Value>, String> {
+    runtime_adapter_targets(app, "hermes".to_string(), runtime_instance_id)
 }
 
 fn history_dir(app: &AppHandle) -> Result<PathBuf, String> {
@@ -1281,9 +903,9 @@ async fn runtime_acp_claude_prompt(
     runtime_command: Option<String>,
 ) -> Result<Vec<Value>, String> {
     let runtime_session_id_for_emit = runtime_session_id.clone();
-    let mut config = acp_runtime::RuntimeConfig::from(load_runtime_config_file(&app));
-    config.runtime_host = runtime_host;
-    config.runtime_command = runtime_command;
+    let adapter =
+        adapter_launch_spec_with_context(&app, "claude", runtime_host, runtime_command, None)?;
+    let config = acp_runtime::RuntimeConfig::from(load_runtime_config_file(&app));
     let result = tauri::async_runtime::spawn_blocking(move || {
         let mut emit_update = |event: Value| {
             let payload = RuntimeSessionStreamPayload {
@@ -1292,7 +914,8 @@ async fn runtime_acp_claude_prompt(
             };
             let _ = app.emit("runtime-session-update", payload);
         };
-        acp_runtime::run_claude_acp_prompt(
+        acp_runtime::run_adapter_acp_prompt(
+            adapter,
             runtime_session_id,
             prompt,
             cwd,
@@ -1316,9 +939,14 @@ async fn runtime_acp_hermes_prompt(
     profile_executable: Option<String>,
 ) -> Result<Vec<Value>, String> {
     let runtime_session_id_for_emit = runtime_session_id.clone();
-    let mut config = acp_runtime::RuntimeConfig::from(load_runtime_config_file(&app));
-    config.runtime_host = runtime_host;
-    config.runtime_command = runtime_command;
+    let adapter = adapter_launch_spec_with_context(
+        &app,
+        "hermes",
+        runtime_host,
+        runtime_command,
+        profile_executable,
+    )?;
+    let config = acp_runtime::RuntimeConfig::from(load_runtime_config_file(&app));
     let result = tauri::async_runtime::spawn_blocking(move || {
         let mut emit_update = |event: Value| {
             let payload = RuntimeSessionStreamPayload {
@@ -1327,11 +955,11 @@ async fn runtime_acp_hermes_prompt(
             };
             let _ = app.emit("runtime-session-update", payload);
         };
-        acp_runtime::run_hermes_acp_prompt(
+        acp_runtime::run_adapter_acp_prompt(
+            adapter,
             runtime_session_id,
             prompt,
             cwd,
-            profile_executable,
             config,
             Some(&mut emit_update),
         )
@@ -1348,10 +976,18 @@ async fn runtime_acp_adapter_prompt(
     runtime_session_id: String,
     prompt: String,
     cwd: Option<String>,
+    runtime_host: Option<String>,
     runtime_command: Option<String>,
+    profile_executable: Option<String>,
 ) -> Result<Vec<Value>, String> {
     let runtime_session_id_for_emit = runtime_session_id.clone();
-    let adapter = adapter_launch_spec(&app, &adapter_id, runtime_command)?;
+    let adapter = adapter_launch_spec_with_context(
+        &app,
+        &adapter_id,
+        runtime_host,
+        runtime_command,
+        profile_executable,
+    )?;
     let config = acp_runtime::RuntimeConfig::from(load_runtime_config_file(&app));
     let result = tauri::async_runtime::spawn_blocking(move || {
         let mut emit_update = |event: Value| {
@@ -1384,11 +1020,17 @@ async fn runtime_acp_claude_resume(
     runtime_host: Option<String>,
     runtime_command: Option<String>,
 ) -> Result<Vec<Value>, String> {
-    let mut config = acp_runtime::RuntimeConfig::from(load_runtime_config_file(&app));
-    config.runtime_host = runtime_host;
-    config.runtime_command = runtime_command;
+    let adapter =
+        adapter_launch_spec_with_context(&app, "claude", runtime_host, runtime_command, None)?;
+    let config = acp_runtime::RuntimeConfig::from(load_runtime_config_file(&app));
     let result = tauri::async_runtime::spawn_blocking(move || {
-        acp_runtime::resume_claude_acp_session(runtime_session_id, acp_session_id, cwd, config)
+        acp_runtime::resume_adapter_acp_session(
+            adapter,
+            runtime_session_id,
+            acp_session_id,
+            cwd,
+            config,
+        )
     })
     .await
     .map_err(|error| classify_backend_error(error.to_string()))?;
@@ -1405,15 +1047,20 @@ async fn runtime_acp_hermes_resume(
     runtime_command: Option<String>,
     profile_executable: Option<String>,
 ) -> Result<Vec<Value>, String> {
-    let mut config = acp_runtime::RuntimeConfig::from(load_runtime_config_file(&app));
-    config.runtime_host = runtime_host;
-    config.runtime_command = runtime_command;
+    let adapter = adapter_launch_spec_with_context(
+        &app,
+        "hermes",
+        runtime_host,
+        runtime_command,
+        profile_executable,
+    )?;
+    let config = acp_runtime::RuntimeConfig::from(load_runtime_config_file(&app));
     let result = tauri::async_runtime::spawn_blocking(move || {
-        acp_runtime::resume_hermes_acp_session(
+        acp_runtime::resume_adapter_acp_session(
+            adapter,
             runtime_session_id,
             acp_session_id,
             cwd,
-            profile_executable,
             config,
         )
     })
@@ -1429,9 +1076,17 @@ async fn runtime_acp_adapter_resume(
     runtime_session_id: String,
     acp_session_id: String,
     cwd: Option<String>,
+    runtime_host: Option<String>,
     runtime_command: Option<String>,
+    profile_executable: Option<String>,
 ) -> Result<Vec<Value>, String> {
-    let adapter = adapter_launch_spec(&app, &adapter_id, runtime_command)?;
+    let adapter = adapter_launch_spec_with_context(
+        &app,
+        &adapter_id,
+        runtime_host,
+        runtime_command,
+        profile_executable,
+    )?;
     let config = acp_runtime::RuntimeConfig::from(load_runtime_config_file(&app));
     let result = tauri::async_runtime::spawn_blocking(move || {
         acp_runtime::resume_adapter_acp_session(
@@ -1449,18 +1104,22 @@ async fn runtime_acp_adapter_resume(
 
 #[tauri::command]
 async fn runtime_acp_claude_alive_ids() -> Result<Vec<String>, String> {
-    tauri::async_runtime::spawn_blocking(|| acp_runtime::list_live_claude_acp_sessions())
-        .await
-        .map_err(|error| classify_backend_error(error.to_string()))?
-        .map_err(classify_backend_error)
+    tauri::async_runtime::spawn_blocking(|| {
+        acp_runtime::list_live_adapter_acp_sessions("claude".to_string())
+    })
+    .await
+    .map_err(|error| classify_backend_error(error.to_string()))?
+    .map_err(classify_backend_error)
 }
 
 #[tauri::command]
 async fn runtime_acp_hermes_alive_ids() -> Result<Vec<String>, String> {
-    tauri::async_runtime::spawn_blocking(|| acp_runtime::list_live_hermes_acp_sessions())
-        .await
-        .map_err(|error| classify_backend_error(error.to_string()))?
-        .map_err(classify_backend_error)
+    tauri::async_runtime::spawn_blocking(|| {
+        acp_runtime::list_live_adapter_acp_sessions("hermes".to_string())
+    })
+    .await
+    .map_err(|error| classify_backend_error(error.to_string()))?
+    .map_err(classify_backend_error)
 }
 
 #[tauri::command]
@@ -1476,7 +1135,7 @@ async fn runtime_acp_adapter_alive_ids(adapter_id: String) -> Result<Vec<String>
 #[tauri::command]
 async fn runtime_acp_claude_shutdown(runtime_session_id: String) -> Result<bool, String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
-        acp_runtime::shutdown_claude_acp_session(runtime_session_id)
+        acp_runtime::shutdown_adapter_acp_session("claude".to_string(), runtime_session_id)
     })
     .await
     .map_err(|error| classify_backend_error(error.to_string()))?;
@@ -1486,7 +1145,7 @@ async fn runtime_acp_claude_shutdown(runtime_session_id: String) -> Result<bool,
 #[tauri::command]
 async fn runtime_acp_hermes_shutdown(runtime_session_id: String) -> Result<bool, String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
-        acp_runtime::shutdown_hermes_acp_session(runtime_session_id)
+        acp_runtime::shutdown_adapter_acp_session("hermes".to_string(), runtime_session_id)
     })
     .await
     .map_err(|error| classify_backend_error(error.to_string()))?;
@@ -1515,11 +1174,17 @@ async fn runtime_acp_claude_load(
     runtime_host: Option<String>,
     runtime_command: Option<String>,
 ) -> Result<Vec<Value>, String> {
-    let mut config = acp_runtime::RuntimeConfig::from(load_runtime_config_file(&app));
-    config.runtime_host = runtime_host;
-    config.runtime_command = runtime_command;
+    let adapter =
+        adapter_launch_spec_with_context(&app, "claude", runtime_host, runtime_command, None)?;
+    let config = acp_runtime::RuntimeConfig::from(load_runtime_config_file(&app));
     let result = tauri::async_runtime::spawn_blocking(move || {
-        acp_runtime::load_claude_acp_session(runtime_session_id, acp_session_id, cwd, config)
+        acp_runtime::load_adapter_acp_session(
+            adapter,
+            runtime_session_id,
+            acp_session_id,
+            cwd,
+            config,
+        )
     })
     .await
     .map_err(|error| classify_backend_error(error.to_string()))?;
@@ -1536,15 +1201,20 @@ async fn runtime_acp_hermes_load(
     runtime_command: Option<String>,
     profile_executable: Option<String>,
 ) -> Result<Vec<Value>, String> {
-    let mut config = acp_runtime::RuntimeConfig::from(load_runtime_config_file(&app));
-    config.runtime_host = runtime_host;
-    config.runtime_command = runtime_command;
+    let adapter = adapter_launch_spec_with_context(
+        &app,
+        "hermes",
+        runtime_host,
+        runtime_command,
+        profile_executable,
+    )?;
+    let config = acp_runtime::RuntimeConfig::from(load_runtime_config_file(&app));
     let result = tauri::async_runtime::spawn_blocking(move || {
-        acp_runtime::load_hermes_acp_session(
+        acp_runtime::load_adapter_acp_session(
+            adapter,
             runtime_session_id,
             acp_session_id,
             cwd,
-            profile_executable,
             config,
         )
     })
@@ -1560,9 +1230,17 @@ async fn runtime_acp_adapter_load(
     runtime_session_id: String,
     acp_session_id: String,
     cwd: Option<String>,
+    runtime_host: Option<String>,
     runtime_command: Option<String>,
+    profile_executable: Option<String>,
 ) -> Result<Vec<Value>, String> {
-    let adapter = adapter_launch_spec(&app, &adapter_id, runtime_command)?;
+    let adapter = adapter_launch_spec_with_context(
+        &app,
+        &adapter_id,
+        runtime_host,
+        runtime_command,
+        profile_executable,
+    )?;
     let config = acp_runtime::RuntimeConfig::from(load_runtime_config_file(&app));
     let result = tauri::async_runtime::spawn_blocking(move || {
         acp_runtime::load_adapter_acp_session(
@@ -1593,6 +1271,7 @@ pub fn run() {
             load_adapters,
             runtime_probe,
             runtime_adapter_probe,
+            runtime_adapter_targets,
             runtime_hermes_profiles,
             run_claude_stream,
             runtime_acp_claude_prompt,
@@ -1613,8 +1292,6 @@ pub fn run() {
         ])
         .on_window_event(|_window, event| {
             if matches!(event, tauri::WindowEvent::Destroyed) {
-                let _ = acp_runtime::shutdown_all_claude_acp_sessions();
-                let _ = acp_runtime::shutdown_all_hermes_acp_sessions();
                 let _ = acp_runtime::shutdown_all_adapter_acp_sessions();
             }
         })

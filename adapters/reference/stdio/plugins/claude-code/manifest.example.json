@@ -1,9 +1,0 @@
-{
-  "id": "claude-code",
-  "name": "Claude Code",
-  "transport": "stdio_json",
-  "command": [
-    "claude"
-  ],
-  "requires_pty": false
-}

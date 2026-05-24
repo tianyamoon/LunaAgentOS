@@ -1,0 +1,32 @@
+{
+  "id": "hermes",
+  "name": "Hermes",
+  "extension": "builtin.hermes",
+  "transport": "stdio_json",
+  "command": [
+    "hermes",
+    "acp",
+    "--accept-hooks"
+  ],
+  "requires_pty": false,
+  "permissions": {
+    "processExec": [
+      {
+        "command": "hermes",
+        "args": [
+          "acp",
+          "--accept-hooks"
+        ]
+      },
+      {
+        "command": "wsl.exe",
+        "args": [
+          "--",
+          "hermes",
+          "acp",
+          "--accept-hooks"
+        ]
+      }
+    ]
+  }
+}

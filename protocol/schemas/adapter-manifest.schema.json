@@ -8,7 +8,7 @@
     "schemaVersion": { "type": "string" },
     "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
     "displayName": { "type": "string" },
-    "kind": { "type": "string", "enum": ["first_party", "community", "internal", "legacy"] },
+    "kind": { "type": "string", "enum": ["registry", "community", "internal", "legacy"] },
     "status": { "type": "string", "enum": ["active", "planned", "legacy", "experimental"] },
     "description": { "type": "string" },
     "entryRole": { "type": "string", "enum": ["runtime", "bridge", "example"] },

@@ -3,10 +3,10 @@
   "schemaVersion": "0.1.0-draft",
   "id": "claude-code",
   "displayName": "Claude Code",
-  "kind": "first_party",
+  "kind": "registry",
   "status": "active",
   "entryRole": "runtime",
-  "description": "First-party adapter for Claude Code as a high-value coding runtime.",
+  "description": "Registry adapter for Claude Code as a high-value coding runtime.",
   "surfaces": [
     {
       "kind": "acp_stdio",
