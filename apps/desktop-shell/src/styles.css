@@ -2567,6 +2567,189 @@ textarea {
   }
 }
 
+/* Availability View Styles */
+.availability-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.availability-view.is-compact {
+  gap: 12px;
+}
+
+.summary-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(217, 108, 58, 0.16);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(255, 247, 238, 0.98), rgba(255, 229, 207, 0.72));
+}
+
+.summary-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 80px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.summary-number {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.summary-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.summary-current-target {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-left: auto;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(217, 108, 58, 0.24);
+}
+
+.availability-provider-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(99, 82, 63, 0.1);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.availability-provider-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.availability-provider-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.availability-runtimes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.availability-runtime-card {
+  flex: 1 1 200px;
+  padding: 12px;
+  border: 1px solid rgba(99, 82, 63, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.runtime-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.availability-targets {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.availability-target-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.availability-target-row.is-current {
+  border: 1px solid rgba(217, 108, 58, 0.34);
+  background: linear-gradient(135deg, rgba(255, 247, 238, 0.98), rgba(255, 229, 207, 0.72));
+}
+
+.target-row-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.current-badge {
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(217, 108, 58, 0.16);
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.availability-problems {
+  padding: 16px;
+  border: 1px solid rgba(177, 72, 72, 0.24);
+  border-radius: 16px;
+  background: rgba(255, 245, 245, 0.72);
+}
+
+.availability-problems h4 {
+  margin: 0 0 12px;
+  color: rgb(177, 72, 72);
+}
+
+.availability-problems ul {
+  margin: 0;
+  padding-left: 20px;
+  line-height: 1.6;
+}
+
+.availability-footer {
+  display: flex;
+  justify-content: flex-end;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.availability-dialog-body {
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.availability-dialog {
+  max-width: 720px;
+}
+
+.availability-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.state-ok {
+  background: rgba(58, 177, 120, 0.16);
+  color: rgb(58, 140, 100);
+}
+
+.state-error {
+  background: rgba(177, 72, 72, 0.16);
+  color: rgb(177, 72, 72);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

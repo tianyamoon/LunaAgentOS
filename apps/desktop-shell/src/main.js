@@ -42,6 +42,8 @@ import {
   compareActiveSessionListItems,
   compareArchivedSessionListItems,
 } from "./state/sessionListItems.js";
+import { getAvailabilityStore } from "./state/availabilityStore.js";
+import { AvailabilityView } from "./components/availability/AvailabilityView.js";
 import {
   acpCommandsForProvider as acpCommandsForProviderRaw,
 } from "./runtime/acpCommands.js";
@@ -681,7 +683,7 @@ function applyStaticTranslations() {
   document.documentElement.lang = lang;
   applyDataI18n(document);
   document.title = lang === "en-US" ? "LunaAgentOS Console" : "LunaAgentOS 控制台";
-  if (providerManagerBtn) providerManagerBtn.textContent = t("common.manage");
+  if (providerManagerBtn) providerManagerBtn.textContent = t("availability.button");
   if (languageBtn) languageBtn.textContent = t("topbar.language");
   applyFontScale();
   updateActionLabels();
@@ -1004,6 +1006,74 @@ async function openProviderManager(providerId = currentTargetProvider()?.id || "
   }
 }
 
+function openAvailabilityModal() {
+  if (!confirmDialog) return;
+
+  const store = getAvailabilityStore();
+  const data = store.getData();
+
+  if (!data.lastCheck) {
+    store.refresh(providers, runtimeInstances, currentTargetAgent());
+  }
+
+  const freshData = store.getData();
+  const viewHtml = AvailabilityView(freshData, { showTitle: false, compact: true });
+
+  confirmDialog.hidden = false;
+  confirmDialog.innerHTML = `
+    <form class="confirm-dialog availability-dialog" role="dialog" aria-modal="true" aria-labelledby="availabilityTitle">
+      <div class="confirm-dialog-header">
+        <span class="runtime-config-icon" aria-hidden="true">●</span>
+        <div>
+          <h3 id="availabilityTitle">${t("availability.title")}</h3>
+          <p class="runtime-config-subtitle">${t("availability.subtitle")}</p>
+        </div>
+        <button type="button" class="confirm-dialog-close availability-close" aria-label="${t("common.close")}">×</button>
+      </div>
+      <div class="availability-dialog-body">
+        ${viewHtml}
+      </div>
+      <div class="confirm-dialog-actions availability-actions">
+        <button type="button" class="confirm-dialog-cancel availability-close">${t("common.close")}</button>
+        <button type="button" class="mini-btn ghost-btn availability-copy">${t("availability.copyReport")}</button>
+        <button type="submit" class="primary availability-recheck">${t("availability.recheck")}</button>
+      </div>
+    </form>
+  `;
+
+  confirmDialog.querySelectorAll(".availability-close").forEach((button) => {
+    button.addEventListener("click", closeConfirmDialog);
+  });
+
+  confirmDialog.querySelector(".availability-copy")?.addEventListener("click", () => {
+    const report = JSON.stringify(freshData, null, 2);
+    navigator.clipboard?.writeText(report).then(() => {
+      setAppNotice("诊断报告已复制到剪贴板");
+    }).catch(() => {
+      setAppNotice("复制失败", "error");
+    });
+  });
+
+  confirmDialog.querySelector(".availability-dialog")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const recheckBtn = event.currentTarget.querySelector(".availability-recheck");
+    recheckBtn.disabled = true;
+    setAppNotice("正在重新检查...", "busy");
+    try {
+      await refreshRuntimeProbe();
+      store.refresh(providers, runtimeInstances, currentTargetAgent());
+      const updatedData = store.getData();
+      const updatedView = AvailabilityView(updatedData, { showTitle: false, compact: true });
+      confirmDialog.querySelector(".availability-dialog-body").innerHTML = updatedView;
+      setAppNotice("检查完成");
+    } catch (error) {
+      setAppNotice(`检查失败：${formatBackendError(error)}`, "error");
+    } finally {
+      recheckBtn.disabled = false;
+    }
+  });
+}
+
 function showProviderAgents(provider) {
   const names = provider.agents.map((agent) => displayAgentName(agent)).join("、");
   setAppNotice(`${provider.name} 当前已登记的 Agent：${names}。`);
@@ -1026,6 +1096,7 @@ async function refreshRuntimeProbe() {
     ensureCurrentTargetAgentExists();
     renderProviders();
     renderWorkspaceStatus();
+    getAvailabilityStore().refresh(providers, runtimeInstances, currentTargetAgent());
     return result;
   } catch (error) {
     console.error(error);
@@ -2919,7 +2990,7 @@ function startSessionFromPrompt(forceNewSession = false) {
 }
 
 providerManagerBtn?.addEventListener("click", () => {
-  openProviderManager();
+  openAvailabilityModal();
 });
 
 sendBtn.addEventListener("click", () => {
