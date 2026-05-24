@@ -166,7 +166,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  flex-wrap: wrap;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
   gap: 8px;
   padding-top: 4px;
 }
@@ -189,6 +190,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  flex: 1 1 auto;
   min-width: 0;
 }
 
@@ -2463,15 +2465,6 @@ textarea {
   html, body, .app-shell {
     overflow: auto;
     height: auto;
-  }
-
-  .topbar {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .brand {
-    width: 100%;
   }
 
   .app-notice {
