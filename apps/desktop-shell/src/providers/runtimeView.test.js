@@ -169,6 +169,28 @@ test("targetsForRuntimeInstance: unknown provider yields no targets", () => {
   assert.deepEqual(targets, []);
 });
 
+test("targetsForRuntimeInstance: manifest adapter produces a generic runtime row", () => {
+  const codexProvider = { id: "codex", name: "OpenAI Codex", dynamicAdapter: true };
+  const codexInstance = {
+    id: "codex-manifest",
+    providerId: "codex",
+    runtimeLabel: "Manifest",
+    commandKind: "manifest",
+    command: "npx -y @openai/codex",
+    transport: "stdio_json",
+    available: true,
+  };
+  const targets = targetsForRuntimeInstance(codexInstance, {
+    providers: [codexProvider],
+    runtimeInstances: [codexInstance],
+    hermesProfilesByInstance: {},
+  });
+  assert.equal(targets.length, 1);
+  assert.equal(targets[0].providerId, "codex");
+  assert.equal(targets[0].runtimeCommand, null);
+  assert.equal(targets[0].subtitle, "stdio_json");
+});
+
 test("runtimeTargets: flattens across all instances", () => {
   const profiles = [{ id: "hermes-wsl:profile:default", displayName: "default" }];
   const all = runtimeTargets({

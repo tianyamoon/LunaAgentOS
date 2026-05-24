@@ -42,7 +42,18 @@ export function runtimeDefaultsForProvider(providerId, runtimeInstanceId = null,
       };
     }
   }
-  return LEGACY_PROVIDER_RUNTIME_DEFAULTS[providerId] || {
+  const legacyDefaults = LEGACY_PROVIDER_RUNTIME_DEFAULTS[providerId];
+  if (legacyDefaults) return legacyDefaults;
+  const instance = runtimeInstances.find((item) => item.providerId === providerId);
+  if (instance) {
+    return {
+      runtimeInstanceId: instance.id,
+      runtimeLabel: instance.runtimeLabel || null,
+      runtimeHost: runtimeHostForInstance(instance),
+      runtimeCommand: instance.commandKind === "manifest" ? null : instance.command || null,
+    };
+  }
+  return {
     runtimeInstanceId: runtimeInstanceId || null,
     runtimeLabel: null,
     runtimeHost: null,

@@ -164,6 +164,14 @@ const acpRuntimeCommands = {
     aliveIds: "runtime_acp_hermes_alive_ids",
   },
 };
+const genericAcpRuntimeCommands = {
+  prompt: "runtime_acp_adapter_prompt",
+  load: "runtime_acp_adapter_load",
+  resume: "runtime_acp_adapter_resume",
+  shutdown: "runtime_acp_adapter_shutdown",
+  aliveIds: "runtime_acp_adapter_alive_ids",
+  requiresAdapterId: true,
+};
 
 const fallbackSessions = {
   hermes: {
@@ -506,7 +514,12 @@ function currentTargetProvider() {
 }
 
 function acpCommandsForProvider(providerId) {
-  return acpRuntimeCommands[providerId] || null;
+  if (!providerId) return null;
+  return acpRuntimeCommands[providerId] || (providerById(providerId)?.dynamicAdapter ? genericAcpRuntimeCommands : null);
+}
+
+function acpInvokeArgs(commands, providerId, args = {}) {
+  return commands?.requiresAdapterId ? { adapterId: providerId, ...args } : args;
 }
 
 function providerState(provider) {
@@ -998,8 +1011,10 @@ function showProviderAgents(provider) {
 
 async function refreshRuntimeProbe() {
   try {
+    const adapterResult = await invoke("load_adapters");
     const result = await invoke("runtime_probe");
     providersStore.batch(() => {
+      providersStore.syncAdapterProviders(adapterResult?.adapters || []);
       providersStore.patchRuntimeAvailability(
         Object.fromEntries((result?.providers || []).map((item) => [item.providerId, item])),
       );
@@ -2077,7 +2092,7 @@ function activateWorkspaceSession(sessionId, options = {}) {
 async function shutdownRuntimeSession(session) {
   const commands = acpCommandsForProvider(session.providerId);
   if (!commands) return false;
-  return invoke(commands.shutdown, { runtimeSessionId: session.id });
+  return invoke(commands.shutdown, acpInvokeArgs(commands, session.providerId, { runtimeSessionId: session.id }));
 }
 
 function markSessionStopped(session) {
@@ -2678,14 +2693,14 @@ async function restoreArchivedSession(sessionId) {
     return;
   }
   try {
-    await invoke(commands.load, {
+    await invoke(commands.load, acpInvokeArgs(commands, restored.providerId, {
       runtimeSessionId: restored.id,
       acpSessionId: restored.acpSessionId,
       cwd: null,
       runtimeHost: restored.runtimeHost || null,
       runtimeCommand: restored.runtimeCommand || null,
       profileExecutable: restored.profileExecutable || null,
-    });
+    }));
     setSessionLifecycle(restored, LIFECYCLE.live);
     markSessionActive(restored.id);
     saveCurrentSession(restored.id);
@@ -2695,19 +2710,19 @@ async function restoreArchivedSession(sessionId) {
   } catch (loadError) {
     const formattedLoadError = formatBackendError(loadError);
     try {
-      await invoke(commands.shutdown, { runtimeSessionId: restored.id });
+      await invoke(commands.shutdown, acpInvokeArgs(commands, restored.providerId, { runtimeSessionId: restored.id }));
     } catch (shutdownError) {
       console.error(shutdownError);
     }
     try {
-      await invoke(commands.resume, {
+      await invoke(commands.resume, acpInvokeArgs(commands, restored.providerId, {
         runtimeSessionId: restored.id,
         acpSessionId: restored.acpSessionId,
         cwd: null,
         runtimeHost: restored.runtimeHost || null,
         runtimeCommand: restored.runtimeCommand || null,
         profileExecutable: restored.profileExecutable || null,
-      });
+      }));
       setSessionLifecycle(restored, LIFECYCLE.live);
       markSessionActive(restored.id);
       saveCurrentSession(restored.id);
@@ -2814,14 +2829,14 @@ async function startAcpSession(session, turn) {
   setAppNotice(`已将任务送入 ${session.agentName}，正在等待返回内容...`, "busy");
   try {
     await new Promise((resolve) => requestAnimationFrame(resolve));
-    const events = await invoke(commands.prompt, {
+    const events = await invoke(commands.prompt, acpInvokeArgs(commands, session.providerId, {
       runtimeSessionId: session.id,
       prompt: turn.task,
       cwd: null,
       runtimeHost: session.runtimeHost || null,
       runtimeCommand: session.runtimeCommand || null,
       profileExecutable: session.profileExecutable || null,
-    });
+    }));
     if (isSessionDeletedTombstone(session.id) || isSessionStoppedTombstone(session.id)) return;
     const saved = updateTurnFromEvents(session.id, turn.id, events);
     if (isSessionDeletedTombstone(session.id) || isSessionStoppedTombstone(session.id)) return;
@@ -2994,7 +3009,11 @@ async function syncRuntimeAliveStates() {
     const aliveByProvider = {};
     for (const providerId of providerIds) {
       const commands = acpCommandsForProvider(providerId);
-      if (commands) aliveByProvider[providerId] = new Set(await invoke(commands.aliveIds));
+      if (commands) {
+        aliveByProvider[providerId] = new Set(
+          await invoke(commands.aliveIds, acpInvokeArgs(commands, providerId)),
+        );
+      }
     }
     let mutated = false;
     sessions.forEach((session) => {

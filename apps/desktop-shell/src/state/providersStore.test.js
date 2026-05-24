@@ -64,6 +64,23 @@ test("providersStore: appendProviderAgent / removeProviderAgent", () => {
   assert.equal(store.providerById("hermes").agents.length, 0);
 });
 
+test("providersStore: syncAdapterProviders adds and prunes manifest providers", () => {
+  const store = createProvidersStore();
+  const ref = store.getProvidersRef();
+  store.syncAdapterProviders([
+    { id: "codex", name: "OpenAI Codex", transport: "stdio_json" },
+    { id: "claude", name: "Ignored Claude Manifest", transport: "stdio_json" },
+  ]);
+  assert.equal(store.getProvidersRef(), ref);
+  assert.equal(store.providerById("claude").dynamicAdapter, undefined);
+  assert.equal(store.providerById("codex").dynamicAdapter, true);
+  assert.deepEqual(store.providerById("codex").agents.map((agent) => agent.id), ["codex-main"]);
+  assert.equal(store.getRuntimeAvailabilityFor("codex").configured, true);
+  store.syncAdapterProviders([]);
+  assert.equal(store.providerById("codex"), null);
+  assert.equal(store.getRuntimeAvailabilityFor("codex"), null);
+});
+
 test("providersStore: runtimeAvailability stable ref + patch", () => {
   const store = createProvidersStore();
   const ref = store.getRuntimeAvailabilityRef();

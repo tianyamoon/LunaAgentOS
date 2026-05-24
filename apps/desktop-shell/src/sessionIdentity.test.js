@@ -5,6 +5,7 @@ import { normalizeSessionIdentity } from "./sessionIdentity.js";
 const providers = [
   { id: "claude", name: "Claude Code" },
   { id: "hermes", name: "Hermes" },
+  { id: "codex", name: "OpenAI Codex" },
 ];
 
 const runtimeInstances = [
@@ -35,6 +36,13 @@ const runtimeInstances = [
     runtimeLabel: "WSL",
     commandKind: "wsl",
     command: "npx",
+  },
+  {
+    id: "codex-manifest",
+    providerId: "codex",
+    runtimeLabel: "Manifest",
+    commandKind: "manifest",
+    command: "npx -y @openai/codex",
   },
 ];
 
@@ -197,4 +205,25 @@ test("keeps Claude Win runtime visible in session title", () => {
   assert.equal(normalized.runtimeInstanceId, "claude-win");
   assert.equal(normalized.runtimeHost, "native");
   assert.equal(normalized.agentName, "Claude Code · Win");
+});
+
+test("uses manifest runtime defaults for dynamic providers without command override", () => {
+  const normalized = normalizeSessionIdentity(
+    {
+      id: "session-codex",
+      providerId: "codex",
+      providerName: "Codex",
+      agentId: "codex-main",
+      agentName: "Codex",
+      runtimeInstanceId: null,
+      runtimeLabel: null,
+      turns: [],
+    },
+    { providers, runtimeInstances, runtimeTargets },
+  );
+
+  assert.equal(normalized.providerName, "OpenAI Codex");
+  assert.equal(normalized.runtimeInstanceId, "codex-manifest");
+  assert.equal(normalized.runtimeHost, "manifest");
+  assert.equal(normalized.runtimeCommand, null);
 });

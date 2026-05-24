@@ -48,6 +48,7 @@ const DEFAULT_PROVIDERS = [
     ],
   },
 ];
+const BUILTIN_PROVIDER_IDS = new Set(DEFAULT_PROVIDERS.map((provider) => provider.id));
 
 const DEFAULT_RUNTIME_AVAILABILITY = {
   claude: { summary: "probing", configured: false, available: false, command: "" },
@@ -59,6 +60,28 @@ function cloneProvider(entry) {
   return {
     ...entry,
     agents: Array.isArray(entry.agents) ? entry.agents.map((agent) => ({ ...agent })) : [],
+  };
+}
+
+function providerFromAdapter(adapter) {
+  const id = adapter?.id;
+  if (!id) return null;
+  return {
+    id,
+    name: adapter.name || id,
+    lane: "",
+    dynamicAdapter: true,
+    adapterManifest: adapter,
+    agents: [
+      {
+        id: `${id}-main`,
+        providerId: id,
+        name: "Main",
+        subtitle: adapter.transport || "Manifest Adapter",
+        state: 1,
+        dynamicAdapter: true,
+      },
+    ],
   };
 }
 
@@ -127,6 +150,44 @@ export function createProvidersStore(initial = {}) {
       if (!Array.isArray(provider.agents)) provider.agents = [];
       provider.agents.push(agent);
       notify();
+    },
+    syncAdapterProviders(adapters) {
+      const adapterProviders = (Array.isArray(adapters) ? adapters : [])
+        .map(providerFromAdapter)
+        .filter((provider) => provider && !BUILTIN_PROVIDER_IDS.has(provider.id));
+      const adapterIds = new Set(adapterProviders.map((provider) => provider.id));
+      let changed = false;
+      for (const provider of adapterProviders) {
+        const existing = providers.find((item) => item.id === provider.id);
+        if (existing) {
+          existing.name = provider.name;
+          existing.dynamicAdapter = true;
+          existing.adapterManifest = provider.adapterManifest;
+          if (!Array.isArray(existing.agents) || existing.agents.length === 0) {
+            existing.agents = provider.agents;
+          }
+        } else {
+          providers.push(provider);
+        }
+        if (!runtimeAvailability[provider.id]) {
+          runtimeAvailability[provider.id] = {
+            summary: "probing",
+            configured: true,
+            available: false,
+            command: provider.name,
+          };
+        }
+        changed = true;
+      }
+      for (let index = providers.length - 1; index >= 0; index -= 1) {
+        const provider = providers[index];
+        if (provider.dynamicAdapter && !adapterIds.has(provider.id)) {
+          providers.splice(index, 1);
+          delete runtimeAvailability[provider.id];
+          changed = true;
+        }
+      }
+      if (changed) notify();
     },
     removeProviderAgent(id, agentId) {
       const provider = providers.find((item) => item.id === id);

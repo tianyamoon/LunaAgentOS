@@ -105,7 +105,19 @@ export function targetsForRuntimeInstance(
       };
     });
   }
-  return [];
+  return [{
+    id: instance.id,
+    providerId: provider.id,
+    runtimeInstanceId: instance.id,
+    runtimeLabel: instance.runtimeLabel,
+    runtimeHost,
+    runtimeCommand: instance.commandKind === "manifest" ? null : instance.command,
+    kind: "runtime",
+    name: providerRuntimeLabel(provider, instance, availableCount),
+    subtitle: instance.transport || instance.runtimeLabel || "Manifest Runtime",
+    state: 1,
+    available: true,
+  }];
 }
 
 export function runtimeTargets({ providers, runtimeInstances, hermesProfilesByInstance }) {

@@ -1,0 +1,11 @@
+{
+  "id": "codex",
+  "name": "OpenAI Codex",
+  "transport": "stdio_json",
+  "command": [
+    "npx",
+    "-y",
+    "@openai/codex"
+  ],
+  "requires_pty": false
+}

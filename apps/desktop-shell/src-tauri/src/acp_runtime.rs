@@ -17,18 +17,28 @@ const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 static CLAUDE_SESSIONS: OnceLock<Mutex<HashMap<String, AcpSession>>> = OnceLock::new();
 static HERMES_SESSIONS: OnceLock<Mutex<HashMap<String, AcpSession>>> = OnceLock::new();
+static ADAPTER_SESSIONS: OnceLock<Mutex<HashMap<String, AcpSession>>> = OnceLock::new();
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 enum AcpRuntime {
     Claude,
     Hermes,
+    Adapter { id: String, name: String },
 }
 
 impl AcpRuntime {
-    fn display(self) -> &'static str {
+    fn display(&self) -> String {
         match self {
-            AcpRuntime::Claude => "Claude ACP",
-            AcpRuntime::Hermes => "Hermes ACP",
+            AcpRuntime::Claude => "Claude ACP".to_string(),
+            AcpRuntime::Hermes => "Hermes ACP".to_string(),
+            AcpRuntime::Adapter { name, .. } => format!("{name} ACP"),
+        }
+    }
+
+    fn adapter_id(&self) -> Option<&str> {
+        match self {
+            AcpRuntime::Adapter { id, .. } => Some(id),
+            _ => None,
         }
     }
 }
@@ -41,6 +51,16 @@ pub struct RuntimeConfig {
     pub hermes_command: Option<String>,
     pub runtime_host: Option<String>,
     pub runtime_command: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct AdapterLaunchSpec {
+    pub id: String,
+    pub name: String,
+    pub command: String,
+    pub args: Vec<String>,
+    pub env: HashMap<String, String>,
+    pub cwd: Option<String>,
 }
 
 enum SessionStartMode {
@@ -72,6 +92,7 @@ pub fn run_claude_acp_prompt(
         cwd,
         None,
         config,
+        None,
         on_event,
     )
 }
@@ -91,6 +112,30 @@ pub fn run_hermes_acp_prompt(
         cwd,
         profile_executable,
         config,
+        None,
+        on_event,
+    )
+}
+
+pub fn run_adapter_acp_prompt(
+    adapter: AdapterLaunchSpec,
+    runtime_session_id: String,
+    prompt: String,
+    cwd: Option<String>,
+    config: RuntimeConfig,
+    on_event: Option<&mut dyn FnMut(Value)>,
+) -> Result<Vec<Value>, String> {
+    run_acp_prompt(
+        AcpRuntime::Adapter {
+            id: adapter.id.clone(),
+            name: adapter.name.clone(),
+        },
+        runtime_session_id,
+        prompt,
+        cwd,
+        None,
+        config,
+        Some(adapter),
         on_event,
     )
 }
@@ -102,6 +147,7 @@ fn run_acp_prompt(
     cwd: Option<String>,
     profile_executable: Option<String>,
     config: RuntimeConfig,
+    adapter: Option<AdapterLaunchSpec>,
     mut on_event: Option<&mut dyn FnMut(Value)>,
 ) -> Result<Vec<Value>, String> {
     let cwd = match cwd {
@@ -109,31 +155,33 @@ fn run_acp_prompt(
         _ => isolated_runtime_cwd(&runtime_session_id)?,
     };
     let mut events = Vec::new();
-    let sessions = session_store(runtime);
+    let session_key = runtime_session_key(&runtime, &runtime_session_id);
+    let sessions = session_store(&runtime);
     let mut sessions = sessions.lock().map_err(|error| error.to_string())?;
-    let session = match sessions.get_mut(&runtime_session_id) {
+    let session = match sessions.get_mut(&session_key) {
         Some(session) => session,
         None => {
             let session = start_acp_session(
-                runtime,
+                &runtime,
                 &cwd,
                 &mut events,
                 SessionStartMode::New,
                 profile_executable.as_deref(),
                 &config,
+                adapter.as_ref(),
                 &mut on_event,
             )?;
-            sessions.insert(runtime_session_id.clone(), session);
+            sessions.insert(session_key.clone(), session);
             sessions
-                .get_mut(&runtime_session_id)
+                .get_mut(&session_key)
                 .ok_or_else(|| format!("{} 会话缓存失败。", runtime.display()))?
         }
     };
 
-    match send_prompt(runtime, session, prompt, &mut events, &mut on_event) {
+    match send_prompt(&runtime, session, prompt, &mut events, &mut on_event) {
         Ok(()) => Ok(events),
         Err(error) => {
-            if let Some(mut broken) = sessions.remove(&runtime_session_id) {
+            if let Some(mut broken) = sessions.remove(&session_key) {
                 let _ = broken.child.kill();
                 let _ = broken.child.wait();
             }
@@ -155,6 +203,7 @@ pub fn resume_claude_acp_session(
         cwd,
         None,
         config,
+        None,
     )
 }
 
@@ -172,6 +221,28 @@ pub fn resume_hermes_acp_session(
         cwd,
         profile_executable,
         config,
+        None,
+    )
+}
+
+pub fn resume_adapter_acp_session(
+    adapter: AdapterLaunchSpec,
+    runtime_session_id: String,
+    acp_session_id: String,
+    cwd: Option<String>,
+    config: RuntimeConfig,
+) -> Result<Vec<Value>, String> {
+    resume_acp_session(
+        AcpRuntime::Adapter {
+            id: adapter.id.clone(),
+            name: adapter.name.clone(),
+        },
+        runtime_session_id,
+        acp_session_id,
+        cwd,
+        None,
+        config,
+        Some(adapter),
     )
 }
 
@@ -182,15 +253,17 @@ fn resume_acp_session(
     cwd: Option<String>,
     profile_executable: Option<String>,
     config: RuntimeConfig,
+    adapter: Option<AdapterLaunchSpec>,
 ) -> Result<Vec<Value>, String> {
     let cwd = match cwd {
         Some(value) if !value.trim().is_empty() => PathBuf::from(value),
         _ => isolated_runtime_cwd(&runtime_session_id)?,
     };
     let mut events = Vec::new();
-    let sessions = session_store(runtime);
+    let session_key = runtime_session_key(&runtime, &runtime_session_id);
+    let sessions = session_store(&runtime);
     let mut sessions = sessions.lock().map_err(|error| error.to_string())?;
-    if sessions.contains_key(&runtime_session_id) {
+    if sessions.contains_key(&session_key) {
         events.push(json!({
             "type": "state",
             "state": 1,
@@ -203,15 +276,16 @@ fn resume_acp_session(
     }
     let mut on_event = None;
     let session = start_acp_session(
-        runtime,
+        &runtime,
         &cwd,
         &mut events,
         SessionStartMode::Resume(acp_session_id.clone()),
         profile_executable.as_deref(),
         &config,
+        adapter.as_ref(),
         &mut on_event,
     )?;
-    sessions.insert(runtime_session_id, session);
+    sessions.insert(session_key, session);
     Ok(events)
 }
 
@@ -228,6 +302,7 @@ pub fn load_claude_acp_session(
         cwd,
         None,
         config,
+        None,
     )
 }
 
@@ -245,6 +320,28 @@ pub fn load_hermes_acp_session(
         cwd,
         profile_executable,
         config,
+        None,
+    )
+}
+
+pub fn load_adapter_acp_session(
+    adapter: AdapterLaunchSpec,
+    runtime_session_id: String,
+    acp_session_id: String,
+    cwd: Option<String>,
+    config: RuntimeConfig,
+) -> Result<Vec<Value>, String> {
+    load_acp_session(
+        AcpRuntime::Adapter {
+            id: adapter.id.clone(),
+            name: adapter.name.clone(),
+        },
+        runtime_session_id,
+        acp_session_id,
+        cwd,
+        None,
+        config,
+        Some(adapter),
     )
 }
 
@@ -255,15 +352,17 @@ fn load_acp_session(
     cwd: Option<String>,
     profile_executable: Option<String>,
     config: RuntimeConfig,
+    adapter: Option<AdapterLaunchSpec>,
 ) -> Result<Vec<Value>, String> {
     let cwd = match cwd {
         Some(value) if !value.trim().is_empty() => PathBuf::from(value),
         _ => isolated_runtime_cwd(&runtime_session_id)?,
     };
     let mut events = Vec::new();
-    let sessions = session_store(runtime);
+    let session_key = runtime_session_key(&runtime, &runtime_session_id);
+    let sessions = session_store(&runtime);
     let mut sessions = sessions.lock().map_err(|error| error.to_string())?;
-    if sessions.contains_key(&runtime_session_id) {
+    if sessions.contains_key(&session_key) {
         events.push(json!({
             "type": "state",
             "state": 1,
@@ -276,15 +375,16 @@ fn load_acp_session(
     }
     let mut on_event = None;
     let session = start_acp_session(
-        runtime,
+        &runtime,
         &cwd,
         &mut events,
         SessionStartMode::Load(acp_session_id.clone()),
         profile_executable.as_deref(),
         &config,
+        adapter.as_ref(),
         &mut on_event,
     )?;
-    sessions.insert(runtime_session_id, session);
+    sessions.insert(session_key, session);
     Ok(events)
 }
 
@@ -296,14 +396,21 @@ pub fn list_live_hermes_acp_sessions() -> Result<Vec<String>, String> {
     list_live_acp_sessions(AcpRuntime::Hermes)
 }
 
+pub fn list_live_adapter_acp_sessions(adapter_id: String) -> Result<Vec<String>, String> {
+    list_live_acp_sessions(AcpRuntime::Adapter {
+        id: adapter_id,
+        name: "Adapter".to_string(),
+    })
+}
+
 fn list_live_acp_sessions(runtime: AcpRuntime) -> Result<Vec<String>, String> {
-    let sessions = session_store(runtime);
+    let sessions = session_store(&runtime);
     let mut sessions = sessions.lock().map_err(|error| error.to_string())?;
     let mut alive = Vec::new();
     let mut dead = Vec::new();
     for (id, session) in sessions.iter_mut() {
         match session.child.try_wait() {
-            Ok(None) => alive.push(id.clone()),
+            Ok(None) => alive.push(runtime_session_id_from_key(&runtime, id)),
             _ => dead.push(id.clone()),
         }
     }
@@ -323,10 +430,24 @@ pub fn shutdown_hermes_acp_session(runtime_session_id: String) -> Result<bool, S
     shutdown_acp_session(AcpRuntime::Hermes, runtime_session_id)
 }
 
+pub fn shutdown_adapter_acp_session(
+    adapter_id: String,
+    runtime_session_id: String,
+) -> Result<bool, String> {
+    shutdown_acp_session(
+        AcpRuntime::Adapter {
+            id: adapter_id,
+            name: "Adapter".to_string(),
+        },
+        runtime_session_id,
+    )
+}
+
 fn shutdown_acp_session(runtime: AcpRuntime, runtime_session_id: String) -> Result<bool, String> {
-    let sessions = session_store(runtime);
+    let session_key = runtime_session_key(&runtime, &runtime_session_id);
+    let sessions = session_store(&runtime);
     let mut sessions = sessions.lock().map_err(|error| error.to_string())?;
-    let Some(mut session) = sessions.remove(&runtime_session_id) else {
+    let Some(mut session) = sessions.remove(&session_key) else {
         return Ok(false);
     };
     let _ = session.stdin.flush();
@@ -344,8 +465,8 @@ pub fn shutdown_all_hermes_acp_sessions() -> Result<usize, String> {
     shutdown_all_acp_sessions(AcpRuntime::Hermes)
 }
 
-fn shutdown_all_acp_sessions(runtime: AcpRuntime) -> Result<usize, String> {
-    let sessions = session_store(runtime);
+pub fn shutdown_all_adapter_acp_sessions() -> Result<usize, String> {
+    let sessions = ADAPTER_SESSIONS.get_or_init(|| Mutex::new(HashMap::new()));
     let mut sessions = sessions.lock().map_err(|error| error.to_string())?;
     let count = sessions.len();
     for (_id, mut session) in sessions.drain() {
@@ -357,23 +478,55 @@ fn shutdown_all_acp_sessions(runtime: AcpRuntime) -> Result<usize, String> {
     Ok(count)
 }
 
-fn session_store(runtime: AcpRuntime) -> &'static Mutex<HashMap<String, AcpSession>> {
+fn shutdown_all_acp_sessions(runtime: AcpRuntime) -> Result<usize, String> {
+    let sessions = session_store(&runtime);
+    let mut sessions = sessions.lock().map_err(|error| error.to_string())?;
+    let count = sessions.len();
+    for (_id, mut session) in sessions.drain() {
+        let _ = session.stdin.flush();
+        drop(session.stdin);
+        let _ = session.child.kill();
+        let _ = session.child.wait();
+    }
+    Ok(count)
+}
+
+fn session_store(runtime: &AcpRuntime) -> &'static Mutex<HashMap<String, AcpSession>> {
     match runtime {
         AcpRuntime::Claude => CLAUDE_SESSIONS.get_or_init(|| Mutex::new(HashMap::new())),
         AcpRuntime::Hermes => HERMES_SESSIONS.get_or_init(|| Mutex::new(HashMap::new())),
+        AcpRuntime::Adapter { .. } => ADAPTER_SESSIONS.get_or_init(|| Mutex::new(HashMap::new())),
+    }
+}
+
+fn runtime_session_key(runtime: &AcpRuntime, runtime_session_id: &str) -> String {
+    match runtime.adapter_id() {
+        Some(adapter_id) => format!("{adapter_id}:{runtime_session_id}"),
+        None => runtime_session_id.to_string(),
+    }
+}
+
+fn runtime_session_id_from_key(runtime: &AcpRuntime, key: &str) -> String {
+    match runtime.adapter_id() {
+        Some(adapter_id) => key
+            .strip_prefix(&format!("{adapter_id}:"))
+            .unwrap_or(key)
+            .to_string(),
+        None => key.to_string(),
     }
 }
 
 fn start_acp_session(
-    runtime: AcpRuntime,
+    runtime: &AcpRuntime,
     cwd: &PathBuf,
     mut events: &mut Vec<Value>,
     mode: SessionStartMode,
     profile_executable: Option<&str>,
     config: &RuntimeConfig,
+    adapter: Option<&AdapterLaunchSpec>,
     on_event: &mut Option<&mut dyn FnMut(Value)>,
 ) -> Result<AcpSession, String> {
-    let mut child = build_acp_command(runtime, cwd, profile_executable, config)
+    let mut child = build_acp_command(runtime, cwd, profile_executable, config, adapter)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -559,7 +712,7 @@ fn abort_started_child(child: &mut Child, error: String) -> String {
 }
 
 fn send_prompt(
-    runtime: AcpRuntime,
+    runtime: &AcpRuntime,
     session: &mut AcpSession,
     prompt: String,
     events: &mut Vec<Value>,
@@ -611,10 +764,11 @@ fn send_prompt(
 }
 
 fn build_acp_command(
-    runtime: AcpRuntime,
+    runtime: &AcpRuntime,
     cwd: &PathBuf,
     profile_executable: Option<&str>,
     config: &RuntimeConfig,
+    adapter: Option<&AdapterLaunchSpec>,
 ) -> Command {
     let runtime_host = config.runtime_host.as_deref();
     let mut command = match runtime {
@@ -652,6 +806,15 @@ fn build_acp_command(
                 .or(config.hermes_command.as_deref())
                 .unwrap_or("hermes"),
         ),
+        AcpRuntime::Adapter { .. } => {
+            let adapter = adapter.expect("adapter launch spec is required for adapter runtime");
+            Command::new(
+                config
+                    .runtime_command
+                    .as_deref()
+                    .unwrap_or(adapter.command.as_str()),
+            )
+        }
     };
 
     #[cfg(windows)]
@@ -701,6 +864,18 @@ fn build_acp_command(
                 command.args(["acp", "--accept-hooks"]);
             }
             command.current_dir(cwd);
+        }
+        AcpRuntime::Adapter { .. } => {
+            let adapter = adapter.expect("adapter launch spec is required for adapter runtime");
+            command.args(&adapter.args);
+            command.current_dir(
+                adapter
+                    .cwd
+                    .as_deref()
+                    .map(PathBuf::from)
+                    .unwrap_or_else(|| cwd.clone()),
+            );
+            command.envs(&adapter.env);
         }
     }
 
@@ -785,7 +960,7 @@ fn write_message(stdin: &mut impl Write, message: &Value) -> Result<(), String> 
 }
 
 fn read_response(
-    runtime: AcpRuntime,
+    runtime: &AcpRuntime,
     reader: &mut impl BufRead,
     stdin: &mut impl Write,
     target_id: i64,
@@ -830,7 +1005,7 @@ fn read_response(
 }
 
 fn format_adapter_stdout_closed(
-    runtime: AcpRuntime,
+    runtime: &AcpRuntime,
     stderr_log: Option<&Arc<Mutex<String>>>,
 ) -> String {
     let stderr = stderr_log

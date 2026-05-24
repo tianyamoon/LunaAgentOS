@@ -9,6 +9,7 @@ use std::process::{Command, Stdio};
 use tauri::{AppHandle, Emitter, Manager};
 
 mod acp_runtime;
+mod adapter_registry;
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -130,6 +131,8 @@ struct RuntimeConfigFile {
     claude_args: Vec<String>,
     hermes_host: Option<String>,
     hermes_command: Option<String>,
+    #[serde(default)]
+    adapter_plugin_paths: Vec<String>,
 }
 
 impl From<RuntimeConfigFile> for acp_runtime::RuntimeConfig {
@@ -194,6 +197,12 @@ struct RuntimeInstanceProbe {
     runtime_label: String,
     command_kind: String,
     command: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    transport: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    adapter_source_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    capabilities: Option<adapter_registry::AdapterCapabilities>,
     configured: bool,
     available: bool,
     summary: String,
@@ -250,6 +259,24 @@ fn run_shell(shell: &str, args: &[&str]) -> Result<String, String> {
     }
 }
 
+fn run_shell_owned(shell: &str, args: &[String]) -> Result<String, String> {
+    let output = build_command(shell)
+        .args(args)
+        .output()
+        .map_err(|error| error.to_string())?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+
+    if output.status.success() {
+        Ok(stdout)
+    } else if !stderr.is_empty() {
+        Err(stderr)
+    } else {
+        Err(stdout)
+    }
+}
+
 fn is_configured(value: &Option<String>) -> bool {
     value.as_ref().is_some_and(|item| !item.trim().is_empty())
 }
@@ -289,6 +316,9 @@ fn runtime_instance_probe(
         runtime_label: runtime_label.to_string(),
         command_kind: command_kind.to_string(),
         command: command.to_string(),
+        transport: None,
+        adapter_source_path: None,
+        capabilities: None,
         configured,
         available,
         summary: summary.to_string(),
@@ -325,6 +355,94 @@ fn provider_probe_from_instances(
         summary: summary.to_string(),
         detail,
     }
+}
+
+fn adapter_instance_probe(adapter: &adapter_registry::AdapterDefinition) -> RuntimeInstanceProbe {
+    let result = adapter.health_check.as_ref().map(|health| {
+        adapter_registry::allow_process_exec(adapter, &health.command, &health.args)
+            .and_then(|_| run_shell_owned(&health.command, &health.args))
+    });
+    let available = result.as_ref().map(|item| item.is_ok()).unwrap_or(true);
+    let detail = match result {
+        Some(Ok(output)) => output,
+        Some(Err(error)) => error,
+        None => "Manifest loaded; no healthCheck configured.".to_string(),
+    };
+    let summary = if available {
+        "available"
+    } else {
+        "unavailable"
+    };
+    let version = available.then(|| first_output_line(&detail)).flatten();
+    RuntimeInstanceProbe {
+        id: format!("{}-manifest", adapter.id),
+        provider_id: adapter.id.clone(),
+        runtime_label: "Manifest".to_string(),
+        command_kind: "manifest".to_string(),
+        command: format!("{} {}", adapter.command, adapter.args.join(" "))
+            .trim()
+            .to_string(),
+        transport: Some(adapter.transport.clone()),
+        adapter_source_path: Some(adapter.source_path.clone()),
+        capabilities: Some(adapter.capabilities.clone()),
+        configured: true,
+        available,
+        summary: summary.to_string(),
+        detail,
+        version,
+    }
+}
+
+fn adapter_provider_probe(
+    adapter: &adapter_registry::AdapterDefinition,
+    instance: &RuntimeInstanceProbe,
+) -> RuntimeProviderProbe {
+    RuntimeProviderProbe {
+        provider_id: adapter.id.clone(),
+        configured: true,
+        available: instance.available,
+        command: adapter.name.clone(),
+        summary: instance.summary.clone(),
+        detail: instance.detail.clone(),
+    }
+}
+
+fn adapter_launch_spec(
+    app: &AppHandle,
+    adapter_id: &str,
+    runtime_command: Option<String>,
+) -> Result<acp_runtime::AdapterLaunchSpec, String> {
+    let config = load_runtime_config_file(app);
+    let mut adapter = adapter_registry::find_adapter(&config.adapter_plugin_paths, adapter_id)?;
+    if let Some(command) = runtime_command.filter(|value| !value.trim().is_empty()) {
+        adapter.command = command;
+    }
+    adapter_registry::allow_process_exec(&adapter, &adapter.command, &adapter.args)?;
+    Ok(acp_runtime::AdapterLaunchSpec {
+        id: adapter.id,
+        name: adapter.name,
+        command: adapter.command,
+        args: adapter.args,
+        env: adapter.env,
+        cwd: adapter.cwd,
+    })
+}
+
+#[tauri::command]
+fn load_adapters(app: AppHandle) -> adapter_registry::AdapterLoadResult {
+    let config = load_runtime_config_file(&app);
+    adapter_registry::load_adapters(&config.adapter_plugin_paths)
+}
+
+#[tauri::command]
+fn runtime_adapter_probe(
+    app: AppHandle,
+    adapter_id: String,
+) -> Result<RuntimeProviderProbe, String> {
+    let config = load_runtime_config_file(&app);
+    let adapter = adapter_registry::find_adapter(&config.adapter_plugin_paths, &adapter_id)?;
+    let instance = adapter_instance_probe(&adapter);
+    Ok(adapter_provider_probe(&adapter, &instance))
 }
 
 #[tauri::command]
@@ -425,24 +543,36 @@ fn runtime_probe(app: AppHandle) -> RuntimeProbeResult {
         .cloned()
         .collect();
 
+    let mut providers = vec![
+        provider_probe_from_instances(
+            "claude",
+            claude_configured,
+            "Claude Code",
+            &claude_instances,
+        ),
+        provider_probe_from_instances("hermes", hermes_configured, "Hermes", &hermes_instances),
+        RuntimeProviderProbe {
+            provider_id: "trae".to_string(),
+            configured: false,
+            available: false,
+            command: "IDE Bridge".to_string(),
+            summary: "planned".to_string(),
+            detail: "Trae IDE bridge is reserved for a later integration.".to_string(),
+        },
+    ];
+
+    let adapter_result = adapter_registry::load_adapters(&config.adapter_plugin_paths);
+    for adapter in adapter_result.adapters {
+        if adapter.id == "claude" || adapter.id == "hermes" || adapter.id == "trae" {
+            continue;
+        }
+        let instance = adapter_instance_probe(&adapter);
+        providers.push(adapter_provider_probe(&adapter, &instance));
+        instances.push(instance);
+    }
+
     RuntimeProbeResult {
-        providers: vec![
-            provider_probe_from_instances(
-                "claude",
-                claude_configured,
-                "Claude Code",
-                &claude_instances,
-            ),
-            provider_probe_from_instances("hermes", hermes_configured, "Hermes", &hermes_instances),
-            RuntimeProviderProbe {
-                provider_id: "trae".to_string(),
-                configured: false,
-                available: false,
-                command: "IDE Bridge".to_string(),
-                summary: "planned".to_string(),
-                detail: "Trae IDE bridge is reserved for a later integration.".to_string(),
-            },
-        ],
+        providers,
         instances,
     }
 }
@@ -1212,6 +1342,40 @@ async fn runtime_acp_hermes_prompt(
 }
 
 #[tauri::command]
+async fn runtime_acp_adapter_prompt(
+    app: AppHandle,
+    adapter_id: String,
+    runtime_session_id: String,
+    prompt: String,
+    cwd: Option<String>,
+    runtime_command: Option<String>,
+) -> Result<Vec<Value>, String> {
+    let runtime_session_id_for_emit = runtime_session_id.clone();
+    let adapter = adapter_launch_spec(&app, &adapter_id, runtime_command)?;
+    let config = acp_runtime::RuntimeConfig::from(load_runtime_config_file(&app));
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let mut emit_update = |event: Value| {
+            let payload = RuntimeSessionStreamPayload {
+                runtime_session_id: runtime_session_id_for_emit.clone(),
+                event,
+            };
+            let _ = app.emit("runtime-session-update", payload);
+        };
+        acp_runtime::run_adapter_acp_prompt(
+            adapter,
+            runtime_session_id,
+            prompt,
+            cwd,
+            config,
+            Some(&mut emit_update),
+        )
+    })
+    .await
+    .map_err(|error| classify_backend_error(error.to_string()))?;
+    result.map_err(classify_backend_error)
+}
+
+#[tauri::command]
 async fn runtime_acp_claude_resume(
     app: AppHandle,
     runtime_session_id: String,
@@ -1259,6 +1423,31 @@ async fn runtime_acp_hermes_resume(
 }
 
 #[tauri::command]
+async fn runtime_acp_adapter_resume(
+    app: AppHandle,
+    adapter_id: String,
+    runtime_session_id: String,
+    acp_session_id: String,
+    cwd: Option<String>,
+    runtime_command: Option<String>,
+) -> Result<Vec<Value>, String> {
+    let adapter = adapter_launch_spec(&app, &adapter_id, runtime_command)?;
+    let config = acp_runtime::RuntimeConfig::from(load_runtime_config_file(&app));
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        acp_runtime::resume_adapter_acp_session(
+            adapter,
+            runtime_session_id,
+            acp_session_id,
+            cwd,
+            config,
+        )
+    })
+    .await
+    .map_err(|error| classify_backend_error(error.to_string()))?;
+    result.map_err(classify_backend_error)
+}
+
+#[tauri::command]
 async fn runtime_acp_claude_alive_ids() -> Result<Vec<String>, String> {
     tauri::async_runtime::spawn_blocking(|| acp_runtime::list_live_claude_acp_sessions())
         .await
@@ -1275,6 +1464,16 @@ async fn runtime_acp_hermes_alive_ids() -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
+async fn runtime_acp_adapter_alive_ids(adapter_id: String) -> Result<Vec<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        acp_runtime::list_live_adapter_acp_sessions(adapter_id)
+    })
+    .await
+    .map_err(|error| classify_backend_error(error.to_string()))?
+    .map_err(classify_backend_error)
+}
+
+#[tauri::command]
 async fn runtime_acp_claude_shutdown(runtime_session_id: String) -> Result<bool, String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
         acp_runtime::shutdown_claude_acp_session(runtime_session_id)
@@ -1288,6 +1487,19 @@ async fn runtime_acp_claude_shutdown(runtime_session_id: String) -> Result<bool,
 async fn runtime_acp_hermes_shutdown(runtime_session_id: String) -> Result<bool, String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
         acp_runtime::shutdown_hermes_acp_session(runtime_session_id)
+    })
+    .await
+    .map_err(|error| classify_backend_error(error.to_string()))?;
+    result.map_err(classify_backend_error)
+}
+
+#[tauri::command]
+async fn runtime_acp_adapter_shutdown(
+    adapter_id: String,
+    runtime_session_id: String,
+) -> Result<bool, String> {
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        acp_runtime::shutdown_adapter_acp_session(adapter_id, runtime_session_id)
     })
     .await
     .map_err(|error| classify_backend_error(error.to_string()))?;
@@ -1341,6 +1553,31 @@ async fn runtime_acp_hermes_load(
     result.map_err(classify_backend_error)
 }
 
+#[tauri::command]
+async fn runtime_acp_adapter_load(
+    app: AppHandle,
+    adapter_id: String,
+    runtime_session_id: String,
+    acp_session_id: String,
+    cwd: Option<String>,
+    runtime_command: Option<String>,
+) -> Result<Vec<Value>, String> {
+    let adapter = adapter_launch_spec(&app, &adapter_id, runtime_command)?;
+    let config = acp_runtime::RuntimeConfig::from(load_runtime_config_file(&app));
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        acp_runtime::load_adapter_acp_session(
+            adapter,
+            runtime_session_id,
+            acp_session_id,
+            cwd,
+            config,
+        )
+    })
+    .await
+    .map_err(|error| classify_backend_error(error.to_string()))?;
+    result.map_err(classify_backend_error)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -1353,24 +1590,32 @@ pub fn run() {
             append_history_entry,
             load_runtime_config,
             save_runtime_config,
+            load_adapters,
             runtime_probe,
+            runtime_adapter_probe,
             runtime_hermes_profiles,
             run_claude_stream,
             runtime_acp_claude_prompt,
             runtime_acp_hermes_prompt,
+            runtime_acp_adapter_prompt,
             runtime_acp_claude_resume,
             runtime_acp_hermes_resume,
+            runtime_acp_adapter_resume,
             runtime_acp_claude_load,
             runtime_acp_hermes_load,
+            runtime_acp_adapter_load,
             runtime_acp_claude_shutdown,
             runtime_acp_hermes_shutdown,
+            runtime_acp_adapter_shutdown,
             runtime_acp_claude_alive_ids,
-            runtime_acp_hermes_alive_ids
+            runtime_acp_hermes_alive_ids,
+            runtime_acp_adapter_alive_ids
         ])
         .on_window_event(|_window, event| {
             if matches!(event, tauri::WindowEvent::Destroyed) {
                 let _ = acp_runtime::shutdown_all_claude_acp_sessions();
                 let _ = acp_runtime::shutdown_all_hermes_acp_sessions();
+                let _ = acp_runtime::shutdown_all_adapter_acp_sessions();
             }
         })
         .run(tauri::generate_context!())
