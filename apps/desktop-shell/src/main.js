@@ -1991,8 +1991,12 @@ function exitFullscreenSessions() {
   return true;
 }
 
-function bindSessionActions() {
-  sessionDeck.querySelectorAll(".session-card").forEach((card) => {
+function bindSessionActions(root = sessionDeck) {
+  const actionRoot = root || sessionDeck;
+  const cards = actionRoot.matches?.(".session-card")
+    ? [actionRoot]
+    : [...actionRoot.querySelectorAll(".session-card")];
+  cards.forEach((card) => {
     card.addEventListener("click", (event) => {
       if (event.target.closest("button, a, summary, details, input, textarea, select")) return;
       if (window.getSelection()?.toString()) return;
@@ -2005,7 +2009,7 @@ function bindSessionActions() {
       activateWorkspaceSession(card.dataset.sessionId);
     });
   });
-  sessionDeck.querySelectorAll(".session-fullscreen-btn").forEach((button) => {
+  actionRoot.querySelectorAll(".session-fullscreen-btn").forEach((button) => {
     button.addEventListener("click", () => {
       const sessionId = button.dataset.sessionId;
       const session = sessions.find((item) => item.id === sessionId);
@@ -2014,27 +2018,27 @@ function bindSessionActions() {
       renderWorkspace();
     });
   });
-  sessionDeck.querySelectorAll(".session-dismiss-btn").forEach((button) => {
+  actionRoot.querySelectorAll(".session-dismiss-btn").forEach((button) => {
     button.addEventListener("click", () => dismissWorkspaceSession(button.dataset.sessionId));
   });
-  sessionDeck.querySelectorAll(".session-archive-btn").forEach((button) => {
+  actionRoot.querySelectorAll(".session-archive-btn").forEach((button) => {
     button.addEventListener("click", () => archiveLiveSession(button.dataset.sessionId));
   });
-  sessionDeck.querySelectorAll(".session-stop-btn").forEach((button) => {
+  actionRoot.querySelectorAll(".session-stop-btn").forEach((button) => {
     button.addEventListener("click", () => stopSession(button.dataset.sessionId));
   });
-  sessionDeck.querySelectorAll(".session-delete-btn").forEach((button) => {
+  actionRoot.querySelectorAll(".session-delete-btn").forEach((button) => {
     button.addEventListener("click", () => requestDeleteConfirmation(button.dataset.sessionId));
   });
-  sessionDeck.querySelectorAll(".session-retry-btn").forEach((button) => {
+  actionRoot.querySelectorAll(".session-retry-btn").forEach((button) => {
     button.addEventListener("click", () => restoreArchivedSession(button.dataset.sessionId));
   });
-  sessionDeck.querySelectorAll(".terminal-detail[data-detail-key]").forEach((detail) => {
+  actionRoot.querySelectorAll(".terminal-detail[data-detail-key]").forEach((detail) => {
     detail.addEventListener("toggle", () => {
       flowDetailOpenState.set(detail.dataset.detailKey, detail.open);
     });
   });
-  sessionDeck.querySelectorAll(".session-scroll-latest-btn").forEach((button) => {
+  actionRoot.querySelectorAll(".session-scroll-latest-btn").forEach((button) => {
     button.addEventListener("click", () => {
       const sessionId = button.dataset.sessionId;
       const body = sessionDeck.querySelector(`.session-card[data-session-id="${sessionId}"] .session-card-body`);
@@ -2043,7 +2047,7 @@ function bindSessionActions() {
       controller.scrollToBottom();
     });
   });
-  sessionDeck.querySelectorAll(".session-copy-btn").forEach((button) => {
+  actionRoot.querySelectorAll(".session-copy-btn").forEach((button) => {
     button.addEventListener("click", async () => {
       const session = sessions.find((item) => item.id === button.dataset.sessionId);
       const text = session ? sessionTranscriptText(session) : "";
@@ -2055,13 +2059,13 @@ function bindSessionActions() {
       setAppNotice(copied ? "已复制当前会话 transcript。" : "复制失败，请手动选择内容。", copied ? "muted" : "error");
     });
   });
-  sessionDeck.querySelectorAll(".session-latest-only-btn").forEach((button) => {
+  actionRoot.querySelectorAll(".session-latest-only-btn").forEach((button) => {
     button.addEventListener("click", () => toggleSessionLatestOnly(button.dataset.sessionId));
   });
-  sessionDeck.querySelectorAll(".session-turns-toggle-btn").forEach((button) => {
+  actionRoot.querySelectorAll(".session-turns-toggle-btn").forEach((button) => {
     button.addEventListener("click", () => toggleSessionTurnsCollapsed(button.dataset.sessionId));
   });
-  sessionDeck.querySelectorAll(".session-toggle-flows-btn").forEach((button) => {
+  actionRoot.querySelectorAll(".session-toggle-flows-btn").forEach((button) => {
     button.addEventListener("click", () => {
       const session = sessions.find((item) => item.id === button.dataset.sessionId);
       if (!session) return;
@@ -2070,10 +2074,10 @@ function bindSessionActions() {
       setAppNotice(shouldOpen ? "已展开当前会话的思考流与运行流。" : "已折叠当前会话的思考流与运行流。");
     });
   });
-  sessionDeck.querySelectorAll(".turn-collapse-btn").forEach((button) => {
+  actionRoot.querySelectorAll(".turn-collapse-btn").forEach((button) => {
     button.addEventListener("click", () => toggleTurnCollapsed(button.dataset.turnId));
   });
-  sessionDeck.querySelectorAll(".turn-copy-response-btn").forEach((button) => {
+  actionRoot.querySelectorAll(".turn-copy-response-btn").forEach((button) => {
     button.addEventListener("click", async () => {
       const result = findTurnById(button.dataset.turnId);
       const text = result ? turnResponseText(result.turn) : "";
@@ -2085,7 +2089,7 @@ function bindSessionActions() {
       setAppNotice(copied ? "已复制当前轮次响应。" : "复制失败，请手动选择内容。", copied ? "muted" : "error");
     });
   });
-  sessionDeck.querySelectorAll(".turn-copy-btn").forEach((button) => {
+  actionRoot.querySelectorAll(".turn-copy-btn").forEach((button) => {
     button.addEventListener("click", async () => {
       const result = findTurnById(button.dataset.turnId);
       const text = result ? turnTranscriptText(result.turn, result.turnIndex) : "";
@@ -2097,7 +2101,7 @@ function bindSessionActions() {
       setAppNotice(copied ? "已复制当前轮次 transcript。" : "复制失败，请手动选择内容。", copied ? "muted" : "error");
     });
   });
-  sessionDeck.querySelectorAll(".md-code-copy-btn").forEach((button) => {
+  actionRoot.querySelectorAll(".md-code-copy-btn").forEach((button) => {
     button.addEventListener("click", async () => {
       const code = button.closest(".md-code-block, .md-diagram-block")?.querySelector("code")?.textContent || "";
       if (!code) {
@@ -2399,11 +2403,10 @@ function renderSessionCardInPlace(sessionId) {
   template.innerHTML = renderSessionCard(session).trim();
   const newArticle = template.content.firstElementChild;
   if (!(newArticle instanceof HTMLElement)) return;
-  card.className = newArticle.className;
-  card.innerHTML = newArticle.innerHTML;
-  bindSessionActions();
-  renderMermaidDiagrams(card).catch((error) => console.error(error));
-  const newBody = card.querySelector(".session-card-body");
+  card.replaceWith(newArticle);
+  bindSessionActions(newArticle);
+  renderMermaidDiagrams(newArticle).catch((error) => console.error(error));
+  const newBody = newArticle.querySelector(".session-card-body");
   if (newBody) {
     const controller = sessionStickRegistry.ensure(sessionId, newBody, { initialStuck: previousStuck });
     controller.notifyContentChanged();
