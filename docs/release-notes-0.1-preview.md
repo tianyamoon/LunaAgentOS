@@ -1,5 +1,7 @@
 # LunaAgentOS 0.1 Preview Release Notes
 
+[中文](./release-notes-0.1-preview.zh-CN.md)
+
 LunaAgentOS 0.1 Preview is a neutral desktop workspace for real AI agent sessions.
 
 This preview is intentionally small. It focuses on making real Claude Code and Hermes sessions visible, restorable, and easier to review in one Windows-first desktop workspace.
@@ -9,17 +11,19 @@ This preview is intentionally small. It focuses on making real Claude Code and H
 - A Windows-first desktop workspace for real AI agent sessions.
 - A local-first app centered on Runtime Session Cards.
 - A neutral surface for external runtime entries rather than a replacement for those runtimes.
-- A product experience backed by protocol, adapters, and the Runtime Session Model.
+- A workspace experience supported by protocol, adapters, and the Runtime Session Model.
 
 ## What works today
 
-- Claude Code can be used as a real runtime entry.
-- Hermes can be used through Windows / WSL ACP runtime instances and profiles.
-- Trae IDE is represented as an IDE-first bridge path.
-- Runtime Session Cards show output, thought, runtime events, and final response in one surface.
-- The workspace separates active sessions from archived sessions.
-- Local JSON history stores session turns.
-- Restore and read-only history states are available.
+The core value is the real session workflow: connect real runtimes, watch output and thought stream arrive in a session card, and keep local history in one place.
+
+- **Claude Code**: real runtime entry — send tasks, watch output stream, thought stream, and runtime events arrive live.
+- **Hermes**: Windows / WSL ACP runtime instances and profiles — thought, tool, plan, and usage events stream through the same card surface.
+- **Trae IDE**: represented as an IDE-first bridge path.
+- **Runtime Session Cards**: output stream, thought stream, runtime events, and final response in one surface across multiple turns.
+- **Local history**: session turns stored in local JSON for all runtime entries.
+- **Restore and archive**: sessions can be restored from local history or opened in a read-only archived state.
+- The workspace separates live sessions from archived sessions in the session list.
 - The UI supports persisted zh-CN / en-US language switching.
 
 ## What is intentionally not in 0.1

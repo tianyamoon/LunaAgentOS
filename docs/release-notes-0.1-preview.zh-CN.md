@@ -11,17 +11,19 @@ LunaAgentOS 0.1 Preview 是真实 AI Agent 会话的中立桌面工作台。
 - Windows 优先的真实 AI Agent 会话桌面工作台。
 - 以 Runtime Session Card 为中心的本地优先 app。
 - 面向外部 runtime entries 的中立界面，而不是这些 runtime 的替代品。
-- 由 protocol、adapters 和 Runtime Session Model 支撑的产品体验。
+- 由 protocol、adapters 和 Runtime Session Model 支撑的工作台体验。
 
 ## What works today
 
-- Claude Code 可以作为真实 runtime entry 使用。
-- Hermes 可以通过 Windows / WSL ACP runtime instance 和 profile 使用。
-- Trae IDE 被表达为 IDE-first bridge path。
-- Runtime Session Cards 在同一界面展示 output、thought、runtime events 和 final response。
-- 工作台区分 active sessions 和 archived sessions。
-- 本地 JSON history 保存 session turns。
-- 已有 restore 和 read-only history states。
+核心价值是真实的 session workflow：连接真实 runtime，看到 output 和 thought stream 实时到达 session card，并把本地历史留在一个地方。
+
+- **Claude Code**：真实 runtime entry —— 发送任务，实时看到 output stream、thought stream 和 runtime events。
+- **Hermes**：Windows / WSL ACP runtime instance 和 profile —— thought、tool、plan、usage events 通过同一张 card 界面流出。
+- **Trae IDE**：被表达为 IDE-first bridge path。
+- **Runtime Session Cards**：在同一界面跨多个 turn 展示 output stream、thought stream、runtime events 和 final response。
+- **本地历史**：所有 runtime entry 的 session turns 均保存在本地 JSON 中。
+- **恢复与归档**：会话可以从本地历史恢复，或以只读归档状态打开。
+- 工作台在 session list 中区分 live sessions 和 archived sessions。
 - UI 支持持久化的 zh-CN / en-US 语言切换。
 
 ## What is intentionally not in 0.1
