@@ -5,6 +5,11 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      tag_name:
+        description: Existing tag to publish or refresh, for example v0.1.0-preview
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -22,6 +27,18 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Resolve release tag
+        id: release_meta
+        run: |
+          $tag = if ("${{ github.ref_type }}" -eq "tag" -and "${{ github.ref_name }}") {
+            "${{ github.ref_name }}"
+          } elseif ("${{ github.event.inputs.tag_name }}") {
+            "${{ github.event.inputs.tag_name }}"
+          } else {
+            "manual-${{ github.run_number }}"
+          }
+          "tag=$tag" >> $env:GITHUB_OUTPUT
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -57,7 +74,7 @@ jobs:
       - name: Package release asset
         id: package
         run: |
-          $tag = if ("${{ github.ref_type }}" -eq "tag") { "${{ github.ref_name }}" } else { "manual-${{ github.run_number }}" }
+          $tag = "${{ steps.release_meta.outputs.tag }}"
           $version = (Get-Content package.json | ConvertFrom-Json).version
           $assetBase = "LunaAgentOS-$tag-windows-x64-no-bundle"
           $assetDir = Join-Path $env:RUNNER_TEMP $assetBase
@@ -78,6 +95,21 @@ jobs:
           "asset_sha=$hashPath" >> $env:GITHUB_OUTPUT
           "version=$version" >> $env:GITHUB_OUTPUT
 
+      - name: Prepare GitHub release notes
+        id: release_notes
+        run: |
+          $repo = "${{ github.repository }}"
+          $tag = "${{ steps.release_meta.outputs.tag }}"
+          $notesPath = "../../docs/release-notes-0.1-preview.md"
+          $notes = Get-Content $notesPath -Raw
+          $zhReleaseNotesUrl = "https://github.com/$repo/blob/$tag/docs/release-notes-0.1-preview.zh-CN.md"
+          $enGettingStartedUrl = "https://github.com/$repo/blob/$tag/docs/getting-started.md"
+          $notes = $notes.Replace("(./release-notes-0.1-preview.zh-CN.md)", "($zhReleaseNotesUrl)")
+          $notes = $notes.Replace("(./getting-started.md)", "($enGettingStartedUrl)")
+          $outPath = Join-Path $env:RUNNER_TEMP "release-notes-$tag.md"
+          Set-Content -Path $outPath -Value $notes
+          "path=$outPath" >> $env:GITHUB_OUTPUT
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -87,11 +119,12 @@ jobs:
             ${{ steps.package.outputs.asset_sha }}
 
       - name: Publish GitHub release
-        if: github.ref_type == 'tag'
+        if: github.ref_type == 'tag' || github.event.inputs.tag_name != ''
         uses: softprops/action-gh-release@v2
         with:
-          name: LunaAgentOS ${{ github.ref_name }}
-          body_path: docs/release-notes-0.1-preview.md
+          tag_name: ${{ steps.release_meta.outputs.tag }}
+          name: LunaAgentOS ${{ steps.release_meta.outputs.tag }}
+          body_path: ${{ steps.release_notes.outputs.path }}
           prerelease: true
           files: |
             ${{ steps.package.outputs.asset_zip }}
