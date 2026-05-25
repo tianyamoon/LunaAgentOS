@@ -12,33 +12,33 @@
 
 LunaAgentOS 是真实 AI Agent 会话的中立桌面工作台。
 
-当前它是一个 Windows 优先的应用，已经接入 Claude Code 和 Hermes：你可以选择 runtime 入口，把任务发给真实 session，实时观察输出、thought 和 runtime 事件，并把本地会话历史留在一个地方。
+它是 Windows 优先的应用，当前已经能直接用于 Claude Code 和 Hermes。选择一个 runtime 入口，把真实任务发进 live session，实时看到输出、thought 和 runtime 事件，并从本地历史回到这个会话。
 
-Protocol、adapters 和 Runtime Session Model 是这个桌面工作台背后的支撑结构。它们帮助 LunaAgentOS 连接真实外部 runtime，但不宣称替代这些外部产品。
+这不是另一个聊天壳。LunaAgentOS 关注的是让真实 agent 进程保持可见、可持续、可恢复，同时不假装替代真正运行它们的外部工具。
 
 ![LunaAgentOS 桌面预览图](./docs/assets/lunaagentos-stage1-preview-cn.svg)
 
 ## 为什么做
 
-AI Agent 会越来越强，但真实会话周围的工作空间仍然很割裂：
+AI Agent 已经足够承担真实工作，但它们的会话仍然散落在不同工具里：
 
-- 不同产品暴露不同入口：CLI、TUI、IDE、gateway、SDK 会长期共存。
-- 过程可见性不一致：有的 runtime 能持续流出 thought、tool、plan、usage，有的只有最终响应。
-- 会话历史分散在不同工具里，很难统一恢复、对比和复盘。
+- CLI、TUI、IDE、gateway、SDK 各自暴露不同部分。
+- thought、tool、plan、usage、output、final response 很少稳定地待在同一个视图里。
+- 会话历史分散在工具孤岛中，恢复、对比和复盘比任务本身还麻烦。
 
-LunaAgentOS 关注的是这些真实会话周围的桌面工作台。它把每个外部 Agent 产品视为 runtime entry，把 Runtime Session Card 做成统一承载输出、思考流、运行流、最终响应和本地历史的共享界面。
+LunaAgentOS 把 session 本身做成产品界面。每个外部 Agent 仍然是自己的 runtime entry；桌面工作台为它们提供同一张 Runtime Session Card，承载输出、思考流、运行流、最终响应和本地历史。
 
 ## 当前能做什么
 
 | 模块 | 状态 | 说明 |
 |---|---:|---|
-| LunaAgentOS App | 已可用 | Tauri 2 桌面应用，Rust Core + Web 工作台 |
-| Claude Code | 已接入 | 真实 runtime 入口 |
-| Hermes | 已接入 | Windows / WSL ACP runtime instance 与 profile |
-| Trae IDE | Bridge 路线 | IDE-first adapter 方向 |
-| Runtime Session Card | 已可用 | 输出流、思考流、运行流、最终响应同屏展示 |
-| 多会话工作台 | 已可用 | 当前发送目标、活会话、归档会话 |
-| 本地历史 | 已可用 | JSON 历史、恢复、只读归档 |
+| LunaAgentOS App | 已可用 | 打开 Windows 优先的本地桌面工作台 |
+| Claude Code | 已接入 | 把任务发进真实 Claude Code runtime session |
+| Hermes | 已接入 | 使用 Windows / WSL ACP runtime instance 与 profile |
+| Trae IDE | Bridge 路线 | 预留 IDE-first adapter 方向 |
+| Runtime Session Card | 已可用 | 同屏查看输出流、思考流、运行流和最终响应 |
+| 多会话工作台 | 已可用 | 切换发送目标，保留 live sessions，查看 archived sessions |
+| 本地历史 | 已可用 | 恢复 JSON session history，或打开只读归档 |
 | 界面语言 | 已可用 | zh-CN / en-US 本地持久化切换 |
 
 ## 快速开始

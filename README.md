@@ -12,33 +12,33 @@
 
 LunaAgentOS is a neutral desktop workspace for real AI agent sessions.
 
-Today it is a Windows-first app for Claude Code and Hermes: choose a runtime entry, send work into a real session, watch output, thought, and runtime events as they arrive, and keep local session history in one place.
+It is Windows-first and useful today with Claude Code and Hermes. Pick a runtime entry, send real work into a live session, watch output, thought, and runtime events arrive, and return to the session from local history.
 
-Protocol, adapters, and the Runtime Session Model are the supporting structure behind that workspace. They help LunaAgentOS connect real external runtimes without claiming to replace them.
+It is not another chat shell. LunaAgentOS is the place where real agent processes stay visible, durable, and recoverable without pretending to replace the tools that run them.
 
 ![LunaAgentOS desktop preview](./docs/assets/lunaagentos-stage1-preview.svg)
 
 ## Why it exists
 
-AI agents are getting stronger, but the workspace around their real sessions is still fragmented:
+AI agents are becoming powerful enough to do real work, but their sessions still disappear into separate tools:
 
-- Different products expose different surfaces: CLI, TUI, IDE, gateway, and SDK.
-- Process visibility is inconsistent: some runtimes stream thought, tool, plan, or usage events, while others only show a final answer.
-- Session history is scattered across tools and hard to restore, compare, or review.
+- CLI, TUI, IDE, gateway, and SDK surfaces all expose different parts of the work.
+- Thought, tool, plan, usage, output, and final response streams rarely live in one durable view.
+- Session history is scattered, making restore, comparison, and review harder than the work itself.
 
-LunaAgentOS focuses on the desktop workspace around those sessions. It treats each external agent product as a runtime entry and makes the Runtime Session Card the shared surface for output, thought, runtime events, final response, and local history.
+LunaAgentOS makes the session the product surface. Each external agent remains its own runtime entry; the desktop gives them a shared Runtime Session Card for output, thought, runtime events, final response, and local history.
 
 ## What you can do today
 
 | Area | Status | Notes |
 |---|---:|---|
-| LunaAgentOS App | Working | Tauri 2 desktop app with Rust core and web workspace |
-| Claude Code | Working | Real runtime entry |
-| Hermes | Working | Windows / WSL ACP runtime instances and profiles |
-| Trae IDE | Bridge path | IDE-first adapter direction |
-| Runtime Session Cards | Working | Output, thought, runtime, and final response in one surface |
-| Multi-session workspace | Working | Current send target, live sessions, archived sessions |
-| Local history | Working | JSON session history with restore and read-only states |
+| LunaAgentOS App | Working | Open a local Windows-first desktop workspace |
+| Claude Code | Working | Send tasks into a real Claude Code runtime session |
+| Hermes | Working | Use Windows / WSL ACP runtime instances and profiles |
+| Trae IDE | Bridge path | Reserved IDE-first adapter direction |
+| Runtime Session Cards | Working | See output, thought, runtime events, and final response together |
+| Multi-session workspace | Working | Switch send target, keep live sessions, inspect archived sessions |
+| Local history | Working | Restore JSON session history or open read-only archives |
 | UI language | Working | zh-CN / en-US switch persisted locally |
 
 ## Quick start
