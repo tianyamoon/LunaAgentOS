@@ -1,0 +1,98 @@
+name: Release Desktop Preview
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release-windows:
+    name: Build and Publish Windows Preview
+    runs-on: windows-latest
+
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: apps/desktop-shell
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/desktop-shell/package-lock.json
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build outputs
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            apps/desktop-shell/src-tauri -> target
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm run test:all
+
+      - name: Run undefined symbol lint
+        run: npm run lint:undef
+
+      - name: Check Rust backend
+        run: cargo check --manifest-path src-tauri/Cargo.toml
+
+      - name: Build lightweight executable
+        run: npm run tauri -- build --no-bundle
+
+      - name: Package release asset
+        id: package
+        run: |
+          $tag = if ("${{ github.ref_type }}" -eq "tag") { "${{ github.ref_name }}" } else { "manual-${{ github.run_number }}" }
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          $assetBase = "LunaAgentOS-$tag-windows-x64-no-bundle"
+          $assetDir = Join-Path $env:RUNNER_TEMP $assetBase
+          New-Item -ItemType Directory -Path $assetDir -Force | Out-Null
+          Copy-Item "src-tauri/target/release/desktop-shell.exe" (Join-Path $assetDir "LunaAgentOS.exe")
+          Copy-Item "../../LICENSE" (Join-Path $assetDir "LICENSE")
+          if (Test-Path "../../docs/release-notes-0.1-preview.md") {
+            Copy-Item "../../docs/release-notes-0.1-preview.md" (Join-Path $assetDir "RELEASE_NOTES.md")
+          }
+          $zipPath = Join-Path $env:RUNNER_TEMP "$assetBase.zip"
+          if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
+          Compress-Archive -Path (Join-Path $assetDir "*") -DestinationPath $zipPath
+          $hash = (Get-FileHash $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
+          $hashPath = Join-Path $env:RUNNER_TEMP "$assetBase.sha256"
+          Set-Content -Path $hashPath -Value "$hash  $(Split-Path $zipPath -Leaf)"
+          "asset_base=$assetBase" >> $env:GITHUB_OUTPUT
+          "asset_zip=$zipPath" >> $env:GITHUB_OUTPUT
+          "asset_sha=$hashPath" >> $env:GITHUB_OUTPUT
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.asset_base }}
+          path: |
+            ${{ steps.package.outputs.asset_zip }}
+            ${{ steps.package.outputs.asset_sha }}
+
+      - name: Publish GitHub release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: LunaAgentOS ${{ github.ref_name }}
+          body_path: docs/release-notes-0.1-preview.md
+          prerelease: true
+          files: |
+            ${{ steps.package.outputs.asset_zip }}
+            ${{ steps.package.outputs.asset_sha }}
