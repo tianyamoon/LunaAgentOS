@@ -54,14 +54,6 @@ import {
   toggleLanguage as toggleLanguagePref,
 } from "./i18n/index.js";
 import {
-  buildLaunchDemoHistoryEntries,
-  buildLaunchDemoSessions,
-  createDemoTurn,
-  demoTimestamp,
-  isDemoSession,
-  isDemoSessionId,
-} from "./launchDemo/index.js";
-import {
   archivedSessionsFromHistory as archivedSessionsFromHistoryRaw,
   historySessionKey,
 } from "./history/entries.js";
@@ -251,7 +243,6 @@ const newSessionToggle = document.getElementById("newSessionToggle");
 const sendBtn = document.getElementById("sendBtn");
 const sendModeBtn = document.getElementById("sendModeBtn");
 const fontScaleBtn = document.getElementById("fontScaleBtn");
-const demoSceneBtn = document.getElementById("demoSceneBtn");
 const languageBtn = document.getElementById("languageBtn");
 const confirmDialog = document.getElementById("confirmDialog");
 
@@ -271,11 +262,9 @@ let sessionSeq = 0;
 let turnSeq = 0;
 let runningSessions = 0;
 let isHistoryLoading = true;
-let isLaunchDemoScene = false;
 let sendAsNewSession = false;
 let sendMode = localStorage.getItem(SEND_MODE_KEY) || "enter";
 let fontScaleId = localStorage.getItem(FONT_SCALE_KEY) || "default";
-let demoHistoryEntries = [];
 let runtimeConfigSnapshot = null;
 let agentBriefs = {};
 const deletedSessionIds = sessionsStore.getDeletedSessionIdsRef();
@@ -480,7 +469,7 @@ function agentById(id) {
   const staticAgent = providers.flatMap((provider) => provider.agents).find((agent) => agent.id === id);
   if (!staticAgent) return null;
   const managedByRuntimeProbe = runtimeInstancesForProvider(staticAgent.providerId).length > 0;
-  if (managedByRuntimeProbe && !staticAgent.isArchivedAgent && !staticAgent.id.includes("-demo-")) return null;
+  if (managedByRuntimeProbe && !staticAgent.isArchivedAgent) return null;
   return staticAgent;
 }
 
@@ -803,14 +792,11 @@ function openConfirmDialog({ title, message, confirmLabel = t("common.delete"), 
 
 function updateActionLabels() {
   const composingNewSession = isComposingNewSession();
-  sendBtn.textContent = isLaunchDemoScene ? t("composer.demo") : t("composer.send");
-  sendBtn.disabled = isLaunchDemoScene;
-  newSessionToggle.disabled = isLaunchDemoScene;
+  sendBtn.textContent = t("composer.send");
   newSessionToggle.classList.toggle("is-active", composingNewSession);
   newSessionToggle.setAttribute("aria-pressed", String(composingNewSession));
-  composer?.classList.toggle("is-new-session-mode", !isLaunchDemoScene && composingNewSession);
-  composer?.classList.toggle("is-current-session-mode", !isLaunchDemoScene && !composingNewSession);
-  if (demoSceneBtn) demoSceneBtn.textContent = isLaunchDemoScene ? t("topbar.clearDemo") : t("topbar.demo");
+  composer?.classList.toggle("is-new-session-mode", composingNewSession);
+  composer?.classList.toggle("is-current-session-mode", !composingNewSession);
   updatePromptPlaceholder();
 }
 
@@ -1718,90 +1704,6 @@ function prependHermesStartupNoticeIfNeeded(session, turn) {
 }
 
 
-
-function ensureLaunchDemoHermesAgent() {
-  const hermesProvider = providerById("hermes");
-  if (!hermesProvider) return null;
-  const existing = agentById("hermes-demo-ailearning");
-  if (existing) return existing;
-  const agent = {
-    id: "hermes-demo-ailearning",
-    providerId: "hermes",
-    name: "ailearning",
-    subtitle: "WSL Profile · Gateway",
-    note: t("launchDemo.hermesNote"),
-    state: 3,
-    profileName: "ailearning",
-    model: "MiniMax M2",
-    gateway: "Gateway API",
-    alias: "ailearning",
-    profileAlias: "ailearning",
-    profileExecutable: "ailearning",
-    skillCount: 4,
-    hasSoul: true,
-  };
-  providersStore.appendProviderAgent("hermes", agent);
-  return agent;
-}
-
-function removeLaunchDemoHermesAgent() {
-  const hermesProvider = providerById("hermes");
-  if (!hermesProvider) return;
-  providersStore.removeProviderAgent("hermes", "hermes-demo-ailearning");
-}
-
-
-
-function activateLaunchDemoScene() {
-  ensureLaunchDemoHermesAgent();
-  isLaunchDemoScene = true;
-  isHistoryLoading = false;
-  demoHistoryEntries = buildLaunchDemoHistoryEntries(HISTORY_SCHEMA_VERSION);
-  sessionsStore.batch(() => {
-    sessionsStore.replaceSessions([
-      ...buildLaunchDemoSessions(),
-      ...sessions.filter((session) => !session.id.startsWith("demo-session-")),
-    ]);
-    sessionsStore.setCurrentSessionId("demo-session-hermes-live");
-    sessionsStore.markActive("demo-session-hermes-live");
-    sessionsStore.markActive("demo-session-claude-review");
-  });
-  currentTargetAgentId = "hermes-demo-ailearning";
-  ["demo-turn-hermes-live:thoughts", "demo-turn-hermes-live:logs", "demo-turn-claude-review:logs"].forEach((key) => {
-    flowDetailOpenState.set(key, true);
-  });
-  document.body.classList.add("is-launch-demo");
-  renderProviders();
-  renderWorkspace();
-  renderHistory();
-  updateActionLabels();
-  setAppNotice(t("launchDemo.loadedNotice"));
-}
-
-
-function leaveLaunchDemoScene() {
-  isLaunchDemoScene = false;
-  demoHistoryEntries = [];
-  sessionsStore.batch(() => {
-    sessionsStore.filterSessions((session) => !isDemoSession(session));
-    sessionsStore.replaceActiveSessionIds(
-      [...activeSessionIds].filter((sessionId) => !sessionId.startsWith("demo-session-")),
-    );
-    if (sessionsStore.getCurrentSessionId()?.startsWith("demo-session-")) {
-      sessionsStore.setCurrentSessionId(null);
-    }
-  });
-  if (currentTargetAgentId === "hermes-demo-ailearning") currentTargetAgentId = "claude-main";
-  removeLaunchDemoHermesAgent();
-  ensureCurrentTargetAgentExists();
-  document.body.classList.remove("is-launch-demo");
-  renderProviders();
-  renderWorkspace();
-  renderHistory();
-  updateActionLabels();
-  setAppNotice(t("launchDemo.clearedNotice"));
-}
-
 function getOrCreateActiveSession(task, forceNew = false) {
   const agent = currentTargetAgent();
   if (!agent) return null;
@@ -1903,7 +1805,7 @@ function countRestorableActiveHistoryItems() {
 function renderWorkspaceStatus() {
   const agent = currentTargetAgent();
   const provider = currentTargetProvider();
-  const countedSessions = isLaunchDemoScene ? sessions.filter(isDemoSession) : sessions;
+  const countedSessions = sessions;
   const liveCount = countedSessions.filter((session) => sessionRuntimeState(session) === "live").length;
   if (!agent || !provider) {
     workspaceStatus.textContent = t("composer.placeholderNoTarget");
@@ -2584,14 +2486,6 @@ async function deleteSession(sessionId) {
     return;
   }
   if (!session && !archived) return;
-  if (isLaunchDemoScene && sessionId.startsWith("demo-session-")) {
-    sessionsStore.removeSessionById(sessionId);
-    demoHistoryEntries = demoHistoryEntries.filter((entry) => historySessionKey(entry) !== sessionId);
-    renderWorkspace();
-    renderHistory();
-    setAppNotice(t("session.deleteDemoRemoved"));
-    return;
-  }
   try {
     if (session) {
       setSessionLifecycle(session, LIFECYCLE.deleted);
@@ -2608,7 +2502,6 @@ async function deleteSession(sessionId) {
     removeSessionFromWorkspace(sessionId);
     const result = await invoke("delete_history_session_entries", { sessionId });
     historyEntries = historyEntries.filter((entry) => historySessionKey(entry) !== sessionId);
-    demoHistoryEntries = demoHistoryEntries.filter((entry) => historySessionKey(entry) !== sessionId);
     renderWorkspace();
     renderHistory();
     const skipped = result?.skippedFiles ? t("session.deleteSkippedFiles", { count: result.skippedFiles }) : "";
@@ -2637,10 +2530,8 @@ function renderWorkspace(options = {}) {
   const deckScrollLeft = sessionDeck.scrollLeft;
   const deckScrollTop = sessionDeck.scrollTop;
   const stickyIntent = sampleSessionStickyIntent();
-  const workspaceSessions = isLaunchDemoScene ? sessions.filter(isDemoSession) : sessions;
+  const workspaceSessions = sessions;
   const visibleSessions = [...workspaceSessions].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
-  document.body.classList.toggle("is-launch-demo", isLaunchDemoScene);
-  sessionDeck.classList.toggle("is-launch-demo", isLaunchDemoScene);
   updatePromptPlaceholder();
   renderWorkspaceStatus();
   workspaceEmpty.style.display = visibleSessions.length ? "none" : "flex";
@@ -2763,13 +2654,13 @@ function syncSessionStickControllers(visibleSessions, stickyIntent) {
 
 
 function readableHistoryEntries() {
-  return isLaunchDemoScene ? demoHistoryEntries : [...demoHistoryEntries, ...historyEntries];
+  return [...historyEntries];
 }
 
 
 
 function sessionListItems() {
-  const sourceSessions = isLaunchDemoScene ? sessions.filter(isDemoSession) : sessions;
+  const sourceSessions = sessions;
   const liveItems = sourceSessions.map((session) => {
     const identitySession = normalizeWorkspaceSession(session);
     const lastTurn = session.turns.at(-1);
@@ -3271,10 +3162,6 @@ async function startAcpSession(session, turn) {
 }
 
 function startSessionFromPrompt(forceNewSession = false) {
-  if (isLaunchDemoScene) {
-    setAppNotice(t("composer.demoBlocked"), "busy");
-    return;
-  }
   const task = promptBox.value.trim();
   if (!task) {
     promptBox.focus();
@@ -3344,14 +3231,6 @@ fontScaleBtn?.addEventListener("click", () => {
 
 languageBtn?.addEventListener("click", () => {
   toggleLanguage();
-});
-
-demoSceneBtn?.addEventListener("click", () => {
-  if (isLaunchDemoScene) {
-    leaveLaunchDemoScene();
-    return;
-  }
-  activateLaunchDemoScene();
 });
 
 promptBox.addEventListener("keydown", (event) => {

@@ -294,10 +294,6 @@ button:disabled {
   min-height: 0;
 }
 
-body.is-launch-demo .layout {
-  grid-template-columns: 260px minmax(0, 1fr) 300px;
-}
-
 .panel {
   background: var(--panel);
   border: 1px solid var(--border);
@@ -1190,14 +1186,6 @@ body.is-launch-demo .layout {
   height: 100%;
 }
 
-.session-deck.is-launch-demo {
-  grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
-  grid-auto-rows: minmax(0, 1fr);
-}
-
-.session-deck.is-launch-demo .session-card {
-  height: 100%;
-}
 
 .session-card {
   position: relative;
