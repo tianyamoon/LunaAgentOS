@@ -82,8 +82,17 @@ import {
   targetsForRuntimeInstance as targetsForRuntimeInstanceRaw,
 } from "./providers/runtimeView.js";
 import {
+  agentBriefTargetKey,
+  briefRecordForTarget,
+  explicitBriefText,
+  fallbackBriefKeyForTarget,
+  providerStatusForFleet,
+  targetStatusForFleet,
+} from "./providers/agentMetadata.js";
+import {
   applyEventsToTurn,
   applyStreamEventToTurn,
+  sessionSectionsFromEvents,
 } from "./runtime/streamEvents.js";
 
 const { invoke } = window.__TAURI__.core;
@@ -267,6 +276,8 @@ let sendAsNewSession = false;
 let sendMode = localStorage.getItem(SEND_MODE_KEY) || "enter";
 let fontScaleId = localStorage.getItem(FONT_SCALE_KEY) || "default";
 let demoHistoryEntries = [];
+let runtimeConfigSnapshot = null;
+let agentBriefs = {};
 const deletedSessionIds = sessionsStore.getDeletedSessionIdsRef();
 const stoppedSessionIds = sessionsStore.getStoppedSessionIdsRef();
 const flowDetailOpenState = sessionsStore.getFlowDetailOpenStateRef();
@@ -488,6 +499,71 @@ function displayAgentName(agent) {
 
 function displayAgentNote(agent) {
   return agent?.noteKey ? t(agent.noteKey) : agent?.note || "";
+}
+
+function normalizedAgentBriefs(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+async function loadRuntimeConfigState() {
+  const config = await invoke("load_runtime_config");
+  runtimeConfigSnapshot = config || {};
+  agentBriefs = normalizedAgentBriefs(runtimeConfigSnapshot.agentBriefs);
+  return runtimeConfigSnapshot;
+}
+
+async function ensureRuntimeConfigState() {
+  if (runtimeConfigSnapshot) return runtimeConfigSnapshot;
+  return loadRuntimeConfigState();
+}
+
+async function saveAgentBriefRecords(nextBriefs) {
+  const current = await invoke("load_runtime_config");
+  const config = {
+    ...(current || {}),
+    agentBriefs: normalizedAgentBriefs(nextBriefs),
+  };
+  const saved = await invoke("save_runtime_config", { config });
+  runtimeConfigSnapshot = saved || config;
+  agentBriefs = normalizedAgentBriefs(runtimeConfigSnapshot.agentBriefs);
+  return agentBriefs;
+}
+
+function cloneAgentBriefs() {
+  return JSON.parse(JSON.stringify(normalizedAgentBriefs(agentBriefs)));
+}
+
+function targetBriefRecord(target, language = getLanguage()) {
+  return briefRecordForTarget(agentBriefs, target, language);
+}
+
+function targetBriefText(target) {
+  const record = targetBriefRecord(target);
+  if (record?.text) return record.text;
+  const explicit = explicitBriefText(target);
+  if (explicit) return explicit;
+  return t(fallbackBriefKeyForTarget(target));
+}
+
+function targetBriefInputValue(target, language) {
+  return targetBriefRecord(target, language)?.text || "";
+}
+
+function writeBriefValue(nextBriefs, target, language, value, source = "manual") {
+  const key = agentBriefTargetKey(target);
+  if (!key) return;
+  if (!nextBriefs[key] || typeof nextBriefs[key] !== "object") nextBriefs[key] = {};
+  const text = String(value || "").trim();
+  if (!text) {
+    delete nextBriefs[key][language];
+    if (!Object.keys(nextBriefs[key]).length) delete nextBriefs[key];
+    return;
+  }
+  nextBriefs[key][language] = {
+    text,
+    source,
+    updatedAt: new Date().toISOString(),
+  };
 }
 
 function displayProviderNote(provider) {
@@ -907,6 +983,208 @@ function runtimeInstanceDetailMarkup(instance) {
   return lines.map((line) => `<small>${escapeHtml(line)}</small>`).join("");
 }
 
+function agentBriefPrompt() {
+  return [
+    "请用10个字以内给自己起一个普通用户一眼能看懂的职责标题。只返回标题，不要解释，不要标点。",
+    "Give yourself a clear role title in 4 words or fewer. Return only the title. No punctuation.",
+    "Return both titles in strict JSON only.",
+    "Return strict JSON only: {\"zh-CN\":\"...\",\"en-US\":\"...\"}",
+  ].join("\n");
+}
+
+function sanitizeBriefText(value, language) {
+  const text = String(value || "")
+    .replace(/^[`"“”'‘’\s]+|[`"“”'‘’\s]+$/g, "")
+    .replace(/[。.!！?？,，;；:：]+$/g, "")
+    .trim();
+  if (!text) return "";
+  if (language === "en-US") return text.split(/\s+/).slice(0, 4).join(" ");
+  return Array.from(text).slice(0, 10).join("");
+}
+
+function parseAgentBriefResponse(text) {
+  const raw = String(text || "").trim();
+  if (!raw) throw new Error(t("agentBrief.emptyResponse"));
+  const jsonText = raw.match(/\{[\s\S]*\}/)?.[0] || raw;
+  const parsed = JSON.parse(jsonText);
+  const zh = sanitizeBriefText(parsed["zh-CN"] || parsed.zh || parsed.zhCN, "zh-CN");
+  const en = sanitizeBriefText(parsed["en-US"] || parsed.en || parsed.enUS, "en-US");
+  if (!zh || !en) throw new Error(t("agentBrief.invalidResponse"));
+  return { "zh-CN": zh, "en-US": en };
+}
+
+async function fetchAgentBriefForTarget(target) {
+  if (!target || !isTargetSendable(target)) throw new Error(t("agentBrief.targetUnavailable"));
+  const commands = acpCommandsForProvider(target.providerId);
+  if (!commands?.prompt) throw new Error(t("agentBrief.autoUnsupported"));
+  const prompt = agentBriefPrompt();
+  const session = createSessionForAgent(target, prompt);
+  if (!session) throw new Error(t("agentBrief.autoUnsupported"));
+  saveCurrentTargetAgent(target.id);
+  saveCurrentSession(session.id);
+  stoppedSessionIds.delete(session.id);
+  const turn = createTurn(session, prompt);
+  closeConfirmDialog();
+  renderProviders();
+  renderWorkspace({ scrollSessionId: session.id });
+  renderHistory({ scrollSessionId: session.id });
+  await startAcpSession(session, turn);
+  const response = turn.finalResponse || turn.outputs.join("\n");
+  return parseAgentBriefResponse(response);
+}
+
+async function refreshAgentBriefForTarget(target, { quiet = false } = {}) {
+  if (!target) return null;
+  if (!quiet) setAppNotice(t("agentBrief.fetching", { target: targetDisplayName(target) }), "busy");
+  const result = await fetchAgentBriefForTarget(target);
+  const next = cloneAgentBriefs();
+  writeBriefValue(next, target, "zh-CN", result["zh-CN"], "agent-session");
+  writeBriefValue(next, target, "en-US", result["en-US"], "agent-session");
+  await saveAgentBriefRecords(next);
+  renderProviders();
+  if (!quiet) setAppNotice(t("agentBrief.fetched", { target: targetDisplayName(target) }));
+  return result;
+}
+
+function agentBriefRowMarkup(target, index) {
+  const sendable = isTargetSendable(target);
+  return `
+    <article class="agent-brief-row" data-agent-id="${escapeHtml(target.id)}">
+      <div class="agent-brief-row-header">
+        <strong>${escapeHtml(targetDisplayName(target) || displayAgentName(target))}</strong>
+        <button type="button" class="mini-btn ghost-btn agent-brief-row-fetch" data-agent-id="${escapeHtml(target.id)}" ${sendable ? "" : "disabled"}>${t("agentBrief.autoFetch")}</button>
+      </div>
+      <label>
+        <span>${t("agentBrief.zhLabel")}</span>
+        <input class="agent-brief-input" data-agent-id="${escapeHtml(target.id)}" data-language="zh-CN" name="brief-${index}-zh" value="${escapeHtml(targetBriefInputValue(target, "zh-CN"))}" placeholder="${escapeHtml(t(fallbackBriefKeyForTarget(target)))}" />
+      </label>
+      <label>
+        <span>${t("agentBrief.enLabel")}</span>
+        <input class="agent-brief-input" data-agent-id="${escapeHtml(target.id)}" data-language="en-US" name="brief-${index}-en" value="${escapeHtml(targetBriefInputValue(target, "en-US"))}" placeholder="${escapeHtml(t("agentBrief.placeholderEn"))}" />
+      </label>
+    </article>
+  `;
+}
+
+async function saveBriefInputs(root) {
+  const next = cloneAgentBriefs();
+  root.querySelectorAll(".agent-brief-input").forEach((input) => {
+    const target = agentById(input.dataset.agentId);
+    if (!target) return;
+    writeBriefValue(next, target, input.dataset.language, input.value, "manual");
+  });
+  await saveAgentBriefRecords(next);
+  renderProviders();
+}
+
+function briefInputFor(root, targetId, language) {
+  return [...root.querySelectorAll(".agent-brief-input")]
+    .find((input) => input.dataset.agentId === targetId && input.dataset.language === language) || null;
+}
+
+async function autoFetchBriefButtons(root) {
+  root.querySelectorAll(".agent-brief-row-fetch").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const target = agentById(button.dataset.agentId);
+      if (!target) return;
+      button.disabled = true;
+      try {
+        const result = await refreshAgentBriefForTarget(target);
+        const zhInput = briefInputFor(root, target.id, "zh-CN");
+        const enInput = briefInputFor(root, target.id, "en-US");
+        if (zhInput) zhInput.value = result["zh-CN"];
+        if (enInput) enInput.value = result["en-US"];
+      } catch (error) {
+        console.error(error);
+        setAppNotice(t("agentBrief.fetchFailed", { error: formatBackendError(error) }), "error");
+      } finally {
+        button.disabled = !isTargetSendable(target);
+      }
+    });
+  });
+}
+
+async function autoFetchProviderBriefs(providerId, root) {
+  const targets = targetsForProvider(providerId).filter(isTargetSendable);
+  if (!targets.length) {
+    setAppNotice(t("agentBrief.noSendableTargets"), "error");
+    return;
+  }
+  for (let index = 0; index < targets.length; index += 1) {
+    const target = targets[index];
+    setAppNotice(t("agentBrief.fetchingProgress", {
+      current: index + 1,
+      total: targets.length,
+      target: targetDisplayName(target),
+    }), "busy");
+    const result = await refreshAgentBriefForTarget(target, { quiet: true });
+    const zhInput = briefInputFor(root, target.id, "zh-CN");
+    const enInput = briefInputFor(root, target.id, "en-US");
+    if (zhInput) zhInput.value = result["zh-CN"];
+    if (enInput) enInput.value = result["en-US"];
+  }
+  setAppNotice(t("agentBrief.fetchAllComplete", { count: targets.length }));
+}
+
+async function openAgentBriefManager(agentId) {
+  const target = agentById(agentId);
+  if (!target || !confirmDialog) return;
+  try {
+    await ensureRuntimeConfigState();
+    confirmDialog.hidden = false;
+    confirmDialog.innerHTML = `
+      <form class="confirm-dialog agent-brief-dialog" role="dialog" aria-modal="true" aria-labelledby="agentBriefTitle">
+        <div class="confirm-dialog-header">
+          <span class="runtime-config-icon" aria-hidden="true">●</span>
+          <div>
+            <h3 id="agentBriefTitle">${t("agentBrief.title")}</h3>
+            <p class="runtime-config-subtitle">${escapeHtml(targetDisplayName(target))}</p>
+          </div>
+          <button type="button" class="confirm-dialog-close agent-brief-close" aria-label="${t("common.close")}">×</button>
+        </div>
+        <div class="runtime-config-body agent-brief-body">
+          ${agentBriefRowMarkup(target, 0)}
+        </div>
+        <div class="confirm-dialog-actions runtime-config-actions">
+          <button type="button" class="confirm-dialog-cancel agent-brief-close">${t("common.cancel")}</button>
+          <button type="submit" class="primary">${t("common.save")}</button>
+        </div>
+      </form>
+    `;
+    confirmDialog.querySelectorAll(".agent-brief-close").forEach((button) => {
+      button.addEventListener("click", closeConfirmDialog);
+    });
+    await autoFetchBriefButtons(confirmDialog);
+    confirmDialog.querySelector(".agent-brief-dialog")?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      await saveBriefInputs(confirmDialog);
+      closeConfirmDialog();
+      setAppNotice(t("agentBrief.saved"));
+    });
+  } catch (error) {
+    console.error(error);
+    setAppNotice(t("agentBrief.openFailed", { error: formatBackendError(error) }), "error");
+  }
+}
+
+function providerBriefSectionMarkup(providerId) {
+  const targets = targetsForProvider(providerId);
+  const rows = targets.map(agentBriefRowMarkup).join("");
+  return `
+    <section class="runtime-config-section agent-brief-section">
+      <div class="agent-brief-section-header">
+        <div>
+          <h4>${t("agentBrief.sectionTitle")}</h4>
+          <p>${t("agentBrief.sectionSubtitle")}</p>
+        </div>
+        <button type="button" class="mini-btn ghost-btn agent-brief-fetch-all" ${targets.some(isTargetSendable) ? "" : "disabled"}>${t("agentBrief.autoFetchAll")}</button>
+      </div>
+      <div class="agent-brief-list">${rows || `<p class="connection-empty">${t("provider.noTargets")}</p>`}</div>
+      <button type="button" class="mini-btn agent-brief-save-all">${t("agentBrief.saveAll")}</button>
+    </section>
+  `;
+}
+
 async function openProviderManager(providerId = currentTargetProvider()?.id || "claude") {
   if (!confirmDialog) {
     await openProviderManagerPrompt();
@@ -914,6 +1192,7 @@ async function openProviderManager(providerId = currentTargetProvider()?.id || "
   }
   try {
     const selectedProviderId = providerId || "claude";
+    await ensureRuntimeConfigState();
     const selectedProvider = providerById(selectedProviderId) || { id: selectedProviderId, name: selectedProviderId };
     const selectedAvailability = providerAvailability(selectedProviderId);
     const selectedState = providerAvailabilityLabel(selectedAvailability.summary);
@@ -961,6 +1240,7 @@ async function openProviderManager(providerId = currentTargetProvider()?.id || "
             <h4>${t("connection.detected")}</h4>
             <div class="connection-instance-list">${instanceMarkup}</div>
           </section>
+          ${providerBriefSectionMarkup(selectedProviderId)}
         </div>
         <div class="confirm-dialog-actions runtime-config-actions">
           <button type="button" class="confirm-dialog-cancel runtime-config-close">${t("common.close")}</button>
@@ -975,6 +1255,28 @@ async function openProviderManager(providerId = currentTargetProvider()?.id || "
     confirmDialog.querySelector(".runtime-config-legacy")?.addEventListener("click", async () => {
       closeConfirmDialog();
       await openProviderManagerPrompt();
+    });
+    await autoFetchBriefButtons(confirmDialog);
+    confirmDialog.querySelector(".agent-brief-save-all")?.addEventListener("click", async () => {
+      try {
+        await saveBriefInputs(confirmDialog);
+        setAppNotice(t("agentBrief.saved"));
+      } catch (error) {
+        console.error(error);
+        setAppNotice(t("agentBrief.saveFailed", { error: formatBackendError(error) }), "error");
+      }
+    });
+    confirmDialog.querySelector(".agent-brief-fetch-all")?.addEventListener("click", async (event) => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      try {
+        await autoFetchProviderBriefs(selectedProviderId, confirmDialog);
+      } catch (error) {
+        console.error(error);
+        setAppNotice(t("agentBrief.fetchFailed", { error: formatBackendError(error) }), "error");
+      } finally {
+        button.disabled = !targetsForProvider(selectedProviderId).some(isTargetSendable);
+      }
     });
     confirmDialog.querySelector(".runtime-config-dialog")?.addEventListener("submit", async (event) => {
       event.preventDefault();
@@ -1146,7 +1448,9 @@ function runtimeConnectionNote(provider, instances) {
 function renderRuntimeTarget(target) {
   const sendable = isTargetSendable(target);
   const selected = sendable && target.id === currentTargetAgentId;
-  const subtitle = compactTargetSubtitle(target) || target.subtitle || "";
+  const status = target.status || targetStatusForFleet(target);
+  const statusLabel = t(status.labelKey);
+  const subtitle = targetBriefText(target);
   const name = displayAgentName(target);
   const shouldShowRuntimeLabel = target.runtimeLabel && !name.includes(target.runtimeLabel);
   const entryClass = selected ? "is-main-agent" : sendable ? "is-selectable" : "is-unavailable";
@@ -1157,7 +1461,11 @@ function renderRuntimeTarget(target) {
     <div class="agent-entry ${entryClass}" data-agent-id="${target.id}" data-sendable="${String(sendable)}"${disabledAttrs}>
       <div class="agent-entry-top">
         <strong>${escapeHtml(name)}</strong>
-        ${shouldShowRuntimeLabel ? `<span class="target-runtime-label">${escapeHtml(target.runtimeLabel)}</span>` : ""}
+        <span class="agent-entry-meta">
+          <span class="target-status-dot ${escapeHtml(status.className)}" title="${escapeHtml(statusLabel)}" aria-label="${escapeHtml(statusLabel)}"></span>
+          ${shouldShowRuntimeLabel ? `<span class="target-runtime-label">${escapeHtml(target.runtimeLabel)}</span>` : ""}
+          <button type="button" class="agent-brief-btn" data-agent-id="${escapeHtml(target.id)}" title="${t("agentBrief.manage")}" aria-label="${t("agentBrief.manage")}">⚙</button>
+        </span>
       </div>
       ${subtitle ? `<div class="agent-entry-sub">${escapeHtml(subtitle)}</div>` : ""}
     </div>
@@ -1170,9 +1478,9 @@ function renderProviders() {
 
   providers.forEach((provider) => {
     const group = document.createElement("section");
-    group.className = "provider-group";
     const availability = providerAvailability(provider.id);
-    const availabilityLabel = providerAvailabilityLabel(availability.summary);
+    const providerStatus = providerStatusForFleet(provider, availability);
+    const availabilityLabel = t(providerStatus.labelKey);
     const instances = runtimeInstancesForProvider(provider.id);
     const targets = targetsForProvider(provider.id);
     const metaLabel = providerMetaLabel(provider, targets, instances);
@@ -1184,15 +1492,11 @@ function renderProviders() {
       : provider.id === "hermes"
         ? t("provider.noHermesRuntime")
         : t("provider.noRuntime");
-    const statusClass = availability.available
-      ? (availability.summary === "partial" ? "is-partial" : "is-available")
-      : provider.id === "trae"
-        ? "is-planned"
-        : "is-unavailable";
     const collapsed = collapsedProviderIds.has(provider.id);
     const collapseLabel = collapsed
       ? t("provider.expand", { provider: provider.name })
       : t("provider.collapse", { provider: provider.name });
+    group.className = `provider-group ${providerStatus.mutedCard ? "is-muted-status" : ""}`;
     group.classList.toggle("is-collapsed", collapsed);
 
     group.innerHTML = `
@@ -1202,7 +1506,7 @@ function renderProviders() {
           <div class="provider-heading">
             <div class="provider-title-row">
               <strong>${provider.name}</strong>
-              <span class="provider-status-dot ${statusClass}" title="${escapeHtml(availabilityLabel)}" aria-label="${escapeHtml(availabilityLabel)}"></span>
+              <span class="provider-status-square ${providerStatus.className}" title="${escapeHtml(availabilityLabel)}" aria-label="${escapeHtml(availabilityLabel)}"></span>
             </div>
             <div class="provider-meta-row">
               <span class="provider-count-badge">${escapeHtml(metaLabel)}</span>
@@ -1230,6 +1534,13 @@ function renderProviders() {
     button.addEventListener("click", (event) => {
       event.stopPropagation();
       openProviderManager(button.dataset.providerId);
+    });
+  });
+
+  agentList.querySelectorAll(".agent-brief-btn").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      openAgentBriefManager(button.dataset.agentId);
     });
   });
 
@@ -1325,9 +1636,8 @@ function hermesProfileMetaFromArchived(archived) {
   return archived?.hermesProfile || archived?.turns?.find((turn) => turn.meta?.hermesProfile)?.meta?.hermesProfile || null;
 }
 
-function createSession(firstTask) {
-  const agent = currentTargetAgent();
-  const provider = currentTargetProvider();
+function createSessionForAgent(agent, firstTask) {
+  const provider = providerById(agent?.providerId);
   if (!agent || !provider) return null;
 
   const hermesProfile = hermesProfileMetaFromAgent(agent);
@@ -1368,6 +1678,10 @@ function createSession(firstTask) {
   renderWorkspace();
   renderHistory();
   return session;
+}
+
+function createSession(firstTask) {
+  return createSessionForAgent(currentTargetAgent(), firstTask);
 }
 
 function createTurn(session, task) {
@@ -3085,6 +3399,15 @@ updateSendModeLabel();
 renderWorkspace();
 renderHistory();
 updateActionLabels();
+setTimeout(() => {
+  loadRuntimeConfigState()
+    .then(() => {
+      renderProviders();
+    })
+    .catch((error) => {
+      console.error(error);
+    });
+}, 0);
 setTimeout(() => {
   void loadHistory();
 }, 0);

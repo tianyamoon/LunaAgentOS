@@ -410,20 +410,28 @@ body.is-launch-demo .layout {
   z-index: 0;
 }
 
-.provider-group:has(.provider-status-dot.is-available) {
+.provider-group:has(.provider-status-square.is-available) {
   --provider-accent: rgba(217, 108, 58, 0.58);
   border-color: rgba(217, 108, 58, 0.18);
   background: rgba(217, 108, 58, 0.055);
 }
 
-.provider-group:has(.provider-status-dot.is-partial) {
+.provider-group:has(.provider-status-square.is-partial) {
   --provider-accent: rgba(217, 108, 58, 0.46);
   border-color: rgba(217, 108, 58, 0.16);
   background: rgba(217, 108, 58, 0.045);
 }
 
-.provider-group:has(.provider-status-dot.is-unavailable) {
+.provider-group:has(.provider-status-square.is-unavailable),
+.provider-group:has(.provider-status-square.is-not-connected) {
   --provider-accent: rgba(99, 82, 63, 0.24);
+}
+
+.provider-group.is-muted-status {
+  --provider-accent: rgba(99, 82, 63, 0.2);
+  border-color: rgba(99, 82, 63, 0.1);
+  background: rgba(99, 82, 63, 0.04);
+  filter: grayscale(0.35);
 }
 
 .provider-group.is-collapsed {
@@ -741,32 +749,46 @@ body.is-launch-demo .layout {
   line-height: 1.2;
 }
 
-.provider-status-dot {
+.provider-status-dot,
+.provider-status-square {
   width: 7px;
   height: 7px;
   flex: 0 0 auto;
-  border-radius: 999px;
   background: rgba(99, 82, 63, 0.34);
   box-shadow: 0 0 0 3px rgba(99, 82, 63, 0.06);
 }
 
-.provider-status-dot.is-available {
+.provider-status-dot {
+  border-radius: 999px;
+}
+
+.provider-status-square {
+  border-radius: 2px;
+}
+
+.provider-status-dot.is-available,
+.provider-status-square.is-available {
   background: var(--done);
   box-shadow: 0 0 0 3px rgba(33, 122, 76, 0.09);
 }
 
-.provider-status-dot.is-partial {
+.provider-status-dot.is-partial,
+.provider-status-square.is-partial {
   background: var(--thinking);
   box-shadow: 0 0 0 3px rgba(178, 107, 0, 0.1);
 }
 
-.provider-status-dot.is-unavailable {
-  background: var(--error);
-  box-shadow: 0 0 0 3px rgba(192, 58, 58, 0.08);
+.provider-status-dot.is-unavailable,
+.provider-status-dot.is-not-connected,
+.provider-status-square.is-unavailable,
+.provider-status-square.is-not-connected,
+.provider-status-square.is-not-configured {
+  background: rgba(99, 82, 63, 0.34);
 }
 
-.provider-status-dot.is-planned {
-  background: rgba(99, 82, 63, 0.34);
+.provider-status-dot.is-planned,
+.provider-status-square.is-planned {
+  background: rgba(99, 82, 63, 0.28);
 }
 
 .provider-count-badge {
@@ -835,12 +857,62 @@ body.is-launch-demo .layout {
 }
 
 .agent-entry-top > strong {
+  min-width: 0;
+  overflow: hidden;
   font-size: 0.94rem;
   line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .agent-entry-sub {
   margin-top: 3px;
+}
+
+.agent-entry-meta {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.target-status-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: rgba(99, 82, 63, 0.36);
+  box-shadow: 0 0 0 3px rgba(99, 82, 63, 0.06);
+}
+
+.target-status-dot.is-available {
+  background: var(--done);
+  box-shadow: 0 0 0 3px rgba(33, 122, 76, 0.09);
+}
+
+.target-status-dot.is-unavailable {
+  background: rgba(99, 82, 63, 0.36);
+}
+
+.agent-brief-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid rgba(122, 103, 85, 0.1);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.5);
+  color: rgba(122, 103, 85, 0.72);
+  font-size: 0.72rem;
+  line-height: 1;
+  box-shadow: none;
+}
+
+.agent-brief-btn:hover {
+  border-color: rgba(217, 108, 58, 0.24);
+  color: var(--accent);
 }
 
 .provider-targets {
@@ -2240,7 +2312,10 @@ textarea {
 }
 
 .runtime-config-dialog {
-  width: min(640px, calc(100vw - 48px));
+  width: min(900px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
   border-radius: 24px;
   padding: 26px;
   background:
@@ -2316,7 +2391,27 @@ textarea {
   display: grid;
   grid-template-columns: 170px minmax(0, 1fr);
   gap: 16px;
+  min-height: 0;
+  overflow: auto;
   margin: 24px 0 22px;
+}
+
+.connection-dialog .runtime-config-body {
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 24px;
+  align-items: stretch;
+}
+
+.connection-dialog .agent-brief-section {
+  grid-column: 1 / -1;
+}
+
+.agent-brief-dialog {
+  width: min(720px, calc(100vw - 48px));
+}
+
+.agent-brief-body {
+  display: block;
 }
 
 .runtime-config-status-card {
@@ -2364,6 +2459,7 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  min-width: 0;
   padding: 18px;
   border: 1px solid rgba(82, 61, 38, 0.1);
   border-radius: 20px;
@@ -2422,6 +2518,7 @@ textarea {
 }
 
 .runtime-config-actions {
+  flex: 0 0 auto;
   align-items: center;
   padding-top: 2px;
 }
@@ -2734,6 +2831,94 @@ textarea {
 .state-error {
   background: rgba(177, 72, 72, 0.16);
   color: rgb(177, 72, 72);
+}
+
+.agent-brief-dialog {
+  width: min(560px, calc(100vw - 48px));
+}
+
+.agent-brief-body {
+  display: block;
+}
+
+.agent-brief-section {
+  max-height: min(72vh, 640px);
+  overflow: hidden;
+}
+
+.connection-dialog .agent-brief-section {
+  max-height: none;
+}
+
+.agent-brief-section-header,
+.agent-brief-row-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.agent-brief-section-header h4,
+.agent-brief-section-header p {
+  margin: 0;
+}
+
+.agent-brief-section-header p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.agent-brief-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 6px;
+}
+
+.agent-brief-row {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid rgba(82, 61, 38, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 250, 244, 0.64);
+}
+
+.agent-brief-row-header strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.88rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-brief-row label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.agent-brief-input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid rgba(82, 61, 38, 0.12);
+  border-radius: 10px;
+  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--text);
+  font: inherit;
+}
+
+.agent-brief-input:focus {
+  outline: 2px solid rgba(217, 108, 58, 0.2);
+  border-color: rgba(217, 108, 58, 0.28);
 }
 
 @media (prefers-reduced-motion: reduce) {
