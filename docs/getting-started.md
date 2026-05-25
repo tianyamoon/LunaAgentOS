@@ -70,7 +70,7 @@ If Claude Code or Hermes is missing, the entry should still appear with a clear 
 4. Confirm that the Runtime Session Card shows output, runtime activity, and the final response.
 5. Confirm that the session appears in the session list and can be restored from local history.
 
-If neither runtime is installed, confirm that each entry shows a clear configuration or unavailable state. This is the expected explainable state, not a crash or error. The app does not fall back to a demo path when a runtime is absent.
+If neither runtime is installed, confirm that each entry shows a clear configuration or unavailable state. This is the expected explainable state, not a crash or error.
 
 ## Optional validation commands
 

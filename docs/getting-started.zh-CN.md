@@ -70,7 +70,7 @@ apps/desktop-shell/src-tauri/target/release/desktop-shell.exe
 4. 确认 Runtime Session Card 展示输出、runtime 活动和最终响应。
 5. 确认该 session 出现在 session list 中，并可以从本地历史恢复。
 
-如果两个 runtime 都没有安装，确认每个入口显示明确的未配置或不可用状态。这是预期的可解释状态，不是崩溃或报错。应用在 runtime 缺失时不会回退到 demo 路径。
+如果两个 runtime 都没有安装，确认每个入口显示明确的未配置或不可用状态。这是预期的可解释状态，不是崩溃或报错。
 
 ## 可选验证命令
 
