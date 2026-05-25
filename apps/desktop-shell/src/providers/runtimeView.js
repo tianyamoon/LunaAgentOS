@@ -8,6 +8,10 @@
 // resolution rules in a single place.
 
 import { runtimeHostForInstance as identityRuntimeHostForInstance } from "../sessionIdentity.js";
+import {
+  isTargetUnavailableForFleet,
+  targetStatusForFleet,
+} from "./agentMetadata.js";
 
 export function runtimeInstancesForProvider(runtimeInstances, providerId) {
   if (!Array.isArray(runtimeInstances)) return [];
@@ -30,10 +34,7 @@ export function providerRuntimeLabel(provider, instance, availableCount) {
 }
 
 function isUnavailableAgentListTarget(target) {
-  if (!target) return true;
-  if (target.gateway) return target.gateway !== "running";
-  if (target.available === false) return true;
-  return target.state === 9;
+  return isTargetUnavailableForFleet(target);
 }
 
 export function sortTargetsForAgentList(targets) {
@@ -53,24 +54,30 @@ export function targetsForRuntimeInstance(
   const runtimeHost = identityRuntimeHostForInstance(instance);
   const extensionTargets = (runtimeTargetsByInstance && runtimeTargetsByInstance[instance.id]) || [];
   if (extensionTargets.length) {
-    return extensionTargets.map((target) => ({
-      ...target,
-      id: target.id || `${instance.id}:target`,
-      providerId: target.providerId || provider.id,
-      runtimeInstanceId: target.runtimeInstanceId || instance.id,
-      runtimeLabel: target.runtimeLabel || instance.runtimeLabel,
-      runtimeHost: target.runtimeHost || runtimeHost,
-      runtimeCommand: target.runtimeCommand ?? instance.command ?? null,
-      name: target.name || target.displayName || providerRuntimeLabel(provider, instance, availableCount),
-      kind: target.kind || (target.profileName || target.alias || target.gateway ? "profile" : "runtime"),
-      state: typeof target.state === "number" ? target.state : 1,
-      available: target.available !== false && (!target.gateway || target.gateway === "running") && target.state !== 9,
-      profileAlias: target.profileAlias || target.alias || null,
-      profileExecutable: target.profileExecutable || target.alias || null,
-      profilePath: target.profilePath || target.path || null,
-    }));
+    return extensionTargets.map((target) => {
+      const normalized = {
+        ...target,
+        id: target.id || `${instance.id}:target`,
+        providerId: target.providerId || provider.id,
+        runtimeInstanceId: target.runtimeInstanceId || instance.id,
+        runtimeLabel: target.runtimeLabel || instance.runtimeLabel,
+        runtimeHost: target.runtimeHost || runtimeHost,
+        runtimeCommand: target.runtimeCommand ?? instance.command ?? null,
+        name: target.name || target.displayName || providerRuntimeLabel(provider, instance, availableCount),
+        kind: target.kind || (target.profileName || target.alias || target.gateway ? "profile" : "runtime"),
+        state: typeof target.state === "number" ? target.state : 1,
+        available: target.available !== false && (!target.gateway || target.gateway === "running") && target.state !== 9,
+        profileAlias: target.profileAlias || target.alias || null,
+        profileExecutable: target.profileExecutable || target.alias || null,
+        profilePath: target.profilePath || target.path || null,
+      };
+      return {
+        ...normalized,
+        status: targetStatusForFleet(normalized),
+      };
+    });
   }
-  return [{
+  const target = {
     id: instance.id,
     providerId: provider.id,
     runtimeInstanceId: instance.id,
@@ -82,6 +89,10 @@ export function targetsForRuntimeInstance(
     subtitle: instance.transport || instance.runtimeLabel || "Manifest Runtime",
     state: 1,
     available: true,
+  };
+  return [{
+    ...target,
+    status: targetStatusForFleet(target),
   }];
 }
 

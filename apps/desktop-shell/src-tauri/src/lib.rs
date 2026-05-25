@@ -1,7 +1,7 @@
 use chrono::Local;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
@@ -126,6 +126,16 @@ struct HistoryEntryInput {
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
+struct AgentBriefConfig {
+    text: String,
+    #[serde(default)]
+    source: Option<String>,
+    #[serde(default)]
+    updated_at: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
 struct RuntimeConfigFile {
     claude_command: Option<String>,
     #[serde(default)]
@@ -134,6 +144,8 @@ struct RuntimeConfigFile {
     hermes_command: Option<String>,
     #[serde(default)]
     adapter_plugin_paths: Vec<String>,
+    #[serde(default)]
+    agent_briefs: HashMap<String, HashMap<String, AgentBriefConfig>>,
 }
 
 impl From<RuntimeConfigFile> for acp_runtime::RuntimeConfig {
@@ -1273,21 +1285,10 @@ pub fn run() {
             runtime_adapter_probe,
             runtime_adapter_targets,
             runtime_hermes_profiles,
-            run_claude_stream,
-            runtime_acp_claude_prompt,
-            runtime_acp_hermes_prompt,
             runtime_acp_adapter_prompt,
-            runtime_acp_claude_resume,
-            runtime_acp_hermes_resume,
             runtime_acp_adapter_resume,
-            runtime_acp_claude_load,
-            runtime_acp_hermes_load,
             runtime_acp_adapter_load,
-            runtime_acp_claude_shutdown,
-            runtime_acp_hermes_shutdown,
             runtime_acp_adapter_shutdown,
-            runtime_acp_claude_alive_ids,
-            runtime_acp_hermes_alive_ids,
             runtime_acp_adapter_alive_ids
         ])
         .on_window_event(|_window, event| {
