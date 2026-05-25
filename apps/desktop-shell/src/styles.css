@@ -373,6 +373,15 @@ button:disabled {
   min-height: 0;
 }
 
+.history-panel {
+  padding: 14px 10px 14px 12px;
+}
+
+.history-panel .panel-header {
+  margin-bottom: 10px;
+  padding: 0 2px;
+}
+
 .agent-list,
 .history-list {
   flex: 1 1 auto;
@@ -382,6 +391,11 @@ button:disabled {
   overflow: auto;
   padding-right: 6px;
   min-height: 0;
+}
+
+.history-list {
+  gap: 8px;
+  padding-right: 2px;
 }
 
 .provider-group {
@@ -2004,6 +2018,7 @@ textarea {
 
 .history-section {
   position: relative;
+  flex: 0 0 auto;
   border: 1px solid rgba(99, 82, 63, 0.12);
   border-radius: 18px;
   background: rgba(82, 61, 38, 0.045);
@@ -2041,7 +2056,7 @@ textarea {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 12px 12px 11px 16px;
+  padding: 11px 10px 10px 12px;
   cursor: pointer;
   list-style: none;
 }
@@ -2092,8 +2107,8 @@ textarea {
 .history-group-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 0 10px 10px 16px;
+  gap: 5px;
+  padding: 0 7px 8px 10px;
 }
 
 .history-section-empty {
@@ -2107,7 +2122,7 @@ textarea {
   position: relative;
   display: grid;
   gap: 5px;
-  padding: 9px 10px 9px 12px;
+  padding: 8px 8px 8px 10px;
   border-radius: 11px;
   background: rgba(255, 255, 255, 0.7);
   border: 1px solid rgba(99, 82, 63, 0.07);
@@ -2137,7 +2152,7 @@ textarea {
 .history-item.is-active-session::before {
   content: "";
   position: absolute;
-  inset: 12px auto 12px 8px;
+  inset: 10px auto 10px 6px;
   width: 3px;
   border-radius: 999px;
   background: var(--accent);
