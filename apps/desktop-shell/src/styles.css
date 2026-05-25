@@ -396,24 +396,25 @@ button:disabled {
 .history-list {
   gap: 8px;
   overflow-y: scroll;
-  scrollbar-color: rgba(217, 108, 58, 0.42) rgba(255, 255, 255, 0.28);
+  background: linear-gradient(rgba(217, 108, 58, 0.18), rgba(217, 108, 58, 0.18)) right 3px top / 5px 100% no-repeat;
+  scrollbar-color: rgba(217, 108, 58, 0.72) rgba(217, 108, 58, 0.14);
   scrollbar-gutter: stable;
-  padding-right: 2px;
+  padding-right: 8px;
 }
 
 .history-list::-webkit-scrollbar {
-  width: 12px;
+  width: 14px;
 }
 
 .history-list::-webkit-scrollbar-track {
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.32);
+  background: rgba(217, 108, 58, 0.14);
 }
 
 .history-list::-webkit-scrollbar-thumb {
-  border: 3px solid transparent;
+  border: 2px solid transparent;
   border-radius: 999px;
-  background: rgba(217, 108, 58, 0.42);
+  background: rgba(217, 108, 58, 0.72);
   background-clip: padding-box;
 }
 
