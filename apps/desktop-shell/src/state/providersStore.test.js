@@ -56,9 +56,9 @@ test("providersStore: setProviderAgents replaces agents in place", () => {
 test("providersStore: appendProviderAgent / removeProviderAgent", () => {
   const store = createProvidersStore();
   store.setProviderAgents("hermes", []);
-  store.appendProviderAgent("hermes", { id: "demo", providerId: "hermes" });
+  store.appendProviderAgent("hermes", { id: "wsl-profile", providerId: "hermes" });
   assert.equal(store.providerById("hermes").agents.length, 1);
-  store.removeProviderAgent("hermes", "demo");
+  store.removeProviderAgent("hermes", "wsl-profile");
   assert.equal(store.providerById("hermes").agents.length, 0);
   store.removeProviderAgent("hermes", "missing");
   assert.equal(store.providerById("hermes").agents.length, 0);

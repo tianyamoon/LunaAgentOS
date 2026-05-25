@@ -54,8 +54,8 @@ test("archivedSessionsFromHistory tolerates snake_case keys and provides default
       date: "2026-05-02",
       provider_id: "hermes",
       provider_name: "Hermes",
-      agent_id: "hermes-demo",
-      agent_name: "Hermes / demo",
+      agent_id: "hermes-ailearning",
+      agent_name: "Hermes / ailearning",
       acp_session_id: "acp-x",
       runtime_instance_id: "rt-1",
       runtime_label: "WSL",
@@ -67,7 +67,7 @@ test("archivedSessionsFromHistory tolerates snake_case keys and provides default
   assert.equal(session.id, "s2");
   assert.equal(session.providerId, "hermes");
   assert.equal(session.providerName, "Hermes");
-  assert.equal(session.agentId, "hermes-demo");
+  assert.equal(session.agentId, "hermes-ailearning");
   assert.equal(session.acpSessionId, "acp-x");
   assert.equal(session.runtimeInstanceId, "rt-1");
   assert.equal(session.runtimeHost, "wsl");
