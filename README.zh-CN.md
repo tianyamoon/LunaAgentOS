@@ -52,7 +52,7 @@ LunaAgentOS 关注的是这些真实会话周围的桌面工作台。它把每�
 - 如需 Claude 入口：本机可用的 Claude Code
 - 如需 Hermes 入口：WSL + Hermes
 
-Claude Code 和 Hermes 都是可选的外部 runtime。就算没有安装，LunaAgentOS 也可以启动，只是对应入口会显示为未配置或不可用。
+Claude Code 和 Hermes 是让工作台真正有价值的 runtime 入口。没有安装时，LunaAgentOS 也可以启动，对应入口会显示明确的未配置状态，而不是崩溃或静默失败。
 
 ### 运行应用
 

@@ -12,7 +12,7 @@ This page defines the release boundary: what exists now, what 0.1 Preview is int
 - **Windows-first**: the current product path is the Tauri desktop app on Windows.
 - **A real-session workspace**: the central object is a Runtime Session Card, not a generic chat bubble list.
 - **A local-first history surface**: session turns, archived sessions, restore actions, and read-only history states are kept locally.
-- **A product backed by protocol and adapters**: the protocol, adapter boundary, and Runtime Session Model support the workspace experience.
+- **A workspace experience supported by protocol and adapters**: the protocol, adapter boundary, and Runtime Session Model are the supporting structure, not the product surface itself.
 
 ## What works now
 
@@ -24,6 +24,7 @@ This page defines the release boundary: what exists now, what 0.1 Preview is int
 - Each card holds output stream, thought stream, runtime stream, and final response.
 - The right side separates live sessions from archived sessions.
 - Local JSON history stores session turns and supports restore/read-only states.
+- When a runtime entry is not installed, its entry remains visible in the Agent Fleet with a clear configuration state. This is an explainable state, not a crash or silent failure.
 
 ## What it is not now
 

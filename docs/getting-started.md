@@ -8,9 +8,9 @@ This guide runs the current LunaAgentOS desktop app locally.
 
 After a successful local run, you should be able to:
 
-- Open the Tauri desktop app
+- Send real tasks to Claude Code or Hermes and watch output, thought, and runtime events arrive in a Runtime Session Card
 - See the left Agent Fleet, center Runtime Session workspace, and right session list
-- Send real tasks to Claude Code or Hermes when those runtimes are installed locally
+- Open the app without those runtimes installed and see each entry in a clear configuration state
 
 ## Requirements
 
@@ -21,7 +21,7 @@ After a successful local run, you should be able to:
 - Claude Code installed if you want the Claude entry
 - WSL and Hermes installed if you want the Hermes entry
 
-Claude Code and Hermes are external runtimes. LunaAgentOS can open without them; unavailable entries remain visible with a clear configuration state.
+Claude Code and Hermes are the real runtime entries that make the workspace useful. LunaAgentOS can also open when they are not installed; each entry shows a clear configuration state rather than a crash or silent failure.
 
 ## Install frontend dependencies
 
@@ -70,7 +70,7 @@ If Claude Code or Hermes is missing, the entry should still appear with a clear 
 4. Confirm that the Runtime Session Card shows output, runtime activity, and the final response.
 5. Confirm that the session appears in the session list and can be restored from local history.
 
-If neither runtime is installed, use the visible unavailable or unconfigured state to confirm that the app is detecting the missing runtime instead of relying on a demo path.
+If neither runtime is installed, confirm that each entry shows a clear configuration or unavailable state. This is the expected explainable state, not a crash or error. The app does not fall back to a demo path when a runtime is absent.
 
 ## Optional validation commands
 

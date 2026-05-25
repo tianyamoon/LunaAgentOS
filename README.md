@@ -52,7 +52,7 @@ LunaAgentOS focuses on the desktop workspace around those sessions. It treats ea
 - Claude Code installed if you want the Claude entry
 - WSL and Hermes installed if you want the Hermes entry
 
-Claude Code and Hermes are optional external runtimes. LunaAgentOS can open without them; unavailable entries remain visible with a clear configuration state.
+Claude Code and Hermes are the real runtime entries that make the workspace useful. LunaAgentOS can also open when those runtimes are not installed; each entry shows a clear configuration state rather than a crash or silent failure.
 
 ### Run the app
 

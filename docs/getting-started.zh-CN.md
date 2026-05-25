@@ -8,9 +8,9 @@
 
 成功启动后，你应该可以：
 
-- 打开 Tauri 桌面应用
+- 把真实任务发给 Claude Code 或 Hermes，在 Runtime Session Card 中实时看到输出、思考流和 runtime 事件
 - 看到左侧 Agent Fleet、中间 Runtime Session workspace、右侧 session list
-- 在本机安装 Claude Code 或 Hermes 时，把真实任务发给这些 runtime
+- 在没有安装这些 runtime 时打开应用，看到每个入口显示明确的配置状态
 
 ## 环境要求
 
@@ -21,7 +21,7 @@
 - 如需 Claude entry：本机可用的 Claude Code
 - 如需 Hermes entry：WSL + Hermes
 
-Claude Code 和 Hermes 都是外部 runtime。即使没有安装，LunaAgentOS 也可以启动，只是对应入口会显示为未配置或不可用。
+Claude Code 和 Hermes 是让工作台真正有价值的 runtime 入口。没有安装时，LunaAgentOS 也可以启动，对应入口会显示明确的未配置状态，而不是崩溃或静默失败。
 
 ## 安装前端依赖
 
@@ -70,7 +70,7 @@ apps/desktop-shell/src-tauri/target/release/desktop-shell.exe
 4. 确认 Runtime Session Card 展示输出、runtime 活动和最终响应。
 5. 确认该 session 出现在 session list 中，并可以从本地历史恢复。
 
-如果两个 runtime 都没有安装，请用界面上可见的不可用或未配置状态确认应用正在检测缺失 runtime，而不是依赖 demo 路径。
+如果两个 runtime 都没有安装，确认每个入口显示明确的未配置或不可用状态。这是预期的可解释状态，不是崩溃或报错。应用在 runtime 缺失时不会回退到 demo 路径。
 
 ## 可选验证命令
 

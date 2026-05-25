@@ -12,7 +12,7 @@ LunaAgentOS 0.1 Preview 是真实 AI Agent 会话的中立桌面工作台。
 - **Windows 优先**：当前产品路径是 Windows 上的 Tauri 桌面应用
 - **真实 session 工作台**：中心对象是 Runtime Session Card，而不是通用气泡聊天列表
 - **本地优先历史界面**：session turns、归档会话、恢复动作和只读历史状态保存在本地
-- **由 protocol 和 adapters 支撑的产品**：protocol、adapter 边界和 Runtime Session Model 服务于工作台体验
+- **由 protocol 和 adapters 支撑的工作台体验**：protocol、adapter 边界和 Runtime Session Model 是支撑结构，不是产品界面本身
 
 ## 现在已经可用什么
 
@@ -24,6 +24,7 @@ LunaAgentOS 0.1 Preview 是真实 AI Agent 会话的中立桌面工作台。
 - 每张卡片同时承载 output、thought、runtime stream 和 final response
 - 右侧区分 live sessions 和 archived sessions
 - 本地 JSON history 支持 session turn 保存、恢复和只读归档
+- 当某个 runtime 未安装时，对应入口仍然显示在 Agent Fleet 中，并显示明确的配置状态。这是可解释状态，不是崩溃或静默失败
 
 ## 现在不是什么
 
