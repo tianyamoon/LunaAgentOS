@@ -395,7 +395,26 @@ button:disabled {
 
 .history-list {
   gap: 8px;
+  overflow-y: scroll;
+  scrollbar-color: rgba(217, 108, 58, 0.42) rgba(255, 255, 255, 0.28);
+  scrollbar-gutter: stable;
   padding-right: 2px;
+}
+
+.history-list::-webkit-scrollbar {
+  width: 12px;
+}
+
+.history-list::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.32);
+}
+
+.history-list::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: rgba(217, 108, 58, 0.42);
+  background-clip: padding-box;
 }
 
 .provider-group {
