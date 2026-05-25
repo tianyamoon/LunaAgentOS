@@ -28,8 +28,7 @@ This page defines the release boundary: what exists now, what 0.1 Preview is int
 
 ## What it is not now
 
-- It is not an AionUi replacement.
-- It is not a Claude Code or Hermes replacement.
+- It is not a single built-in agent runtime that absorbs external products.
 - It is not a complete multi-agent orchestration platform.
 - It is not a marketplace or broad commercial platform.
 - It does not make every agent internally identical.

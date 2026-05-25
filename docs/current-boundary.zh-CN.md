@@ -28,8 +28,7 @@ LunaAgentOS 0.1 Preview 是真实 AI Agent 会话的中立桌面工作台。
 
 ## 现在不是什么
 
-- 不是 AionUi 的替代品
-- 不是 Claude Code 或 Hermes 的替代品
+- 不是试图把外部产品全部收编进单一内置 Agent 的运行时
 - 不是完整的多 Agent orchestration 平台
 - 不是 marketplace 或大型商业平台
 - 不会把所有 Agent 内部机制强行做成一样

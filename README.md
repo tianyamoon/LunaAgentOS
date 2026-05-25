@@ -88,7 +88,7 @@ LunaAgentOS 0.1 Preview is:
 
 LunaAgentOS 0.1 Preview is not:
 
-- A replacement for AionUi, Claude Code, or Hermes
+- A single built-in agent that tries to absorb external runtimes
 - A complete multi-agent orchestration platform
 - A claim that every agent must look the same internally
 - A marketplace or broad commercial platform today

@@ -13,7 +13,7 @@ LunaAgentOS 0.1 Preview 是 Windows 优先的真实 AI Agent 会话中立桌面�
 - Windows 优先的真实 AI Agent 会话桌面工作台。
 - 以可持续 Runtime Session Card 为中心的本地优先 app。
 - 面向 Claude Code 和 Hermes runtime entry 的共享 session 界面。
-- 外部 runtime 的中立工作台伙伴，而不是替代品。
+- 围绕外部 runtime 的中立工作台，而不是试图把它们收编成单一内置 Agent。
 
 ## What works today
 
@@ -30,8 +30,7 @@ LunaAgentOS 0.1 Preview 是 Windows 优先的真实 AI Agent 会话中立桌面�
 
 ## What is intentionally not in 0.1
 
-- 不是 AionUi 的替代品。
-- 不是 Claude Code 或 Hermes 的替代品。
+- 不是试图把外部产品全部收编进单一内置 Agent 的运行时。
 - 不是完整的多 Agent orchestration 平台。
 - 不是 marketplace 或大型商业平台。
 - 不会把所有 Agent 内部机制强行做成一样。

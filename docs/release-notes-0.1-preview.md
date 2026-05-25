@@ -13,7 +13,7 @@ The scope is intentionally small. LunaAgentOS 0.1 Preview is useful today as a l
 - A Windows-first desktop workspace for real AI agent sessions.
 - A local-first app centered on durable Runtime Session Cards.
 - A shared session surface for Claude Code and Hermes runtime entries.
-- A neutral companion to external runtimes, not a replacement for them.
+- A neutral workspace around external runtimes, without trying to absorb them into one built-in agent.
 
 ## What works today
 
@@ -30,8 +30,7 @@ The core value is the real runtime workflow: send work to real runtimes, keep th
 
 ## What is intentionally not in 0.1
 
-- It is not an AionUi replacement.
-- It is not a Claude Code or Hermes replacement.
+- It is not a single built-in agent runtime that absorbs external products.
 - It is not a complete multi-agent orchestration platform.
 - It is not a marketplace or broad commercial platform.
 - It does not make every agent internally identical.

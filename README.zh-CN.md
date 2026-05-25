@@ -88,7 +88,7 @@ LunaAgentOS 0.1 Preview 当前是：
 
 LunaAgentOS 0.1 Preview 当前不是：
 
-- AionUi、Claude Code 或 Hermes 的替代品
+- 试图把外部 runtime 全部收编成单一内置 Agent 的产品
 - 完整的多 Agent orchestration 平台
 - 要把所有 Agent 内部机制强行做成一样
 - 现在就去做插件市场或商业平台
