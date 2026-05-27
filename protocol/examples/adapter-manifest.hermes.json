@@ -35,6 +35,28 @@
     "models": true,
     "skills": true,
     "mcp": true,
-    "permissions": true
+    "permissions": true,
+    "slashCommands": [
+      { "name": "compress", "descriptionKey": "composer.command.compress" },
+      { "name": "clear", "descriptionKey": "composer.command.clear" },
+      { "name": "new", "descriptionKey": "composer.command.new" },
+      { "name": "reset", "descriptionKey": "composer.command.reset" },
+      { "name": "status", "descriptionKey": "composer.command.status" },
+      { "name": "model", "descriptionKey": "composer.command.model" },
+      { "name": "resume", "descriptionKey": "composer.command.resume" },
+      { "name": "sessions", "descriptionKey": "composer.command.sessions" },
+      { "name": "history", "descriptionKey": "composer.command.history" },
+      { "name": "save", "descriptionKey": "composer.command.save" },
+      { "name": "retry", "descriptionKey": "composer.command.retry" },
+      { "name": "undo", "descriptionKey": "composer.command.undo" },
+      { "name": "title", "descriptionKey": "composer.command.title" },
+      { "name": "config", "descriptionKey": "composer.command.config" },
+      { "name": "tools", "descriptionKey": "composer.command.tools" },
+      { "name": "skills", "descriptionKey": "composer.command.skills" },
+      { "name": "help", "descriptionKey": "composer.command.help" },
+      { "name": "usage", "descriptionKey": "composer.command.usage" },
+      { "name": "quit", "descriptionKey": "composer.command.quit" },
+      { "name": "exit", "descriptionKey": "composer.command.exit" }
+    ]
   }
 }

@@ -68,12 +68,30 @@ test("providersStore: syncAdapterProviders marks built-ins and prunes manifest p
   const store = createProvidersStore();
   const ref = store.getProvidersRef();
   store.syncAdapterProviders([
-    { id: "codex", name: "OpenAI Codex", transport: "stdio_json" },
-    { id: "claude", name: "Ignored Claude Manifest", transport: "stdio_json" },
+    {
+      id: "codex",
+      name: "OpenAI Codex",
+      transport: "stdio_json",
+      capabilities: { slashCommands: [{ name: "compact" }] },
+    },
+    {
+      id: "claude",
+      name: "Ignored Claude Manifest",
+      transport: "stdio_json",
+      capabilities: { slashCommands: [{ name: "model" }] },
+    },
   ]);
   assert.equal(store.getProvidersRef(), ref);
   assert.equal(store.providerById("claude").dynamicAdapter, true);
   assert.equal(store.providerById("codex").dynamicAdapter, true);
+  assert.deepEqual(
+    store.providerById("claude").adapterManifest.capabilities.slashCommands.map((item) => item.name),
+    ["model"],
+  );
+  assert.deepEqual(
+    store.providerById("codex").adapterManifest.capabilities.slashCommands.map((item) => item.name),
+    ["compact"],
+  );
   assert.deepEqual(store.providerById("codex").agents.map((agent) => agent.id), ["codex-main"]);
   assert.equal(store.getRuntimeAvailabilityFor("codex").configured, true);
   store.syncAdapterProviders([]);
@@ -120,6 +138,19 @@ test("providersStore: runtime targets per instance + prune + total count", () =>
   assert.equal(store.totalRuntimeTargetCount(), 1);
   store.pruneRuntimeTargetsByInstanceIds(["inst-2"]);
   assert.deepEqual(Object.keys(ref), ["inst-2"]);
+});
+
+test("providersStore: slash commands per provider are stable and resettable", () => {
+  const store = createProvidersStore();
+  const ref = store.getSlashCommandsByProviderRef();
+  store.setSlashCommandsForProvider("hermes", [{ name: "demo", kind: "skill" }]);
+  assert.equal(store.getSlashCommandsByProviderRef(), ref);
+  assert.deepEqual(ref.hermes.map((item) => item.name), ["demo"]);
+  store.setSlashCommandsForProvider("hermes", null);
+  assert.deepEqual(ref.hermes, []);
+  store.setSlashCommandsForProvider("hermes", [{ name: "demo" }]);
+  store.reset();
+  assert.deepEqual(ref, {});
 });
 
 test("providersStore: subscribe is notified on each mutation, batched in batch()", () => {

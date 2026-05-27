@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: Existing tag to publish or refresh, for example v0.1.0-preview
+        description: Existing tag to publish or refresh, for example v0.2.0-preview
         required: false
         type: string
 
@@ -81,8 +81,13 @@ jobs:
           New-Item -ItemType Directory -Path $assetDir -Force | Out-Null
           Copy-Item "src-tauri/target/release/desktop-shell.exe" (Join-Path $assetDir "LunaAgentOS.exe")
           Copy-Item "../../LICENSE" (Join-Path $assetDir "LICENSE")
-          if (Test-Path "../../docs/release-notes-0.1-preview.md") {
-            Copy-Item "../../docs/release-notes-0.1-preview.md" (Join-Path $assetDir "RELEASE_NOTES.md")
+          $notesPath = if ($tag -like "v0.1*") {
+            "../../docs/release-notes-0.1-preview.md"
+          } else {
+            "../../docs/release-notes-0.2-preview.zh-CN.md"
+          }
+          if (Test-Path $notesPath) {
+            Copy-Item $notesPath (Join-Path $assetDir "RELEASE_NOTES.md")
           }
           $zipPath = Join-Path $env:RUNNER_TEMP "$assetBase.zip"
           if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
@@ -100,12 +105,25 @@ jobs:
         run: |
           $repo = "${{ github.repository }}"
           $tag = "${{ steps.release_meta.outputs.tag }}"
-          $notesPath = "../../docs/release-notes-0.1-preview.md"
+          if ($tag -like "v0.1*") {
+            $notesPath = "../../docs/release-notes-0.1-preview.md"
+            $alternateNotesRelative = "./release-notes-0.1-preview.zh-CN.md"
+            $alternateNotesUrl = "https://github.com/$repo/blob/$tag/docs/release-notes-0.1-preview.zh-CN.md"
+            $gettingStartedRelative = "./getting-started.md"
+            $gettingStartedUrl = "https://github.com/$repo/blob/$tag/docs/getting-started.md"
+          } else {
+            $notesPath = "../../docs/release-notes-0.2-preview.zh-CN.md"
+            $alternateNotesRelative = "./release-notes-0.2-preview.md"
+            $alternateNotesUrl = "https://github.com/$repo/blob/$tag/docs/release-notes-0.2-preview.md"
+            $gettingStartedRelative = "./getting-started.zh-CN.md"
+            $gettingStartedUrl = "https://github.com/$repo/blob/$tag/docs/getting-started.zh-CN.md"
+          }
+          if (!(Test-Path $notesPath)) {
+            throw "Release notes file not found: $notesPath"
+          }
           $notes = Get-Content $notesPath -Raw
-          $zhReleaseNotesUrl = "https://github.com/$repo/blob/$tag/docs/release-notes-0.1-preview.zh-CN.md"
-          $enGettingStartedUrl = "https://github.com/$repo/blob/$tag/docs/getting-started.md"
-          $notes = $notes.Replace("(./release-notes-0.1-preview.zh-CN.md)", "($zhReleaseNotesUrl)")
-          $notes = $notes.Replace("(./getting-started.md)", "($enGettingStartedUrl)")
+          $notes = $notes.Replace("($alternateNotesRelative)", "($alternateNotesUrl)")
+          $notes = $notes.Replace("($gettingStartedRelative)", "($gettingStartedUrl)")
           $outPath = Join-Path $env:RUNNER_TEMP "release-notes-$tag.md"
           Set-Content -Path $outPath -Value $notes
           "path=$outPath" >> $env:GITHUB_OUTPUT

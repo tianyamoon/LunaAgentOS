@@ -55,7 +55,22 @@
         "models": { "type": "boolean" },
         "skills": { "type": "boolean" },
         "mcp": { "type": "boolean" },
-        "permissions": { "type": "boolean" }
+        "permissions": { "type": "boolean" },
+        "slashCommands": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": { "type": "string" },
+              "descriptionKey": { "type": "string" },
+              "description": { "type": "string" },
+              "kind": { "type": "string" },
+              "source": { "type": "string" }
+            },
+            "additionalProperties": true
+          }
+        }
       },
       "additionalProperties": true
     }

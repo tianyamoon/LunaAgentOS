@@ -9,6 +9,20 @@
     "@agentclientprotocol/claude-agent-acp"
   ],
   "requires_pty": false,
+  "capabilities": {
+    "slashCommands": [
+      { "name": "compact", "descriptionKey": "composer.command.compact" },
+      { "name": "clear", "descriptionKey": "composer.command.clear" },
+      { "name": "status", "descriptionKey": "composer.command.status" },
+      { "name": "model", "descriptionKey": "composer.command.model" },
+      { "name": "permissions", "descriptionKey": "composer.command.permissions" },
+      { "name": "plan", "descriptionKey": "composer.command.plan" },
+      { "name": "init", "descriptionKey": "composer.command.init" },
+      { "name": "resume", "descriptionKey": "composer.command.resume" },
+      { "name": "review", "descriptionKey": "composer.command.review" },
+      { "name": "mcp", "descriptionKey": "composer.command.mcp" }
+    ]
+  },
   "permissions": {
     "processExec": [
       {

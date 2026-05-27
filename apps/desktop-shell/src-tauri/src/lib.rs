@@ -460,6 +460,18 @@ fn runtime_adapter_targets(
 }
 
 #[tauri::command]
+fn runtime_adapter_slash_commands(
+    app: AppHandle,
+    adapter_id: String,
+    runtime_instance_id: Option<String>,
+) -> Result<Vec<adapter_registry::SlashCommandCapability>, String> {
+    let config = load_runtime_config_file(&app);
+    let adapter = adapter_registry::find_adapter(&config.adapter_plugin_paths, &adapter_id)?;
+    adapter_extensions::slash_commands(&adapter, &config, runtime_instance_id.as_deref())
+        .unwrap_or_else(|| Ok(Vec::new()))
+}
+
+#[tauri::command]
 fn runtime_hermes_profiles(
     app: AppHandle,
     runtime_instance_id: Option<String>,
@@ -906,82 +918,6 @@ fn run_claude_stream(prompt: String) -> Result<Vec<Value>, String> {
 }
 
 #[tauri::command]
-async fn runtime_acp_claude_prompt(
-    app: AppHandle,
-    runtime_session_id: String,
-    prompt: String,
-    cwd: Option<String>,
-    runtime_host: Option<String>,
-    runtime_command: Option<String>,
-) -> Result<Vec<Value>, String> {
-    let runtime_session_id_for_emit = runtime_session_id.clone();
-    let adapter =
-        adapter_launch_spec_with_context(&app, "claude", runtime_host, runtime_command, None)?;
-    let config = acp_runtime::RuntimeConfig::from(load_runtime_config_file(&app));
-    let result = tauri::async_runtime::spawn_blocking(move || {
-        let mut emit_update = |event: Value| {
-            let payload = RuntimeSessionStreamPayload {
-                runtime_session_id: runtime_session_id_for_emit.clone(),
-                event,
-            };
-            let _ = app.emit("runtime-session-update", payload);
-        };
-        acp_runtime::run_adapter_acp_prompt(
-            adapter,
-            runtime_session_id,
-            prompt,
-            cwd,
-            config,
-            Some(&mut emit_update),
-        )
-    })
-    .await
-    .map_err(|error| classify_backend_error(error.to_string()))?;
-    result.map_err(classify_backend_error)
-}
-
-#[tauri::command]
-async fn runtime_acp_hermes_prompt(
-    app: AppHandle,
-    runtime_session_id: String,
-    prompt: String,
-    cwd: Option<String>,
-    runtime_host: Option<String>,
-    runtime_command: Option<String>,
-    profile_executable: Option<String>,
-) -> Result<Vec<Value>, String> {
-    let runtime_session_id_for_emit = runtime_session_id.clone();
-    let adapter = adapter_launch_spec_with_context(
-        &app,
-        "hermes",
-        runtime_host,
-        runtime_command,
-        profile_executable,
-    )?;
-    let config = acp_runtime::RuntimeConfig::from(load_runtime_config_file(&app));
-    let result = tauri::async_runtime::spawn_blocking(move || {
-        let mut emit_update = |event: Value| {
-            let payload = RuntimeSessionStreamPayload {
-                runtime_session_id: runtime_session_id_for_emit.clone(),
-                event,
-            };
-            let _ = app.emit("runtime-session-update", payload);
-        };
-        acp_runtime::run_adapter_acp_prompt(
-            adapter,
-            runtime_session_id,
-            prompt,
-            cwd,
-            config,
-            Some(&mut emit_update),
-        )
-    })
-    .await
-    .map_err(|error| classify_backend_error(error.to_string()))?;
-    result.map_err(classify_backend_error)
-}
-
-#[tauri::command]
 async fn runtime_acp_adapter_prompt(
     app: AppHandle,
     adapter_id: String,
@@ -1284,6 +1220,7 @@ pub fn run() {
             runtime_probe,
             runtime_adapter_probe,
             runtime_adapter_targets,
+            runtime_adapter_slash_commands,
             runtime_hermes_profiles,
             runtime_acp_adapter_prompt,
             runtime_acp_adapter_resume,

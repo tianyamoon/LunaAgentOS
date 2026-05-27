@@ -1,8 +1,10 @@
 use super::{runtime_instance_probe_with_metadata, AdapterLaunchContext, AdapterProbeResult};
-use crate::adapter_registry::AdapterDefinition;
+use crate::adapter_registry::{AdapterDefinition, SlashCommandCapability};
 use crate::{is_configured, provider_probe_from_instances, run_shell, RuntimeConfigFile};
 use serde_json::Value;
 use std::collections::HashMap;
+use std::fs;
+use std::path::Path;
 
 pub(super) fn probe(adapter: &AdapterDefinition, config: &RuntimeConfigFile) -> AdapterProbeResult {
     let command = config
@@ -175,6 +177,72 @@ fn sanitize_id_fragment(value: &str) -> String {
             }
         })
         .collect()
+}
+
+fn skill_name_from_path(path: &Path) -> Option<String> {
+    path.file_stem()
+        .or_else(|| path.file_name())
+        .and_then(|value| value.to_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToString::to_string)
+}
+
+fn shell_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\\''"))
+}
+
+fn skill_command(name: String) -> SlashCommandCapability {
+    SlashCommandCapability {
+        name,
+        description_key: None,
+        description: Some("Hermes skill".to_string()),
+        kind: Some("skill".to_string()),
+        source: Some("runtime".to_string()),
+    }
+}
+
+fn discover_skills_from_profile_path(profile_path: &str, command_kind: &str) -> Vec<SlashCommandCapability> {
+    let names = if cfg!(windows) && command_kind == "wsl" {
+        let skills_dir = format!("{}/skills", profile_path.trim_end_matches('/'));
+        let quoted = shell_quote(&skills_dir);
+        let script = format!("if [ -d {quoted} ]; then find {quoted} -mindepth 1 -maxdepth 1 -printf '%f\\n'; fi");
+        run_shell("wsl.exe", &["--exec", "bash", "-lc", &script])
+            .map(|raw| {
+                raw.lines()
+                    .map(str::trim)
+                    .filter(|line| !line.is_empty())
+                    .map(ToString::to_string)
+                    .collect::<Vec<String>>()
+            })
+            .unwrap_or_default()
+    } else {
+        let skills_dir = Path::new(profile_path).join("skills");
+        let Ok(entries) = fs::read_dir(skills_dir) else {
+            return Vec::new();
+        };
+        entries
+            .flatten()
+            .filter_map(|entry| skill_name_from_path(&entry.path()))
+            .collect::<Vec<String>>()
+    };
+
+    let mut commands = names
+        .into_iter()
+        .map(|name| {
+            let name = Path::new(&name)
+                .file_stem()
+                .or_else(|| Path::new(&name).file_name())
+                .and_then(|value| value.to_str())
+                .unwrap_or(&name)
+                .to_string();
+            skill_command(name)
+        })
+        .filter(|command| !command.name.trim().is_empty())
+        .collect::<Vec<SlashCommandCapability>>();
+    commands.sort_by(|left, right| left.name.cmp(&right.name));
+    commands.dedup_by(|left, right| left.name == right.name);
+    commands
 }
 
 fn instance_parts(
@@ -364,4 +432,33 @@ pub(super) fn targets(
     }
 
     Ok(targets)
+}
+
+pub(super) fn slash_commands(
+    _adapter: &AdapterDefinition,
+    config: &RuntimeConfigFile,
+    runtime_instance_id: Option<&str>,
+) -> Result<Vec<SlashCommandCapability>, String> {
+    let (instance_id, _, command_kind, _) = instance_parts(config, runtime_instance_id);
+    let list_raw = run_profile_command(config, Some(&instance_id), &["profile", "list"])?;
+    let mut commands = Vec::new();
+    for (profile_name, _, gateway, _, _) in parse_profile_list(&list_raw) {
+        if gateway != "running" {
+            continue;
+        }
+        let show_raw = run_profile_command(
+            config,
+            Some(&instance_id),
+            &["profile", "show", &profile_name],
+        )
+        .unwrap_or_default();
+        let details = parse_profile_show(&show_raw);
+        let Some(path) = details.get("path") else {
+            continue;
+        };
+        commands.extend(discover_skills_from_profile_path(path, &command_kind));
+    }
+    commands.sort_by(|left, right| left.name.cmp(&right.name));
+    commands.dedup_by(|left, right| left.name == right.name);
+    Ok(commands)
 }

@@ -1,4 +1,4 @@
-use crate::adapter_registry::AdapterDefinition;
+use crate::adapter_registry::{AdapterDefinition, SlashCommandCapability};
 use crate::{
     adapter_instance_probe, adapter_provider_probe, RuntimeConfigFile, RuntimeInstanceProbe,
     RuntimeProviderProbe,
@@ -55,6 +55,17 @@ pub fn adapter_targets(
 ) -> Option<Result<Vec<Value>, String>> {
     match adapter.extension.as_deref() {
         Some("builtin.hermes") => Some(hermes::targets(adapter, config, runtime_instance_id)),
+        _ => None,
+    }
+}
+
+pub fn slash_commands(
+    adapter: &AdapterDefinition,
+    config: &RuntimeConfigFile,
+    runtime_instance_id: Option<&str>,
+) -> Option<Result<Vec<SlashCommandCapability>, String>> {
+    match adapter.extension.as_deref() {
+        Some("builtin.hermes") => Some(hermes::slash_commands(adapter, config, runtime_instance_id)),
         _ => None,
     }
 }

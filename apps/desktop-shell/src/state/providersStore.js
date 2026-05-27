@@ -92,6 +92,7 @@ export function createProvidersStore(initial = {}) {
   const runtimeTargetsByInstance = {
     ...(initial.runtimeTargetsByInstance || initial.hermesProfilesByInstance || {}),
   };
+  const slashCommandsByProvider = { ...(initial.slashCommandsByProvider || {}) };
 
   const listeners = new Set();
   let suppressNotify = 0;
@@ -237,6 +238,14 @@ export function createProvidersStore(initial = {}) {
     getRuntimeTargetsByInstanceRef() {
       return runtimeTargetsByInstance;
     },
+    getSlashCommandsByProviderRef() {
+      return slashCommandsByProvider;
+    },
+    setSlashCommandsForProvider(providerId, commands) {
+      if (!providerId) return;
+      slashCommandsByProvider[providerId] = Array.isArray(commands) ? commands : [];
+      notify();
+    },
     setRuntimeTargetsForInstance(instanceId, targets) {
       if (!instanceId) return;
       runtimeTargetsByInstance[instanceId] = Array.isArray(targets) ? targets : [];
@@ -286,6 +295,7 @@ export function createProvidersStore(initial = {}) {
       Object.assign(runtimeAvailability, DEFAULT_RUNTIME_AVAILABILITY);
       runtimeInstances.length = 0;
       for (const key of Object.keys(runtimeTargetsByInstance)) delete runtimeTargetsByInstance[key];
+      for (const key of Object.keys(slashCommandsByProvider)) delete slashCommandsByProvider[key];
       notify();
     },
   };

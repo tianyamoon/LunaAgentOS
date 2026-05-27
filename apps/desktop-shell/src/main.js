@@ -25,6 +25,20 @@ import {
   isAtBottom,
 } from "./ui/stickToBottom.js";
 import {
+  filterComposerSlashCommands,
+  matchComposerSlashQuery,
+  normalizeSlashCommand,
+  slashCommandsForProvider,
+} from "./ui/slashCommands.js";
+import {
+  sessionCardStats,
+  sessionTurnVisibility,
+  turnResponseText,
+} from "./ui/sessionCardView.js";
+import { turnEventsFromTurn } from "./ui/turnEvents.js";
+import { renderTurnEventItemHtml, renderTurnEventsHtml } from "./ui/turnEventsView.js";
+import { renderProviderIcon } from "./ui/providerIcon.js";
+import {
   LIFECYCLE,
   InvalidLifecycleTransition,
   canSendLifecycle,
@@ -182,6 +196,7 @@ const CURRENT_SESSION_KEY = "lunaagentos.currentSessionId";
 const SEND_MODE_KEY = "lunaagentos.sendMode";
 const FONT_SCALE_KEY = "lunaagentos.fontScale";
 const PROVIDER_COLLAPSE_KEY = "lunaagentos.providerCollapsedIds";
+const SLASH_COMMAND_USAGE_KEY = "lunaagentos.slashCommandUsage";
 const HISTORY_SCHEMA_VERSION = 3;
 const STREAM_CARD_RENDER_INTERVAL_MS = 100;
 const DEFAULT_HERMES_AGENT_ID = "hermes-wsl:profile:default";
@@ -223,6 +238,38 @@ function readCollapsedProviderIds() {
   }
 }
 
+function readSlashCommandUsage() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(SLASH_COMMAND_USAGE_KEY) || "{}");
+    return stored && typeof stored === "object" && !Array.isArray(stored) ? stored : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+function slashCommandUsageAgentKey() {
+  const target = currentTargetAgent();
+  return target?.id || target?.providerId || currentTargetAgentId || "default";
+}
+
+function slashCommandUsageForCurrentAgent() {
+  const usage = slashCommandUsage[slashCommandUsageAgentKey()];
+  return usage && typeof usage === "object" && !Array.isArray(usage) ? usage : {};
+}
+
+function recordSlashCommandUsage(commandName) {
+  const agentKey = slashCommandUsageAgentKey();
+  const current = slashCommandUsageForCurrentAgent();
+  slashCommandUsage = {
+    ...slashCommandUsage,
+    [agentKey]: {
+      ...current,
+      [commandName]: Number(current[commandName] || 0) + 1,
+    },
+  };
+  localStorage.setItem(SLASH_COMMAND_USAGE_KEY, JSON.stringify(slashCommandUsage));
+}
+
 function saveCollapsedProviderIds() {
   localStorage.setItem(PROVIDER_COLLAPSE_KEY, JSON.stringify([...collapsedProviderIds]));
 }
@@ -254,6 +301,7 @@ const providers = providersStore.getProvidersRef();
 const runtimeAvailability = providersStore.getRuntimeAvailabilityRef();
 const runtimeInstances = providersStore.getRuntimeInstancesRef();
 const runtimeTargetsByInstance = providersStore.getRuntimeTargetsByInstanceRef();
+const slashCommandsByProvider = providersStore.getSlashCommandsByProviderRef();
 const sessionsStore = createSessionsStore();
 const sessions = sessionsStore.getSessionsRef();
 const activeSessionIds = sessionsStore.getActiveSessionIdsRef();
@@ -282,6 +330,14 @@ let scheduledWorkspaceRenderFrame = 0;
 let scheduledWorkspaceRenderTimer = 0;
 let pendingConfirmAction = null;
 let restoreIntentSeq = 0;
+let composerCommandHint = null;
+let composerCommandMenu = null;
+let composerCommandMenuOpen = false;
+let composerCommandMenuPinned = false;
+let composerCommandMenuActiveIndex = 0;
+let composerCommandSearchQuery = "";
+let composerCommandSearchFocused = false;
+let slashCommandUsage = readSlashCommandUsage();
 
 function allAgents() {
   const dynamicTargets = runtimeTargets();
@@ -363,20 +419,22 @@ function sessionIdentityTitle(session) {
 
 function renderSessionIdentityTitle(session) {
   const parts = normalizedSessionTitleParts(session, providers);
+  const provider = providerById(session.providerId);
+  const icon = renderProviderIcon(provider || { id: session.providerId, name: parts.providerName });
   if (session.providerId === "hermes") {
     return [
-      `<span class="session-title-provider">${escapeHtml(parts.providerName)}</span>`,
+      `<span class="session-title-provider">${icon}${escapeHtml(parts.providerName)}</span>`,
       parts.runtimeLabel ? `<span class="session-title-runtime">${escapeHtml(parts.runtimeLabel)}</span>` : "",
       parts.targetName ? `<span class="session-title-target">${escapeHtml(parts.targetName)}</span>` : "",
     ].filter(Boolean).join("");
   }
   if (session.providerId === "claude") {
     return [
-      `<span class="session-title-provider">${escapeHtml(parts.providerName)}</span>`,
+      `<span class="session-title-provider">${icon}${escapeHtml(parts.providerName)}</span>`,
       parts.runtimeLabel ? `<span class="session-title-runtime">${escapeHtml(parts.runtimeLabel)}</span>` : "",
     ].filter(Boolean).join("");
   }
-  return `<span class="session-title-provider">${escapeHtml(parts.providerName)}</span>`;
+  return `<span class="session-title-provider">${icon}${escapeHtml(parts.providerName)}</span>`;
 }
 
 function targetsForRuntimeInstance(instance) {
@@ -746,6 +804,7 @@ function applyStaticTranslations() {
   updateActionLabels();
   updateSendModeLabel();
   updatePromptPlaceholder();
+  updateComposerCommandHint();
 }
 
 function toggleLanguage() {
@@ -797,6 +856,7 @@ function updateActionLabels() {
   newSessionToggle.setAttribute("aria-pressed", String(composingNewSession));
   composer?.classList.toggle("is-new-session-mode", composingNewSession);
   composer?.classList.toggle("is-current-session-mode", !composingNewSession);
+  updateComposerCommandHint();
   updatePromptPlaceholder();
 }
 
@@ -805,6 +865,209 @@ function updatePromptPlaceholder() {
   promptBox.placeholder = target
     ? t(isComposingNewSession() ? "composer.placeholderNewSession" : "composer.placeholderCurrentSession", { target })
     : t("composer.placeholderNoTarget");
+}
+
+function ensureComposerCommandHint() {
+  if (!composer || composerCommandHint) return;
+  const row = composer.querySelector(".composer-row");
+  composerCommandHint = document.createElement("div");
+  composerCommandHint.className = "composer-command-hint";
+  composerCommandHint.setAttribute("aria-live", "polite");
+  if (row) composer.insertBefore(composerCommandHint, row);
+  else composer.prepend(composerCommandHint);
+}
+
+function ensureComposerCommandMenu() {
+  if (!composer || composerCommandMenu) return;
+  composerCommandMenu = document.createElement("div");
+  composerCommandMenu.className = "composer-command-menu";
+  composerCommandMenu.hidden = true;
+  composer.appendChild(composerCommandMenu);
+}
+
+function composerInputKind() {
+  return promptBox.value.trimStart().startsWith("/") ? "slash" : "plain";
+}
+
+function composerSlashQuery() {
+  return matchComposerSlashQuery(promptBox.value);
+}
+
+function composerSlashCommands() {
+  return slashCommandsForProvider(localizedComposerSlashCommands(), currentTargetProvider()?.id);
+}
+
+function filteredComposerSlashCommands() {
+  const searchQuery = composerCommandSearchFocused || composerCommandSearchQuery
+    ? composerCommandSearchQuery.trim().toLowerCase()
+    : null;
+  return filterComposerSlashCommands(localizedComposerSlashCommands(), {
+    providerId: currentTargetProvider()?.id,
+    query: searchQuery ?? composerSlashQuery(),
+    pinned: searchQuery === null && composerCommandMenuPinned,
+    usageByName: slashCommandUsageForCurrentAgent(),
+  });
+}
+
+function localizedComposerSlashCommands() {
+  const provider = currentTargetProvider();
+  const providerId = provider?.id;
+  const manifestCommands = provider?.adapterManifest?.capabilities?.slashCommands;
+  const dynamicCommands = providerId ? slashCommandsByProvider[providerId] : [];
+  return mergeSlashCommands([...(Array.isArray(manifestCommands) ? manifestCommands : []), ...(Array.isArray(dynamicCommands) ? dynamicCommands : [])])
+    .map((command) => normalizeSlashCommand(command, {
+      providerId,
+      description: command.description || t(command.descriptionKey),
+    }))
+    .filter(Boolean);
+}
+
+function closeComposerCommandMenu() {
+  composerCommandMenuOpen = false;
+  composerCommandMenuPinned = false;
+  composerCommandSearchFocused = false;
+  composerCommandMenuActiveIndex = 0;
+  if (composerCommandMenu) composerCommandMenu.hidden = true;
+}
+
+function openComposerCommandMenu({ pinned = false } = {}) {
+  ensureComposerCommandMenu();
+  composerCommandMenuOpen = true;
+  composerCommandMenuPinned = pinned;
+  composerCommandMenuActiveIndex = 0;
+  renderComposerCommandMenu();
+}
+
+function selectComposerCommand(index) {
+  const command = filteredComposerSlashCommands()[index];
+  if (!command) return false;
+  promptBox.value = `/${command.name} `;
+  recordSlashCommandUsage(command.name);
+  composerCommandSearchQuery = "";
+  composerCommandSearchFocused = false;
+  promptBox.focus();
+  promptBox.setSelectionRange(promptBox.value.length, promptBox.value.length);
+  closeComposerCommandMenu();
+  updateComposerCommandHint();
+  return true;
+}
+
+function syncComposerCommandMenuActiveItem({ scrollIntoView = false } = {}) {
+  if (!composerCommandMenu) return;
+  composerCommandMenu.querySelectorAll(".composer-command-menu-item").forEach((button) => {
+    const isActive = Number(button.dataset.commandIndex || 0) === composerCommandMenuActiveIndex;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-selected", isActive ? "true" : "false");
+    if (isActive && scrollIntoView) button.scrollIntoView({ block: "nearest" });
+  });
+}
+
+function renderComposerCommandMenu() {
+  ensureComposerCommandMenu();
+  if (!composerCommandMenu) return;
+  const commands = filteredComposerSlashCommands();
+  const usageByName = slashCommandUsageForCurrentAgent();
+  if (!composerCommandMenuOpen) {
+    composerCommandMenu.hidden = true;
+    return;
+  }
+  if (composerCommandMenuActiveIndex >= commands.length) composerCommandMenuActiveIndex = 0;
+  composerCommandMenu.hidden = false;
+  composerCommandMenu.innerHTML = `
+    <div class="composer-command-menu-panel" role="listbox" aria-label="${escapeHtml(t("composer.commandMenu.title"))}">
+      <div class="composer-command-menu-header">
+        <strong>${escapeHtml(t("composer.commandMenu.title"))}</strong>
+        <span>${escapeHtml(t("composer.commandMenu.hint"))}</span>
+      </div>
+      <div class="composer-command-menu-list">
+        ${commands.length ? commands.map((command, index) => `
+          <button type="button" class="composer-command-menu-item ${index === composerCommandMenuActiveIndex ? "is-active" : ""}" role="option" aria-selected="${index === composerCommandMenuActiveIndex ? "true" : "false"}" data-command-index="${index}">
+            <span class="composer-command-menu-name">/${escapeHtml(command.name)}</span>
+            <span class="composer-command-menu-description">${escapeHtml(command.description || t(command.descriptionKey))}</span>
+            ${usageByName[command.name] ? `<span class="composer-command-menu-badge">${escapeHtml(t("composer.commandMenu.frequent"))}</span>` : ""}
+          </button>
+        `).join("") : `<div class="composer-command-menu-empty">${escapeHtml(t("composer.commandMenu.empty"))}</div>`}
+      </div>
+    </div>
+  `;
+  composerCommandMenu.querySelectorAll(".composer-command-menu-item").forEach((button) => {
+    button.addEventListener("mouseenter", () => {
+      composerCommandMenuActiveIndex = Number(button.dataset.commandIndex || 0);
+      syncComposerCommandMenuActiveItem();
+    });
+    button.addEventListener("click", () => {
+      selectComposerCommand(Number(button.dataset.commandIndex || 0));
+    });
+  });
+}
+
+function updateComposerCommandHint() {
+  ensureComposerCommandHint();
+  if (!composerCommandHint) return;
+  const kind = composerInputKind();
+  composer?.classList.toggle("is-slash-input", kind === "slash");
+  composerCommandHint.innerHTML = `
+    <button type="button" class="composer-command-chip composer-command-open-btn ${kind === "slash" ? "is-active" : ""}" aria-haspopup="listbox" aria-expanded="${composerCommandMenuOpen ? "true" : "false"}">${escapeHtml(t("composer.input.slash"))}</button>
+    <input class="composer-command-search" type="search" value="${escapeHtml(composerCommandSearchQuery)}" placeholder="${escapeHtml(t("composer.commandMenu.searchPlaceholder"))}" aria-label="${escapeHtml(t("composer.commandMenu.searchLabel"))}">
+  `;
+  const searchInput = composerCommandHint.querySelector(".composer-command-search");
+  const openSearchMenu = () => {
+    composerCommandSearchFocused = true;
+    openComposerCommandMenu();
+  };
+  composerCommandHint.querySelector(".composer-command-open-btn")?.addEventListener("click", () => {
+    openSearchMenu();
+    searchInput?.focus();
+  });
+  searchInput?.addEventListener("focus", () => {
+    openSearchMenu();
+  });
+  searchInput?.addEventListener("input", () => {
+    composerCommandSearchFocused = true;
+    composerCommandSearchQuery = searchInput.value;
+    openComposerCommandMenu();
+  });
+  searchInput?.addEventListener("keydown", (event) => {
+    handleComposerCommandMenuKeydown(event);
+  });
+  if (composerSlashQuery() !== null) {
+    composerCommandMenuPinned = false;
+    composerCommandMenuOpen = true;
+    renderComposerCommandMenu();
+  } else if (!composerCommandMenuPinned && !composerCommandSearchFocused) {
+    closeComposerCommandMenu();
+  }
+}
+
+function handleComposerCommandMenuKeydown(event) {
+  if (!composerCommandMenuOpen) return false;
+  const commands = filteredComposerSlashCommands();
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeComposerCommandMenu();
+    return true;
+  }
+  if (event.key === "ArrowDown") {
+    event.preventDefault();
+    composerCommandMenuActiveIndex = commands.length
+      ? (composerCommandMenuActiveIndex + 1) % commands.length
+      : 0;
+    syncComposerCommandMenuActiveItem({ scrollIntoView: true });
+    return true;
+  }
+  if (event.key === "ArrowUp") {
+    event.preventDefault();
+    composerCommandMenuActiveIndex = commands.length
+      ? (composerCommandMenuActiveIndex - 1 + commands.length) % commands.length
+      : 0;
+    syncComposerCommandMenuActiveItem({ scrollIntoView: true });
+    return true;
+  }
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    return selectComposerCommand(composerCommandMenuActiveIndex);
+  }
+  return false;
 }
 
 function scheduleWorkspaceRender(options = {}, delayMs = 0) {
@@ -1377,6 +1640,10 @@ async function refreshRuntimeProbe() {
     renderProviders();
     renderWorkspaceStatus();
     getAvailabilityStore().refresh(providers, runtimeInstances, currentTargetAgent());
+    [...new Set(runtimeInstances.filter((instance) => instance.available).map((instance) => instance.providerId))]
+      .forEach((providerId) => {
+        loadRuntimeSlashCommandsForProvider(providerId);
+      });
     return result;
   } catch (error) {
     console.error(error);
@@ -1417,6 +1684,7 @@ function setCurrentTargetAgent(agentId) {
   renderProviders();
   renderWorkspace();
   renderHistory();
+  focusComposerInput();
 }
 
 function runtimeConnectionNote(provider, instances) {
@@ -1491,7 +1759,7 @@ function renderProviders() {
           <span class="provider-collapse-caret" aria-hidden="true">▸</span>
           <div class="provider-heading">
             <div class="provider-title-row">
-              <strong>${provider.name}</strong>
+              <strong>${renderProviderIcon(provider, { size: "13px" })}${provider.name}</strong>
               <span class="provider-status-square ${providerStatus.className}" title="${escapeHtml(availabilityLabel)}" aria-label="${escapeHtml(availabilityLabel)}"></span>
             </div>
             <div class="provider-meta-row">
@@ -1558,6 +1826,38 @@ function applyRuntimeTargetsForInstance(providerId, runtimeInstanceId, targets) 
       });
     }
   });
+}
+
+function mergeSlashCommands(commands) {
+  const byKey = new Map();
+  for (const command of Array.isArray(commands) ? commands : []) {
+    if (!command?.name) continue;
+    const key = command.name;
+    if (!byKey.has(key)) byKey.set(key, command);
+  }
+  return [...byKey.values()];
+}
+
+async function loadRuntimeSlashCommandsForProvider(providerId, runtimeInstanceIds = null) {
+  const instances = (runtimeInstanceIds || availableRuntimeInstancesForProvider(providerId).map((instance) => instance.id))
+    .map(runtimeInstanceById)
+    .filter(Boolean)
+    .filter((instance) => instance.available);
+  if (!instances.length) return;
+  try {
+    const discovered = [];
+    for (const instance of instances) {
+      const commands = await invoke("runtime_adapter_slash_commands", {
+        adapterId: providerId,
+        runtimeInstanceId: instance.id,
+      });
+      discovered.push(...(Array.isArray(commands) ? commands : []));
+    }
+    providersStore.setSlashCommandsForProvider(providerId, mergeSlashCommands(discovered));
+    renderComposerCommandMenu();
+  } catch (error) {
+    console.error(error);
+  }
 }
 
 async function loadRuntimeTargetsForProvider(providerId, runtimeInstanceIds = null) {
@@ -1833,17 +2133,6 @@ function renderWorkspaceStatus() {
 
 
 
-function sessionCardStats(session) {
-  const thoughtCount = session.turns.reduce((count, turn) => count + turn.thoughts.length, 0);
-  const logCount = session.turns.reduce((count, turn) => count + turn.logs.length, 0);
-  const outputCount = session.turns.filter((turn) => turnResponseText(turn)).length;
-  return [
-    thoughtCount ? { key: "thoughts", label: t("session.thoughts", { count: thoughtCount }) } : null,
-    logCount ? { key: "logs", label: t("session.logs", { count: logCount }) } : null,
-    outputCount ? { key: "responses", label: t("session.responses", { count: outputCount }) } : null,
-  ].filter(Boolean);
-}
-
 function isSessionLatestOnly(session) {
   return sessionLatestOnlyState.get(session.id) ?? false;
 }
@@ -1853,10 +2142,6 @@ function toggleSessionLatestOnly(sessionId) {
   if (!session) return;
   sessionLatestOnlyState.set(sessionId, !isSessionLatestOnly(session));
   renderWorkspace();
-}
-
-function turnResponseText(turn) {
-  return turn.finalResponse || turn.outputs.join("\n\n");
 }
 
 function shouldPreferPlainResponseView(text, phase = "final") {
@@ -1987,17 +2272,29 @@ function renderTurnCollapseIcon(collapsed) {
 
 function renderSessionActionIcon(name) {
   const icons = {
-    dismiss: `<path d="M12 4v10"></path><path d="m8 10 4 4 4-4"></path><path d="M5 20h14"></path>`,
-    archive: `<path d="M4 7h16"></path><path d="M6 7l1.2 13h9.6L18 7"></path><path d="M9 11h6"></path>`,
+    // 移出工作台 — LogOut（门 + 向右箭头），明确"离开/移出"语义
+    dismiss: `<path d="M9 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h4"></path><path d="m15 8 4 4-4 4"></path><path d="M19 12H10"></path>`,
+    // 归档 — 标准 Archive 抽屉
+    archive: `<rect x="3" y="4" width="18" height="5" rx="1"></rect><path d="M5 9v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9"></path><path d="M10 13h4"></path>`,
+    // 停止运行 — 实心方块
     stop: `<rect x="7" y="7" width="10" height="10" rx="1.5"></rect>`,
+    // 删除 — 垃圾桶（保留）
     delete: `<path d="M4 7h16"></path><path d="M10 11v5"></path><path d="M14 11v5"></path><path d="M6 7l1 13h10l1-13"></path><path d="M9 7V4h6v3"></path>`,
+    // 复制 — 双方块（保留）
     copy: `<rect x="8" y="8" width="11" height="11" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path>`,
-    latest: `<circle cx="12" cy="12" r="4"></circle><path d="M12 3v2"></path><path d="M12 19v2"></path><path d="M3 12h2"></path><path d="M19 12h2"></path>`,
+    // 仅显示最新一轮 — 高亮顶部一条 + 其他半透明（视觉上一目了然"只看一条"）
+    latest: `<path d="M5 7h14"></path><path opacity="0.3" d="M5 12h14"></path><path opacity="0.3" d="M5 17h14"></path>`,
+    // 显示全部轮次 — 三条横线同色
     all: `<path d="M5 7h14"></path><path d="M5 12h14"></path><path d="M5 17h14"></path>`,
-    collapse: `<path d="M7 15l5-5 5 5"></path><path d="M5 20h14"></path>`,
-    expand: `<path d="M7 9l5 5 5-5"></path><path d="M5 4h14"></path>`,
-    latestScroll: `<path d="M12 4v13"></path><path d="m7 12 5 5 5-5"></path><path d="M5 20h14"></path>`,
+    // 折叠 flow 详情 — 双 V 朝上（ChevronsUp）
+    collapse: `<path d="m7 12 5-5 5 5"></path><path d="m7 18 5-5 5 5"></path>`,
+    // 展开 flow 详情 — 双 V 朝下（ChevronsDown）
+    expand: `<path d="m7 6 5 5 5-5"></path><path d="m7 13 5 5 5-5"></path>`,
+    // 滚到最新内容 — 圆框 + 向下箭头（与 dismiss/expand 视觉区分）
+    latestScroll: `<circle cx="12" cy="12" r="9"></circle><path d="M12 8v7"></path><path d="m8 11 4 4 4-4"></path>`,
+    // 全屏（保留）
     fullscreen: `<path d="M8 4H4v4"></path><path d="M16 4h4v4"></path><path d="M20 16v4h-4"></path><path d="M4 16v4h4"></path>`,
+    // 退出全屏（保留）
     fullscreenExit: `<path d="M9 4v5H4"></path><path d="M15 4v5h5"></path><path d="M20 15h-5v5"></path><path d="M4 15h5v5"></path>`,
   };
   return `
@@ -2069,6 +2366,24 @@ async function copyTextToClipboard(text) {
   return copied;
 }
 
+function isFlowDetailOpen(key, defaultOpen) {
+  return flowDetailOpenState.get(key) ?? defaultOpen;
+}
+
+// 跟踪每个 turn 上一次 render 时的 streaming 状态，用于在 streaming → 终态切换时
+// 清除该 turn 的所有 detail open 状态，让"运行中默认展开、结束默认收回"自动生效。
+const prevTurnStreamingById = new Map();
+
+function clearTurnDetailOpenState(turnId) {
+  if (!turnId) return;
+  const prefix = `${turnId}:`;
+  const keysToDelete = [];
+  for (const key of flowDetailOpenState.keys()) {
+    if (typeof key === "string" && key.startsWith(prefix)) keysToDelete.push(key);
+  }
+  for (const key of keysToDelete) flowDetailOpenState.delete(key);
+}
+
 function renderTurn(turn, index) {
   const streaming = executingSessionStates.has(turn.state);
   const waiting = streaming && !turn.finalResponse;
@@ -2076,8 +2391,44 @@ function renderTurn(turn, index) {
   const responseText = rawResponseText || t("turn.waiting");
   const thoughtDetailKey = `${turn.id}:thoughts`;
   const logDetailKey = `${turn.id}:logs`;
+
+  // 检测 streaming → 完成的状态转折，清除该 turn 的所有 detail open 状态，
+  // 让 streaming 期默认展开、结束后默认收回的 fallback 接管。
+  const prevStreaming = prevTurnStreamingById.get(turn.id);
+  if (prevStreaming === true && !streaming) {
+    clearTurnDetailOpenState(turn.id);
+  }
+  prevTurnStreamingById.set(turn.id, streaming);
   const collapsed = collapsedTurnIds.has(turn.id);
   const turnToggleLabel = collapsed ? t("action.expandTurn") : t("action.collapseTurn");
+
+  const events = turnEventsFromTurn(turn, { translate: t, streaming });
+  const thinkingEvent = events.find((event) => event.kind === "thinking");
+  const processEvents = events.filter((event) => event.kind !== "thinking");
+  const hasRunningProcess = processEvents.some((event) => event.status === "running");
+  const eventViewOptions = {
+    translate: t,
+    escapeHtml,
+    isOpenForKey: isFlowDetailOpen,
+  };
+  const thinkingHtml = thinkingEvent
+    ? `<ul class="turn-events turn-events--thinking" role="list">${renderTurnEventItemHtml(
+        { ...thinkingEvent, id: thoughtDetailKey },
+        { ...eventViewOptions, detailsExtraClass: "turn-event-thinking-shell" },
+      )}</ul>`
+    : "";
+  const processOpen = isFlowDetailOpen(logDetailKey, streaming);
+  const processHtml = processEvents.length
+    ? `<details class="terminal-detail turn-events-shell" data-detail-key="${escapeHtml(logDetailKey)}"${processOpen ? " open" : ""}>
+        <summary class="turn-events-shell-summary">
+          <span class="turn-event-dot ${hasRunningProcess ? "turn-event-status-running" : "turn-event-status-info"}" aria-hidden="true"></span>
+          <span class="turn-events-shell-label">${t("turn.logs", { count: processEvents.length })}</span>
+          <span class="turn-event-arrow" aria-hidden="true"></span>
+        </summary>
+        ${renderTurnEventsHtml(processEvents, eventViewOptions)}
+      </details>`
+    : "";
+
   return `
     <section class="turn-block ${collapsed ? "is-collapsed" : ""}" data-turn-id="${escapeHtml(turn.id)}">
       <div class="turn-header">
@@ -2099,26 +2450,12 @@ function renderTurn(turn, index) {
           <div class="terminal-message user-message">
             <p>${escapeHtml(turn.task)}</p>
           </div>
-          ${turn.thoughts.length
-            ? `
-              <details class="terminal-detail" data-detail-key="${escapeHtml(thoughtDetailKey)}" ${detailOpenAttribute(thoughtDetailKey, waiting)}>
-                <summary>${t("turn.thoughts", { count: turn.thoughts.length })}</summary>
-                <div class="terminal-pre rich-text">${renderRichText(turn.thoughts.join("\n\n"))}</div>
-              </details>
-            `
-            : ""}
+          ${thinkingHtml}
           <div class="terminal-message assistant-message ${waiting ? "is-waiting" : ""}">
             <div class="terminal-label">assistant</div>
             ${renderAssistantResponse(responseText, streaming ? "streaming" : "final")}
           </div>
-          ${turn.logs.length
-            ? `
-              <details class="terminal-detail log-block" data-detail-key="${escapeHtml(logDetailKey)}" ${detailOpenAttribute(logDetailKey, waiting)}>
-                <summary>${t("turn.logs", { count: turn.logs.length })}</summary>
-                <div class="terminal-pre rich-text">${renderRichText(turn.logs.join("\n"))}</div>
-              </details>
-            `
-            : ""}
+          ${processHtml}
         `}
     </section>
   `;
@@ -2135,14 +2472,12 @@ function renderSessionCard(session) {
     ? [identitySession.profileName, identitySession.profileModel].filter(Boolean).join(" · ")
     : "";
   const shouldShowRuntimeState = runtimeState !== "live";
-  const stats = sessionCardStats(session);
+  const stats = sessionCardStats(session, t);
   const latestOnly = isSessionLatestOnly(session);
   const hasFlowDetails = flowDetailEntriesForSession(session).length > 0;
   const flowsOpen = areSessionFlowDetailsOpen(session);
   const turnsCollapsed = areSessionTurnsCollapsed(session);
-  const turnEntries = session.turns.map((turn, index) => ({ turn, index }));
-  const visibleTurnEntries = latestOnly && turnEntries.length > 1 ? turnEntries.slice(-1) : turnEntries;
-  const hiddenTurnCount = turnEntries.length - visibleTurnEntries.length;
+  const { visibleTurnEntries, hiddenTurnCount } = sessionTurnVisibility(session, latestOnly);
   const managementTitleSuffix = isRestoring ? t("action.restoringSuffix") : "";
   const runtimeLabel = runtimeStateLabel(runtimeState);
   const canArchiveCard = runtimeState !== LIFECYCLE.archived && runtimeState !== LIFECYCLE.resume_failed;
@@ -2155,39 +2490,40 @@ function renderSessionCard(session) {
   return `
     <article class="session-card ${session.fullscreen ? "fullscreen" : ""} ${isActiveReceiver ? "is-active-receiver" : ""} ${isWaiting ? "is-waiting" : ""}" data-session-id="${session.id}" tabindex="0" aria-label="${escapeHtml(t("session.ariaSwitch", { task: session.task }))}" ${isActiveReceiver ? "aria-current=\"true\"" : ""}>
       <div class="session-card-header">
-        <div class="session-identity-row">
+        <div class="session-card-row session-card-identity-line">
           <div class="session-agent-title">
             <strong title="${escapeHtml(identityTitle)}">${identityTitleMarkup}</strong>
             ${isActiveReceiver ? `<span class="active-receiver-banner">${t("session.current")}</span>` : ""}
           </div>
-          ${profileMeta ? `<div class="caption session-profile-meta">${escapeHtml(profileMeta)}</div>` : ""}
-        </div>
-        <div class="session-control-row">
-          <div class="session-status-cluster">
-            ${shouldShowRuntimeState ? `<span class="runtime-pill ${runtimeStateClasses[runtimeState] || "runtime-archived"} ${isWaiting ? "is-busy" : ""}" aria-label="${escapeHtml(t("session.statusAria", { state: runtimeLabel }))}">${escapeHtml(runtimeLabel)}</span>` : ""}
-            <div class="session-card-stats" aria-label="${t("session.statsAria")}">
-              <button type="button" class="session-stat-pill session-turns-toggle-btn ${turnsCollapsed ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${turnsCollapsed ? "true" : "false"}" title="${turnToggleLabel}" aria-label="${turnToggleLabel}" ${session.turns.length ? "" : "disabled"}>${t("session.turns", { count: session.turns.length })}</button>
-              ${stats.map((item) => `<span class="session-stat-pill" data-stat-key="${escapeHtml(item.key)}">${escapeHtml(item.label)}</span>`).join("")}
-            </div>
-          </div>
-          <div class="session-card-actions">
-            ${isWaiting && runtimeState === "live" ? `<button type="button" class="mini-btn ghost-btn session-action-btn session-stop-btn" data-session-id="${session.id}" title="${t("action.stop")}" aria-label="${t("action.stop")}">${renderSessionActionIcon("stop")}</button>` : ""}
-            <button type="button" class="mini-btn ghost-btn session-action-btn session-dismiss-btn" data-session-id="${session.id}" title="${t("action.dismiss")}${managementTitleSuffix}" aria-label="${t("action.dismiss")}" ${managementDisabled}>${renderSessionActionIcon("dismiss")}</button>
-            ${canArchiveCard ? `<button type="button" class="mini-btn ghost-btn session-action-btn session-archive-btn" data-session-id="${session.id}" title="${t("action.archive")}${managementTitleSuffix}" aria-label="${t("action.archive")}" ${managementDisabled}>${renderSessionActionIcon("archive")}</button>` : ""}
-            <button type="button" class="mini-btn ghost-btn session-action-btn danger-btn session-delete-btn" data-session-id="${session.id}" title="${t("action.delete")}${managementTitleSuffix}" aria-label="${t("action.delete")}" ${managementDisabled}>${renderSessionActionIcon("delete")}</button>
-            ${canRestoreSession(session) ? `<button type="button" class="mini-btn ghost-btn session-retry-btn" data-session-id="${session.id}">${t("session.restoreRetry")}</button>` : ""}
-            <div class="session-tool-group" role="group" aria-label="${t("session.actionsAria")}">
+          <div class="session-card-actions" role="toolbar" aria-label="${t("session.actionsAria")}">
+            ${isWaiting && runtimeState === "live" ? `<button type="button" class="mini-btn ghost-btn session-action-btn danger-btn session-stop-btn" data-session-id="${session.id}" title="${t("action.stop")}" aria-label="${t("action.stop")}">${renderSessionActionIcon("stop")}</button>` : ""}
+            <div class="session-tool-group" role="group">
               <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-copy-btn" data-session-id="${session.id}" title="${t("action.copySession")}" aria-label="${t("action.copySession")}" ${session.turns.length ? "" : "disabled"}>${renderSessionActionIcon("copy")}</button>
               <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-latest-only-btn ${latestOnly ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${latestOnly ? "true" : "false"}" title="${latestOnlyLabel}" aria-label="${latestOnlyLabel}" ${session.turns.length > 1 ? "" : "disabled"}>${renderSessionActionIcon(latestOnly ? "all" : "latest")}</button>
               <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-toggle-flows-btn ${flowsOpen ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${flowsOpen ? "true" : "false"}" title="${flowToggleLabel}" aria-label="${flowToggleLabel}" ${hasFlowDetails ? "" : "disabled"}>${renderSessionActionIcon(flowsOpen ? "collapse" : "expand")}</button>
               <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-scroll-latest-btn" data-session-id="${session.id}" title="${t("action.scrollLatest")}" aria-label="${t("action.scrollLatest")}">${renderSessionActionIcon("latestScroll")}</button>
-              <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-fullscreen-btn ${session.fullscreen ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${session.fullscreen ? "true" : "false"}" title="${fullscreenLabel}" aria-label="${fullscreenLabel}">
-                ${renderSessionActionIcon(session.fullscreen ? "fullscreenExit" : "fullscreen")}
-              </button>
+              <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-fullscreen-btn ${session.fullscreen ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${session.fullscreen ? "true" : "false"}" title="${fullscreenLabel}" aria-label="${fullscreenLabel}">${renderSessionActionIcon(session.fullscreen ? "fullscreenExit" : "fullscreen")}</button>
+            </div>
+            <div class="session-management-group" role="group">
+              <button type="button" class="mini-btn ghost-btn session-action-btn session-dismiss-btn" data-session-id="${session.id}" title="${t("action.dismiss")}${managementTitleSuffix}" aria-label="${t("action.dismiss")}" ${managementDisabled}>${renderSessionActionIcon("dismiss")}</button>
+              ${canArchiveCard ? `<button type="button" class="mini-btn ghost-btn session-action-btn session-archive-btn" data-session-id="${session.id}" title="${t("action.archive")}${managementTitleSuffix}" aria-label="${t("action.archive")}" ${managementDisabled}>${renderSessionActionIcon("archive")}</button>` : ""}
+              <button type="button" class="mini-btn ghost-btn session-action-btn danger-btn session-delete-btn" data-session-id="${session.id}" title="${t("action.delete")}${managementTitleSuffix}" aria-label="${t("action.delete")}" ${managementDisabled}>${renderSessionActionIcon("delete")}</button>
+              ${canRestoreSession(session) ? `<button type="button" class="mini-btn ghost-btn session-retry-btn" data-session-id="${session.id}">${t("session.restoreRetry")}</button>` : ""}
             </div>
           </div>
         </div>
-        <div class="caption session-task">${escapeHtml(t("session.task", { task: session.task }))}</div>
+        <div class="session-card-row session-card-status-line">
+          ${shouldShowRuntimeState ? `<span class="runtime-pill ${runtimeStateClasses[runtimeState] || "runtime-archived"} ${isWaiting ? "is-busy" : ""}" aria-label="${escapeHtml(t("session.statusAria", { state: runtimeLabel }))}">${escapeHtml(runtimeLabel)}</span>` : ""}
+          <div class="session-card-stats" aria-label="${t("session.statsAria")}">
+            <button type="button" class="session-stat-pill session-turns-toggle-btn ${turnsCollapsed ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${turnsCollapsed ? "true" : "false"}" title="${turnToggleLabel}" aria-label="${turnToggleLabel}" ${session.turns.length ? "" : "disabled"}>${t("session.turns", { count: session.turns.length })}</button>
+            ${stats.map((item) => `<span class="session-stat-pill" data-stat-key="${escapeHtml(item.key)}">${escapeHtml(item.label)}</span>`).join("")}
+          </div>
+          ${profileMeta ? `<div class="caption session-profile-meta">${escapeHtml(profileMeta)}</div>` : ""}
+        </div>
+        <div class="session-task-line" title="${escapeHtml(session.task)}" aria-label="${escapeHtml(t("session.task", { task: session.task }))}">
+          <span class="session-task-label">${escapeHtml(t("session.taskLabel"))}</span>
+          <span class="session-task-text">${escapeHtml(session.task)}</span>
+        </div>
       </div>
       <div class="session-card-body">
         ${session.turns.length
@@ -2196,6 +2532,50 @@ function renderSessionCard(session) {
       </div>
     </article>
   `;
+}
+
+function focusSessionInWorkspace(sessionId) {
+  let changed = false;
+  sessions.forEach((session) => {
+    const shouldBeFocused = session.id === sessionId;
+    if (Boolean(session.fullscreen) !== shouldBeFocused) {
+      session.fullscreen = shouldBeFocused;
+      changed = true;
+    }
+  });
+  if (!changed) return false;
+  renderWorkspace();
+  return true;
+}
+
+function toggleSessionFocus(sessionId) {
+  const session = sessions.find((item) => item.id === sessionId);
+  if (!session) return;
+  if (session.fullscreen) {
+    session.fullscreen = false;
+    renderWorkspace();
+    return;
+  }
+  focusSessionInWorkspace(sessionId);
+}
+
+function renderSessionMiniCard(session) {
+  const identitySession = normalizeWorkspaceSession(session);
+  const runtimeState = sessionRuntimeState(session);
+  const isActive = sessionsStore.getCurrentSessionId() === session.id;
+  const isWaiting = isSessionExecuting(session);
+  const runtimeClass = runtimeStateClasses[runtimeState] || "runtime-archived";
+  const taskPreview = (session.task || "").replace(/\s+/g, " ").trim();
+  const previewText = taskPreview.length > 64 ? `${taskPreview.slice(0, 64)}\u2026` : taskPreview;
+  const identityTitle = sessionIdentityTitle(identitySession);
+  return `<button type="button" class="session-mini-card ${isActive ? "is-active" : ""} ${isWaiting ? "is-waiting" : ""}" data-session-id="${escapeHtml(session.id)}" title="${escapeHtml(identityTitle)}">
+    <span class="session-mini-card-state runtime-pill ${runtimeClass} ${isWaiting ? "is-busy" : ""}" aria-hidden="true"></span>
+    <span class="session-mini-card-body">
+      <span class="session-mini-card-title">${escapeHtml(identityTitle)}</span>
+      ${previewText ? `<span class="session-mini-card-task">${escapeHtml(previewText)}</span>` : ""}
+    </span>
+    <span class="session-mini-card-action" aria-hidden="true">\u21F1</span>
+  </button>`;
 }
 
 function exitFullscreenSessions() {
@@ -2229,11 +2609,13 @@ function bindSessionActions(root = sessionDeck) {
   });
   actionRoot.querySelectorAll(".session-fullscreen-btn").forEach((button) => {
     button.addEventListener("click", () => {
-      const sessionId = button.dataset.sessionId;
-      const session = sessions.find((item) => item.id === sessionId);
-      if (!session) return;
-      session.fullscreen = !session.fullscreen;
-      renderWorkspace();
+      toggleSessionFocus(button.dataset.sessionId);
+    });
+  });
+  actionRoot.querySelectorAll(".session-mini-card").forEach((button) => {
+    button.addEventListener("click", () => {
+      focusSessionInWorkspace(button.dataset.sessionId);
+      activateWorkspaceSession(button.dataset.sessionId);
     });
   });
   actionRoot.querySelectorAll(".session-dismiss-btn").forEach((button) => {
@@ -2251,11 +2633,13 @@ function bindSessionActions(root = sessionDeck) {
   actionRoot.querySelectorAll(".session-retry-btn").forEach((button) => {
     button.addEventListener("click", () => restoreArchivedSession(button.dataset.sessionId));
   });
-  actionRoot.querySelectorAll(".terminal-detail[data-detail-key]").forEach((detail) => {
-    detail.addEventListener("toggle", () => {
-      flowDetailOpenState.set(detail.dataset.detailKey, detail.open);
+  actionRoot
+    .querySelectorAll(".terminal-detail[data-detail-key], .turn-event-thinking-shell[data-detail-key]")
+    .forEach((detail) => {
+      detail.addEventListener("toggle", () => {
+        flowDetailOpenState.set(detail.dataset.detailKey, detail.open);
+      });
     });
-  });
   actionRoot.querySelectorAll(".session-scroll-latest-btn").forEach((button) => {
     button.addEventListener("click", () => {
       const sessionId = button.dataset.sessionId;
@@ -2349,6 +2733,23 @@ function activateWorkspaceSession(sessionId, options = {}) {
     : runtimeState === "restoring"
       ? t("session.restoringFocused")
       : t("session.readOnlySwitchBlocked"));
+  focusComposerInput();
+}
+
+function focusComposerInput() {
+  if (!promptBox) return;
+  if (document.activeElement === promptBox) return;
+  const active = document.activeElement;
+  if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.isContentEditable)) {
+    return;
+  }
+  requestAnimationFrame(() => {
+    try {
+      promptBox.focus({ preventScroll: true });
+    } catch (_) {
+      promptBox.focus();
+    }
+  });
 }
 
 async function shutdownRuntimeSession(session) {
@@ -2539,7 +2940,22 @@ function renderWorkspace(options = {}) {
   sessionDeck.classList.toggle("is-single-session", visibleSessions.length === 1);
   sessionDeck.classList.toggle("is-two-sessions", visibleSessions.length === 2);
   sessionDeck.classList.toggle("is-many-sessions", visibleSessions.length > 2);
-  sessionDeck.innerHTML = visibleSessions.map(renderSessionCard).join("");
+  const explicitFocusSession = visibleSessions.find((session) => session.fullscreen);
+  const focusedSession = explicitFocusSession || (visibleSessions.length === 1 ? visibleSessions[0] : null);
+  sessionDeck.classList.toggle("is-focused", Boolean(focusedSession));
+  sessionDeck.classList.toggle("is-implicit-focused", Boolean(focusedSession && !explicitFocusSession));
+  if (focusedSession) {
+    sessionDeck.innerHTML = `
+      ${renderSessionCard(focusedSession)}
+      ${visibleSessions.length > 1
+        ? `<div class="session-mini-bar" role="region" aria-label="${escapeHtml(t("session.miniBarAria"))}">
+            ${visibleSessions.map((session) => renderSessionMiniCard(session)).join("")}
+          </div>`
+        : ""}
+    `;
+  } else {
+    sessionDeck.innerHTML = visibleSessions.map(renderSessionCard).join("");
+  }
   bindSessionActions();
   renderMermaidDiagrams(sessionDeck).catch((error) => console.error(error));
   requestAnimationFrame(() => {
@@ -2669,6 +3085,7 @@ function sessionListItems() {
       date: session.createdAt.slice(0, 10),
       createdAt: session.createdAt,
       updatedAt: lastTurn?.createdAt || session.createdAt,
+      providerId: identitySession.providerId,
       providerName: identitySession.providerName,
       agentName: identitySession.agentName,
       title: session.task || t("history.newSession"),
@@ -2779,7 +3196,7 @@ function renderSessionListItem(item) {
   return `
     <article class="history-item ${listStateClass} ${isActiveHistoryItem ? "is-active-session" : ""}" data-session-id="${item.id}" data-agent-id="${item.agentId || ""}" ${isActiveHistoryItem ? "aria-current=\"true\"" : ""}>
       <div class="history-item-top">
-        <strong class="history-tool-name"><span class="history-signal ${signalClass}" title="${escapeHtml(signalLabel)}" aria-label="${escapeHtml(signalLabel)}"></span>${escapeHtml(item.providerName)}</strong>
+        <strong class="history-tool-name"><span class="history-signal ${signalClass}" title="${escapeHtml(signalLabel)}" aria-label="${escapeHtml(signalLabel)}"></span>${renderProviderIcon(providerById(item.providerId) || { id: item.providerId, name: item.providerName })}${escapeHtml(item.providerName)}</strong>
         <div class="history-item-actions">
           ${shouldShowState ? `<span class="history-state-pill ${runtimeStateClasses[item.runtimeState] || ""}">${escapeHtml(stateLabel)}</span>` : ""}
           <button type="button" class="history-delete-btn" data-session-id="${item.id}" title="${t("history.delete")}" aria-label="${t("history.delete")}">${renderSessionActionIcon("delete")}</button>
@@ -2954,6 +3371,7 @@ function openArchivedTranscript(sessionId) {
   setAppNotice(restored.acpSessionId
     ? t("archive.openedRestorable")
     : t("archive.openedReadOnly"));
+  focusComposerInput();
 }
 
 async function restoreArchivedSession(sessionId) {
@@ -2980,6 +3398,7 @@ async function restoreArchivedSession(sessionId) {
   renderProviders();
   renderWorkspace();
   renderHistory();
+  focusComposerInput();
   if (!restored.acpSessionId) {
     setSessionLifecycle(restored, LIFECYCLE.archived);
     markSessionInactive(restored.id);
@@ -3234,6 +3653,7 @@ languageBtn?.addEventListener("click", () => {
 });
 
 promptBox.addEventListener("keydown", (event) => {
+  if (handleComposerCommandMenuKeydown(event)) return;
   if (event.key !== "Enter" || event.isComposing) return;
   const shouldSend = sendMode === "enter"
     ? !event.ctrlKey && !event.shiftKey && !event.altKey
@@ -3243,8 +3663,24 @@ promptBox.addEventListener("keydown", (event) => {
   startSessionFromPrompt(sendAsNewSession);
 });
 
+promptBox.addEventListener("input", () => {
+  composerCommandSearchFocused = false;
+  updateComposerCommandHint();
+});
+
+document.addEventListener("pointerdown", (event) => {
+  if (!composerCommandMenuOpen) return;
+  if (composer?.contains(event.target)) return;
+  closeComposerCommandMenu();
+});
+
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
+  if (composerCommandMenuOpen) {
+    closeComposerCommandMenu();
+    event.preventDefault();
+    return;
+  }
   if (exitFullscreenSessions()) event.preventDefault();
 });
 
@@ -3258,6 +3694,7 @@ newSessionToggle.addEventListener("click", () => {
     sendAsNewSession = !sendAsNewSession;
   }
   updateActionLabels();
+  focusComposerInput();
 });
 
 if (listenRuntimeEvent) {

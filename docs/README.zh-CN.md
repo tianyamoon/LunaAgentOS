@@ -13,6 +13,7 @@
 ## 先看这些
 
 - [快速开始](./getting-started.zh-CN.md)：安装依赖、运行桌面应用、验证当前工作台
+- [0.2 Preview 发布说明](./release-notes-0.2-preview.zh-CN.md)：本次 preview 的新增能力、保留边界和适合人群
 - [当前产品边界](./current-boundary.zh-CN.md)：LunaAgentOS 现在是什么，不是什么，哪些内容暂时不做
 - [贡献指南](../CONTRIBUTING.zh-CN.md)：开发环境、测试命令、贡献方向、PR 预期
 

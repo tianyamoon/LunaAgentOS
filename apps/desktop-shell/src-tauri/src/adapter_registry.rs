@@ -49,6 +49,18 @@ pub struct AdapterCapabilities {
     pub resume: bool,
     #[serde(default)]
     pub profiles: bool,
+    #[serde(default)]
+    pub slash_commands: Vec<SlashCommandCapability>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SlashCommandCapability {
+    pub name: String,
+    pub description_key: Option<String>,
+    pub description: Option<String>,
+    pub kind: Option<String>,
+    pub source: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
