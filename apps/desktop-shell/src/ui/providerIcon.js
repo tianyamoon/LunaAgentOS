@@ -1,30 +1,6 @@
-// Provider icon rendering — maps provider iconSlug to an asset path or first-letter fallback.
-// Icon assets live in src/public/provider-icons/ (Vite's publicDir), so they are
-// copied as-is to dist/provider-icons/ and served from the webview root. We
-// reference them by absolute URL ("/provider-icons/<file>") which works the same
-// in `vite dev`, the production bundle, and Node tests (since these are plain
-// strings, not module imports).
-// Dynamic adapters can specify an iconSlug in their manifest to reuse a registered icon.
+export const NEUTRAL_BRAND_COLOR = "#7a7a7a";
 
-/**
- * Registry of built-in icon slugs → asset URL relative to the webview root.
- */
-const ICON_REGISTRY = {
-  claude: "/provider-icons/claude.svg",
-  openai: "/provider-icons/openai.svg",
-  trae: "/provider-icons/trae.png",
-};
-
-/**
- * Built-in mapping: providerId → { iconSlug, brandColor }.
- * Used when provider object itself doesn't carry iconSlug / brandColor.
- */
-const BUILTIN_ICON_META = {
-  claude: { iconSlug: "claude", brandColor: "#D4A27F" },
-  codex: { iconSlug: "openai", brandColor: "#412991" },
-  hermes: { iconSlug: null, brandColor: "#40B4A6" },
-  trae: { iconSlug: "trae", brandColor: "#325AB4" },
-};
+const ADAPTER_ICON_REGISTRY = new Map();
 
 function escapeHtml(text) {
   return String(text).replace(/[&<>"']/g, (ch) =>
@@ -32,52 +8,41 @@ function escapeHtml(text) {
   );
 }
 
-/**
- * Resolve the icon slug for a provider.
- * Priority: provider.iconSlug > provider.adapterManifest.iconSlug > BUILTIN_ICON_META[id]
- */
-export function resolveIconSlug(provider) {
-  if (!provider) return null;
-  if (provider.iconSlug) return provider.iconSlug;
-  if (provider.adapterManifest?.iconSlug) return provider.adapterManifest.iconSlug;
-  return BUILTIN_ICON_META[provider.id]?.iconSlug ?? null;
+export function setAdapterIcon(id, url) {
+  if (!id) return;
+  if (url) {
+    ADAPTER_ICON_REGISTRY.set(String(id), String(url));
+  } else {
+    ADAPTER_ICON_REGISTRY.delete(String(id));
+  }
 }
 
-/**
- * Resolve the brand color for a provider.
- */
+export function setAdapterIconRegistry(entries) {
+  ADAPTER_ICON_REGISTRY.clear();
+  if (!entries) return;
+  const iterable = entries instanceof Map ? entries.entries() : Object.entries(entries);
+  for (const [id, url] of iterable) {
+    setAdapterIcon(id, url);
+  }
+}
+
+export function adapterIconUrl(id) {
+  if (!id) return null;
+  return ADAPTER_ICON_REGISTRY.get(String(id)) ?? null;
+}
+
 export function resolveBrandColor(provider) {
-  if (!provider) return "#666";
+  if (!provider) return NEUTRAL_BRAND_COLOR;
   if (provider.brandColor) return provider.brandColor;
   if (provider.adapterManifest?.brandColor) return provider.adapterManifest.brandColor;
-  return BUILTIN_ICON_META[provider.id]?.brandColor ?? "#666";
+  return NEUTRAL_BRAND_COLOR;
 }
 
-/**
- * Get the asset path for a given slug, or null if not registered.
- */
-export function iconPathForSlug(slug) {
-  return ICON_REGISTRY[slug] ?? null;
-}
-
-/**
- * Render a provider icon as an HTML string.
- * Returns an <img> when the slug has a registered asset path,
- * or a first-letter fallback span otherwise.
- *
- * @param {object} provider - Provider object (from providersStore)
- * @param {object} [options]
- * @param {string} [options.size] - CSS size override (default "14px")
- * @returns {string} HTML string
- */
 export function renderProviderIcon(provider, options = {}) {
   const size = options.size || "14px";
-  const slug = resolveIconSlug(provider);
-  const path = slug ? iconPathForSlug(slug) : null;
-  if (path) {
-    // Monochrome (SVG, e.g. Simple Icons) accepts theme tinting; raster (PNG) is treated as full-color.
-    const variantClass = path.endsWith(".svg") ? "provider-icon-img-mono" : "provider-icon-img-color";
-    return `<img class="provider-icon provider-icon-img ${variantClass}" src="${escapeHtml(path)}" alt="" style="width:${size};height:${size}" aria-hidden="true">`;
+  const url = adapterIconUrl(provider?.id);
+  if (url) {
+    return `<img class="provider-icon provider-icon-img provider-icon-img-color" src="${escapeHtml(url)}" alt="" style="width:${size};height:${size}" aria-hidden="true">`;
   }
   const name = provider?.name || provider?.id || "?";
   const letter = name.charAt(0).toUpperCase();

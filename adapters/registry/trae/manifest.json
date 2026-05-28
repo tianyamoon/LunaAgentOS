@@ -3,6 +3,6 @@
   "name": "Trae IDE",
   "icon": "assets/icon.png",
   "brandColor": "#325AB4",
-  "placeholder": true,
-  "description": "Identity-only manifest. Trae is reserved as a planned IDE bridge entry; no runtime command is registered yet."
+  "identityOnly": true,
+  "description": "Trae IDE entry on the LunaAgentOS desktop. The IDE bridge ships through its own integration path; this manifest registers the identity so Trae appears alongside the other agents."
 }

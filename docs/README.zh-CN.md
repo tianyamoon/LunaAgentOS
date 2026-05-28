@@ -14,7 +14,7 @@
 
 - [快速开始](./getting-started.zh-CN.md)：安装依赖、运行桌面应用、验证当前工作台
 - [0.2.1 发布说明](./release-notes-0.2.1.zh-CN.md)：本次发版的新增能力、保留边界和适合人群
-- [当前产品边界](./current-boundary.zh-CN.md)：LunaAgentOS 现在是什么，不是什么，哪些内容暂时不做
+- [当前产品边界](./current-boundary.zh-CN.md)：LunaAgentOS 现在做实了什么、下一段路怎么走、哪些常见误解需要先讲清
 - [贡献指南](../CONTRIBUTING.zh-CN.md)：开发环境、测试命令、贡献方向、PR 预期
 
 ## 产品与概念
@@ -23,6 +23,7 @@
 - [为什么做 LunaAgentOS](./why-lunaagentos.zh-CN.md)：这个项目试图解决什么问题
 - [轻核心原则](./light-core-principles.zh-CN.md)：控制层要保持聚焦的约束条件
 - [路线图](./roadmap.zh-CN.md)：近期和中长期方向
+- [0.3 需求定义](./requirements-0.3.zh-CN.md)：下一步聚焦 Agent 可用性管理和 Session 卡片任务化
 
 ## 架构与接入
 

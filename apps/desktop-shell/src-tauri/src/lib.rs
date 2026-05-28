@@ -399,6 +399,9 @@ fn adapter_launch_spec_with_context(
 ) -> Result<acp_runtime::AdapterLaunchSpec, String> {
     let config = load_runtime_config_file(app);
     let adapter = adapter_registry::find_adapter(&config.adapter_plugin_paths, adapter_id)?;
+    if adapter.identity_only {
+        return Err(format!("adapter {adapter_id} is identity-only and cannot be launched"));
+    }
     if let Some(result) = adapter_extensions::build_launch_spec(
         &adapter,
         &config,
@@ -426,6 +429,9 @@ fn runtime_adapter_probe(
 ) -> Result<RuntimeProviderProbe, String> {
     let config = load_runtime_config_file(&app);
     let adapter = adapter_registry::find_adapter(&config.adapter_plugin_paths, &adapter_id)?;
+    if adapter.identity_only {
+        return Err(format!("adapter {adapter_id} is identity-only and cannot be probed"));
+    }
     Ok(adapter_extensions::probe_adapter(&adapter, &config).provider)
 }
 
@@ -436,6 +442,9 @@ fn runtime_probe(app: AppHandle) -> RuntimeProbeResult {
     let mut instances = Vec::new();
     let adapter_result = adapter_registry::load_adapters(&config.adapter_plugin_paths);
     for adapter in adapter_result.adapters {
+        if adapter.identity_only {
+            continue;
+        }
         let probe = adapter_extensions::probe_adapter(&adapter, &config);
         providers.push(probe.provider);
         instances.extend(probe.instances);
@@ -593,6 +602,86 @@ fn save_runtime_config(
     let json = serde_json::to_string_pretty(&config).map_err(|error| error.to_string())?;
     fs::write(path, json).map_err(|error| error.to_string())?;
     Ok(config)
+}
+
+// Payload returned by `read_adapter_icon`. The shell composes a `data:` URL
+// from `mime` + `base64` and feeds it directly into `<img src>`. We use
+// base64 (vs a Vec<u8>) because Tauri's default JSON encoding would
+// serialise raw bytes as an array of numbers — ~4x larger.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AdapterIconPayload {
+    mime: String,
+    base64: String,
+}
+
+// Pick a MIME type from a file extension. We deliberately keep this list
+// short — adapter icons are expected to be SVG or PNG. Unknown extensions
+// fall back to `application/octet-stream` so the webview at least logs a
+// clear "image failed to load" rather than mis-interpreting the bytes.
+fn icon_mime_for_path(path: &std::path::Path) -> &'static str {
+    match path
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(|value| value.to_ascii_lowercase())
+        .as_deref()
+    {
+        Some("svg") => "image/svg+xml",
+        Some("png") => "image/png",
+        Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("webp") => "image/webp",
+        Some("gif") => "image/gif",
+        _ => "application/octet-stream",
+    }
+}
+
+// Read the icon file declared by an adapter manifest's `icon` field and
+// return it as a base64 payload. The shell calls this once per adapter
+// at startup (see `loadAdapterIcons` in main.js) to populate an in-memory
+// icon registry; first-letter badges are used until the call completes
+// or when the adapter declares no icon.
+//
+// Failure modes (returns `Ok(None)`):
+//   - adapter id not found in the registry
+//   - manifest declares no `icon` field
+//   - resolved icon path does not exist on disk
+//   - icon file is unreadable (permissions, transient I/O)
+// `Err` is reserved for programmer-visible bugs; transient/expected
+// misses are swallowed so a single bad adapter cannot break the rest.
+#[tauri::command]
+fn read_adapter_icon(
+    app: AppHandle,
+    adapter_id: String,
+) -> Result<Option<AdapterIconPayload>, String> {
+    use base64::Engine;
+    let config = load_runtime_config_file(&app);
+    let Ok(adapter) = adapter_registry::find_adapter(&config.adapter_plugin_paths, &adapter_id)
+    else {
+        return Ok(None);
+    };
+    let Some(icon_path) = adapter.icon_path.as_ref() else {
+        return Ok(None);
+    };
+    let path = std::path::Path::new(icon_path);
+    if !path.is_file() {
+        return Ok(None);
+    }
+    let bytes = match fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            eprintln!(
+                "read_adapter_icon: failed to read {} for {}: {}",
+                path.display(),
+                adapter_id,
+                error
+            );
+            return Ok(None);
+        }
+    };
+    Ok(Some(AdapterIconPayload {
+        mime: icon_mime_for_path(path).to_string(),
+        base64: base64::engine::general_purpose::STANDARD.encode(&bytes),
+    }))
 }
 
 fn load_history_file(path: &PathBuf) -> Result<Vec<HistoryEntry>, String> {
@@ -1264,6 +1353,7 @@ pub fn run() {
             load_runtime_config,
             save_runtime_config,
             load_user_themes,
+            read_adapter_icon,
             load_adapters,
             runtime_probe,
             runtime_adapter_probe,

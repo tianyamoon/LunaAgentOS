@@ -2,9 +2,9 @@
 
 [中文](./current-boundary.zh-CN.md)
 
-LunaAgentOS 0.1 Preview is a neutral desktop workspace for real AI agent sessions.
+LunaAgentOS is heading toward a personal Agent operating system for the AI era — a desktop layer where users install agents like apps, schedule tasks like processes, and own agent memory like local files. 0.2 Preview lays down the foundational capabilities on the way to that goal: a credible, archivable, neutral desktop workspace that hosts real AI agent sessions.
 
-This page defines the release boundary: what exists now, what 0.1 Preview is intentionally not, and what the next layer should make possible.
+This page captures the current release boundary: what is actually built today, where the next stretch of road goes, and which common misreadings to clear up early.
 
 ## What it is now
 
@@ -26,14 +26,19 @@ This page defines the release boundary: what exists now, what 0.1 Preview is int
 - Local JSON history stores session turns and supports restore/read-only states.
 - When a runtime entry is not installed, its entry remains visible in the Agent Fleet with a clear configuration state. This is an explainable state, not a crash or silent failure.
 
-## What it is not now
+## How far the full form still is
 
-- It is not a single built-in agent runtime that absorbs external products.
-- It is not a complete multi-agent orchestration platform.
-- It is not a marketplace or broad commercial platform.
-- It does not make every agent internally identical.
-- It does not provide a shared memory bus across agents.
-- It does not present remote or team entry points as available 0.1 Preview features.
+0.2 Preview is a foundation stage. The next stretch of road grows naturally in these directions:
+
+- **Multi-agent orchestration**: the "current send target" carries single-track work today; cross-agent scheduling and collaboration is the headline of the next stage.
+- **Cross-agent context bridging and shared memory**: first make sessions resumable in place, then targeted session handoff, and only then a shared memory bus across agents.
+- **Remote and team entries**: an expansion direction for after the local experience is steady.
+- **Agent marketplace and ecosystem layer**: the adapter manifest already reserves the integration surface; the product shape comes in later releases.
+
+A few boundaries are worth stating once, to keep LunaAgentOS from being mistaken for something it is not:
+
+- It does not absorb external agents into a single built-in runtime — each agent keeps its own internal mechanism.
+- The adapter layer is a translator, not a homogenizer.
 
 ## Modeling rules
 
@@ -57,7 +62,7 @@ The adapter rule is:
 new agent product -> adapter manifest + adapter implementation -> LunaAgentOS unified JSON contract
 ```
 
-Adding a new agent product should follow adapter/plugin installation and normalized Runtime Session events. That path is the next integration model, not a promise that every possible adapter is already production-ready.
+New agent products enter through adapter/plugin installation and normalized Runtime Session events. The adapter contract is the integration surface for that path and is still being polished.
 
 ### Current send target
 
@@ -78,7 +83,7 @@ A session card is the shared surface for:
 
 ## Next layer
 
-The next layer is not a rebrand and not a jump to a full orchestration platform. It should focus on:
+The next layer builds on the 0.2 workspace foundation. It focuses on:
 
 - Hardening Claude Code and Hermes runtime entry reliability.
 - Making local history and restore behavior easier to trust.

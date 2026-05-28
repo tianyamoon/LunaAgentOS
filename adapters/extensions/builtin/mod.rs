@@ -162,6 +162,9 @@ mod tests {
             },
             source_path: "".to_string(),
             manifest_id: "codex".to_string(),
+            icon_path: None,
+            brand_color: None,
+            identity_only: false,
         };
 
         let spec = generic_launch_spec(

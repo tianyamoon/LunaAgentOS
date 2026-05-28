@@ -1,75 +1,77 @@
-import { describe, test } from "node:test";
+import { beforeEach, describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { resolveIconSlug, resolveBrandColor, renderProviderIcon, iconPathForSlug } from "./providerIcon.js";
+import {
+  NEUTRAL_BRAND_COLOR,
+  adapterIconUrl,
+  renderProviderIcon,
+  resolveBrandColor,
+  setAdapterIcon,
+  setAdapterIconRegistry,
+} from "./providerIcon.js";
 
 describe("providerIcon", () => {
-  test("resolveIconSlug returns builtin slug for known providers", () => {
-    assert.equal(resolveIconSlug({ id: "claude" }), "claude");
-    assert.equal(resolveIconSlug({ id: "codex" }), "openai");
-    assert.equal(resolveIconSlug({ id: "trae" }), "trae");
-    assert.equal(resolveIconSlug({ id: "hermes" }), null);
+  beforeEach(() => {
+    setAdapterIconRegistry({});
   });
 
-  test("resolveIconSlug prefers provider.iconSlug over builtin", () => {
-    assert.equal(resolveIconSlug({ id: "claude", iconSlug: "custom" }), "custom");
+  test("adapterIconUrl reads icons registered by adapter id", () => {
+    setAdapterIcon("claude", "data:image/svg+xml;base64,PHN2Zy8+");
+    assert.equal(adapterIconUrl("claude"), "data:image/svg+xml;base64,PHN2Zy8+");
+    assert.equal(adapterIconUrl("unknown"), null);
   });
 
-  test("resolveIconSlug reads adapterManifest.iconSlug", () => {
-    assert.equal(resolveIconSlug({ id: "foo", adapterManifest: { iconSlug: "openai" } }), "openai");
+  test("setAdapterIcon removes an icon when url is empty", () => {
+    setAdapterIcon("claude", "data:image/svg+xml;base64,PHN2Zy8+");
+    setAdapterIcon("claude", null);
+    assert.equal(adapterIconUrl("claude"), null);
   });
 
-  test("resolveIconSlug returns null for unknown provider without iconSlug", () => {
-    assert.equal(resolveIconSlug({ id: "unknown" }), null);
-    assert.equal(resolveIconSlug(null), null);
+  test("setAdapterIconRegistry replaces previous registry", () => {
+    setAdapterIcon("claude", "data:image/svg+xml;base64,PHN2Zy8+");
+    setAdapterIconRegistry({ trae: "data:image/png;base64,AAAA" });
+    assert.equal(adapterIconUrl("claude"), null);
+    assert.equal(adapterIconUrl("trae"), "data:image/png;base64,AAAA");
   });
 
-  test("resolveBrandColor returns builtin color for known providers", () => {
-    assert.equal(resolveBrandColor({ id: "claude" }), "#D4A27F");
-    assert.equal(resolveBrandColor({ id: "hermes" }), "#40B4A6");
+  test("setAdapterIconRegistry accepts Map entries", () => {
+    setAdapterIconRegistry(new Map([["codex", "data:image/png;base64,BBBB"]]));
+    assert.equal(adapterIconUrl("codex"), "data:image/png;base64,BBBB");
   });
 
   test("resolveBrandColor prefers provider.brandColor", () => {
     assert.equal(resolveBrandColor({ id: "claude", brandColor: "#FF0000" }), "#FF0000");
   });
 
-  test("resolveBrandColor returns #666 for unknown", () => {
-    assert.equal(resolveBrandColor({ id: "unknown" }), "#666");
-    assert.equal(resolveBrandColor(null), "#666");
+  test("resolveBrandColor reads adapterManifest brandColor", () => {
+    assert.equal(resolveBrandColor({ id: "claude", adapterManifest: { brandColor: "#D4A27F" } }), "#D4A27F");
   });
 
-  test("iconPathForSlug returns path for registered slugs", () => {
-    const path = iconPathForSlug("claude");
-    assert.ok(path);
-    assert.ok(path.includes("claude.svg"));
-    const traePath = iconPathForSlug("trae");
-    assert.ok(traePath);
-    assert.ok(traePath.includes("trae.png"));
+  test("resolveBrandColor returns neutral color for unknown", () => {
+    assert.equal(resolveBrandColor({ id: "unknown" }), NEUTRAL_BRAND_COLOR);
+    assert.equal(resolveBrandColor(null), NEUTRAL_BRAND_COLOR);
   });
 
-  test("iconPathForSlug returns null for unregistered slugs", () => {
-    assert.equal(iconPathForSlug("nonexistent"), null);
-  });
-
-  test("renderProviderIcon returns img tag for claude", () => {
+  test("renderProviderIcon returns img tag for registered adapter icon", () => {
+    setAdapterIcon("claude", "data:image/svg+xml;base64,PHN2Zy8+");
     const html = renderProviderIcon({ id: "claude", name: "Claude Code" });
     assert.ok(html.includes("provider-icon-img"));
     assert.ok(html.includes("<img"));
-    assert.ok(html.includes("claude.svg"));
+    assert.ok(html.includes("data:image/svg+xml;base64,PHN2Zy8+"));
   });
 
-  test("renderProviderIcon returns fallback icon for hermes", () => {
-    const html = renderProviderIcon({ id: "hermes", name: "Hermes" });
-    assert.ok(html.includes("provider-icon-fallback"));
-    assert.ok(html.includes(">H<"));
-  });
-
-  test("renderProviderIcon returns fallback for unknown provider", () => {
+  test("renderProviderIcon returns fallback when no adapter icon is registered", () => {
     const html = renderProviderIcon({ id: "foo", name: "FooAgent" });
     assert.ok(html.includes("provider-icon-fallback"));
     assert.ok(html.includes(">F<"));
   });
 
+  test("renderProviderIcon uses adapter manifest brand color for fallback", () => {
+    const html = renderProviderIcon({ id: "foo", name: "FooAgent", adapterManifest: { brandColor: "#123456" } });
+    assert.ok(html.includes("--pi-color:#123456"));
+  });
+
   test("renderProviderIcon uses custom size", () => {
+    setAdapterIcon("claude", "data:image/svg+xml;base64,PHN2Zy8+");
     const html = renderProviderIcon({ id: "claude" }, { size: "20px" });
     assert.ok(html.includes("width:20px"));
     assert.ok(html.includes("height:20px"));

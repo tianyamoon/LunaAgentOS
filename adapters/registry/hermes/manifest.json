@@ -2,6 +2,7 @@
   "id": "hermes",
   "name": "Hermes",
   "extension": "builtin.hermes",
+  "icon": "assets/icon.png",
   "brandColor": "#40B4A6",
   "transport": "stdio_json",
   "command": [

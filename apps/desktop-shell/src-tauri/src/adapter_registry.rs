@@ -30,6 +30,29 @@ pub struct AdapterDefinition {
     pub permissions: AdapterPermissions,
     pub source_path: String,
     pub manifest_id: String,
+    /// Absolute filesystem path to the icon asset declared by the manifest's
+    /// `icon` field (resolved against the manifest directory). `None` means
+    /// the manifest declares no icon and the shell should fall back to a
+    /// first-letter badge. The path is kept absolute so the
+    /// `read_adapter_icon` Tauri command can read it without re-resolving.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon_path: Option<String>,
+    /// Brand color (e.g. `"#D4A27F"`) declared by the manifest. `None` means
+    /// the manifest is silent and the shell should pick a neutral default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub brand_color: Option<String>,
+    /// `true` when the manifest is identity-only (no `transport` / `command`).
+    /// Such adapters appear in the registry for iconography but are never
+    /// selected by the launch path. See `load_manifest_file` for how the
+    /// loader synthesises a stub command/health-check pair to keep the rest
+    /// of the pipeline happy.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub identity_only: bool,
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -103,6 +126,13 @@ struct RawManifest {
     capabilities: AdapterCapabilities,
     #[serde(default)]
     permissions: AdapterPermissions,
+    /// Identity fields. Read by `load_manifest_file` and forwarded to
+    /// `AdapterDefinition`. Per-contribution overrides live on
+    /// `RawAdapterContribution`.
+    icon: Option<String>,
+    brand_color: Option<String>,
+    #[serde(default)]
+    identity_only: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -133,6 +163,11 @@ struct RawAdapterContribution {
     capabilities: AdapterCapabilities,
     #[serde(default)]
     permissions: AdapterPermissions,
+    /// Per-contribution identity overrides. When `None`, the loader falls
+    /// back to the parent manifest's `icon` / `brand_color` (which is the
+    /// common case: one logo per manifest, shared by all contributions).
+    icon: Option<String>,
+    brand_color: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -247,14 +282,45 @@ fn load_manifest_file(path: &Path) -> Result<Vec<AdapterDefinition>, String> {
             .collect();
     }
 
-    let Some(transport) = manifest.transport else {
-        return Err("manifest must define contributes.acpAdapters or transport".to_string());
+    // Identity-only manifests are allowed to omit transport and command.
+    // They appear in the registry purely so the shell can pick up the icon
+    // + brand color; the launch path filters them out via the `identity_only`
+    // flag, and the synthesised "stub" command/health-check below keeps
+    // downstream code that always expects a non-empty command string from
+    // panicking.
+    let is_identity_only =
+        manifest.identity_only && manifest.transport.is_none() && manifest.command.is_none();
+
+    let (transport, command, args, health_check, permissions) = if is_identity_only {
+        (
+            "none".to_string(),
+            String::new(),
+            Vec::<String>::new(),
+            None,
+            AdapterPermissions::default(),
+        )
+    } else {
+        let Some(transport) = manifest.transport else {
+            return Err(
+                "manifest must define contributes.acpAdapters or transport (or set \"identityOnly\": true)"
+                    .to_string(),
+            );
+        };
+        let Some(command_spec) = manifest.command else {
+            return Err("manifest must define command (or set \"identityOnly\": true)".to_string());
+        };
+        let (command, args) = command_spec.into_parts(manifest.args)?;
+        (
+            transport,
+            command,
+            args,
+            raw_health_check(manifest.health_check)?,
+            manifest.permissions,
+        )
     };
-    let Some(command) = manifest.command else {
-        return Err("manifest must define command".to_string());
-    };
-    let (command, args) = command.into_parts(manifest.args)?;
-    Ok(vec![finalize_adapter(AdapterDefinition {
+
+    let icon_path = resolve_icon_path(manifest.icon.as_deref(), manifest_dir);
+    let definition = AdapterDefinition {
         id: manifest.id.clone(),
         name: manifest.name.clone(),
         extension: manifest.extension.clone(),
@@ -266,12 +332,23 @@ fn load_manifest_file(path: &Path) -> Result<Vec<AdapterDefinition>, String> {
         env: manifest.env,
         cwd: resolve_cwd(manifest.cwd, manifest_dir),
         requires_pty: manifest.requires_pty,
-        health_check: raw_health_check(manifest.health_check)?,
+        health_check,
         capabilities: manifest.capabilities,
-        permissions: manifest.permissions,
+        permissions,
         source_path,
         manifest_id: manifest.id,
-    })])
+        icon_path,
+        brand_color: manifest.brand_color,
+        identity_only: is_identity_only,
+    };
+
+    if is_identity_only {
+        // Skip command-permission / health-check synthesis; identity-only
+        // adapters have no command to defend.
+        Ok(vec![definition])
+    } else {
+        Ok(vec![finalize_adapter(definition)])
+    }
 }
 
 fn adapter_from_contribution(
@@ -281,6 +358,13 @@ fn adapter_from_contribution(
     source_path: &str,
 ) -> Result<AdapterDefinition, String> {
     let (command, args) = adapter.command.into_parts(adapter.args)?;
+    let icon_path = resolve_icon_path(
+        adapter.icon.as_deref().or(manifest.icon.as_deref()),
+        manifest_dir,
+    );
+    let brand_color = adapter
+        .brand_color
+        .or_else(|| manifest.brand_color.clone());
     Ok(finalize_adapter(AdapterDefinition {
         id: adapter.id,
         name: adapter.name,
@@ -298,7 +382,31 @@ fn adapter_from_contribution(
         permissions: adapter.permissions,
         source_path: source_path.to_string(),
         manifest_id: manifest.id.clone(),
+        icon_path,
+        brand_color,
+        identity_only: false,
     }))
+}
+
+/// Resolve an `icon` field from a manifest into an absolute filesystem path.
+///
+/// `None` and empty strings yield `None`. Relative paths are joined onto the
+/// directory containing the manifest, exactly like `cwd` resolution. Absolute
+/// paths are passed through unchanged. The result is the actual location the
+/// `read_adapter_icon` Tauri command will read from later, so we keep it
+/// absolute to avoid re-resolving against an unknown cwd at command time.
+fn resolve_icon_path(icon: Option<&str>, manifest_dir: &Path) -> Option<String> {
+    let trimmed = icon?.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let path = PathBuf::from(trimmed);
+    let resolved = if path.is_absolute() {
+        path
+    } else {
+        manifest_dir.join(path)
+    };
+    Some(resolved.to_string_lossy().to_string())
 }
 
 fn raw_health_check(value: Option<RawHealthCheck>) -> Result<Option<AdapterHealthCheck>, String> {
@@ -492,6 +600,9 @@ mod tests {
             },
             source_path: "".to_string(),
             manifest_id: "codex".to_string(),
+            icon_path: None,
+            brand_color: None,
+            identity_only: false,
         };
         assert!(
             allow_process_exec(&adapter, "npx", &["-y".into(), "@openai/codex".into()]).is_ok()
@@ -503,6 +614,77 @@ mod tests {
         )
         .is_ok());
         assert!(allow_process_exec(&adapter, "node", &[]).is_err());
+    }
+
+    #[test]
+    fn load_manifest_file_reads_icon_and_brand_color() {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock before unix epoch")
+            .as_nanos();
+        let dir = env::temp_dir().join(format!("lunaagentos-manifest-icon-{nonce}"));
+        let assets = dir.join("assets");
+        fs::create_dir_all(&assets).expect("create temp manifest dir");
+        fs::write(assets.join("icon.svg"), b"<svg/>").expect("write icon");
+        fs::write(
+            dir.join("manifest.json"),
+            r##"{
+                "id": "demo",
+                "name": "Demo",
+                "icon": "assets/icon.svg",
+                "brandColor": "#abcdef",
+                "transport": "stdio_json",
+                "command": ["demo"]
+            }"##,
+        )
+        .expect("write manifest");
+
+        let result = load_manifest_file(&dir.join("manifest.json")).expect("load manifest");
+        let adapter = result.into_iter().next().expect("one adapter expected");
+        assert_eq!(adapter.brand_color.as_deref(), Some("#abcdef"));
+        assert!(!adapter.identity_only);
+        let icon = adapter.icon_path.as_deref().expect("icon path resolved");
+        assert!(icon.ends_with("icon.svg"), "icon = {icon}");
+        assert!(
+            std::path::Path::new(icon).is_file(),
+            "icon path should be readable: {icon}"
+        );
+
+        fs::remove_dir_all(&dir).expect("remove temp manifest dir");
+    }
+
+    #[test]
+    fn load_manifest_file_accepts_identity_only_without_command() {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock before unix epoch")
+            .as_nanos();
+        let dir = env::temp_dir().join(format!("lunaagentos-manifest-identity-only-{nonce}"));
+        fs::create_dir_all(&dir).expect("create temp manifest dir");
+        fs::write(
+            dir.join("manifest.json"),
+            r##"{
+                "id": "stub",
+                "name": "Stub",
+                "brandColor": "#123456",
+                "identityOnly": true
+            }"##,
+        )
+        .expect("write manifest");
+
+        let adapter = load_manifest_file(&dir.join("manifest.json"))
+            .expect("identity-only manifest must load")
+            .into_iter()
+            .next()
+            .expect("one adapter expected");
+        assert!(adapter.identity_only);
+        assert_eq!(adapter.transport, "none");
+        assert!(adapter.command.is_empty());
+        assert!(adapter.health_check.is_none());
+        assert!(adapter.permissions.process_exec.is_empty());
+        assert_eq!(adapter.brand_color.as_deref(), Some("#123456"));
+
+        fs::remove_dir_all(&dir).expect("remove temp manifest dir");
     }
 
     #[test]

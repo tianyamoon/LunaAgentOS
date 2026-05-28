@@ -2,9 +2,9 @@
 
 [English](./current-boundary.md)
 
-LunaAgentOS 0.1 Preview 是真实 AI Agent 会话的中立桌面工作台。
+LunaAgentOS 的目标是 AI 时代的个人 Agent 操作系统：让用户像装应用一样装 Agent、像调度进程一样调度任务、像管本地资料一样掌控 Agent 记忆。0.2 Preview 沉淀了通往这个目标的若干先决能力——一个能承载真实 AI Agent 会话、可信且可归档的中立桌面工作台。
 
-这个页面定义发布边界：现在已经存在什么、0.1 Preview 有意不是什么、下一层能力应该解决什么。
+这个页面给出当前发布边界：现在已经做实了什么、下一段路怎么走、哪些常见误解需要先讲清。
 
 ## 现在是什么
 
@@ -26,14 +26,19 @@ LunaAgentOS 0.1 Preview 是真实 AI Agent 会话的中立桌面工作台。
 - 本地 JSON history 支持 session turn 保存、恢复和只读归档
 - 当某个 runtime 未安装时，对应入口仍然显示在 Agent Fleet 中，并显示明确的配置状态。这是可解释状态，不是崩溃或静默失败
 
-## 现在不是什么
+## 距离完整形态还有多远
 
-- 不是试图把外部产品全部收编进单一内置 Agent 的运行时
-- 不是完整的多 Agent orchestration 平台
-- 不是 marketplace 或大型商业平台
-- 不会把所有 Agent 内部机制强行做成一样
-- 不提供跨 Agent 的 shared memory bus
-- 不把 remote 或 team entry point 表达为 0.1 Preview 已可用能力
+0.2 Preview 是奠基阶段，下一段路在这些方向上顺势展开：
+
+- **多 Agent orchestration**：当前以“当前发送目标”承担单线工作流；跨 Agent 调度与协作是下一阶段的核心命题
+- **跨 Agent 上下文桥接与共享记忆**：先做 session 内可恢复，再做可定向的 session handoff，最后再设计跨 Agent 记忆总线
+- **Remote 与 team 入口**：本地稳态之后的扩张方向
+- **Agent marketplace 与生态层**：adapter manifest 已为它留好接入面，产品形态留待后续版本
+
+也借此划清几条边界，避免把 LunaAgentOS 错认成它不是的东西：
+
+- 不把外部 Agent 收编为单一内置 runtime——每个 Agent 保留自己的内部机制
+- adapter 是翻译层，不是同化层
 
 ## 建模规则
 
@@ -57,7 +62,7 @@ adapter 规则是：
 new agent product -> adapter manifest + adapter implementation -> LunaAgentOS unified JSON contract
 ```
 
-新增 Agent 产品应该沿着 adapter/plugin 安装路径和归一化 Runtime Session events 进入系统。这是下一步接入模型，不是所有可能 adapter 都已经生产可用的承诺。
+新增 Agent 产品沿着 adapter/plugin 安装路径和归一化 Runtime Session events 进入系统。adapter contract 是这条路的接入面，仍在持续打磨。
 
 ### 当前发送目标
 
@@ -78,7 +83,7 @@ new agent product -> adapter manifest + adapter implementation -> LunaAgentOS un
 
 ## 下一层能力
 
-下一层不是再次改名，也不是直接跳到完整 orchestration 平台。它应该聚焦：
+下一层走在 0.2 的工作台底盘之上，重点把这些做扎实：
 
 - 加强 Claude Code 和 Hermes runtime entry 的可靠性
 - 让本地历史和恢复行为更可信

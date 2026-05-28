@@ -37,7 +37,7 @@ import {
 } from "./ui/sessionCardView.js";
 import { turnEventsFromTurn } from "./ui/turnEvents.js";
 import { renderTurnEventItemHtml, renderTurnEventsHtml } from "./ui/turnEventsView.js";
-import { renderProviderIcon } from "./ui/providerIcon.js";
+import { renderProviderIcon, setAdapterIconRegistry } from "./ui/providerIcon.js";
 import {
   LIFECYCLE,
   InvalidLifecycleTransition,
@@ -1240,6 +1240,25 @@ async function loadUserThemes() {
   }
 }
 
+async function loadAdapterIcons(adapters) {
+  if (typeof invoke !== "function") return;
+  const iconEntries = {};
+  await Promise.all(
+    (Array.isArray(adapters) ? adapters : []).map(async (adapter) => {
+      if (!adapter?.id || !adapter?.iconPath) return;
+      try {
+        const payload = await invoke("read_adapter_icon", { adapterId: adapter.id });
+        if (payload?.mime && payload?.base64) {
+          iconEntries[adapter.id] = `data:${payload.mime};base64,${payload.base64}`;
+        }
+      } catch (error) {
+        console.warn("read_adapter_icon failed", adapter.id, error);
+      }
+    }),
+  );
+  setAdapterIconRegistry(iconEntries);
+}
+
 function updateSendModeLabel() {
   if (!sendModeBtn) return;
   sendModeBtn.textContent = sendMode === "enter" ? t("composer.enterSend") : t("composer.ctrlEnter");
@@ -1686,9 +1705,11 @@ function showProviderAgents(provider) {
 async function refreshRuntimeProbe() {
   try {
     const adapterResult = await invoke("load_adapters");
+    const adapters = adapterResult?.adapters || [];
+    await loadAdapterIcons(adapters);
     const result = await invoke("runtime_probe");
     providersStore.batch(() => {
-      providersStore.syncAdapterProviders(adapterResult?.adapters || []);
+      providersStore.syncAdapterProviders(adapters);
       providersStore.patchRuntimeAvailability(
         Object.fromEntries((result?.providers || []).map((item) => [item.providerId, item])),
       );
@@ -1699,6 +1720,8 @@ async function refreshRuntimeProbe() {
     });
     ensureCurrentTargetAgentExists();
     renderProviders();
+    renderWorkspace();
+    renderHistory();
     renderWorkspaceStatus();
     getAvailabilityStore().refresh(providers, runtimeInstances, currentTargetAgent());
     [...new Set(runtimeInstances.filter((instance) => instance.available).map((instance) => instance.providerId))]
