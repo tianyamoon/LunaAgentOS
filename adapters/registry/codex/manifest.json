@@ -1,6 +1,8 @@
 {
   "id": "codex",
   "name": "OpenAI Codex",
+  "icon": "assets/icon.svg",
+  "brandColor": "#412991",
   "transport": "stdio_json",
   "command": [
     "npx",

@@ -2,6 +2,8 @@
   "id": "claude",
   "name": "Claude Code",
   "extension": "builtin.claude",
+  "icon": "assets/icon.svg",
+  "brandColor": "#D4A27F",
   "transport": "stdio_json",
   "command": [
     "npx",

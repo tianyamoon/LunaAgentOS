@@ -1,0 +1,8 @@
+{
+  "id": "trae",
+  "name": "Trae IDE",
+  "icon": "assets/icon.png",
+  "brandColor": "#325AB4",
+  "placeholder": true,
+  "description": "Identity-only manifest. Trae is reserved as a planned IDE bridge entry; no runtime command is registered yet."
+}
