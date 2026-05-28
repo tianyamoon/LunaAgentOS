@@ -34,7 +34,7 @@ const bundledModules = import.meta.glob("./*.json", { eager: true, import: "defa
 
 // Preferred display order for shipped built-in themes. Themes not listed
 // here (user themes, future built-ins) sort alphabetically after these.
-const DISPLAY_ORDER = ["light", "dark-neutral", "dark-warm", "dark-high-contrast"];
+const DISPLAY_ORDER = ["light", "soft-light", "dark-neutral", "dark-warm", "dark-high-contrast"];
 
 export const DEFAULT_THEME_ID = "light";
 
