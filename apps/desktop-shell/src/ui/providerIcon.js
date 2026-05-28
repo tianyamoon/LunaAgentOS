@@ -1,22 +1,18 @@
 // Provider icon rendering — maps provider iconSlug to an asset path or first-letter fallback.
-// Icon assets live in src/assets/provider-icons/. Both SVG and PNG are supported.
+// Icon assets live in src/public/provider-icons/ (Vite's publicDir), so they are
+// copied as-is to dist/provider-icons/ and served from the webview root. We
+// reference them by absolute URL ("/provider-icons/<file>") which works the same
+// in `vite dev`, the production bundle, and Node tests (since these are plain
+// strings, not module imports).
 // Dynamic adapters can specify an iconSlug in their manifest to reuse a registered icon.
 
 /**
- * Registry of built-in icon slugs → resolved asset URL.
- *
- * Uses `new URL(path, import.meta.url)` so Vite recognises the static
- * dependency at build time and emits a hashed asset under dist/assets/.
- * Plain string paths are invisible to Vite's asset graph, which is why
- * the previous "./assets/..." literals were missing from the bundle.
- *
- * Both forms (Vite-bundled URL in production, file:// URL under Node
- * tests) still satisfy the runtime contract: `<img src>` accepts either.
+ * Registry of built-in icon slugs → asset URL relative to the webview root.
  */
 const ICON_REGISTRY = {
-  claude: new URL("../assets/provider-icons/claude.svg", import.meta.url).href,
-  openai: new URL("../assets/provider-icons/openai.svg", import.meta.url).href,
-  trae: new URL("../assets/provider-icons/trae.png", import.meta.url).href,
+  claude: "/provider-icons/claude.svg",
+  openai: "/provider-icons/openai.svg",
+  trae: "/provider-icons/trae.png",
 };
 
 /**
