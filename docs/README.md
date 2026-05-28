@@ -13,7 +13,7 @@ If you are new here, start with the docs that answer three practical questions f
 ## Start here
 
 - [Getting Started](./getting-started.md): install dependencies, run the desktop app, and validate the current workspace
-- [0.2.1 Release Notes](./release-notes-0.2.1.md): new capabilities, retained boundaries, and who this release is for
+- [0.2.2 Release Notes](./release-notes-0.2.2.md): new capabilities, fixes, and retained boundaries
 - [Current Product Boundary](./current-boundary.md): what LunaAgentOS has built today, where the next stretch of road goes, and which common misreadings to clear up early
 - [Contributing](../CONTRIBUTING.md): development setup, tests, contribution areas, and pull request expectations
 

@@ -12,7 +12,7 @@
   <a href="./README.en.md">English</a>
 </p>
 
-**LunaAgentOS 0.2.1**
+**LunaAgentOS 0.2.2**
 
 LunaAgentOS 是为多 Agent 工作与协作而生的个人桌面操作环境。
 
@@ -175,7 +175,7 @@ apps/desktop-shell/src-tauri/target/release/desktop-shell.exe
 
 ## 产品边界
 
-LunaAgentOS 0.2.1 当前是：
+LunaAgentOS 0.2.2 当前是：
 
 - 真实 AI Agent 会话的中立桌面工作台
 - 面向 Claude Code、Hermes 和 OpenAI Codex Manifest session 的 Windows 优先本地应用
@@ -184,7 +184,7 @@ LunaAgentOS 0.2.1 当前是：
 - Human Command Workspace 的第一块可运行地基
 - 由 protocol、adapters 和 Runtime Session Model 支撑的产品界面
 
-LunaAgentOS 0.2.1 当前不是：
+LunaAgentOS 0.2.2 当前不是：
 
 - 试图把外部 runtime 全部收编成单一内置 Agent 的产品
 - 完整的多 Agent orchestration 平台
@@ -197,7 +197,7 @@ LunaAgentOS 0.2.1 当前不是：
 ### 先看这些
 
 - [文档总览](./docs/README.zh-CN.md)
-- [0.2.1 发布说明](./docs/release-notes-0.2.1.zh-CN.md)
+- [0.2.2 发布说明](./docs/release-notes-0.2.2.zh-CN.md)
 - [快速开始](./docs/getting-started.zh-CN.md)
 - [当前产品边界](./docs/current-boundary.zh-CN.md)
 - [贡献指南](./CONTRIBUTING.zh-CN.md)
