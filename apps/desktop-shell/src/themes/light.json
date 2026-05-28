@@ -1,0 +1,39 @@
+{
+  "id": "light",
+  "label": {
+    "zh-CN": "浅色",
+    "en-US": "Light"
+  },
+  "colorScheme": "light",
+  "vars": {
+    "--bg": "#f3efe7",
+    "--panel": "rgba(255, 251, 245, 0.95)",
+    "--panel-strong": "rgba(255, 253, 249, 0.98)",
+    "--border": "rgba(82, 61, 38, 0.12)",
+    "--text": "#1f1a16",
+    "--muted": "#7a6755",
+    "--accent": "#d96c3a",
+    "--accent-soft": "rgba(217, 108, 58, 0.1)",
+    "--thinking": "#b26b00",
+    "--tooling": "#9653d6",
+    "--done": "#217a4c",
+    "--error": "#c03a3a",
+    "--shadow": "0 18px 55px rgba(73, 49, 25, 0.08)",
+    "--scrollbar-thumb": "rgba(99, 82, 63, 0.14)",
+    "--scrollbar-thumb-hover": "rgba(99, 82, 63, 0.34)",
+    "--scrollbar-thumb-active": "rgba(217, 108, 58, 0.32)",
+    "--surface-raised-rgb": "255, 255, 255",
+    "--accent-tint-from": "rgba(255, 247, 238, 0.98)",
+    "--accent-tint-to": "rgba(255, 229, 207, 0.86)",
+    "--code-text": "#3c332a",
+    "--terminal-muted": "#6d5a48",
+    "--inline-code": "#8b4a24",
+    "--blockquote-text": "#5b4636",
+    "--label-warm": "#7d5e43",
+    "--mini-card-title": "#4f3b27",
+    "--brand-logo-filter": "none",
+    "--composer-bg": "rgba(var(--surface-raised-rgb), 0.58)",
+    "--composer-input-bg": "rgba(var(--surface-raised-rgb), 0.8)",
+    "--body-background": "radial-gradient(circle at top left, rgba(217, 108, 58, 0.16), transparent 26%), radial-gradient(circle at right, rgba(150, 83, 214, 0.1), transparent 22%), var(--bg)"
+  }
+}

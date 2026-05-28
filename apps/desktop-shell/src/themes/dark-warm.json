@@ -1,0 +1,39 @@
+{
+  "id": "dark-warm",
+  "label": {
+    "zh-CN": "暖夜深棕",
+    "en-US": "Warm Night"
+  },
+  "colorScheme": "dark",
+  "vars": {
+    "--bg": "#1a1612",
+    "--panel": "rgba(34, 28, 22, 0.92)",
+    "--panel-strong": "rgba(42, 35, 27, 0.96)",
+    "--border": "rgba(217, 196, 168, 0.14)",
+    "--text": "#f0e6d5",
+    "--muted": "#a89476",
+    "--accent": "#ff9a5e",
+    "--accent-soft": "rgba(255, 154, 94, 0.18)",
+    "--thinking": "#f0c878",
+    "--tooling": "#d6a5ff",
+    "--done": "#86dba8",
+    "--error": "#ff8a80",
+    "--shadow": "0 18px 55px rgba(0, 0, 0, 0.60)",
+    "--scrollbar-thumb": "rgba(240, 230, 213, 0.16)",
+    "--scrollbar-thumb-hover": "rgba(240, 230, 213, 0.36)",
+    "--scrollbar-thumb-active": "rgba(255, 154, 94, 0.42)",
+    "--surface-raised-rgb": "62, 50, 38",
+    "--accent-tint-from": "rgba(255, 154, 94, 0.08)",
+    "--accent-tint-to": "rgba(255, 154, 94, 0.03)",
+    "--code-text": "#e6d8c0",
+    "--terminal-muted": "#b09a78",
+    "--inline-code": "#ffc098",
+    "--blockquote-text": "#d8c8aa",
+    "--label-warm": "#d4c0a0",
+    "--mini-card-title": "#f4ead6",
+    "--brand-logo-filter": "invert(1) hue-rotate(180deg) brightness(0.9) saturate(1.1)",
+    "--composer-bg": "rgba(10, 6, 2, 0.30)",
+    "--composer-input-bg": "rgba(10, 6, 2, 0.48)",
+    "--body-background": "radial-gradient(circle at top left, rgba(255, 154, 94, 0.14), transparent 26%), radial-gradient(circle at right, rgba(214, 165, 255, 0.08), transparent 22%), var(--bg)"
+  }
+}

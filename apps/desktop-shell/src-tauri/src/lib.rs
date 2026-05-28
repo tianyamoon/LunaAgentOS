@@ -537,6 +537,53 @@ fn load_runtime_config(app: AppHandle) -> Result<RuntimeConfigFile, String> {
     Ok(load_runtime_config_file(&app))
 }
 
+// Resolve the on-disk directory where users may drop additional theme
+// JSON files (`~/.lunaagentos/themes/`). Returns None when the OS home
+// directory cannot be resolved; the frontend treats that as an empty set.
+fn user_themes_dir(app: &AppHandle) -> Option<PathBuf> {
+    let home = app.path().home_dir().ok()?;
+    Some(home.join(".lunaagentos").join("themes"))
+}
+
+// Load every `*.json` file under `~/.lunaagentos/themes/` and return them
+// to the frontend as raw JSON values. The frontend validates and merges
+// them via `registerUserThemes()`. Malformed or unreadable files are
+// silently skipped so a single bad file cannot brick the theme picker.
+#[tauri::command]
+fn load_user_themes(app: AppHandle) -> Vec<Value> {
+    let Some(dir) = user_themes_dir(&app) else {
+        return Vec::new();
+    };
+    if !dir.is_dir() {
+        return Vec::new();
+    }
+    let Ok(read_dir) = fs::read_dir(&dir) else {
+        return Vec::new();
+    };
+    let mut themes = Vec::new();
+    for entry in read_dir.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|value| value.to_str()) != Some("json") {
+            continue;
+        }
+        let Ok(raw) = fs::read_to_string(&path) else {
+            eprintln!("跳过无法读取的用户主题文件 {}", path.display());
+            continue;
+        };
+        match serde_json::from_str::<Value>(&raw) {
+            Ok(value) => themes.push(value),
+            Err(error) => {
+                eprintln!(
+                    "跳过解析失败的用户主题文件 {}：{}",
+                    path.display(),
+                    error
+                );
+            }
+        }
+    }
+    themes
+}
+
 #[tauri::command]
 fn save_runtime_config(
     app: AppHandle,
@@ -1216,6 +1263,7 @@ pub fn run() {
             append_history_entry,
             load_runtime_config,
             save_runtime_config,
+            load_user_themes,
             load_adapters,
             runtime_probe,
             runtime_adapter_probe,

@@ -68,6 +68,14 @@ import {
   toggleLanguage as toggleLanguagePref,
 } from "./i18n/index.js";
 import {
+  DEFAULT_THEME_ID,
+  THEMES,
+  findTheme,
+  nextThemeId,
+  registerUserThemes,
+  themeLabel,
+} from "./themes/index.js";
+import {
   archivedSessionsFromHistory as archivedSessionsFromHistoryRaw,
   historySessionKey,
 } from "./history/entries.js";
@@ -195,6 +203,7 @@ const CURRENT_TARGET_AGENT_KEY = "lunaagentos.currentTargetId";
 const CURRENT_SESSION_KEY = "lunaagentos.currentSessionId";
 const SEND_MODE_KEY = "lunaagentos.sendMode";
 const FONT_SCALE_KEY = "lunaagentos.fontScale";
+const THEME_KEY = "lunaagentos.theme";
 const PROVIDER_COLLAPSE_KEY = "lunaagentos.providerCollapsedIds";
 const SLASH_COMMAND_USAGE_KEY = "lunaagentos.slashCommandUsage";
 const HISTORY_SCHEMA_VERSION = 3;
@@ -290,6 +299,7 @@ const newSessionToggle = document.getElementById("newSessionToggle");
 const sendBtn = document.getElementById("sendBtn");
 const sendModeBtn = document.getElementById("sendModeBtn");
 const fontScaleBtn = document.getElementById("fontScaleBtn");
+const themeBtn = document.getElementById("themeBtn");
 const languageBtn = document.getElementById("languageBtn");
 const confirmDialog = document.getElementById("confirmDialog");
 
@@ -313,6 +323,7 @@ let isHistoryLoading = true;
 let sendAsNewSession = false;
 let sendMode = localStorage.getItem(SEND_MODE_KEY) || "enter";
 let fontScaleId = localStorage.getItem(FONT_SCALE_KEY) || "default";
+let themeId = localStorage.getItem(THEME_KEY) || DEFAULT_THEME_ID;
 let runtimeConfigSnapshot = null;
 let agentBriefs = {};
 const deletedSessionIds = sessionsStore.getDeletedSessionIdsRef();
@@ -801,6 +812,7 @@ function applyStaticTranslations() {
   if (providerManagerBtn) providerManagerBtn.textContent = t("availability.button");
   if (languageBtn) languageBtn.textContent = t("topbar.language");
   applyFontScale();
+  applyTheme();
   updateActionLabels();
   updateSendModeLabel();
   updatePromptPlaceholder();
@@ -1177,6 +1189,55 @@ function cycleFontScale() {
   fontScaleId = next.id;
   localStorage.setItem(FONT_SCALE_KEY, fontScaleId);
   applyFontScale();
+}
+
+function currentTheme() {
+  return findTheme(themeId) || findTheme(DEFAULT_THEME_ID) || THEMES[0];
+}
+
+function applyTheme() {
+  const theme = currentTheme();
+  if (!theme) return;
+  const root = document.documentElement;
+  const vars = theme.vars || {};
+  Object.entries(vars).forEach(([name, value]) => {
+    if (name && value !== undefined && value !== null) {
+      root.style.setProperty(name, String(value));
+    }
+  });
+  if (theme.colorScheme) {
+    root.style.setProperty("color-scheme", theme.colorScheme);
+  }
+  root.classList.toggle("theme-dark", theme.colorScheme === "dark");
+  root.classList.toggle("theme-light", theme.colorScheme !== "dark");
+  root.dataset.theme = theme.id;
+  if (themeBtn) {
+    themeBtn.textContent = t("topbar.theme", { name: themeLabel(theme, getLanguage()) });
+  }
+}
+
+function cycleTheme() {
+  themeId = nextThemeId(themeId);
+  localStorage.setItem(THEME_KEY, themeId);
+  applyTheme();
+}
+
+// Pull user-supplied themes from ~/.lunaagentos/themes/*.json via the
+// Tauri backend, merge them into the registry, and re-apply the active
+// theme so a persisted user-theme id picks up its real values instead
+// of falling back to the default. Failures are non-fatal: the built-in
+// theme set continues to work.
+async function loadUserThemes() {
+  if (typeof invoke !== "function") return;
+  try {
+    const userThemes = await invoke("load_user_themes");
+    if (Array.isArray(userThemes) && userThemes.length) {
+      registerUserThemes(userThemes);
+      applyTheme();
+    }
+  } catch (error) {
+    console.warn("load_user_themes failed", error);
+  }
 }
 
 function updateSendModeLabel() {
@@ -1957,6 +2018,7 @@ function createSessionForAgent(agent, firstTask) {
     gateway: hermesProfile?.gateway || null,
     skillCount: hermesProfile?.skillCount ?? null,
     hasSoul: hermesProfile?.hasSoul || false,
+    inWorkspace: true,
   };
   Object.assign(session, normalizeWorkspaceSession(session));
   sessionsStore.upsertHead(session);
@@ -2851,31 +2913,23 @@ function removeSessionFromWorkspace(sessionId) {
 async function dismissWorkspaceSession(sessionId) {
   const session = sessions.find((item) => item.id === sessionId);
   if (!session) return;
+  // Display-line only: drop the session from the workspace view but keep it in the
+  // sessions store so any in-flight runtime work (restoring, live ACP, resume_failed
+  // retries) can keep running and routing events. Lifecycle / runtime is untouched.
   const runtimeState = sessionRuntimeState(session);
   const wasArchived = isArchivedLifecycle(runtimeState);
-  if (runtimeState === "restoring") {
-    setAppNotice(t("session.dismissRestoringBlocked"), "busy");
-    return;
+  session.inWorkspace = false;
+  if (sessionsStore.getCurrentSessionId() === sessionId) {
+    clearCurrentSessionIf(sessionId);
   }
-  if (runtimeState === "live") {
-    await detachRuntimeKeepActive(session);
-    const lastTurn = session.turns.at(-1);
-    if (lastTurn) {
-      try {
-        await saveTurnToHistory(session, lastTurn);
-        historyEntries = await invoke("load_history_entries");
-      } catch (error) {
-        console.error(error);
-      }
-    }
+  if (scheduledWorkspaceRenderOptions?.focusSessionId === sessionId) {
+    scheduledWorkspaceRenderOptions = { ...scheduledWorkspaceRenderOptions, focusSessionId: null };
   }
-  const removed = removeSessionFromWorkspace(sessionId);
-  if (!removed) return;
   renderWorkspace();
   renderHistory();
   setAppNotice(wasArchived
-    ? t("session.dismissedArchived", { agent: removed.agentName })
-    : t("session.dismissedActive", { agent: removed.agentName }));
+    ? t("session.dismissedArchived", { agent: session.agentName })
+    : t("session.dismissedActive", { agent: session.agentName }));
 }
 
 async function deleteSession(sessionId) {
@@ -2931,7 +2985,7 @@ function renderWorkspace(options = {}) {
   const deckScrollLeft = sessionDeck.scrollLeft;
   const deckScrollTop = sessionDeck.scrollTop;
   const stickyIntent = sampleSessionStickyIntent();
-  const workspaceSessions = sessions;
+  const workspaceSessions = sessions.filter((session) => session.inWorkspace !== false);
   const visibleSessions = [...workspaceSessions].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
   updatePromptPlaceholder();
   renderWorkspaceStatus();
@@ -3080,6 +3134,7 @@ function sessionListItems() {
   const liveItems = sourceSessions.map((session) => {
     const identitySession = normalizeWorkspaceSession(session);
     const lastTurn = session.turns.at(-1);
+    const inWorkspace = session.inWorkspace !== false;
     return {
       id: session.id,
       date: session.createdAt.slice(0, 10),
@@ -3096,7 +3151,10 @@ function sessionListItems() {
       runtimeInstanceId: identitySession.runtimeInstanceId || null,
       targetId: identitySession.targetId || identitySession.agentId,
       acpSessionId: session.acpSessionId || null,
-      isInWorkspace: true,
+      // Display flag: only sessions actually shown in the workspace get the "in workspace" pill.
+      // A dismissed-but-still-live session keeps its runtimeState (live/restoring/...) so the
+      // history list reflects the real runtime status; the runtime keeps running in the background.
+      isInWorkspace: inWorkspace,
       isRuntimeAttached: true,
     };
   });
@@ -3226,10 +3284,14 @@ function bindSessionListActions() {
   historyList.querySelectorAll(".history-item.is-active-history").forEach((item) => {
     item.addEventListener("click", () => {
       const sessionId = item.dataset.sessionId;
-      if (!sessions.some((entry) => entry.id === sessionId)) {
+      const existing = sessions.find((entry) => entry.id === sessionId);
+      if (!existing) {
         restoreArchivedSession(sessionId);
         return;
       }
+      // Session is in the store but might have been dismissed from the workspace.
+      // Re-attach it to the workspace display before activating so the card actually shows up.
+      if (existing.inWorkspace === false) existing.inWorkspace = true;
       activateWorkspaceSession(sessionId, { focusWorkspace: true });
     });
   });
@@ -3346,6 +3408,7 @@ function workspaceSessionFromArchived(archived, existing = null) {
     restored.profileExecutable = inferHermesProfileExecutable(archived, restored);
   }
   restored.targetId = restored.targetId || restored.agentId;
+  restored.inWorkspace = true;
   Object.assign(restored, normalizeWorkspaceSession(restored));
   return restored;
 }
@@ -3648,6 +3711,10 @@ fontScaleBtn?.addEventListener("click", () => {
   cycleFontScale();
 });
 
+themeBtn?.addEventListener("click", () => {
+  cycleTheme();
+});
+
 languageBtn?.addEventListener("click", () => {
   toggleLanguage();
 });
@@ -3711,6 +3778,8 @@ if (listenRuntimeEvent) {
 renderProviders();
 applyStaticTranslations();
 applyFontScale();
+applyTheme();
+void loadUserThemes();
 updateSendModeLabel();
 renderWorkspace();
 renderHistory();

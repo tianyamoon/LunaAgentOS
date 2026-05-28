@@ -1,0 +1,39 @@
+{
+  "id": "dark-high-contrast",
+  "label": {
+    "zh-CN": "高对比黑",
+    "en-US": "High Contrast"
+  },
+  "colorScheme": "dark",
+  "vars": {
+    "--bg": "#000000",
+    "--panel": "rgba(10, 10, 10, 0.95)",
+    "--panel-strong": "rgba(16, 16, 16, 0.98)",
+    "--border": "rgba(255, 255, 255, 0.28)",
+    "--text": "#ffffff",
+    "--muted": "#b8b8b8",
+    "--accent": "#ffb070",
+    "--accent-soft": "rgba(255, 176, 112, 0.22)",
+    "--thinking": "#ffd166",
+    "--tooling": "#d9a8ff",
+    "--done": "#7af0a8",
+    "--error": "#ff8888",
+    "--shadow": "0 18px 55px rgba(0, 0, 0, 0.80)",
+    "--scrollbar-thumb": "rgba(255, 255, 255, 0.24)",
+    "--scrollbar-thumb-hover": "rgba(255, 255, 255, 0.48)",
+    "--scrollbar-thumb-active": "rgba(255, 176, 112, 0.55)",
+    "--surface-raised-rgb": "26, 26, 26",
+    "--accent-tint-from": "rgba(255, 176, 112, 0.16)",
+    "--accent-tint-to": "rgba(255, 176, 112, 0.05)",
+    "--code-text": "#f4f4f4",
+    "--terminal-muted": "#c4c4c4",
+    "--inline-code": "#ffcaa0",
+    "--blockquote-text": "#e6e6e6",
+    "--label-warm": "#dcdcdc",
+    "--mini-card-title": "#ffffff",
+    "--brand-logo-filter": "invert(1) brightness(1.1)",
+    "--composer-bg": "rgba(0, 0, 0, 0.55)",
+    "--composer-input-bg": "rgba(0, 0, 0, 0.75)",
+    "--body-background": "radial-gradient(circle at top left, rgba(255, 176, 112, 0.08), transparent 28%), radial-gradient(circle at right, rgba(217, 168, 255, 0.06), transparent 24%), var(--bg)"
+  }
+}
