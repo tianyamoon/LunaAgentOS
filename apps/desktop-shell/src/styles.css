@@ -354,7 +354,7 @@ button:disabled {
 }
 
 .workspace-status-target {
-  color: rgba(82, 61, 38, 0.84);
+  color: var(--text);
   font-weight: 700;
 }
 
@@ -585,20 +585,20 @@ button:disabled {
   font-weight: 600;
   letter-spacing: 0.04em;
   line-height: 1;
-  color: rgba(82, 61, 38, 0.38);
+  color: var(--muted);
   transform: translateY(-0.06em);
 }
 
 .session-title-runtime::before {
   content: "·";
   margin-right: 5px;
-  color: rgba(82, 61, 38, 0.3);
+  color: var(--muted);
 }
 
 .session-title-target::before {
   content: "/";
   margin: 0 2px 0 1px;
-  color: rgba(82, 61, 38, 0.42);
+  color: var(--muted);
 }
 
 .session-agent-title .active-receiver-banner {
@@ -683,7 +683,7 @@ button:disabled {
 .session-task-label {
   flex: 0 0 auto;
   font-weight: 600;
-  color: rgba(82, 61, 38, 0.62);
+  color: var(--muted);
 }
 
 .session-task-text {
@@ -1437,7 +1437,7 @@ button:disabled {
   padding: 8px 10px;
   border-radius: 12px;
   border: 1px solid rgba(99, 82, 63, 0.12);
-  background: rgba(255, 252, 248, 0.7);
+  background: rgba(var(--surface-raised-rgb), 0.7);
   color: var(--text);
   cursor: pointer;
   text-align: left;
@@ -1446,7 +1446,7 @@ button:disabled {
 
 .session-mini-card:hover,
 .session-mini-card:focus-visible {
-  background: rgba(255, 252, 248, 0.95);
+  background: rgba(var(--surface-raised-rgb), 0.95);
   border-color: rgba(99, 102, 241, 0.32);
   transform: translateY(-1px);
 }
@@ -1586,7 +1586,7 @@ button:disabled {
   padding: 7px 10px;
   border: 1px dashed rgba(99, 82, 63, 0.16);
   border-radius: 12px;
-  background: rgba(250, 248, 244, 0.6);
+  background: rgba(var(--surface-raised-rgb), 0.6);
   color: var(--muted);
   font-size: 0.78rem;
   line-height: 1.45;
@@ -1664,7 +1664,7 @@ button:disabled {
   overflow: hidden;
   border: 1px solid rgba(99, 82, 63, 0.12);
   border-radius: 12px;
-  background: rgba(255, 253, 249, 0.96);
+  background: rgba(var(--surface-raised-rgb), 0.96);
 }
 
 .plain-report-toolbar {
@@ -1714,7 +1714,7 @@ button:disabled {
   padding: 6px 9px;
   border: 1px solid rgba(99, 82, 63, 0.08);
   border-radius: 10px;
-  background: rgba(250, 248, 244, 0.58);
+  background: rgba(var(--surface-raised-rgb), 0.58);
   color: var(--muted);
 }
 
@@ -1850,7 +1850,7 @@ button:disabled {
   overflow: hidden;
   border: 1px solid rgba(99, 82, 63, 0.12);
   border-radius: 12px;
-  background: rgba(250, 248, 244, 0.96);
+  background: rgba(var(--surface-raised-rgb), 0.96);
 }
 
 .md-diagram-block {
@@ -1858,7 +1858,7 @@ button:disabled {
   overflow: hidden;
   border: 1px solid rgba(88, 112, 190, 0.16);
   border-radius: 12px;
-  background: rgba(246, 248, 255, 0.92);
+  background: rgba(var(--surface-raised-rgb), 0.92);
 }
 
 .md-diagram-fallback {
@@ -2077,7 +2077,7 @@ button:disabled {
   height: 8px;
   border-radius: 999px;
   background: rgba(99, 82, 63, 0.4);
-  box-shadow: 0 0 0 2px rgba(255, 252, 248, 1);
+  box-shadow: 0 0 0 2px rgba(var(--surface-raised-rgb), 1);
 }
 
 .turn-event-status-running .turn-event-dot {
@@ -2107,7 +2107,7 @@ button:disabled {
 }
 
 @keyframes turn-event-pulse {
-  0%, 100% { box-shadow: 0 0 0 2px rgba(255, 252, 248, 1); }
+  0%, 100% { box-shadow: 0 0 0 2px rgba(var(--surface-raised-rgb), 1); }
   50% { box-shadow: 0 0 0 4px rgba(217, 119, 6, 0.18); }
 }
 
@@ -2188,7 +2188,7 @@ button:disabled {
   margin: 4px 0 6px 26px;
   padding: 8px 10px;
   border-radius: 8px;
-  background: rgba(250, 248, 244, 0.7);
+  background: rgba(var(--surface-raised-rgb), 0.7);
   border: 1px solid rgba(99, 82, 63, 0.08);
   font-size: 0.76rem;
   line-height: 1.5;
@@ -2297,7 +2297,7 @@ button:disabled {
 
 .final-block {
   border-color: rgba(217, 108, 58, 0.14);
-  background: rgba(255, 247, 239, 0.94);
+  background: rgba(var(--surface-raised-rgb), 0.94);
 }
 
 .log-block {
@@ -2323,8 +2323,8 @@ button:disabled {
   padding: 4px 8px;
   border: 1px solid rgba(87, 70, 50, 0.08);
   border-radius: 13px;
-  background: rgba(250, 248, 244, 0.58);
-  color: rgba(74, 58, 43, 0.72);
+  background: rgba(var(--surface-raised-rgb), 0.58);
+  color: var(--muted);
 }
 
 .composer-command-search {
@@ -2401,7 +2401,7 @@ button:disabled {
   overflow: hidden;
   border: 1px solid rgba(82, 61, 38, 0.12);
   border-radius: 14px;
-  background: rgba(255, 253, 249, 0.92);
+  background: rgba(var(--surface-raised-rgb), 0.92);
   box-shadow: 0 18px 48px rgba(73, 49, 25, 0.14);
   backdrop-filter: blur(14px) saturate(1.1);
 }
@@ -2413,7 +2413,7 @@ button:disabled {
   gap: 12px;
   padding: 8px 12px;
   border-bottom: 1px solid rgba(82, 61, 38, 0.08);
-  background: rgba(250, 248, 244, 0.72);
+  background: rgba(var(--surface-raised-rgb), 0.72);
 }
 
 .composer-command-menu-header strong {
@@ -2455,7 +2455,7 @@ button:disabled {
 .composer-command-menu-item:hover,
 .composer-command-menu-item.is-active {
   border-color: rgba(217, 108, 58, 0.16);
-  background: rgba(255, 247, 239, 0.88);
+  background: var(--accent-soft);
   box-shadow: none;
   transform: none;
 }
@@ -2610,7 +2610,7 @@ textarea {
 
 .composer.is-new-session-mode textarea {
   border-color: rgba(191, 74, 74, 0.72);
-  background: rgba(255, 248, 244, 0.92);
+  background: var(--composer-input-bg);
   box-shadow: 0 0 0 2px rgba(191, 74, 74, 0.1), 0 10px 28px rgba(191, 74, 74, 0.06);
 }
 
@@ -2929,7 +2929,7 @@ textarea {
   border-radius: 24px;
   padding: 26px;
   background:
-    linear-gradient(135deg, rgba(255, 250, 244, 0.98), rgba(var(--surface-raised-rgb), 0.98)),
+    linear-gradient(135deg, rgba(var(--surface-raised-rgb), 0.98), rgba(var(--surface-raised-rgb), 0.92)),
     var(--panel-strong);
 }
 
@@ -3035,7 +3035,7 @@ textarea {
   border-radius: 20px;
   background:
     radial-gradient(circle at top left, rgba(217, 108, 58, 0.16), transparent 42%),
-    rgba(255, 247, 239, 0.86);
+    rgba(var(--surface-raised-rgb), 0.86);
 }
 
 .runtime-config-status-card strong {
@@ -3426,7 +3426,7 @@ textarea {
   padding: 16px;
   border: 1px solid rgba(177, 72, 72, 0.24);
   border-radius: 16px;
-  background: rgba(255, 245, 245, 0.72);
+  background: rgba(var(--surface-raised-rgb), 0.72);
 }
 
 .availability-problems h4 {
@@ -3526,7 +3526,7 @@ textarea {
   padding: 14px 16px;
   border: 1px solid rgba(82, 61, 38, 0.08);
   border-radius: 16px;
-  background: rgba(255, 250, 244, 0.64);
+  background: rgba(var(--surface-raised-rgb), 0.64);
 }
 
 .agent-brief-row-header strong {
