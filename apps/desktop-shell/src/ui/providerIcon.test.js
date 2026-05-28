@@ -4,9 +4,9 @@ import { resolveIconSlug, resolveBrandColor, renderProviderIcon, iconPathForSlug
 
 describe("providerIcon", () => {
   test("resolveIconSlug returns builtin slug for known providers", () => {
-    assert.equal(resolveIconSlug({ id: "claude" }), "anthropic");
+    assert.equal(resolveIconSlug({ id: "claude" }), "claude");
     assert.equal(resolveIconSlug({ id: "codex" }), "openai");
-    assert.equal(resolveIconSlug({ id: "trae" }), "bytedance");
+    assert.equal(resolveIconSlug({ id: "trae" }), "trae");
     assert.equal(resolveIconSlug({ id: "hermes" }), null);
   });
 
@@ -38,9 +38,12 @@ describe("providerIcon", () => {
   });
 
   test("iconPathForSlug returns path for registered slugs", () => {
-    const path = iconPathForSlug("anthropic");
+    const path = iconPathForSlug("claude");
     assert.ok(path);
-    assert.ok(path.includes("anthropic.svg"));
+    assert.ok(path.includes("claude.svg"));
+    const traePath = iconPathForSlug("trae");
+    assert.ok(traePath);
+    assert.ok(traePath.includes("trae.png"));
   });
 
   test("iconPathForSlug returns null for unregistered slugs", () => {
@@ -51,7 +54,7 @@ describe("providerIcon", () => {
     const html = renderProviderIcon({ id: "claude", name: "Claude Code" });
     assert.ok(html.includes("provider-icon-img"));
     assert.ok(html.includes("<img"));
-    assert.ok(html.includes("anthropic.svg"));
+    assert.ok(html.includes("claude.svg"));
   });
 
   test("renderProviderIcon returns fallback icon for hermes", () => {

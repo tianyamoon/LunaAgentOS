@@ -23,13 +23,13 @@ The App consumes the protocol/core layer and provides:
 ### Development mode
 
 ```powershell
-npm run tauri -- dev
+npm run tauri dev
 ```
 
 ### Lightweight executable
 
 ```powershell
-npm run tauri -- build --no-bundle
+npm run tauri build -- --no-bundle
 ```
 
 Executable path:

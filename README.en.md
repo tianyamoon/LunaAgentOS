@@ -2,128 +2,142 @@
   <img src="./docs/assets/logo2.png" alt="LunaAgentOS" width="560" />
 </p>
 
-<h1 align="center">LunaAgentOS</h1>
+<h1 align="center">The Personal Desktop Operating System for the AI Era</h1>
+
+<p align="center">
+  Bring scattered agent work back into one personal operating environment.
+</p>
 
 <p align="center">
   <a href="./README.md">中文说明</a>
 </p>
 
-**LunaAgentOS 0.2 Preview**
+**LunaAgentOS 0.2.1**
 
-LunaAgentOS is a neutral desktop workspace for real AI agent sessions.
+LunaAgentOS is a personal desktop operating environment built for multi-agent work and collaboration.
 
-Today it is a Windows-first app for Claude Code and Hermes: choose a runtime entry, send real work into a live session, watch output, thought, and runtime events arrive, and return to the session from local history.
+It brings agent tools such as Claude Code, Hermes, and OpenAI Codex Manifest into one desktop entry point, so you can start tasks, inspect process, switch sessions, and recover history in one place instead of carrying context between separate tools.
 
-But that is only the first working slice. LunaAgentOS is aiming at a larger idea: a **Human Command Workspace** where the workspace adapts to the work, instead of forcing people to keep adapting themselves to every tool around it.
-
-**Human commands. Agents execute. The workspace remembers.**
+**Humans command. Agents execute. The workspace remembers.**
 
 ![LunaAgentOS desktop preview](./docs/assets/lunaagentos-stage1-preview.svg)
 
-## Why it exists
+## The New Problem of Agent Work
 
-AI agents are becoming powerful enough to do real work, but their sessions still disappear into separate tools:
+AI agents have started to carry real work, but a new problem has appeared: people are no longer talking to one tool. They are making decisions across multiple agents, sessions, and execution processes.
 
-- CLI, TUI, IDE, gateway, and SDK surfaces all expose different parts of the work.
-- Thought, tool, plan, usage, output, and final response streams rarely live in one durable view.
-- Session history is scattered, making restore, comparison, and review harder than the work itself.
-- Multi-agent work creates configuration, memory, and tool duplication everywhere.
+A single agent can finish a task. Several agents together create a new kind of work overhead:
 
-The problem is no longer just agent capability. The problem is that users still have to keep adapting themselves to every surface around the work.
+- who took the task, who is still running, and who already produced a result
+- which process details are worth keeping, and which context can continue in another agent
+- which result is final, and which one is only intermediate material
+- when a human needs to confirm something, and when execution can continue
 
-LunaAgentOS is meant to reverse that burden: bring your existing agents, keep their native strengths, and get one workspace that helps you stay focused on the work instead of constantly re-learning tools, re-routing context, and stitching results back together.
+There is also a more practical burden: accounts, subscriptions, API keys, model quotas, and trial periods keep multiplying. Which one is still valid, which one expired, which one is still costing money, and which one has been abandoned should not depend on memory.
 
-## The product idea
+LunaAgentOS is not trying to create one more agent. It is trying to give multi-agent work a desktop environment that humans can command, observe, hand off, collect, and govern, so both work and resources waste less.
 
-LunaAgentOS is not trying to flatten every agent into one generic chatbot. It is trying to make real agent work feel less fragmented, less repetitive, and less tool-driven.
+## The Product Idea
+
+LunaAgentOS is not trying to flatten every agent into one generic chatbot. It is trying to make real agent work less fragmented, less repetitive, and less tool-driven.
 
 That idea has four pillars:
 
 ### 1. Human Command Workspace
 
-The goal is not to give users one more panel to babysit. The goal is to let the workspace absorb tool boundaries so users can stay with the work:
+The goal is not to give users one more control panel to babysit. The goal is to let the workspace absorb tool boundaries so people can keep their attention on the work itself:
 
-- choose where the next task goes
+- decide where the next task goes
 - inject context deliberately
-- watch processes stay visible
-- step in for approval or correction
-- collect outputs back into one workspace
+- keep the execution process visible
+- step in for approval or correction when needed
+- collect results back into one workspace
 
-### 2. A breathing workspace
+### 2. A Breathing Workspace
 
-Agents should not feel like static windows pinned forever on screen.
+Agents should not feel like a contact list permanently pinned to the screen.
 
-Over time, LunaAgentOS should make agent work feel alive:
+Over time, LunaAgentOS should make agent work feel like it can move in and out of the stage:
 
-- idle when nothing needs attention
-- active when a task wakes them up
-- prominent while work is unfolding
-- folded and archived when the work is done
+- quiet when nothing needs attention
+- awakened when there is a task
+- prominent while execution is underway
+- folded back into history when the work is done
 
-This "breathing" lifecycle is part of the product philosophy, not just a UI flourish.
+### 3. A Neutral Agent Desktop Environment
 
-### 3. A neutral desktop environment
+LunaAgentOS is not absorbing Claude Code, Hermes, Trae, or future runtimes into one built-in super-agent.
 
-LunaAgentOS should not absorb Claude Code, Hermes, Trae, or future runtimes into one built-in super-agent.
+It lets users bring the agents they already trust, keeps those agents recognizable and native, and removes the tax of adapting to a new surface every time work crosses tool boundaries.
 
-Instead, it should let users bring the agents they already trust, keep those agents recognizable, and stop paying the tax of re-learning a different surface every time the work crosses a tool boundary.
+### 4. An OS Layer Above Agent Chaos
 
-### 4. An OS layer above agent chaos
-
-The long game is to reduce multi-agent pain from O(N) to O(1):
+The longer goal is to compress the O(N) pain of multi-agent work into O(1):
 
 - configure shared capabilities once
 - route tools through one desktop control point
 - preserve reusable memory and context
 - collect results without manual copy-paste glue
 
-That is why LunaAgentOS ultimately wants to be more than a session viewer: it wants to remove the overhead around agent work, not add another layer of overhead on top of it.
+That is why LunaAgentOS ultimately does not want to be only a session viewer. It wants to reduce the overhead around agent work instead of adding another layer of overhead.
 
-## What you can do today
+## What You Can Do Today
 
 | Area | Status | Notes |
 |---|---:|---|
 | LunaAgentOS App | Working | Open a local Windows-first desktop workspace |
 | Claude Code | Working | Send tasks into a real Claude Code runtime session |
 | Hermes | Working | Use Windows / WSL ACP runtime instances and profiles |
-| Trae IDE | Bridge path | Reserved IDE-first adapter direction |
-| Runtime Session Cards | Working | See output, thought, runtime events, and final response together |
+| OpenAI Codex Manifest | Working | Identify and host Codex as a manifest-backed agent entry |
+| Runtime Session Card | Working | See output, thought, runtime events, and final response together |
 | Session Card event flow | Working | Render thought, tool, plan, usage, error, and related process signals as expandable event nodes |
-| Focused workspace view | Working | Focus one session inside the workspace while keeping the input area available |
-| Native slash command affordance | Working | Discover and insert native runtime commands exposed by agent entries |
+| Focus view | Working | Focus a single session inside the workspace while keeping the input area available |
+| Native agent command entry | Working | Discover and insert native runtime commands through slash commands |
 | Provider identity | Working | Use provider icons and runtime identity to distinguish agent entries |
-| Multi-session workspace | Working | Switch send target, keep live sessions, inspect archived sessions |
+| Multi-session workspace | Working | Switch send target, keep live sessions, and inspect archived sessions |
 | Local history | Working | Restore JSON session history or open read-only archives |
-| UI language | Working | zh-CN / en-US switch persisted locally |
+| UI language | Working | Persist zh-CN / en-US switching locally |
 
-## What comes next
+## What Changed
 
-The next stage is not a dramatic rebrand and not a sudden jump to full orchestration. It is the next credible layer of the same workspace: less time adapting to tools, more trust that the workspace can carry the work forward.
+- Process is clearer: thought, tool calls, and runtime state no longer scatter across surfaces
+- Single-session work is more focused: after entering Focus, the input area remains available
+- Multi-session work is easier to manage: current sessions, history, and archived sessions are separated more clearly
+- Agent identity is easier to recognize: entries from different providers have clearer visual identity
+- Common commands are easier to reach: native agent commands can be invoked quickly from the input area
 
-- harden Claude Code and Hermes runtime entry reliability
-- make local history, restore, and archived transcripts easier to trust
-- clarify adapter installation, capability boundaries, and future entry onboarding
-- strengthen the Trae IDE bridge path without pretending it is already a mature runtime path
-- introduce targeted session handoff, so selected context can move between entries or sessions when that behavior is truly implemented
-- begin turning the workspace from "multiple visible sessions" into a more intentional human command surface
+## What Comes Next
 
-## The longer ambition
+The next stage is no longer just placing multiple agents in one interface. It is about letting LunaAgentOS become the management layer for personal agent work.
 
-If LunaAgentOS succeeds, it should grow into something larger than a good desktop shell.
+The workspace can already host Claude Code, Hermes, and OpenAI Codex Manifest. It can show process, focus sessions, and separate history from archives. The next more important step is to make these entries, sessions, accounts, models, and resources manageable, transferable, and governable.
 
-It should become a **neutral Agent Desktop Environment** and eventually an **operating layer for heterogeneous agent products**:
+- **Manage agent assets in one place**: bring providers, runtimes, accounts, API keys, model quotas, subscription cycles, and trial states together so users know what still works, what is expiring, and what has been abandoned.
+- **Reduce invisible waste**: identify duplicate capabilities, idle entries, expired configuration, and keys that still consume budget, so cost no longer depends on memory.
+- **Let work continue across agents**: one agent's process, context, and result should be handed to another agent under human confirmation instead of manual copy-paste.
+- **Make collaboration relationships visible**: who took the task, who is running, who needs more information, and who produced the final result should all leave clear relationships in the workspace.
+- **Make entry health more trustworthy**: do more than show whether a runtime is available; explain configuration gaps, error states, recovery paths, and capability boundaries.
+- **Turn the workspace into a personal control surface**: move from "choose an agent and send a task" toward "manage my agent capabilities, budget, sessions, history, and collaboration flows."
 
-- different runtimes can be installed without being flattened
-- runtime sessions can be observed, resumed, replayed, and governed
-- task routing can happen between entries and sessions with explicit human control
-- approvals, permissions, and result collection can live in one place
-- shared configuration, tools, memory, and profiles can stop fragmenting across every agent setup
+## The Longer Ambition
 
-The endpoint is not "one more AI app."
+In the long run, LunaAgentOS should not stop at being a convenient desktop shell.
 
-The endpoint is a workspace where agent work becomes more legible, more governable, more durable, and less dependent on the quirks of whichever tool happened to start it.
+The shell is only the first entry point. The deeper order to protect is the working order between a person and a set of different agent products: a **neutral, observable, recoverable, and governable Agent Desktop Environment** that can keep growing into an **operating layer for heterogeneous agent products**.
 
-## Quick start
+That operating layer should not get coherence by forcing every runtime into the same internal model. It should assume that Claude Code, Hermes, Trae, and future agent products keep their own runtime shape, permission boundaries, interaction habits, and release rhythms. LunaAgentOS should form a stable working environment above them:
+
+- different runtimes can be connected without being flattened into one internal structure
+- runtime sessions become work objects that can be observed, resumed, replayed, audited, and governed
+- task routing between entries and sessions happens under explicit human control, not through an opaque takeover
+- multiple agents can collaborate around the same piece of work: one agent's process, context, and result can become material for another agent to continue with human confirmation
+- approvals, permissions, process evidence, and result collection can live in one trusted place
+- shared configuration, tools, memory, profiles, and work preferences stop fragmenting across every agent setup
+- people can understand, in one desktop environment, who is doing what, why it is happening, how far it got, and whether it can continue
+
+It is a new kind of working environment: agent work becomes less trapped in scattered tool windows, temporary context hauling, and product-specific quirks, and becomes more visible, more governable, more durable, and more worthy of long-term human trust and control.
+
+## Quick Start
 
 ### Requirements
 
@@ -134,21 +148,21 @@ The endpoint is a workspace where agent work becomes more legible, more governab
 - Claude Code installed if you want the Claude entry
 - WSL and Hermes installed if you want the Hermes entry
 
-Claude Code and Hermes are the real runtime entries that make the workspace useful. LunaAgentOS can also open when those runtimes are not installed; each entry shows a clear configuration state rather than a crash or silent failure.
+Claude Code, Hermes, and OpenAI Codex Manifest are the runtime entries that make the workspace valuable. LunaAgentOS can also open when they are not installed; each entry shows a clear configuration state rather than a crash or silent failure.
 
-### Run the app
+### Run the App
 
 ```powershell
 cd apps/desktop-shell
 npm install
-npm run tauri -- dev
+npm run tauri dev
 ```
 
-### Build a lightweight executable
+### Build a Lightweight Executable
 
 ```powershell
 cd apps/desktop-shell
-npm run tauri -- build --no-bundle
+npm run tauri build -- --no-bundle
 ```
 
 Executable path:
@@ -159,20 +173,20 @@ apps/desktop-shell/src-tauri/target/release/desktop-shell.exe
 
 More detail: [Getting Started](./docs/getting-started.md)
 
-## Product boundary
+## Product Boundary
 
-LunaAgentOS 0.2 Preview is:
+LunaAgentOS 0.2.1 is:
 
 - A neutral desktop workspace for real AI agent sessions
-- A Windows-first local app for Claude Code and Hermes sessions
-- A workspace centered on Runtime Session Cards, event flow, and focused session views
+- A Windows-first local app for Claude Code, Hermes, and OpenAI Codex Manifest sessions
+- A workspace centered on Runtime Session Cards, event flow, and Focus view
 - A session workspace with native agent commands and provider identity
 - The first working slice of a Human Command Workspace
 - A product surface backed by protocol, adapters, and the Runtime Session Model
 
-LunaAgentOS 0.2 Preview is not:
+LunaAgentOS 0.2.1 is not:
 
-- A single built-in agent that tries to absorb external runtimes
+- A product that absorbs external runtimes into one built-in agent
 - A complete multi-agent orchestration platform
 - A claim that every agent must look the same internally
 - Team Mode, remote entry, or a complete shared memory bus
@@ -180,22 +194,22 @@ LunaAgentOS 0.2 Preview is not:
 
 ## Documentation
 
-### Start here
+### Start Here
 
 - [Docs index](./docs/README.md)
-- [0.2 Preview Release Notes](./docs/release-notes-0.2-preview.md)
+- [0.2.1 Release Notes](./docs/release-notes-0.2.1.md)
 - [Getting Started](./docs/getting-started.md)
 - [Current Product Boundary](./docs/current-boundary.md)
 - [Contributing](./CONTRIBUTING.md)
 
-### Product and concepts
+### Product and Concepts
 
 - [Product Definition](./docs/product-definition.md)
 - [Why LunaAgentOS](./docs/why-lunaagentos.md)
 - [Light-Core Principles](./docs/light-core-principles.md)
 - [Roadmap](./docs/roadmap.md)
 
-### Architecture and integration
+### Architecture and Integration
 
 - [Architecture Overview](./docs/architecture-overview.md)
 - [Hermes ACP Runtime](./docs/hermes-acp-profile-runtime.md)
@@ -206,15 +220,23 @@ LunaAgentOS 0.2 Preview is not:
 - [Apps](./apps/README.md)
 - [Trae IDE Bridge](./bridges/trae-ide/README.md)
 
-### Community and policies
+### Community and Policies
 
 - [Security Policy](./SECURITY.md)
 - [Trademark and Brand Guidelines](./TRADEMARKS.md)
 
-### Chinese entry
+### Chinese Entry
 
 - [Chinese README](./README.md)
 - [Chinese docs index](./docs/README.zh-CN.md)
+
+## Author
+
+Li Bai
+
+## Community
+
+QQ Group: 687805974
 
 ## License
 
@@ -222,13 +244,13 @@ This project is licensed under [Apache-2.0](./LICENSE).
 
 ## Contributing
 
-The highest-value contributions right now are:
+The highest-value contribution areas right now are:
 
-- Runtime hardening for Claude Code and Hermes
+- Claude Code / Hermes runtime reliability
 - Runtime Session Card usability and readability
-- Hermes thought, tool, plan, and usage event UX
+- Hermes thought / tool / plan / usage event experience
 - Local history, restore, and error-state validation
 - Trae IDE bridge design and integration
-- Documentation, screenshots, and release polish
+- Documentation, screenshots, and release materials
 
 Read [CONTRIBUTING.md](./CONTRIBUTING.md) before starting.

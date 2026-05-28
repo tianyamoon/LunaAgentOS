@@ -34,14 +34,14 @@ npm install
 
 ```powershell
 cd apps/desktop-shell
-npm run tauri -- dev
+npm run tauri dev
 ```
 
 ## 构建轻量可执行文件
 
 ```powershell
 cd apps/desktop-shell
-npm run tauri -- build --no-bundle
+npm run tauri build -- --no-bundle
 ```
 
 可执行文件路径：

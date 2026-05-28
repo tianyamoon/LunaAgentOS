@@ -6,6 +6,14 @@ LunaAgentOS 0.2 Preview 继续聚焦一个目标：让真实 Agent session 在�
 
 这个版本不是一次大而全的能力扩张，而是把 0.1 的可运行切片打磨成更像产品的工作区：过程更可见，单个 session 更舒服，runtime 身份更清楚，Agent 原生命令也能从工作台里被发现和插入。
 
+## 0.2 指向的下一阶段
+
+0.2 的意义不只是多了几项界面能力。它开始把 LunaAgentOS 从“能把多个 Agent session 摆在同一个地方”，推向“人真的愿意把一段工作交给这里承载、追踪、恢复和收尾”的工作台。
+
+下一阶段会继续补强这个承载力：让 Claude Code 和 Hermes entry 更稳定，让本地历史、恢复和 archived transcript 更可信，让 Runtime Session Card 更像可理解、可继续的工作对象，并把 adapter contract、Trae IDE bridge 和可控的 session handoff 继续往前推进。
+
+更长期看，LunaAgentOS 不想停在一个好用的 desktop shell。它要继续长成一个中立的 Agent Desktop Environment，并最终成为面向异构 Agent 产品的 operating layer：不同 runtime 保留自己的形状，人类仍然掌握路由、审批、权限和结果回收，而共享配置、工具、记忆和 profile 不再碎裂在每一个 Agent 设置里。
+
 ## 主要变化
 
 - **Session Card 事件流**：thought、tool、plan、usage、error 等过程信息被整理为结构化事件节点，streaming 时展开，完成后收起，既保留过程，也减少噪音。

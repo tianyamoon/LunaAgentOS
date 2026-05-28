@@ -34,14 +34,14 @@ npm install
 
 ```powershell
 cd apps/desktop-shell
-npm run tauri -- dev
+npm run tauri dev
 ```
 
 ## Build a lightweight executable
 
 ```powershell
 cd apps/desktop-shell
-npm run tauri -- build --no-bundle
+npm run tauri build -- --no-bundle
 ```
 
 Executable path:

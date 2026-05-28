@@ -1,15 +1,22 @@
-// Provider icon rendering — maps provider iconSlug to an SVG asset path or first-letter fallback.
-// Icon assets live in src/assets/provider-icons/{slug}.svg.
+// Provider icon rendering — maps provider iconSlug to an asset path or first-letter fallback.
+// Icon assets live in src/assets/provider-icons/. Both SVG and PNG are supported.
 // Dynamic adapters can specify an iconSlug in their manifest to reuse a registered icon.
 
 /**
- * Registry of built-in icon slugs → relative path to SVG asset (from src/).
- * Extend this object when adding new provider icon files.
+ * Registry of built-in icon slugs → resolved asset URL.
+ *
+ * Uses `new URL(path, import.meta.url)` so Vite recognises the static
+ * dependency at build time and emits a hashed asset under dist/assets/.
+ * Plain string paths are invisible to Vite's asset graph, which is why
+ * the previous "./assets/..." literals were missing from the bundle.
+ *
+ * Both forms (Vite-bundled URL in production, file:// URL under Node
+ * tests) still satisfy the runtime contract: `<img src>` accepts either.
  */
 const ICON_REGISTRY = {
-  anthropic: "./assets/provider-icons/anthropic.svg",
-  openai: "./assets/provider-icons/openai.svg",
-  bytedance: "./assets/provider-icons/bytedance.svg",
+  claude: new URL("../assets/provider-icons/claude.svg", import.meta.url).href,
+  openai: new URL("../assets/provider-icons/openai.svg", import.meta.url).href,
+  trae: new URL("../assets/provider-icons/trae.png", import.meta.url).href,
 };
 
 /**
@@ -17,10 +24,10 @@ const ICON_REGISTRY = {
  * Used when provider object itself doesn't carry iconSlug / brandColor.
  */
 const BUILTIN_ICON_META = {
-  claude: { iconSlug: "anthropic", brandColor: "#D4A27F" },
+  claude: { iconSlug: "claude", brandColor: "#D4A27F" },
   codex: { iconSlug: "openai", brandColor: "#412991" },
   hermes: { iconSlug: null, brandColor: "#40B4A6" },
-  trae: { iconSlug: "bytedance", brandColor: "#325AB4" },
+  trae: { iconSlug: "trae", brandColor: "#325AB4" },
 };
 
 function escapeHtml(text) {
@@ -72,7 +79,9 @@ export function renderProviderIcon(provider, options = {}) {
   const slug = resolveIconSlug(provider);
   const path = slug ? iconPathForSlug(slug) : null;
   if (path) {
-    return `<img class="provider-icon provider-icon-img" src="${escapeHtml(path)}" alt="" style="width:${size};height:${size}" aria-hidden="true">`;
+    // Monochrome (SVG, e.g. Simple Icons) accepts theme tinting; raster (PNG) is treated as full-color.
+    const variantClass = path.endsWith(".svg") ? "provider-icon-img-mono" : "provider-icon-img-color";
+    return `<img class="provider-icon provider-icon-img ${variantClass}" src="${escapeHtml(path)}" alt="" style="width:${size};height:${size}" aria-hidden="true">`;
   }
   const name = provider?.name || provider?.id || "?";
   const letter = name.charAt(0).toUpperCase();

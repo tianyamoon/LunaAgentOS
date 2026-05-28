@@ -4,7 +4,7 @@
 export const translations = {
   "zh-CN": {
     "app.title": "LunaAgentOS 控制台",
-    "topbar.eyebrow": "真实 AI Agent 会话工作台",
+    "topbar.eyebrow": "AI 时代的个人桌面操作系统",
     "topbar.language": "语言：中文",
     "fleet.title": "Agent 舰队",
     "common.manage": "连接详情",

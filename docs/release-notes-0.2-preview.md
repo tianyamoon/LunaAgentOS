@@ -6,6 +6,14 @@ LunaAgentOS 0.2 Preview keeps the same product direction: make real agent sessio
 
 This release is not a broad expansion of scope. It turns the 0.1 working slice into a more product-like workspace: process visibility is stronger, focused single-session work feels better, runtime identity is clearer, and native agent commands can be discovered and inserted from the workspace.
 
+## What 0.2 points toward
+
+The meaning of 0.2 is not just a handful of interface improvements. It starts moving LunaAgentOS from "several agent sessions are visible in one place" toward "people are willing to let this place carry, trace, resume, and close out real work."
+
+The next stage keeps strengthening that carrying capacity: make Claude Code and Hermes entries more reliable, make local history, restore, and archived transcripts more trustworthy, make Runtime Session Cards feel more like understandable and continuable work objects, and keep advancing the adapter contract, Trae IDE bridge, and controlled session handoff.
+
+In the longer run, LunaAgentOS should not stop at being a useful desktop shell. It should keep growing into a neutral Agent Desktop Environment, and eventually an operating layer for heterogeneous agent products: different runtimes keep their own shape, humans stay in control of routing, approvals, permissions, and result collection, and shared configuration, tools, memory, and profiles stop fragmenting across every agent setup.
+
 ## Highlights
 
 - **Session Card event flow**: thought, tool, plan, usage, error, and related process signals are rendered as structured event nodes. They expand during streaming and fold back after completion, preserving process without keeping the whole workspace noisy.
