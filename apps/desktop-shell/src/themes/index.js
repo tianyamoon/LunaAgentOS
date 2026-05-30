@@ -28,6 +28,14 @@
 //   --code-text, --terminal-muted, --inline-code, --blockquote-text,
 //   --label-warm, --mini-card-title,
 //   --brand-logo-filter, --composer-bg, --composer-input-bg,
+//   --connection-dialog-bg, --connection-dialog-panel,
+//   --connection-dialog-panel-strong, --connection-dialog-card,
+//   --connection-dialog-border, --connection-dialog-border-strong,
+//   --connection-dialog-text, --connection-dialog-muted,
+//   --connection-dialog-accent, --connection-dialog-ok,
+//   --connection-dialog-warn, --connection-dialog-error,
+//   --connection-dialog-input-bg, --connection-dialog-focus-outline,
+//   --connection-dialog-focus-border, --connection-dialog-shadow,
 //   --body-background.
 
 const bundledModules = import.meta.glob("./*.json", { eager: true, import: "default" });

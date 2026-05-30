@@ -1,7 +1,8 @@
 export function isStoppedHermesTarget(target) {
-  if (!target || target.providerId !== "hermes") return false;
+  if (!target) return false;
+  if (target.activatable === true || target.availability === "connectable") return true;
   if (target.gateway) return target.gateway !== "running";
-  return target.state === 9;
+  return false;
 }
 
 export function isTargetSendable(target) {
@@ -11,6 +12,8 @@ export function isTargetSendable(target) {
 }
 
 export function isTargetActivatable(target) {
+  if (!target) return false;
+  if (target.activatable === true || target.availability === "connectable") return true;
   if (!isStoppedHermesTarget(target)) return false;
   if (target.kind && target.kind !== "profile") return false;
   if (target.profileExecutable || target.profileAlias || target.alias) return true;

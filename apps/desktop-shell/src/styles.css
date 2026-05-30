@@ -36,6 +36,22 @@
   --brand-logo-filter: none;
   --composer-bg: rgba(var(--surface-raised-rgb), 0.58);
   --composer-input-bg: rgba(var(--surface-raised-rgb), 0.8);
+  --connection-dialog-bg: var(--panel-strong);
+  --connection-dialog-panel: rgba(var(--surface-raised-rgb), 0.78);
+  --connection-dialog-panel-strong: rgba(var(--surface-raised-rgb), 0.88);
+  --connection-dialog-card: rgba(var(--surface-raised-rgb), 0.55);
+  --connection-dialog-border: var(--border);
+  --connection-dialog-border-strong: rgba(217, 108, 58, 0.24);
+  --connection-dialog-text: var(--text);
+  --connection-dialog-muted: var(--muted);
+  --connection-dialog-accent: var(--accent);
+  --connection-dialog-ok: var(--done);
+  --connection-dialog-warn: var(--thinking);
+  --connection-dialog-error: var(--error);
+  --connection-dialog-input-bg: rgba(var(--surface-raised-rgb), 0.82);
+  --connection-dialog-focus-outline: rgba(217, 108, 58, 0.2);
+  --connection-dialog-focus-border: rgba(217, 108, 58, 0.42);
+  --connection-dialog-shadow: var(--shadow);
   --body-background:
     radial-gradient(circle at top left, rgba(217, 108, 58, 0.16), transparent 26%),
     radial-gradient(circle at right, rgba(150, 83, 214, 0.1), transparent 22%),
@@ -1196,21 +1212,21 @@ button:disabled {
 
 .connection-instance-card {
   padding: 12px;
-  border: 1px solid rgba(99, 82, 63, 0.1);
+  border: 1px solid var(--connection-dialog-border, rgba(99, 82, 63, 0.1));
   border-radius: 16px;
-  background: rgba(var(--surface-raised-rgb), 0.55);
+  background: var(--connection-dialog-card, rgba(var(--surface-raised-rgb), 0.55));
 }
 
 .connection-instance-card p {
   margin: 8px 0 4px;
-  color: var(--text);
+  color: var(--connection-dialog-text, var(--text));
   line-height: 1.35;
 }
 
 .connection-instance-card small,
 .connection-empty {
   display: block;
-  color: var(--muted);
+  color: var(--connection-dialog-muted, var(--muted));
   line-height: 1.35;
 }
 
@@ -3031,9 +3047,10 @@ textarea {
   flex-direction: column;
   border-radius: 24px;
   padding: 26px;
-  background:
-    linear-gradient(135deg, rgba(var(--surface-raised-rgb), 0.98), rgba(var(--surface-raised-rgb), 0.92)),
-    var(--panel-strong);
+  border: 1px solid var(--connection-dialog-border);
+  background: var(--connection-dialog-bg);
+  color: var(--connection-dialog-text);
+  box-shadow: var(--connection-dialog-shadow);
 }
 
 .confirm-dialog-header {
@@ -3061,8 +3078,8 @@ textarea {
   width: 42px;
   height: 42px;
   border-radius: 16px;
-  background: linear-gradient(135deg, rgba(217, 108, 58, 0.18), rgba(217, 108, 58, 0.08));
-  color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--connection-dialog-accent);
   font-weight: 900;
 }
 
@@ -3073,7 +3090,7 @@ textarea {
 
 .runtime-config-subtitle {
   margin: 5px 0 0;
-  color: var(--muted);
+  color: var(--connection-dialog-muted);
   font-size: 0.88rem;
   line-height: 1.45;
 }
@@ -3081,11 +3098,15 @@ textarea {
 .confirm-dialog-close {
   border: 0;
   background: transparent;
-  color: var(--muted);
+  color: var(--connection-dialog-muted, var(--muted));
   font-size: 1.6rem;
   line-height: 1;
   padding: 0 4px;
   box-shadow: none;
+}
+
+.runtime-config-dialog .confirm-dialog-close:hover {
+  color: var(--connection-dialog-text, var(--text));
 }
 
 .confirm-dialog-message {
@@ -3135,14 +3156,13 @@ textarea {
   gap: 10px;
   min-height: 100%;
   padding: 18px;
-  border: 1px solid rgba(217, 108, 58, 0.16);
+  border: 1px solid var(--connection-dialog-border-strong);
   border-radius: 20px;
-  background:
-    radial-gradient(circle at top left, rgba(217, 108, 58, 0.16), transparent 42%),
-    rgba(var(--surface-raised-rgb), 0.86);
+  background: var(--connection-dialog-panel-strong);
 }
 
 .runtime-config-status-card strong {
+  color: var(--connection-dialog-text);
   font-size: 1.18rem;
   line-height: 1.2;
 }
@@ -3152,8 +3172,8 @@ textarea {
   margin-top: auto;
   padding: 8px 9px;
   border-radius: 10px;
-  background: rgba(var(--surface-raised-rgb), 0.72);
-  color: var(--muted);
+  background: var(--connection-dialog-input-bg);
+  color: var(--connection-dialog-muted);
   font-family: "Cascadia Mono", "Consolas", monospace;
   font-size: 0.76rem;
   white-space: nowrap;
@@ -3162,7 +3182,7 @@ textarea {
 }
 
 .runtime-config-kicker {
-  color: var(--accent);
+  color: var(--connection-dialog-accent);
   font-size: 0.72rem;
   font-weight: 900;
   letter-spacing: 0.08em;
@@ -3175,9 +3195,9 @@ textarea {
   gap: 14px;
   min-width: 0;
   padding: 18px;
-  border: 1px solid rgba(82, 61, 38, 0.1);
+  border: 1px solid var(--connection-dialog-border);
   border-radius: 20px;
-  background: rgba(var(--surface-raised-rgb), 0.78);
+  background: var(--connection-dialog-panel);
 }
 
 .runtime-config-section-head {
@@ -3188,11 +3208,12 @@ textarea {
 }
 
 .runtime-config-section-head strong {
+  color: var(--connection-dialog-text);
   font-size: 1rem;
 }
 
 .runtime-config-section-head span {
-  color: var(--muted);
+  color: var(--connection-dialog-muted);
   font-size: 0.78rem;
   font-weight: 700;
 }
@@ -3200,7 +3221,7 @@ textarea {
 .runtime-config-section label {
   display: grid;
   gap: 7px;
-  color: var(--text);
+  color: var(--connection-dialog-text);
   font-size: 0.86rem;
   font-weight: 800;
 }
@@ -3209,10 +3230,10 @@ textarea {
 .runtime-config-section select {
   width: 100%;
   min-height: 48px;
-  border: 1px solid rgba(82, 61, 38, 0.15);
+  border: 1px solid var(--connection-dialog-border);
   border-radius: 15px;
-  background: rgba(var(--surface-raised-rgb), 0.88);
-  color: var(--text);
+  background: var(--connection-dialog-input-bg);
+  color: var(--connection-dialog-text);
   padding: 11px 13px;
   font: inherit;
   font-weight: 650;
@@ -3220,12 +3241,12 @@ textarea {
 
 .runtime-config-section input:focus,
 .runtime-config-section select:focus {
-  outline: 2px solid rgba(217, 108, 58, 0.24);
-  border-color: rgba(217, 108, 58, 0.42);
+  outline: 2px solid var(--connection-dialog-focus-outline);
+  border-color: var(--connection-dialog-focus-border);
 }
 
 .runtime-config-section small {
-  color: var(--muted);
+  color: var(--connection-dialog-muted);
   font-size: 0.76rem;
   font-weight: 500;
   line-height: 1.4;
@@ -3243,6 +3264,17 @@ textarea {
   border-radius: 999px;
 }
 
+.runtime-config-dialog .runtime-config-save {
+  border-color: var(--connection-dialog-accent);
+  background: var(--connection-dialog-accent);
+  color: #fff;
+}
+
+.runtime-config-dialog .runtime-config-save:hover {
+  border-color: color-mix(in srgb, var(--connection-dialog-accent) 86%, #fff);
+  background: color-mix(in srgb, var(--connection-dialog-accent) 86%, #fff);
+}
+
 .confirm-dialog-cancel,
 .confirm-dialog-confirm {
   min-width: 74px;
@@ -3257,9 +3289,20 @@ textarea {
   color: var(--text);
 }
 
+.runtime-config-dialog .confirm-dialog-cancel {
+  border-color: var(--connection-dialog-border);
+  background: var(--connection-dialog-card);
+  color: var(--connection-dialog-text);
+}
+
 .confirm-dialog-cancel:hover {
   background: rgba(var(--surface-raised-rgb), 0.85);
   border-color: rgba(var(--surface-raised-rgb), 0.95);
+}
+
+.runtime-config-dialog .confirm-dialog-cancel:hover {
+  border-color: var(--connection-dialog-border-strong);
+  background: var(--connection-dialog-panel);
 }
 
 .confirm-dialog-confirm {
@@ -3555,6 +3598,58 @@ textarea {
   line-height: 1.6;
 }
 
+.health-message,
+.health-repair {
+  margin: 0;
+  line-height: 1.45;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.health-repair {
+  color: var(--muted);
+}
+
+.health-diagnostics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 6px;
+  margin: 0;
+}
+
+.health-diagnostic-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  padding: 5px 7px;
+  border-radius: 7px;
+  background: rgba(var(--surface-raised-rgb), 0.48);
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.health-diagnostic-item dt,
+.health-diagnostic-item dd {
+  margin: 0;
+}
+
+.health-diagnostic-item dd {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.health-state-missing dd,
+.health-state-failed dd,
+.health-state-required dd {
+  color: rgb(177, 72, 72);
+}
+
+.health-state-outdated dd,
+.health-state-unknown dd {
+  color: rgb(165, 102, 36);
+}
+
 .availability-footer {
   display: flex;
   justify-content: flex-end;
@@ -3594,6 +3689,24 @@ textarea {
   color: rgb(177, 72, 72);
 }
 
+.runtime-config-dialog .state-ok {
+  border-color: color-mix(in srgb, var(--connection-dialog-ok) 30%, transparent);
+  background: color-mix(in srgb, var(--connection-dialog-ok) 14%, transparent);
+  color: var(--connection-dialog-ok);
+}
+
+.runtime-config-dialog .state-warn {
+  border-color: color-mix(in srgb, var(--connection-dialog-warn) 30%, transparent);
+  background: color-mix(in srgb, var(--connection-dialog-warn) 14%, transparent);
+  color: var(--connection-dialog-warn);
+}
+
+.runtime-config-dialog .state-error {
+  border-color: color-mix(in srgb, var(--connection-dialog-error) 30%, transparent);
+  background: color-mix(in srgb, var(--connection-dialog-error) 14%, transparent);
+  color: var(--connection-dialog-error);
+}
+
 .agent-brief-dialog {
   width: min(560px, calc(100vw - 48px));
 }
@@ -3626,7 +3739,7 @@ textarea {
 
 .agent-brief-section-header p {
   margin-top: 4px;
-  color: var(--muted);
+  color: var(--connection-dialog-muted, var(--muted));
   font-size: 0.78rem;
   line-height: 1.35;
 }
@@ -3640,18 +3753,23 @@ textarea {
   padding-right: 6px;
 }
 
+.connection-dialog .agent-brief-list {
+  padding-right: 10px;
+}
+
 .agent-brief-row {
   display: grid;
   gap: 12px;
   padding: 14px 16px;
-  border: 1px solid rgba(82, 61, 38, 0.08);
+  border: 1px solid var(--connection-dialog-border, rgba(82, 61, 38, 0.08));
   border-radius: 16px;
-  background: rgba(var(--surface-raised-rgb), 0.64);
+  background: var(--connection-dialog-card, rgba(var(--surface-raised-rgb), 0.64));
 }
 
 .agent-brief-row-header strong {
   min-width: 0;
   overflow: hidden;
+  color: var(--connection-dialog-text, var(--text));
   font-size: 0.88rem;
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -3661,7 +3779,7 @@ textarea {
 .agent-brief-row label {
   display: grid;
   gap: 5px;
-  color: var(--muted);
+  color: var(--connection-dialog-muted, var(--muted));
   font-size: 0.72rem;
   font-weight: 800;
 }
@@ -3669,17 +3787,17 @@ textarea {
 .agent-brief-input {
   width: 100%;
   min-height: 38px;
-  border: 1px solid rgba(82, 61, 38, 0.12);
+  border: 1px solid var(--connection-dialog-border, rgba(82, 61, 38, 0.12));
   border-radius: 10px;
   padding: 0 12px;
-  background: rgba(var(--surface-raised-rgb), 0.82);
-  color: var(--text);
+  background: var(--connection-dialog-input-bg, rgba(var(--surface-raised-rgb), 0.82));
+  color: var(--connection-dialog-text, var(--text));
   font: inherit;
 }
 
 .agent-brief-input:focus {
-  outline: 2px solid rgba(217, 108, 58, 0.2);
-  border-color: rgba(217, 108, 58, 0.28);
+  outline: 2px solid var(--connection-dialog-focus-outline, rgba(217, 108, 58, 0.2));
+  border-color: var(--connection-dialog-focus-border, rgba(217, 108, 58, 0.28));
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -3714,7 +3832,7 @@ textarea {
   object-fit: contain;
 }
 
-/* Monochrome brand SVGs (Simple Icons style) — tint to fit theme */
+/* Monochrome brand SVGs (Simple Icons style) - tint to fit theme */
 .provider-icon-img-mono {
   opacity: 0.8;
 }
@@ -3724,7 +3842,7 @@ textarea {
   opacity: 0.75;
 }
 
-/* Full-color raster favicons — keep brand colors as-is */
+/* Full-color raster favicons - keep brand colors as-is */
 .provider-icon-img-color {
   opacity: 1;
 }
@@ -3747,3 +3865,4 @@ textarea {
   width: 13px;
   height: 13px;
 }
+

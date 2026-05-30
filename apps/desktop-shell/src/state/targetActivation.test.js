@@ -73,3 +73,17 @@ test("unavailable non-Hermes targets are neither selectable nor startable", () =
   assert.equal(isTargetSelectable(target), false);
   assert.equal(canTargetStartSession(target), false);
 });
+
+test("generic adapter targets can declare a connectable activation state", () => {
+  const target = {
+    providerId: "demo",
+    kind: "profile",
+    available: false,
+    activatable: true,
+  };
+
+  assert.equal(isTargetSendable(target), false);
+  assert.equal(isTargetActivatable(target), true);
+  assert.equal(isTargetSelectable(target), true);
+  assert.equal(canTargetStartSession(target), true);
+});

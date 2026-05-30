@@ -4,6 +4,11 @@ import {
   isTargetSelectable,
   isTargetSendable,
 } from "./targetActivation.js";
+import {
+  deriveProviderHealth,
+  deriveRuntimeHealth,
+  deriveTargetHealth,
+} from "./agentHealth.js";
 
 let store = null;
 
@@ -37,18 +42,18 @@ export function createAvailabilityStore() {
 
   const compactTargetSubtitle = (target) => {
     if (!target) return { text: "", key: "" };
-    if (target.providerId === "hermes") {
-      if (target.gateway === "running") return { text: "", key: "availability.gatewayRunning" };
-      if (target.gateway) return { text: "", key: "availability.gatewayStopped" };
-      if (target.model) return { text: target.model, key: "" };
-    }
+    if (target.subtitle) return { text: target.subtitle, key: "" };
+    if (target.gateway === "running") return { text: "", key: "availability.gatewayRunning" };
+    if (target.gateway) return { text: "", key: "availability.gatewayStopped" };
+    if (target.model) return { text: target.model, key: "" };
     return { text: "", key: "" };
   };
 
-  const refresh = (providersInput, runtimeInstancesInput, currentTargetAgent) => {
+  const refresh = (providersInput, runtimeInstancesInput, currentTargetAgent, runtimeAvailabilityInput = {}) => {
     const providerList = providersInput || [];
     const allInstances = runtimeInstancesInput || [];
     const currentTarget = currentTargetAgent || null;
+    const runtimeAvailability = runtimeAvailabilityInput || {};
 
     // Calculate summary stats
     const summary = {
@@ -81,6 +86,12 @@ export function createAvailabilityStore() {
           ? "available"
           : "partial"
         : "not_connected";
+      const availability = runtimeAvailability[provider.id] || {
+        configured: instancesForProvider.length ? instancesForProvider.some((instance) => instance.configured) : undefined,
+        available: isAvailable,
+        summary: availabilitySummary,
+        detail: provider.note || "",
+      };
 
       if (isAvailable) summary.providers.available++;
 
@@ -89,25 +100,32 @@ export function createAvailabilityStore() {
       summary.targets.total += targets.length;
       summary.targets.sendable += targets.filter(isTargetSendable).length;
 
+      const providerHealth = deriveProviderHealth(provider, availability, instancesForProvider);
       return {
         id: provider.id,
         name: provider.name,
         available: isAvailable,
         availabilitySummary,
-        instances: instancesForProvider.map((instance) => ({
-          id: instance.id,
-          runtimeLabel: instance.runtimeLabel,
-          available: instance.available,
-          summary: instance.summary || "",
-          detail: instance.detail || "",
-          version: instance.version || "",
-          commandKind: instance.commandKind,
-          command: instance.command,
-        })),
+        health: providerHealth,
+        instances: instancesForProvider.map((instance) => {
+          const health = deriveRuntimeHealth(instance);
+          return {
+            id: instance.id,
+            runtimeLabel: instance.runtimeLabel,
+            available: instance.available,
+            summary: instance.summary || "",
+            detail: instance.detail || "",
+            version: instance.version || "",
+            commandKind: instance.commandKind,
+            command: instance.command,
+            health,
+          };
+        }),
         targets: targets.map((target) => {
           const subtitle = compactTargetSubtitle(target);
           const sendable = isTargetSendable(target);
           const activatable = isTargetActivatable(target);
+          const health = deriveTargetHealth(target, { sendable, activatable });
           return {
             id: target.id,
             name: displayAgentName(target),
@@ -120,6 +138,7 @@ export function createAvailabilityStore() {
             state: target.state,
             runtimeInstanceId: target.runtimeInstanceId,
             isCurrent: currentTarget && target.id === currentTarget.id,
+            health,
           };
         }),
       };
@@ -134,17 +153,23 @@ export function createAvailabilityStore() {
             type: "target",
             provider: p.name,
             target: t.name,
-            reasonKey: t.state === 9 ? "availability.unavailable" : "availability.gatewayStopped",
+            reason: t.health?.unavailable_reason,
+            reasonParams: t.health?.unavailable_reason_params,
+            repairHint: t.health?.repair_hint,
+            repairHintParams: t.health?.repair_hint_params,
           });
         }
       });
       p.instances.forEach((i) => {
-        if (!i.available && i.detail?.includes("update")) {
+        if (!i.available) {
           problems.push({
             type: "runtime",
             provider: p.name,
             runtime: i.runtimeLabel,
-            reasonKey: "availability.updateAvailable",
+            reason: i.health?.unavailable_reason,
+            reasonParams: i.health?.unavailable_reason_params,
+            repairHint: i.health?.repair_hint,
+            repairHintParams: i.health?.repair_hint_params,
           });
         }
       });
@@ -163,6 +188,10 @@ export function createAvailabilityStore() {
           activatable: isTargetActivatable(currentTarget),
           selectable: isTargetSelectable(currentTarget),
           state: currentTarget.state,
+          health: deriveTargetHealth(currentTarget, {
+            sendable: isTargetSendable(currentTarget),
+            activatable: isTargetActivatable(currentTarget),
+          }),
         }
       : null;
     if (currentTargetData) {

@@ -1374,34 +1374,6 @@ function toggleSendMode() {
   updateSendModeLabel();
 }
 
-async function openProviderManagerPrompt() {
-  try {
-    const current = await invoke("load_runtime_config");
-    const claudeCommand = window.prompt(t("runtimeConfig.promptClaudeCommand"), current?.claudeCommand || "");
-    if (claudeCommand === null) return;
-    const claudeArgs = window.prompt(t("runtimeConfig.promptClaudeArgs"), (current?.claudeArgs || []).join(" "));
-    if (claudeArgs === null) return;
-    const hermesHost = window.prompt(t("runtimeConfig.promptHermesHost"), current?.hermesHost || "wsl");
-    if (hermesHost === null) return;
-    const hermesCommand = window.prompt(t("runtimeConfig.promptHermesCommand"), current?.hermesCommand || "");
-    if (hermesCommand === null) return;
-    await invoke("save_runtime_config", {
-      config: {
-        ...current,
-        claudeCommand: claudeCommand.trim() || null,
-        claudeArgs: claudeArgs.trim() ? claudeArgs.trim().split(/\s+/) : [],
-        hermesHost: hermesHost.trim() || "wsl",
-        hermesCommand: hermesCommand.trim() || null,
-      },
-    });
-    setAppNotice(t("runtimeConfig.saved"));
-    await refreshRuntimeProbe();
-  } catch (error) {
-    console.error(error);
-    setAppNotice(t("runtimeConfig.failed", { error: formatBackendError(error) }), "error");
-  }
-}
-
 function runtimeInstanceDetailMarkup(instance) {
   const lines = [];
   const addLine = (value) => {
@@ -1618,10 +1590,7 @@ function providerBriefSectionMarkup(providerId) {
 }
 
 async function openProviderManager(providerId = currentTargetProvider()?.id || "claude") {
-  if (!confirmDialog) {
-    await openProviderManagerPrompt();
-    return;
-  }
+  if (!confirmDialog) return;
   try {
     const selectedProviderId = providerId || "claude";
     await ensureRuntimeConfigState();
@@ -1676,17 +1645,12 @@ async function openProviderManager(providerId = currentTargetProvider()?.id || "
         </div>
         <div class="confirm-dialog-actions runtime-config-actions">
           <button type="button" class="confirm-dialog-cancel runtime-config-close">${t("common.close")}</button>
-          ${["claude", "hermes"].includes(selectedProviderId) ? `<button type="button" class="mini-btn ghost-btn runtime-config-legacy">${t("runtimeConfig.legacyPrompt")}</button>` : ""}
           <button type="submit" class="primary runtime-config-save">${t("connection.recheck")}</button>
         </div>
       </form>
     `;
     confirmDialog.querySelectorAll(".runtime-config-close").forEach((button) => {
       button.addEventListener("click", closeConfirmDialog);
-    });
-    confirmDialog.querySelector(".runtime-config-legacy")?.addEventListener("click", async () => {
-      closeConfirmDialog();
-      await openProviderManagerPrompt();
     });
     await autoFetchBriefButtons(confirmDialog);
     confirmDialog.querySelector(".agent-brief-save-all")?.addEventListener("click", async () => {
@@ -1739,7 +1703,7 @@ function openAvailabilityModal() {
   const data = store.getData();
 
   if (!data.lastCheck) {
-    store.refresh(providers, runtimeInstances, currentTargetAgent());
+    store.refresh(providers, runtimeInstances, currentTargetAgent(), runtimeAvailability);
   }
 
   const freshData = store.getData();
@@ -1787,7 +1751,7 @@ function openAvailabilityModal() {
     setAppNotice(t("availability.rechecking"), "busy");
     try {
       await refreshRuntimeProbe();
-      store.refresh(providers, runtimeInstances, currentTargetAgent());
+      store.refresh(providers, runtimeInstances, currentTargetAgent(), runtimeAvailability);
       const updatedData = store.getData();
       const updatedView = AvailabilityView(updatedData, { showTitle: false, compact: true });
       confirmDialog.querySelector(".availability-dialog-body").innerHTML = updatedView;
@@ -1826,7 +1790,7 @@ async function refreshRuntimeProbe() {
     renderWorkspace();
     renderHistory();
     renderWorkspaceStatus();
-    getAvailabilityStore().refresh(providers, runtimeInstances, currentTargetAgent());
+    getAvailabilityStore().refresh(providers, runtimeInstances, currentTargetAgent(), runtimeAvailability);
     [...new Set(runtimeInstances.filter((instance) => instance.available).map((instance) => instance.providerId))]
       .forEach((providerId) => {
         loadRuntimeSlashCommandsForProvider(providerId);
