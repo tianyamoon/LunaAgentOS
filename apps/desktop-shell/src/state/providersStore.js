@@ -4,6 +4,32 @@ const DEFAULT_PROVIDERS = [
     name: "Claude Code",
     lane: "",
     noteKey: "provider.claude.note",
+    agentDetail: {
+      summaryKey: "agentDetail.claude.summary",
+      runtimeEnvironmentKey: "agentDetail.runtime.windowsWsl",
+      defaultWorkingDirectoryKey: "agentDetail.cwd.currentProject",
+      models: {
+        available: ["agentDetail.model.nativeRuntime"],
+        default: "agentDetail.model.nativeRuntime",
+        recommended: ["agentDetail.model.claudeRecommended"],
+      },
+      capabilities: {
+        files: { state: "enabled", noteKey: "agentDetail.capabilityNote.filesRepo" },
+        commands: { state: "limited", noteKey: "agentDetail.capabilityNote.commandsApproval" },
+        network: { state: "depends", noteKey: "agentDetail.capabilityNote.runtimePolicy" },
+        images: { state: "depends", noteKey: "agentDetail.capabilityNote.modelSupport" },
+        browser: { state: "limited", noteKey: "agentDetail.capabilityNote.viaTools" },
+        localRepo: { state: "enabled", noteKey: "agentDetail.capabilityNote.localRepo" },
+      },
+      safetyBoundaries: [
+        "agentDetail.claude.safety.permissions",
+        "agentDetail.safety.destructive",
+      ],
+      bestPractices: [
+        "agentDetail.claude.practice.scope",
+        "agentDetail.practice.repoContext",
+      ],
+    },
     agents: [
       {
         id: "claude-main",
@@ -20,6 +46,32 @@ const DEFAULT_PROVIDERS = [
     name: "Hermes",
     lane: "",
     noteKey: "provider.hermes.note",
+    agentDetail: {
+      summaryKey: "agentDetail.hermes.summary",
+      runtimeEnvironmentKey: "agentDetail.runtime.windowsWsl",
+      defaultWorkingDirectoryKey: "agentDetail.cwd.profileRuntime",
+      models: {
+        available: ["agentDetail.model.profileConfigured"],
+        default: "agentDetail.model.profileDefault",
+        recommended: ["agentDetail.model.profileRecommended"],
+      },
+      capabilities: {
+        files: { state: "depends", noteKey: "agentDetail.capabilityNote.profileTools" },
+        commands: { state: "depends", noteKey: "agentDetail.capabilityNote.profileTools" },
+        network: { state: "depends", noteKey: "agentDetail.capabilityNote.profileTools" },
+        images: { state: "depends", noteKey: "agentDetail.capabilityNote.modelSupport" },
+        browser: { state: "depends", noteKey: "agentDetail.capabilityNote.profileTools" },
+        localRepo: { state: "depends", noteKey: "agentDetail.capabilityNote.cwd" },
+      },
+      safetyBoundaries: [
+        "agentDetail.hermes.safety.profile",
+        "agentDetail.safety.destructive",
+      ],
+      bestPractices: [
+        "agentDetail.hermes.practice.profile",
+        "agentDetail.practice.handoffContext",
+      ],
+    },
     agents: [
       {
         id: "hermes-main",
@@ -36,6 +88,30 @@ const DEFAULT_PROVIDERS = [
     name: "Trae IDE",
     lane: "",
     noteKey: "provider.trae.note",
+    agentDetail: {
+      summaryKey: "agentDetail.trae.summary",
+      runtimeEnvironmentKey: "agentDetail.runtime.ideBridge",
+      defaultWorkingDirectoryKey: "agentDetail.cwd.ideWorkspace",
+      models: {
+        available: ["agentDetail.model.ideManaged"],
+        default: "agentDetail.model.ideManaged",
+        recommended: ["agentDetail.model.ideManaged"],
+      },
+      capabilities: {
+        files: { state: "depends", noteKey: "agentDetail.capabilityNote.ideBridge" },
+        commands: { state: "depends", noteKey: "agentDetail.capabilityNote.ideBridge" },
+        network: { state: "unknown", noteKey: "agentDetail.capabilityNote.ideManaged" },
+        images: { state: "unknown", noteKey: "agentDetail.capabilityNote.ideManaged" },
+        browser: { state: "depends", noteKey: "agentDetail.capabilityNote.ideBridge" },
+        localRepo: { state: "depends", noteKey: "agentDetail.capabilityNote.ideWorkspace" },
+      },
+      safetyBoundaries: [
+        "agentDetail.trae.safety.bridge",
+      ],
+      bestPractices: [
+        "agentDetail.trae.practice.useIde",
+      ],
+    },
     agents: [
       {
         id: "trae-main",

@@ -1076,7 +1076,7 @@ button:disabled {
   background: rgba(99, 82, 63, 0.36);
 }
 
-.agent-brief-btn {
+.agent-manage-btn {
   display: inline-grid;
   place-items: center;
   width: 20px;
@@ -1091,7 +1091,7 @@ button:disabled {
   box-shadow: none;
 }
 
-.agent-brief-btn:hover {
+.agent-manage-btn:hover {
   border-color: rgba(217, 108, 58, 0.24);
   color: var(--accent);
 }
@@ -3041,7 +3041,8 @@ textarea {
 }
 
 .runtime-config-dialog {
-  width: min(900px, calc(100vw - 48px));
+  width: min(1120px, calc(100vw - 48px));
+  height: min(820px, calc(100vh - 48px));
   max-height: calc(100vh - 48px);
   display: flex;
   flex-direction: column;
@@ -3058,6 +3059,7 @@ textarea {
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 12px;
+  flex: 0 0 auto;
 }
 
 .confirm-dialog-icon {
@@ -3120,33 +3122,39 @@ textarea {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+  flex: 0 0 auto;
 }
 
 .runtime-config-body {
   display: grid;
   grid-template-columns: 170px minmax(0, 1fr);
   gap: 16px;
+  flex: 1 1 auto;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   margin: 24px 0 22px;
 }
 
 .connection-dialog .runtime-config-body {
-  grid-template-columns: 220px minmax(0, 1fr);
-  gap: 24px;
-  align-items: stretch;
+  grid-template-columns: 220px repeat(2, max-content) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.connection-dialog {
+  width: min(1240px, calc(100vw - 48px));
+}
+
+.connection-manager-body .runtime-config-status-card {
+  grid-row: 1 / span 2;
+}
+
+.connection-manager-body .dialog-tab-panels {
+  grid-column: 2 / -1;
 }
 
 .connection-dialog .agent-brief-section {
-  grid-column: 1 / -1;
-}
-
-.agent-brief-dialog {
-  width: min(720px, calc(100vw - 48px));
-}
-
-.agent-brief-body {
-  display: block;
+  max-height: none;
 }
 
 .runtime-config-status-card {
@@ -3707,21 +3715,9 @@ textarea {
   color: var(--connection-dialog-error);
 }
 
-.agent-brief-dialog {
-  width: min(560px, calc(100vw - 48px));
-}
-
-.agent-brief-body {
-  display: block;
-}
-
 .agent-brief-section {
   max-height: min(72vh, 640px);
   overflow: hidden;
-}
-
-.connection-dialog .agent-brief-section {
-  max-height: none;
 }
 
 .agent-brief-section-header,
@@ -3798,6 +3794,294 @@ textarea {
 .agent-brief-input:focus {
   outline: 2px solid var(--connection-dialog-focus-outline, rgba(217, 108, 58, 0.2));
   border-color: var(--connection-dialog-focus-border, rgba(217, 108, 58, 0.28));
+}
+
+.dialog-tabs {
+  align-content: start;
+  grid-template-columns: repeat(3, max-content) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px 8px;
+  overflow: hidden;
+}
+
+.dialog-tab-input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.dialog-tab-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: start;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 15px;
+  border: 1px solid var(--connection-dialog-border);
+  border-radius: 999px;
+  background: var(--connection-dialog-card);
+  color: var(--connection-dialog-muted);
+  font-size: 0.82rem;
+  font-weight: 850;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease,
+    transform 0.16s ease;
+}
+
+.dialog-tab-label::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.42;
+}
+
+.dialog-tab-label:hover {
+  border-color: var(--connection-dialog-border-strong);
+  color: var(--connection-dialog-text);
+  transform: translateY(-1px);
+}
+
+.dialog-tab-input:checked + .dialog-tab-label {
+  border-color: var(--connection-dialog-border-strong);
+  background: var(--connection-dialog-panel-strong);
+  color: var(--connection-dialog-text);
+}
+
+.dialog-tab-input:checked + .dialog-tab-label::before {
+  color: var(--connection-dialog-accent);
+  opacity: 1;
+}
+
+.dialog-tab-input:focus-visible + .dialog-tab-label {
+  outline: 2px solid var(--connection-dialog-focus-outline, rgba(217, 108, 58, 0.2));
+  outline-offset: 2px;
+}
+
+.dialog-tab-panels {
+  grid-column: 1 / -1;
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+  padding-right: 8px;
+}
+
+.dialog-tab-panel {
+  display: none;
+}
+
+#agentManagerTabOverview:checked ~ .dialog-tab-panels .agent-manager-overview,
+#agentManagerTabBrief:checked ~ .dialog-tab-panels .agent-manager-brief,
+#agentManagerTabConnection:checked ~ .dialog-tab-panels .agent-manager-connection,
+#providerManagerTabConnection:checked ~ .dialog-tab-panels .provider-connection-tab,
+#providerManagerTabBrief:checked ~ .dialog-tab-panels .provider-brief-tab {
+  display: block;
+}
+
+.agent-manager-dialog {
+  width: min(1320px, calc(100vw - 40px));
+}
+
+.agent-manager-body {
+  display: grid;
+}
+
+.agent-manager-dialog .agent-brief-section {
+  max-height: none;
+}
+
+.agent-manager-dialog .agent-brief-list {
+  display: block;
+  overflow: visible;
+  padding-right: 0;
+}
+
+.agent-manager-dialog .agent-brief-row {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.agent-manager-dialog .agent-detail-panel {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.agent-detail-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.agent-manager-dialog .agent-detail-hero,
+.agent-manager-dialog .agent-detail-section:first-of-type {
+  grid-column: 1 / -1;
+}
+
+.agent-detail-hero {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 18px;
+  border: 1px solid var(--connection-dialog-border-strong);
+  border-radius: 18px;
+  background: var(--connection-dialog-panel-strong);
+}
+
+.agent-detail-hero h3,
+.agent-detail-hero p,
+.agent-detail-section h4 {
+  margin: 0;
+}
+
+.agent-detail-hero h3 {
+  margin-top: 3px;
+  font-size: 1.28rem;
+}
+
+.agent-detail-hero p:last-child {
+  margin-top: 8px;
+  color: var(--connection-dialog-muted);
+  line-height: 1.45;
+}
+
+.agent-detail-kicker {
+  color: var(--connection-dialog-accent);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.agent-detail-section {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--connection-dialog-border);
+  border-radius: 16px;
+  background: var(--connection-dialog-panel);
+}
+
+.agent-manager-dialog .agent-detail-section {
+  padding: 13px;
+}
+
+.agent-manager-dialog .agent-detail-grid,
+.agent-manager-dialog .agent-detail-capability-grid {
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+}
+
+.agent-detail-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.agent-detail-grid,
+.agent-detail-capability-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.agent-detail-field,
+.agent-detail-capability {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--connection-dialog-border);
+  border-radius: 12px;
+  background: var(--connection-dialog-card);
+}
+
+.agent-detail-field dt,
+.agent-detail-capability dt {
+  color: var(--connection-dialog-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.agent-detail-field dd,
+.agent-detail-capability dd {
+  margin: 0;
+  color: var(--connection-dialog-text);
+  font-weight: 750;
+  overflow-wrap: anywhere;
+}
+
+.agent-detail-capability dd {
+  display: grid;
+  gap: 5px;
+}
+
+.agent-detail-capability dd small,
+.agent-detail-empty,
+.agent-detail-list {
+  color: var(--connection-dialog-muted);
+  line-height: 1.45;
+}
+
+.agent-detail-capability-state {
+  width: max-content;
+  max-width: 100%;
+  padding: 3px 7px;
+  border-radius: 7px;
+  background: var(--connection-dialog-input-bg);
+  color: var(--connection-dialog-muted);
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+
+.agent-detail-capability-state.is-enabled {
+  color: var(--connection-dialog-ok);
+}
+
+.agent-detail-capability-state.is-limited,
+.agent-detail-capability-state.is-depends {
+  color: var(--connection-dialog-warn);
+}
+
+.agent-detail-capability-state.is-unavailable {
+  color: var(--connection-dialog-error);
+}
+
+.agent-detail-list {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.agent-detail-empty {
+  margin: 0;
+}
+
+@media (max-width: 1180px) {
+  .agent-manager-dialog .agent-detail-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .connection-dialog .runtime-config-body {
+    grid-template-columns: 1fr;
+  }
+
+  .agent-manager-dialog .agent-detail-hero,
+  .agent-manager-dialog .agent-detail-section:first-of-type,
+  .connection-manager-body .dialog-tab-label,
+  .connection-manager-body .dialog-tab-panels {
+    grid-column: auto;
+  }
+
+  .connection-manager-body .runtime-config-status-card {
+    grid-row: auto;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

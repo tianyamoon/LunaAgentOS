@@ -84,6 +84,7 @@ import {
 } from "./state/targetActivation.js";
 import { getAvailabilityStore } from "./state/availabilityStore.js";
 import { AvailabilityView } from "./components/availability/AvailabilityView.js";
+import { AgentDetailPanel } from "./components/agentDetail/AgentDetailPanel.js";
 import {
   acpCommandsForProvider as acpCommandsForProviderRaw,
 } from "./runtime/acpCommands.js";
@@ -121,6 +122,7 @@ import {
   sortTargetsForAgentList,
   targetsForRuntimeInstance as targetsForRuntimeInstanceRaw,
 } from "./providers/runtimeView.js";
+import { buildAgentDetail } from "./providers/agentDetail.js";
 import {
   agentBriefTargetKey,
   briefRecordForTarget,
@@ -1387,6 +1389,20 @@ function runtimeInstanceDetailMarkup(instance) {
   return lines.map((line) => `<small>${escapeHtml(line)}</small>`).join("");
 }
 
+function connectionInstanceMarkup(instance, title = "") {
+  const state = instance.available ? 1 : 9;
+  return `
+    <article class="connection-instance-card">
+      <div class="connection-instance-top">
+        <strong>${escapeHtml(instance.runtimeLabel || title)}</strong>
+        <span class="state-pill ${stateClasses[state] || "state-idle"}">${instance.available ? t("provider.available") : t("provider.notConnected")}</span>
+      </div>
+      <p>${escapeHtml(instance.summary || "")}</p>
+      ${runtimeInstanceDetailMarkup(instance)}
+    </article>
+  `;
+}
+
 function agentBriefPrompt() {
   return [
     "请用10个字以内给自己起一个普通用户一眼能看懂的职责标题。只返回标题，不要解释，不要标点。",
@@ -1530,36 +1546,107 @@ async function autoFetchProviderBriefs(providerId, root) {
   setAppNotice(t("agentBrief.fetchAllComplete", { count: targets.length }));
 }
 
-async function openAgentBriefManager(agentId) {
+function availabilityTargetForAgent(target) {
+  if (!target) return null;
+  const store = getAvailabilityStore();
+  const data = store.refresh(providers, runtimeInstances, currentTargetAgent(), runtimeAvailability);
+  const provider = data.providers.find((entry) => entry.id === target.providerId);
+  return provider?.targets.find((entry) => entry.id === target.id) || null;
+}
+
+async function openAgentManager(agentId) {
   const target = agentById(agentId);
   if (!target || !confirmDialog) return;
   try {
     await ensureRuntimeConfigState();
+    const provider = providerById(target.providerId) || { id: target.providerId, name: target.providerName || target.providerId };
+    const runtimeInstance = runtimeInstanceById(target.runtimeInstanceId);
+    const availabilityTarget = availabilityTargetForAgent(target);
+    const detail = buildAgentDetail({
+      target: {
+        ...target,
+        name: targetDisplayName(target) || displayAgentName(target),
+      },
+      provider,
+      runtimeInstance,
+      availabilityTarget,
+      agentBrief: targetBriefText(target),
+    });
+    const title = detail.name || targetDisplayName(target);
+    const instances = runtimeInstance
+      ? [runtimeInstance]
+      : runtimeInstancesForProvider(target.providerId);
+    const instanceMarkup = instances.length
+      ? instances.map((instance) => connectionInstanceMarkup(instance, detail.providerName)).join("")
+      : `<p class="connection-empty">${t("connection.none")}</p>`;
     confirmDialog.hidden = false;
     confirmDialog.innerHTML = `
-      <form class="confirm-dialog agent-brief-dialog" role="dialog" aria-modal="true" aria-labelledby="agentBriefTitle">
+      <form class="confirm-dialog runtime-config-dialog agent-manager-dialog" role="dialog" aria-modal="true" aria-labelledby="agentManagerTitle">
         <div class="confirm-dialog-header">
           <span class="runtime-config-icon" aria-hidden="true">●</span>
           <div>
-            <h3 id="agentBriefTitle">${t("agentBrief.title")}</h3>
-            <p class="runtime-config-subtitle">${escapeHtml(targetDisplayName(target))}</p>
+            <h3 id="agentManagerTitle">${t("agentDetail.title")} · ${escapeHtml(title)}</h3>
+            <p class="runtime-config-subtitle">${t("agentDetail.subtitle")}</p>
           </div>
-          <button type="button" class="confirm-dialog-close agent-brief-close" aria-label="${t("common.close")}">×</button>
+          <button type="button" class="confirm-dialog-close agent-manager-close" aria-label="${t("common.close")}">×</button>
         </div>
-        <div class="runtime-config-body agent-brief-body">
-          ${agentBriefRowMarkup(target, 0)}
+        <div class="runtime-config-body agent-manager-body dialog-tabs">
+          <input class="dialog-tab-input" type="radio" name="agent-manager-tab" id="agentManagerTabOverview" checked>
+          <label class="dialog-tab-label" for="agentManagerTabOverview">${t("agentDetail.tab.overview")}</label>
+          <input class="dialog-tab-input" type="radio" name="agent-manager-tab" id="agentManagerTabBrief">
+          <label class="dialog-tab-label" for="agentManagerTabBrief">${t("agentDetail.tab.brief")}</label>
+          <input class="dialog-tab-input" type="radio" name="agent-manager-tab" id="agentManagerTabConnection">
+          <label class="dialog-tab-label" for="agentManagerTabConnection">${t("agentDetail.tab.connection")}</label>
+          <div class="dialog-tab-panels">
+            <section class="dialog-tab-panel agent-manager-overview">
+              ${AgentDetailPanel(detail)}
+            </section>
+            <section class="dialog-tab-panel agent-manager-brief">
+              <div class="runtime-config-section agent-brief-section">
+                <div class="agent-brief-section-header">
+                  <div>
+                    <h4>${t("agentBrief.sectionTitle")}</h4>
+                    <p>${t("agentBrief.sectionSubtitle")}</p>
+                  </div>
+                </div>
+                <div class="agent-brief-list">${agentBriefRowMarkup(target, 0)}</div>
+              </div>
+            </section>
+            <section class="dialog-tab-panel agent-manager-connection">
+              <div class="runtime-config-section">
+                <h4>${t("connection.detected")}</h4>
+                <div class="connection-instance-list">${instanceMarkup}</div>
+              </div>
+            </section>
+          </div>
         </div>
         <div class="confirm-dialog-actions runtime-config-actions">
-          <button type="button" class="confirm-dialog-cancel agent-brief-close">${t("common.cancel")}</button>
-          <button type="submit" class="primary">${t("common.save")}</button>
+          <button type="button" class="confirm-dialog-cancel agent-manager-close">${t("common.close")}</button>
+          <button type="button" class="mini-btn ghost-btn agent-manager-recheck">${t("connection.recheck")}</button>
+          <button type="submit" class="primary runtime-config-save">${t("agentBrief.saveAll")}</button>
         </div>
       </form>
     `;
-    confirmDialog.querySelectorAll(".agent-brief-close").forEach((button) => {
+    confirmDialog.querySelectorAll(".agent-manager-close").forEach((button) => {
       button.addEventListener("click", closeConfirmDialog);
     });
     await autoFetchBriefButtons(confirmDialog);
-    confirmDialog.querySelector(".agent-brief-dialog")?.addEventListener("submit", async (event) => {
+    confirmDialog.querySelector(".agent-manager-recheck")?.addEventListener("click", async (event) => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      setAppNotice(t("connection.rechecking"), "busy");
+      try {
+        await refreshRuntimeProbe();
+        if (target.providerId === "hermes") await loadHermesProfiles();
+        setAppNotice(t("connection.checkComplete"));
+        await openAgentManager(agentId);
+      } catch (error) {
+        console.error(error);
+        button.disabled = false;
+        setAppNotice(t("runtimeConfig.failed", { error: formatBackendError(error) }), "error");
+      }
+    });
+    confirmDialog.querySelector(".agent-manager-dialog")?.addEventListener("submit", async (event) => {
       event.preventDefault();
       await saveBriefInputs(confirmDialog);
       closeConfirmDialog();
@@ -1567,7 +1654,7 @@ async function openAgentBriefManager(agentId) {
     });
   } catch (error) {
     console.error(error);
-    setAppNotice(t("agentBrief.openFailed", { error: formatBackendError(error) }), "error");
+    setAppNotice(t("agentDetail.openFailed", { error: formatBackendError(error) }), "error");
   }
 }
 
@@ -1605,19 +1692,7 @@ async function openProviderManager(providerId = currentTargetProvider()?.id || "
         : selectedProvider.name;
     const instances = runtimeInstancesForProvider(selectedProviderId);
     const instanceMarkup = instances.length
-      ? instances.map((instance) => {
-        const state = instance.available ? 1 : 9;
-        return `
-          <article class="connection-instance-card">
-            <div class="connection-instance-top">
-              <strong>${escapeHtml(instance.runtimeLabel || title)}</strong>
-              <span class="state-pill ${stateClasses[state] || "state-idle"}">${instance.available ? t("provider.available") : t("provider.notConnected")}</span>
-            </div>
-            <p>${escapeHtml(instance.summary || "")}</p>
-            ${runtimeInstanceDetailMarkup(instance)}
-          </article>
-        `;
-      }).join("")
+      ? instances.map((instance) => connectionInstanceMarkup(instance, title)).join("")
       : `<p class="connection-empty">${t("connection.none")}</p>`;
     confirmDialog.hidden = false;
     confirmDialog.innerHTML = `
@@ -1630,18 +1705,28 @@ async function openProviderManager(providerId = currentTargetProvider()?.id || "
           </div>
           <button type="button" class="confirm-dialog-close runtime-config-close" aria-label="${t("common.close")}">×</button>
         </div>
-        <div class="runtime-config-body">
+        <div class="runtime-config-body connection-manager-body dialog-tabs">
           <aside class="runtime-config-status-card">
             <span class="runtime-config-kicker">${selectedProviderId}</span>
             <strong>${title}</strong>
             <span class="state-pill ${selectedStateClass}">${selectedState}</span>
             <span>${escapeHtml(runtimeConnectionNote(selectedProvider, instances))}</span>
           </aside>
-          <section class="runtime-config-section">
-            <h4>${t("connection.detected")}</h4>
-            <div class="connection-instance-list">${instanceMarkup}</div>
-          </section>
-          ${providerBriefSectionMarkup(selectedProviderId)}
+          <input class="dialog-tab-input" type="radio" name="provider-manager-tab" id="providerManagerTabConnection" checked>
+          <label class="dialog-tab-label" for="providerManagerTabConnection">${t("agentDetail.tab.connection")}</label>
+          <input class="dialog-tab-input" type="radio" name="provider-manager-tab" id="providerManagerTabBrief">
+          <label class="dialog-tab-label" for="providerManagerTabBrief">${t("agentDetail.tab.brief")}</label>
+          <div class="dialog-tab-panels">
+            <section class="dialog-tab-panel provider-connection-tab">
+              <div class="runtime-config-section">
+                <h4>${t("connection.detected")}</h4>
+                <div class="connection-instance-list">${instanceMarkup}</div>
+              </div>
+            </section>
+            <section class="dialog-tab-panel provider-brief-tab">
+              ${providerBriefSectionMarkup(selectedProviderId)}
+            </section>
+          </div>
         </div>
         <div class="confirm-dialog-actions runtime-config-actions">
           <button type="button" class="confirm-dialog-cancel runtime-config-close">${t("common.close")}</button>
@@ -1871,7 +1956,7 @@ function renderRuntimeTarget(target) {
         <span class="agent-entry-meta">
           <span class="target-status-dot ${escapeHtml(status.className)}" title="${escapeHtml(statusLabel)}" aria-label="${escapeHtml(statusLabel)}"></span>
           ${shouldShowRuntimeLabel ? `<span class="target-runtime-label">${escapeHtml(target.runtimeLabel)}</span>` : ""}
-          <button type="button" class="agent-brief-btn" data-agent-id="${escapeHtml(target.id)}" title="${t("agentBrief.manage")}" aria-label="${t("agentBrief.manage")}">⚙</button>
+          <button type="button" class="agent-manage-btn" data-agent-id="${escapeHtml(target.id)}" title="${t("agentDetail.button")}" aria-label="${t("agentDetail.button")}">⚙</button>
         </span>
       </div>
       ${subtitle ? `<div class="agent-entry-sub">${escapeHtml(subtitle)}</div>` : ""}
@@ -1944,10 +2029,10 @@ function renderProviders() {
     });
   });
 
-  agentList.querySelectorAll(".agent-brief-btn").forEach((button) => {
+  agentList.querySelectorAll(".agent-manage-btn").forEach((button) => {
     button.addEventListener("click", (event) => {
       event.stopPropagation();
-      openAgentBriefManager(button.dataset.agentId);
+      openAgentManager(button.dataset.agentId);
     });
   });
 
