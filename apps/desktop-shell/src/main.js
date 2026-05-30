@@ -75,6 +75,13 @@ import {
   isResumeValidationTurn,
   markResumeValidationPending,
 } from "./state/resumeValidation.js";
+import {
+  canTargetStartSession,
+  isStoppedHermesTarget,
+  isTargetActivatable,
+  isTargetSelectable,
+  isTargetSendable,
+} from "./state/targetActivation.js";
 import { getAvailabilityStore } from "./state/availabilityStore.js";
 import { AvailabilityView } from "./components/availability/AvailabilityView.js";
 import {
@@ -445,18 +452,6 @@ function targetDisplayName(target) {
   return target.name || providerName || displayAgentName(target);
 }
 
-function isStoppedHermesTarget(target) {
-  if (!target || target.providerId !== "hermes") return false;
-  if (target.gateway) return target.gateway !== "running";
-  return target.state === 9;
-}
-
-function isTargetSendable(target) {
-  if (!target) return false;
-  if (isStoppedHermesTarget(target)) return false;
-  return target.available !== false;
-}
-
 function targetSendBlockNotice(target) {
   const targetName = targetDisplayName(target) || displayAgentName(target) || "Hermes";
   if (isStoppedHermesTarget(target)) {
@@ -553,7 +548,7 @@ function providerRuntimeMiniLabel(instances) {
 
 function ensureCurrentTargetAgentExists() {
   const currentTarget = agentById(currentTargetAgentId);
-  if (currentTarget && isTargetSendable(currentTarget)) return;
+  if (currentTarget && isTargetSelectable(currentTarget)) return;
   const defaultHermesTarget = agentById(DEFAULT_HERMES_AGENT_ID);
   if (defaultHermesTarget && isTargetSendable(defaultHermesTarget)) {
     saveCurrentTargetAgent(DEFAULT_HERMES_AGENT_ID);
@@ -567,6 +562,11 @@ function ensureCurrentTargetAgentExists() {
   const fallbackAgent = allAgents().find(isTargetSendable);
   if (fallbackAgent) {
     saveCurrentTargetAgent(fallbackAgent.id);
+    return;
+  }
+  const activatableAgent = allAgents().find(isTargetActivatable);
+  if (activatableAgent) {
+    saveCurrentTargetAgent(activatableAgent.id);
   } else {
     saveCurrentTargetAgent(null);
   }
@@ -731,7 +731,7 @@ function providerAvailability(providerId) {
 function canSendToProvider(providerId) {
   if (providerId === "trae") return false;
   if (runtimeInstancesForProvider(providerId).length) {
-    return runtimeTargets().some((target) => target.providerId === providerId && isTargetSendable(target));
+    return runtimeTargets().some((target) => target.providerId === providerId && canTargetStartSession(target));
   }
   return providerAvailability(providerId).available;
 }
@@ -1847,7 +1847,7 @@ function latestActiveSessionForAgent(agentId) {
 
 function setCurrentTargetAgent(agentId) {
   const target = agentById(agentId);
-  if (!isTargetSendable(target)) {
+  if (!isTargetSelectable(target)) {
     setAppNotice(targetSendBlockNotice(target), "error");
     renderProviders();
     updateActionLabels();
@@ -1888,18 +1888,20 @@ function runtimeConnectionNote(provider, instances) {
 
 function renderRuntimeTarget(target) {
   const sendable = isTargetSendable(target);
-  const selected = sendable && target.id === currentTargetAgentId;
+  const activatable = isTargetActivatable(target);
+  const selectable = sendable || activatable;
+  const selected = selectable && target.id === currentTargetAgentId;
   const status = target.status || targetStatusForFleet(target);
   const statusLabel = t(status.labelKey);
   const subtitle = targetBriefText(target);
   const name = displayAgentName(target);
   const shouldShowRuntimeLabel = target.runtimeLabel && !name.includes(target.runtimeLabel);
-  const entryClass = selected ? "is-main-agent" : sendable ? "is-selectable" : "is-unavailable";
-  const disabledAttrs = sendable
+  const entryClass = selected ? "is-main-agent" : selectable ? "is-selectable" : "is-unavailable";
+  const disabledAttrs = selectable
     ? ""
     : ` aria-disabled="true" title="${escapeHtml(targetSendBlockNotice(target))}"`;
   return `
-    <div class="agent-entry ${entryClass}" data-agent-id="${target.id}" data-sendable="${String(sendable)}"${disabledAttrs}>
+    <div class="agent-entry ${entryClass}" data-agent-id="${target.id}" data-sendable="${String(sendable)}" data-selectable="${String(selectable)}"${disabledAttrs}>
       <div class="agent-entry-top">
         <strong>${escapeHtml(name)}</strong>
         <span class="agent-entry-meta">
@@ -1990,7 +1992,7 @@ function renderProviders() {
       const agentId = entry.dataset.agentId;
       if (!agentId) return;
       const target = agentById(agentId);
-      if (entry.dataset.sendable === "false" || !isTargetSendable(target)) {
+      if (entry.dataset.selectable === "false" || !isTargetSelectable(target)) {
         setAppNotice(targetSendBlockNotice(target), "error");
         return;
       }
@@ -3912,6 +3914,9 @@ async function startAcpSession(session, turn) {
       }
       renderProviders();
       await saveTurnToHistory(session, saved);
+      if (session.providerId === "hermes") {
+        await loadHermesProfiles(session.runtimeInstanceId ? [session.runtimeInstanceId] : null);
+      }
       setAppNotice(t("runtime.completedSaved", { agent: session.agentName }));
     }
   } catch (error) {
@@ -3942,7 +3947,7 @@ function startSessionFromPrompt(forceNewSession = false) {
     setAppNotice(t("composer.needTargetBeforeSend"), "error");
     return;
   }
-  if (!isTargetSendable(agent)) {
+  if (!canTargetStartSession(agent)) {
     setAppNotice(targetSendBlockNotice(agent), "error");
     promptBox.focus();
     return;
@@ -3971,6 +3976,9 @@ function startSessionFromPrompt(forceNewSession = false) {
   promptBox.value = "";
   sendAsNewSession = false;
   updateActionLabels();
+  if (isTargetActivatable(agent)) {
+    setAppNotice(t("runtime.activatingTarget", { target: targetDisplayName(agent) }), "busy");
+  }
   const commands = acpCommandsForProvider(provider.id);
   if (commands) {
     void startAcpSession(session, turn);

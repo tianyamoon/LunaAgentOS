@@ -3584,6 +3584,11 @@ textarea {
   color: rgb(58, 140, 100);
 }
 
+.state-warn {
+  background: rgba(205, 137, 55, 0.16);
+  color: rgb(165, 102, 36);
+}
+
 .state-error {
   background: rgba(177, 72, 72, 0.16);
   color: rgb(177, 72, 72);

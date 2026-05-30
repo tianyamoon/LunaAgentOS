@@ -1,8 +1,12 @@
 import { t } from "../../i18n/index.js";
 
 export function TargetRow(target) {
-  const statusClass = target.sendable ? "state-ok" : "state-error";
-  const statusText = target.sendable ? t("availability.sendable") : t("availability.unavailable");
+  const statusClass = target.sendable ? "state-ok" : target.activatable ? "state-warn" : "state-error";
+  const statusText = target.sendable
+    ? t("availability.sendable")
+    : target.activatable
+      ? t("availability.activatable")
+      : t("availability.unavailable");
   const currentBadge = target.isCurrent ? `<span class="current-badge">${t("availability.current")}</span>` : "";
   const subtitle = target.subtitleKey ? t(target.subtitleKey) : target.subtitle;
 

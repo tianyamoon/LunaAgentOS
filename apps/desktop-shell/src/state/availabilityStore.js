@@ -1,5 +1,9 @@
 // Availability store: aggregates provider/runtime/target health status
-// Self-contained: no external imports, receives all data via refresh()
+import {
+  isTargetActivatable,
+  isTargetSelectable,
+  isTargetSendable,
+} from "./targetActivation.js";
 
 let store = null;
 
@@ -29,14 +33,7 @@ export function createAvailabilityStore() {
     });
   };
 
-  // Helper functions for display logic
   const displayAgentName = (agent) => agent?.nameKey || agent?.name || "";
-  
-  const isTargetSendable = (target) => {
-    if (!target) return false;
-    if (target.providerId === "hermes" && target.gateway && target.gateway !== "running") return false;
-    return target.available !== false;
-  };
 
   const compactTargetSubtitle = (target) => {
     if (!target) return { text: "", key: "" };
@@ -109,13 +106,17 @@ export function createAvailabilityStore() {
         })),
         targets: targets.map((target) => {
           const subtitle = compactTargetSubtitle(target);
+          const sendable = isTargetSendable(target);
+          const activatable = isTargetActivatable(target);
           return {
             id: target.id,
             name: displayAgentName(target),
             displayName: target.name || provider.name,
             subtitle: subtitle.text,
             subtitleKey: subtitle.key,
-            sendable: isTargetSendable(target),
+            sendable,
+            activatable,
+            selectable: sendable || activatable,
             state: target.state,
             runtimeInstanceId: target.runtimeInstanceId,
             isCurrent: currentTarget && target.id === currentTarget.id,
@@ -159,6 +160,8 @@ export function createAvailabilityStore() {
           providerId: currentTarget.providerId,
           providerName: providerList.find((p) => p.id === currentTarget.providerId)?.name,
           sendable: isTargetSendable(currentTarget),
+          activatable: isTargetActivatable(currentTarget),
+          selectable: isTargetSelectable(currentTarget),
           state: currentTarget.state,
         }
       : null;

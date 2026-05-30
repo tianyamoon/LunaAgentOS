@@ -2,13 +2,19 @@ import { t } from "../../i18n/index.js";
 
 export function SummaryStats(data) {
   const { summary, currentTarget } = data;
+  const currentTargetStateClass = currentTarget?.sendable ? "state-ok" : currentTarget?.activatable ? "state-warn" : "state-error";
+  const currentTargetStateText = currentTarget?.sendable
+    ? t("availability.sendable")
+    : currentTarget?.activatable
+      ? t("availability.activatable")
+      : t("availability.notSendable");
 
   const currentTargetHtml = currentTarget
     ? `<div class="summary-current-target">
         <span class="summary-label">${t("availability.currentTarget")}</span>
         <strong>${escapeHtml(currentTarget.displayName)}</strong>
-        <span class="state-pill ${currentTarget.sendable ? "state-ok" : "state-error"}">
-          ${currentTarget.sendable ? t("availability.sendable") : t("availability.notSendable")}
+        <span class="state-pill ${currentTargetStateClass}">
+          ${currentTargetStateText}
         </span>
       </div>`
     : "";
