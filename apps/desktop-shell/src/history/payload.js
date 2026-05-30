@@ -27,9 +27,9 @@ export function buildHistoryEntryPayload({
   const turnForHistory = hermesProfile
     ? { ...turn, meta: { ...(turn.meta || {}), hermesProfile } }
     : turn;
-  const status = typeof getStateName === "function"
+  const status = turn.status || (typeof getStateName === "function"
     ? getStateName(turn.state) || "UNKNOWN"
-    : "UNKNOWN";
+    : "UNKNOWN");
   const summary = turn.finalResponse
     || (Array.isArray(turn.outputs) ? turn.outputs.at(-1) : undefined)
     || (Array.isArray(turn.logs) ? turn.logs.at(0) : undefined)
@@ -53,7 +53,10 @@ export function buildHistoryEntryPayload({
     status,
     summary,
     turn: turnForHistory,
-    runtimeState,
+    runtime_state: runtimeState,
+    record_state: session.record_state || null,
+    access_mode: session.access_mode || null,
+    runtime_binding: session.runtime_binding || null,
   };
 }
 

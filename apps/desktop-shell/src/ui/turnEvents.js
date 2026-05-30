@@ -1,33 +1,28 @@
 /**
- * Turn 事件流 view-model（纯函数）
+ * Pure view-model helpers for turn event streams.
  *
- * 把现有 `turn.thoughts / turn.logs / turn.outputs / turn.finalResponse / turn.state`
- * 推导成 AionUI 风格的事件节点列表。设计目标：
- *   - 不修改 runtime 写入路径（streamEvents.js 不动）
- *   - 不改变 turn 持久化结构
- *   - 历史 turn / 实时 turn 都能 fallback 解析
- *
- * 节点 schema:
- *   {
- *     id: string,
- *     kind: "thinking" | "tool" | "plan" | "usage" | "state" | "log" | "error",
- *     status: "running" | "done" | "info" | "error",
- *     title: string,
- *     detail?: string,
- *     raw?: string,
- *   }
+ * Converts existing turn fields into event nodes without changing runtime
+ * writes or persisted turn shape. Historical and live turns both use the same
+ * fallback parsing path.
  */
 
-const RUNNING_STATES = new Set([0, 1, 2, 3]);
+import { TURN_STATUS, statusFromRuntimeStateCode } from "../state/sessionStatus.js";
+
+const STREAMING_TURN_STATUSES = new Set([
+  TURN_STATUS.created,
+  TURN_STATUS.running,
+  TURN_STATUS.waiting_confirmation,
+]);
 
 export function isStreamingTurnState(state) {
-  return RUNNING_STATES.has(state);
+  return statusFromRuntimeStateCode(state) === TURN_STATUS.running;
 }
 
 export function turnEventsFromTurn(turn, options = {}) {
   if (!turn) return [];
   const translate = typeof options.translate === "function" ? options.translate : (key) => key;
-  const streaming = options.streaming ?? isStreamingTurnState(turn.state);
+  const turnStatus = turn.status || statusFromRuntimeStateCode(turn.state, Boolean(turn.finalResponse));
+  const streaming = options.streaming ?? STREAMING_TURN_STATUSES.has(turnStatus);
   const turnId = turn.id || "turn";
   const events = [];
 
@@ -35,7 +30,7 @@ export function turnEventsFromTurn(turn, options = {}) {
   if (thoughtBlocks.length) {
     const detail = thoughtBlocks.join("\n\n").trim();
     if (detail) {
-      const isError = turn.state === 9 && !turn.finalResponse;
+      const isError = turnStatus === TURN_STATUS.failed && !turn.finalResponse;
       const isRunning = streaming && !turn.finalResponse;
       events.push({
         id: `${turnId}:thinking`,
@@ -50,7 +45,7 @@ export function turnEventsFromTurn(turn, options = {}) {
   }
 
   const logs = Array.isArray(turn.logs) ? turn.logs : [];
-  // logs 是 prepend 的（最新在前），事件流按时间正序展示。
+  // Logs are prepended, so render the event stream in chronological order.
   const orderedLogs = [...logs].reverse();
   orderedLogs.forEach((line, index) => {
     const node = classifyLogLine(line, translate);
@@ -62,7 +57,7 @@ export function turnEventsFromTurn(turn, options = {}) {
     });
   });
 
-  if (turn.state === 9) {
+  if (turnStatus === TURN_STATUS.failed) {
     const errorRaw = orderedLogs.length ? orderedLogs[orderedLogs.length - 1] : "";
     const lastIsError = events.length && events[events.length - 1].status === "error";
     if (!lastIsError) {

@@ -31,6 +31,7 @@ export function archivedSessionsFromHistory(entries, { normalizeSession } = {}) 
       id: entry.id,
       task: entry.task,
       state: 5,
+      status: entry.status || "completed",
       thoughts: [],
       outputs: [],
       finalResponse: entry.summary,
@@ -62,6 +63,9 @@ export function archivedSessionsFromHistory(entries, { normalizeSession } = {}) 
         turnCount: 1,
         turns: [turn],
         runtimeState: entry.runtimeState || entry.runtime_state || "archived",
+        record_state: entry.record_state || "archived",
+        access_mode: entry.access_mode || "read_only",
+        runtime_binding: entry.runtime_binding || null,
         hermesProfile,
       });
       return;

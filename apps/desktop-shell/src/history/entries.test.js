@@ -61,6 +61,9 @@ test("archivedSessionsFromHistory tolerates snake_case keys and provides default
       runtime_label: "WSL",
       runtime_host: "wsl",
       runtime_command: "cmd",
+      record_state: "archived",
+      access_mode: "read_only",
+      runtime_binding: { state: "failed", stage: "resume" },
     },
   ];
   const [session] = archivedSessionsFromHistory(entries);
@@ -72,6 +75,9 @@ test("archivedSessionsFromHistory tolerates snake_case keys and provides default
   assert.equal(session.runtimeInstanceId, "rt-1");
   assert.equal(session.runtimeHost, "wsl");
   assert.equal(session.runtimeCommand, "cmd");
+  assert.equal(session.record_state, "archived");
+  assert.equal(session.access_mode, "read_only");
+  assert.deepEqual(session.runtime_binding, { state: "failed", stage: "resume" });
 });
 
 test("archivedSessionsFromHistory synthesizes a turn when entry.turn is absent", () => {
@@ -82,6 +88,7 @@ test("archivedSessionsFromHistory synthesizes a turn when entry.turn is absent",
   assert.equal(session.turns.length, 1);
   assert.equal(session.turns[0].id, "t1");
   assert.equal(session.turns[0].finalResponse, "auto");
+  assert.equal(session.turns[0].status, "completed");
   assert.deepEqual(session.turns[0].thoughts, []);
 });
 

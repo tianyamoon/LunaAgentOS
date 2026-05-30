@@ -18,7 +18,7 @@ use std::os::windows::process::CommandExt;
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
-const HISTORY_SCHEMA_VERSION: u32 = 3;
+const HISTORY_SCHEMA_VERSION: u32 = 4;
 
 fn history_schema_version() -> u32 {
     HISTORY_SCHEMA_VERSION
@@ -98,6 +98,12 @@ struct HistoryEntry {
     turn: Option<Value>,
     #[serde(alias = "runtime_state")]
     runtime_state: Option<String>,
+    #[serde(default, rename = "record_state")]
+    record_state: Option<String>,
+    #[serde(default, rename = "access_mode")]
+    access_mode: Option<String>,
+    #[serde(default, rename = "runtime_binding")]
+    runtime_binding: Option<Value>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -122,6 +128,12 @@ struct HistoryEntryInput {
     summary: String,
     turn: Option<Value>,
     runtime_state: Option<String>,
+    #[serde(default, rename = "record_state")]
+    record_state: Option<String>,
+    #[serde(default, rename = "access_mode")]
+    access_mode: Option<String>,
+    #[serde(default, rename = "runtime_binding")]
+    runtime_binding: Option<Value>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -872,6 +884,8 @@ fn archive_history_session_entries(
         for mut entry in entries {
             if history_entry_session_key(&entry).unwrap_or_else(|| entry.id.clone()) == session_id {
                 entry.runtime_state = Some("archived".to_string());
+                entry.record_state = Some("archived".to_string());
+                entry.access_mode = Some("read_only".to_string());
                 moved.push(entry);
             } else {
                 retained.push(entry);
@@ -902,7 +916,9 @@ fn archive_history_session_entries(
 
 #[tauri::command]
 fn append_history_entry(app: AppHandle, entry: HistoryEntryInput) -> Result<HistoryEntry, String> {
-    let bucket = if entry.runtime_state.as_deref() == Some("live") {
+    let bucket = if entry.record_state.as_deref() == Some("active")
+        && entry.access_mode.as_deref() != Some("read_only")
+    {
         "live"
     } else {
         "archive"
@@ -932,6 +948,9 @@ fn append_history_entry(app: AppHandle, entry: HistoryEntryInput) -> Result<Hist
         summary: entry.summary,
         turn: entry.turn,
         runtime_state: entry.runtime_state,
+        record_state: entry.record_state,
+        access_mode: entry.access_mode,
+        runtime_binding: entry.runtime_binding,
     };
     let saved_turn_id = history_entry_turn_id(&saved);
     let saved_session_key = history_entry_session_key(&saved);

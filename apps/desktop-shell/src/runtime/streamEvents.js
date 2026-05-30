@@ -1,4 +1,9 @@
 import { t } from "../i18n/index.js";
+import {
+  TURN_STATUS,
+  statusFromRuntimeEvent,
+  statusFromRuntimeStateCode,
+} from "../state/sessionStatus.js";
 
 export function sessionSectionsFromEvents(events) {
   const sections = {
@@ -126,6 +131,13 @@ export function applyEventsToTurn(session, turn, events) {
   turn.finalResponse = sections.finalResponse;
   turn.logs = sections.logs;
   turn.state = lastState ? lastState.state : turn.state;
+  turn.status = events.reduce(
+    (status, event) => statusFromRuntimeEvent(event, status, Boolean(sections.finalResponse)),
+    turn.status || statusFromRuntimeStateCode(turn.state, Boolean(sections.finalResponse)),
+  );
+  if (turn.status === TURN_STATUS.running && sections.finalResponse && lastState?.state === 5) {
+    turn.status = TURN_STATUS.completed;
+  }
   if (acpSessionEvent?.payload?.sessionId) session.acpSessionId = acpSessionEvent.payload.sessionId;
   session.task = turn.task;
   session.state = turn.state;
@@ -139,6 +151,11 @@ export function applyStreamEventToTurn(session, turn, event) {
     turn.state = event.state;
     session.state = event.state;
   }
+  turn.status = statusFromRuntimeEvent(
+    event,
+    turn.status || TURN_STATUS.created,
+    Boolean(turn.finalResponse),
+  );
 
   if (event.payload?.sessionId) {
     session.acpSessionId = event.payload.sessionId;
@@ -156,6 +173,7 @@ export function applyStreamEventToTurn(session, turn, event) {
         if (!turn.outputs.length) turn.outputs.push(content);
         else turn.outputs[turn.outputs.length - 1] += content;
         turn.finalResponse = turn.outputs.join("");
+        if (event.state === 5) turn.status = TURN_STATUS.completed;
       }
       break;
     case "tool":

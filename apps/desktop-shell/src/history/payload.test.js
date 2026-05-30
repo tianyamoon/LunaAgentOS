@@ -24,6 +24,9 @@ function makeSession(overrides = {}) {
     runtimeCommand: null,
     profileExecutable: null,
     acpSessionId: null,
+    record_state: "active",
+    access_mode: "interactive",
+    runtime_binding: { state: "connected", stage: null },
     ...overrides,
   };
 }
@@ -33,6 +36,7 @@ function makeTurn(overrides = {}) {
     id: "turn-1",
     task: "task text",
     state: 5,
+    status: "completed",
     finalResponse: null,
     outputs: [],
     logs: [],
@@ -54,8 +58,11 @@ test("buildHistoryEntryPayload: copies session/turn fields and falls back to def
   assert.equal(payload.schemaVersion, 3);
   assert.equal(payload.providerId, "claude");
   assert.equal(payload.sessionId, "session-1");
-  assert.equal(payload.runtimeState, "live");
-  assert.equal(payload.status, "DONE");
+  assert.equal(payload.runtime_state, "live");
+  assert.equal(payload.record_state, "active");
+  assert.equal(payload.access_mode, "interactive");
+  assert.deepEqual(payload.runtime_binding, { state: "connected", stage: null });
+  assert.equal(payload.status, "completed");
   assert.equal(payload.summary, "消息已结束。");
   // turn is passed through verbatim when there is no hermes profile.
   assert.equal(payload.turn.id, "turn-1");
@@ -120,10 +127,10 @@ test("buildHistoryEntryPayload: targetId / targetName fall back to agent fields"
   assert.equal(payload.targetName, "Claude Code");
 });
 
-test("buildHistoryEntryPayload: status defaults to UNKNOWN when getStateName missing", () => {
+test("buildHistoryEntryPayload: status defaults to UNKNOWN when status and getStateName are missing", () => {
   const payload = buildHistoryEntryPayload({
     session: makeSession(),
-    turn: makeTurn({ state: 99 }),
+    turn: makeTurn({ state: 99, status: undefined }),
     hermesProfile: null,
     schemaVersion: 3,
     runtimeState: "live",

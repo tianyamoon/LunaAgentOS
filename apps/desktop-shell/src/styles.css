@@ -216,7 +216,9 @@ body {
 .brand-title-row {
   display: flex;
   align-items: center;
+  gap: 14px;
   min-width: 0;
+  flex-wrap: wrap;
 }
 
 .brand-logo {
@@ -248,6 +250,34 @@ body {
 .app-notice.is-error {
   color: var(--error);
 }
+
+.topbar-notice {
+  flex: 1 1 200px;
+  min-width: 0;
+  align-self: center;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(var(--surface-raised-rgb), 0.55);
+  border: 1px solid transparent;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.topbar-notice:empty {
+  display: none;
+}
+
+.topbar-notice.is-busy {
+  background: rgba(217, 108, 58, 0.08);
+  border-color: rgba(217, 108, 58, 0.18);
+}
+
+.topbar-notice.is-error {
+  background: rgba(191, 74, 74, 0.08);
+  border-color: rgba(191, 74, 74, 0.2);
+}
+
 
 .actions {
   display: flex;
@@ -1273,6 +1303,82 @@ button:disabled {
   color: #9c3434;
 }
 
+.session-card-status-pill {
+  gap: 6px;
+}
+
+.session-card-status-pill .session-status-icon {
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.session-card-status-pill .session-status-secondary {
+  margin-left: 6px;
+  font-weight: 500;
+  opacity: 0.78;
+}
+
+.session-status-neutral { background: rgba(116, 100, 83, 0.12); border-color: rgba(116, 100, 83, 0.18); color: var(--muted); }
+.session-status-busy { background: rgba(178, 107, 0, 0.14); border-color: rgba(178, 107, 0, 0.2); color: var(--thinking); }
+.session-status-attention { background: rgba(214, 154, 51, 0.18); border-color: rgba(214, 154, 51, 0.26); color: #8a5a16; }
+.session-status-danger { background: rgba(191, 74, 74, 0.16); border-color: rgba(191, 74, 74, 0.24); color: #9c3434; }
+.session-status-success { background: rgba(33, 122, 76, 0.14); border-color: rgba(33, 122, 76, 0.2); color: var(--done); }
+.session-status-muted { background: rgba(99, 82, 63, 0.1); border-color: rgba(99, 82, 63, 0.14); color: var(--muted); }
+
+.session-status-running.runtime-pill::before {
+  animation: liveBreath 1.4s infinite ease-in-out;
+}
+
+.session-status-error {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(var(--surface-raised-rgb), 0.55);
+  border: 1px solid var(--error);
+  border-left-width: 3px;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.session-status-error strong {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--error);
+}
+
+.session-status-error-stage {
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+
+.session-status-error pre {
+  margin: 0;
+  padding: 8px 10px;
+  background: rgba(var(--surface-raised-rgb), 0.85);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--font-mono, "JetBrains Mono", monospace);
+  font-size: 0.76rem;
+  color: var(--text);
+}
+
+.session-status-error p {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text);
+}
+
 .workspace-panel {
   gap: 12px;
 }
@@ -1413,10 +1519,7 @@ button:disabled {
   outline-offset: -2px;
 }
 
-/* 单 session 工作区：默认主视图态，但不强加 fullscreen 视觉标记 */
-.session-deck.is-implicit-focused .session-fullscreen-btn {
-  display: none;
-}
+/* 单 session 工作区：默认主视图态，但保留 fullscreen 按钮以便显式拉真全屏 */
 
 .session-mini-bar {
   display: flex;
@@ -2030,7 +2133,7 @@ button:disabled {
   white-space: normal;
 }
 
-/* === Turn event stream (AionUI-inspired event nodes) ============= */
+/* === Turn event stream =========================================== */
 .turn-events {
   display: flex;
   flex-direction: column;
@@ -2905,8 +3008,8 @@ textarea {
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(40, 35, 30, 0.42);
-  backdrop-filter: blur(2px);
+  background: rgba(8, 10, 14, 0.52);
+  backdrop-filter: blur(3px);
 }
 
 .confirm-dialog-backdrop[hidden] {
@@ -2987,7 +3090,8 @@ textarea {
 
 .confirm-dialog-message {
   margin: 24px 0 26px;
-  color: rgba(54, 43, 31, 0.72);
+  color: var(--text);
+  opacity: 0.86;
   line-height: 1.6;
 }
 
@@ -3145,6 +3249,17 @@ textarea {
   min-height: 40px;
   border-radius: 7px;
   font-size: 0.96rem;
+}
+
+.confirm-dialog-cancel {
+  border: 1px solid var(--border);
+  background: rgba(var(--surface-raised-rgb), 0.6);
+  color: var(--text);
+}
+
+.confirm-dialog-cancel:hover {
+  background: rgba(var(--surface-raised-rgb), 0.85);
+  border-color: rgba(var(--surface-raised-rgb), 0.95);
 }
 
 .confirm-dialog-confirm {

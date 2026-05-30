@@ -37,7 +37,7 @@ test("slashCommandsForProvider filters by provider and includes Hermes native co
   assert.deepEqual(slashCommandsForProvider(commands, null).map((item) => item.name), commands.map((item) => item.name));
 });
 
-test("selectionBehaviorForSlashCommand follows AionUI insert-vs-execute defaults", () => {
+test("selectionBehaviorForSlashCommand follows insert-vs-execute defaults", () => {
   assert.equal(selectionBehaviorForSlashCommand({ name: "new", kind: "template" }), "insert");
   assert.equal(selectionBehaviorForSlashCommand({ name: "skill", kind: "skill" }), "insert");
   assert.equal(selectionBehaviorForSlashCommand({ name: "open", kind: "builtin" }), "execute");

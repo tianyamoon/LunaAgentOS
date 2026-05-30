@@ -1,11 +1,10 @@
 /**
- * 把 turnEvents.js 输出的事件节点渲染成 HTML 字符串。
+ * Render normalized turn event nodes as expandable HTML.
  *
- * 设计参考 AionUI 的 MessageThinking / MessageToolCall / MessagePlan：
- *   - 单行 summary（状态点 + 类型标签 + 标题 + 可选耗时/状态徽标）
- *   - 有 detail 时点击展开
- *   - running 默认展开、done/info 默认折叠
- *   - 不引入新依赖；用 vanilla details/summary
+ * - Single-line summary with status dot, kind label, title, and optional metadata.
+ * - Click to expand when detail content exists.
+ * - Running and error events open by default; completed/info events stay collapsed.
+ * - Uses vanilla details/summary patterns without adding a UI dependency.
  */
 
 const KIND_LABEL_KEYS = {

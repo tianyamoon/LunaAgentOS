@@ -8,6 +8,7 @@ import {
   eventLogText,
   sessionSectionsFromEvents,
 } from "./streamEvents.js";
+import { TURN_STATUS } from "../state/sessionStatus.js";
 
 function makeSession() {
   return {
@@ -28,6 +29,7 @@ function makeTurn() {
     finalResponse: "",
     logs: [],
     state: 1,
+    status: TURN_STATUS.created,
   };
 }
 
@@ -89,6 +91,7 @@ test("applyEventsToTurn replaces aggregate turn sections and updates session ide
   assert.deepEqual(turn.outputs, ["done"]);
   assert.equal(turn.finalResponse, "done");
   assert.equal(turn.state, 5);
+  assert.equal(turn.status, TURN_STATUS.completed);
   assert.equal(session.state, 5);
   assert.equal(session.task, "build feature");
   assert.equal(session.activeTurnId, "turn-1");
@@ -106,6 +109,7 @@ test("applyStreamEventToTurn appends incremental thought and response chunks", (
   assert.deepEqual(turn.outputs, ["cd"]);
   assert.equal(turn.finalResponse, "cd");
   assert.equal(turn.state, 4);
+  assert.equal(turn.status, TURN_STATUS.running);
   assert.equal(session.state, 4);
   assert.equal(session.acpSessionId, "acp-2");
 });
@@ -124,5 +128,6 @@ test("applyStreamEventToTurn prepends tool/plan/usage/state logs", () => {
     "Run：ok",
   ]);
   assert.equal(turn.state, 5);
+  assert.equal(turn.status, TURN_STATUS.completed);
   assert.equal(session.state, 5);
 });

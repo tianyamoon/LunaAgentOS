@@ -56,6 +56,25 @@ import {
   compareActiveSessionListItems,
   compareArchivedSessionListItems,
 } from "./state/sessionListItems.js";
+import {
+  ACCESS_MODE,
+  CARD_STATUS,
+  RECORD_STATE,
+  RUNTIME_BINDING_STAGE,
+  RUNTIME_BINDING_STATE,
+  TURN_STATUS,
+  createRuntimeBinding,
+  isRunningTurnStatus,
+  normalizeSessionStatusShape,
+  resolveSessionCardStatusView,
+  statusFromRuntimeStateCode,
+} from "./state/sessionStatus.js";
+import {
+  bindResumeValidationTurn,
+  clearResumeValidation,
+  isResumeValidationTurn,
+  markResumeValidationPending,
+} from "./state/resumeValidation.js";
 import { getAvailabilityStore } from "./state/availabilityStore.js";
 import { AvailabilityView } from "./components/availability/AvailabilityView.js";
 import {
@@ -156,6 +175,24 @@ const stateClasses = {
   9: "state-error",
 };
 
+const turnStatusKeys = {
+  created: "turnStatus.created",
+  running: "turnStatus.running",
+  waiting_confirmation: "turnStatus.waitingConfirmation",
+  completed: "turnStatus.completed",
+  failed: "turnStatus.failed",
+  cancelled: "turnStatus.cancelled",
+};
+
+const turnStatusClasses = {
+  created: "turn-status-created",
+  running: "turn-status-running",
+  waiting_confirmation: "turn-status-waiting-confirmation",
+  completed: "turn-status-completed",
+  failed: "turn-status-failed",
+  cancelled: "turn-status-cancelled",
+};
+
 const runtimeStateLabels = {
   live: "Live",
   archived: "Read-only",
@@ -206,7 +243,7 @@ const FONT_SCALE_KEY = "lunaagentos.fontScale";
 const THEME_KEY = "lunaagentos.theme";
 const PROVIDER_COLLAPSE_KEY = "lunaagentos.providerCollapsedIds";
 const SLASH_COMMAND_USAGE_KEY = "lunaagentos.slashCommandUsage";
-const HISTORY_SCHEMA_VERSION = 3;
+const HISTORY_SCHEMA_VERSION = 4;
 const STREAM_CARD_RENDER_INTERVAL_MS = 100;
 const DEFAULT_HERMES_AGENT_ID = "hermes-wsl:profile:default";
 const SEND_MODE_OPTIONS = ["enter", "ctrlEnter"];
@@ -232,6 +269,10 @@ function providerAvailabilityLabel(summary) {
 
 function stateDisplayLabel(state) {
   return stateDisplayKeys[state] ? t(stateDisplayKeys[state]) : stateDisplayNames[state] || "UNKNOWN";
+}
+
+function turnStatusLabel(status) {
+  return turnStatusKeys[status] ? t(turnStatusKeys[status]) : status || t("turnStatus.created");
 }
 
 function runtimeStateLabel(runtimeState) {
@@ -716,6 +757,50 @@ function sessionLifecycle(session) {
   });
 }
 
+function ensureSessionStatusShape(session) {
+  return normalizeSessionStatusShape(session);
+}
+
+function sessionRecordState(session) {
+  ensureSessionStatusShape(session);
+  return session?.record_state || RECORD_STATE.active;
+}
+
+function setSessionRecordState(session, state) {
+  if (!session) return null;
+  ensureSessionStatusShape(session);
+  session.record_state = state;
+  return state;
+}
+
+function setSessionAccessMode(session, mode) {
+  if (!session) return null;
+  ensureSessionStatusShape(session);
+  session.access_mode = mode;
+  return mode;
+}
+
+function setRuntimeBinding(session, patch = {}) {
+  if (!session) return null;
+  ensureSessionStatusShape(session);
+  session.runtime_binding = {
+    ...createRuntimeBinding(session.runtime_binding),
+    ...patch,
+  };
+  return session.runtime_binding;
+}
+
+function clearRuntimeBindingError(session, patch = {}) {
+  return setRuntimeBinding(session, {
+    state: RUNTIME_BINDING_STATE.connected,
+    stage: null,
+    error_title: null,
+    error_detail: null,
+    error_suggestion: null,
+    ...patch,
+  });
+}
+
 function sessionRuntimeState(session) {
   return sessionLifecycle(session);
 }
@@ -738,6 +823,16 @@ function setSessionLifecycle(session, target) {
   }
   session.lifecycle = next;
   session.runtimeState = next;
+  if (next === LIFECYCLE.archived) {
+    setSessionRecordState(session, RECORD_STATE.archived);
+  } else if (next === LIFECYCLE.deleted) {
+    setSessionRecordState(session, RECORD_STATE.deleted);
+  } else if (next === LIFECYCLE.live || next === LIFECYCLE.restoring || next === LIFECYCLE.resume_failed || next === LIFECYCLE.stopped) {
+    setSessionRecordState(session, RECORD_STATE.active);
+  }
+  if (next === LIFECYCLE.restoring) {
+    setRuntimeBinding(session, { state: RUNTIME_BINDING_STATE.reconnecting, stage: RUNTIME_BINDING_STAGE.load });
+  }
   if (isStoppedLifecycle(next)) {
     if (session.id) stoppedSessionIds.add(session.id);
   } else if (next !== LIFECYCLE.deleted) {
@@ -763,16 +858,25 @@ function isSessionStoppedTombstone(sessionId) {
 }
 
 function canSendToSession(session) {
-  return canSendLifecycle(sessionLifecycle(session));
+  ensureSessionStatusShape(session);
+  return session?.record_state === RECORD_STATE.active
+    && session?.access_mode === ACCESS_MODE.interactive
+    && session?.runtime_binding?.state !== RUNTIME_BINDING_STATE.failed
+    && canSendLifecycle(sessionLifecycle(session));
 }
 
 function canRestoreSession(session) {
-  return Boolean(session?.acpSessionId) && canRestoreLifecycle(sessionLifecycle(session));
+  ensureSessionStatusShape(session);
+  return Boolean(session?.acpSessionId)
+    && (
+      session?.record_state === RECORD_STATE.archived
+      || session?.runtime_binding?.state === RUNTIME_BINDING_STATE.failed
+      || canRestoreLifecycle(sessionLifecycle(session))
+    );
 }
 
 function isArchivedSessionListItem(item) {
-  if (!item?.isInWorkspace && !item?.acpSessionId) return true;
-  return isArchivedLifecycle(item.runtimeState || LIFECYCLE.live);
+  return item?.record_state === RECORD_STATE.archived || item?.access_mode === ACCESS_MODE.read_only;
 }
 
 function isActiveSessionListItem(item) {
@@ -780,7 +884,7 @@ function isActiveSessionListItem(item) {
 }
 
 function isSessionExecuting(session) {
-  return executingSessionStates.has(session.state);
+  return isRunningTurnStatus(session?.turns?.find((turn) => turn.id === session?.activeTurnId)?.status || session?.turns?.at(-1)?.status);
 }
 
 function formatBackendError(error) {
@@ -1168,7 +1272,6 @@ function currentComposerTargetLabel() {
 function currentSessionSendBlockReason(session, agent) {
   if (!session) return "";
   if (agent && session.agentId !== agent.id) return t("composer.blockInactiveSession");
-  if (!activeSessionIds.has(session.id)) return t("composer.blockInactiveSession");
   if (canSendToSession(session)) return "";
   return t("composer.blockInactiveSession");
 }
@@ -2029,6 +2132,9 @@ function createSessionForAgent(agent, firstTask) {
     state: 2,
     lifecycle: LIFECYCLE.live,
     runtimeState: LIFECYCLE.live,
+    record_state: RECORD_STATE.active,
+    access_mode: ACCESS_MODE.interactive,
+    runtime_binding: createRuntimeBinding(),
     turns: [],
     createdAt: new Date().toISOString(),
     fullscreen: false,
@@ -2062,6 +2168,7 @@ function createTurn(session, task) {
     id: `turn-${Date.now()}-${turnSeq}`,
     task,
     state: 0,
+    status: TURN_STATUS.created,
     thoughts: [],
     outputs: [],
     finalResponse: t("turn.initialResponse"),
@@ -2072,6 +2179,8 @@ function createTurn(session, task) {
   session.task = task;
   session.state = 2;
   session.activeTurnId = turn.id;
+  turn.status = TURN_STATUS.running;
+  clearRuntimeBindingError(session, { state: RUNTIME_BINDING_STATE.connected, stage: RUNTIME_BINDING_STAGE.prompt });
   session.turns.push(turn);
   renderWorkspace();
   return turn;
@@ -2118,7 +2227,31 @@ function appendStreamEventToTurn(sessionId, event) {
   if (!turn) return;
 
   applyStreamEventToTurn(session, turn, event);
+  const validatedByStream = turn.finalResponse
+    || event.type === "thought"
+    || event.type === "tool"
+    || event.type === "plan"
+    || turn.status === TURN_STATUS.waiting_confirmation
+    || turn.status === TURN_STATUS.completed;
+  if (isResumeValidationTurn(session, turn.id) && turn.status !== TURN_STATUS.failed && validatedByStream) {
+    clearResumeValidation(session);
+  }
   scheduleSessionCardRender(session.id);
+}
+
+function markPromptErrorOnTurn(session, turn, message) {
+  turn.state = 9;
+  turn.status = TURN_STATUS.failed;
+  turn.logs = [message, ...turn.logs];
+  session.state = 9;
+  setRuntimeBinding(session, {
+    state: RUNTIME_BINDING_STATE.failed,
+    stage: RUNTIME_BINDING_STAGE.prompt,
+    error_title: t("runtime.promptFailedTitle", { agent: session.agentName }),
+    error_detail: message,
+    error_suggestion: t("runtime.promptFailedSuggestion"),
+  });
+  return turn;
 }
 
 function appendErrorToTurn(sessionId, turnId, message) {
@@ -2126,16 +2259,28 @@ function appendErrorToTurn(sessionId, turnId, message) {
   if (!session) return;
   const turn = session.turns.find((item) => item.id === turnId);
   if (!turn) return;
-  turn.state = 9;
-  turn.logs = [message, ...turn.logs];
-  session.state = 9;
-  if (session.acpSessionId) {
-    setSessionLifecycle(session, LIFECYCLE.resume_failed);
-    markSessionInactive(session.id);
-  }
+  markPromptErrorOnTurn(session, turn, message);
   renderWorkspace();
   renderHistory();
   setAppNotice(t("runtime.failed", { agent: session.agentName, message }), "error");
+}
+
+function rollbackResumeValidationPromptFailure(session, turn, message) {
+  markPromptErrorOnTurn(session, turn, message);
+  clearResumeValidation(session);
+  setSessionLifecycle(session, LIFECYCLE.resume_failed);
+  setSessionAccessMode(session, ACCESS_MODE.read_only);
+  setRuntimeBinding(session, {
+    state: RUNTIME_BINDING_STATE.failed,
+    stage: RUNTIME_BINDING_STAGE.prompt,
+    error_title: t("restore.firstTurnFailedTitle"),
+    error_detail: message,
+    error_suggestion: t("restore.firstTurnFailedSuggestion"),
+  });
+  markSessionInactive(session.id);
+  renderWorkspace();
+  renderHistory();
+  setAppNotice(t("restore.firstTurnFailedNotice", { error: compactNoticeText(message) }), "error");
 }
 
 function appendRuntimeLogToSession(session, message, state = null) {
@@ -2146,6 +2291,7 @@ function appendRuntimeLogToSession(session, message, state = null) {
   }
   if (typeof state === "number") {
     turn.state = state;
+    turn.status = statusFromRuntimeStateCode(state, Boolean(turn.finalResponse));
     session.state = state;
   }
   flowDetailOpenState.set(`${turn.id}:logs`, true);
@@ -2183,7 +2329,7 @@ function countRestorableActiveHistoryItems() {
   const liveIds = new Set(sessions.map((session) => session.id));
   return archivedSessionsFromHistory(readableHistoryEntries())
     .filter((item) => !liveIds.has(item.id))
-    .filter((item) => (item.runtimeState || "archived") !== "archived")
+    .filter((item) => item.record_state === RECORD_STATE.active && item.access_mode !== ACCESS_MODE.read_only)
     .length;
 }
 
@@ -2191,7 +2337,7 @@ function renderWorkspaceStatus() {
   const agent = currentTargetAgent();
   const provider = currentTargetProvider();
   const countedSessions = sessions;
-  const liveCount = countedSessions.filter((session) => sessionRuntimeState(session) === "live").length;
+  const liveCount = countedSessions.filter((session) => sessionRecordState(session) === RECORD_STATE.active).length;
   if (!agent || !provider) {
     workspaceStatus.textContent = t("composer.placeholderNoTarget");
     return;
@@ -2470,7 +2616,8 @@ function clearTurnDetailOpenState(turnId) {
 }
 
 function renderTurn(turn, index) {
-  const streaming = executingSessionStates.has(turn.state);
+  const turnStatus = turn.status || statusFromRuntimeStateCode(turn.state, Boolean(turn.finalResponse));
+  const streaming = isRunningTurnStatus(turnStatus);
   const waiting = streaming && !turn.finalResponse;
   const rawResponseText = turnResponseText(turn);
   const responseText = rawResponseText || t("turn.waiting");
@@ -2524,7 +2671,7 @@ function renderTurn(turn, index) {
           <strong>${t("turn.title", { index: index + 1 })}</strong>
         </div>
         <div class="turn-header-actions">
-          <span class="state-pill ${stateClasses[turn.state] || "state-idle"}">${stateNames[turn.state] || "UNKNOWN"}</span>
+          <span class="state-pill ${turnStatusClasses[turnStatus] || "turn-status-created"}">${escapeHtml(turnStatusLabel(turnStatus))}</span>
           <button type="button" class="mini-btn ghost-btn turn-copy-btn" data-turn-id="${escapeHtml(turn.id)}">${t("turn.copyTurn")}</button>
           <button type="button" class="mini-btn ghost-btn turn-copy-response-btn" data-turn-id="${escapeHtml(turn.id)}" ${rawResponseText ? "" : "disabled"}>${t("turn.copyResponse")}</button>
         </div>
@@ -2546,17 +2693,53 @@ function renderTurn(turn, index) {
   `;
 }
 
+function renderSessionStatusIcon(icon) {
+  const glyphs = {
+    dot: "•",
+    spinner: "◌",
+    warning: "!",
+    check: "✓",
+    archive: "▣",
+    lock: "⌕",
+  };
+  return `<span class="session-status-icon session-status-icon-${escapeHtml(icon || "dot")}" aria-hidden="true">${escapeHtml(glyphs[icon] || glyphs.dot)}</span>`;
+}
+
+function renderSessionStatusChip(statusView) {
+  const secondary = statusView.secondary_status?.label
+    ? `<span class="session-status-secondary">${escapeHtml(statusView.secondary_status.label)}</span>`
+    : "";
+  return `<span class="runtime-pill session-card-status-pill session-status-${escapeHtml(statusView.tone)} session-status-${escapeHtml(statusView.status)}" aria-label="${escapeHtml(t("session.statusAria", { state: statusView.label }))}" title="${escapeHtml(statusView.detail)}">
+    ${renderSessionStatusIcon(statusView.icon)}
+    <span>${escapeHtml(statusView.label)}</span>
+    ${secondary}
+  </span>`;
+}
+
+function renderSessionStatusError(statusView) {
+  if (!statusView.error) return "";
+  const stage = statusView.error.stage
+    ? `<div class="session-status-error-stage">${escapeHtml(t("sessionStatus.errorStage", { stage: statusView.error.stage }))}</div>`
+    : "";
+  return `<div class="session-status-error">
+    <strong>${escapeHtml(statusView.error.title)}</strong>
+    ${stage}
+    ${statusView.error.detail ? `<pre>${escapeHtml(statusView.error.detail)}</pre>` : ""}
+    ${statusView.error.suggestion ? `<p>${escapeHtml(statusView.error.suggestion)}</p>` : ""}
+  </div>`;
+}
+
 function renderSessionCard(session) {
+  ensureSessionStatusShape(session);
   const identitySession = normalizeWorkspaceSession(session);
-  const runtimeState = sessionRuntimeState(session);
+  const statusView = resolveSessionCardStatusView(session, { translate: t });
   const isActiveReceiver = sessionsStore.getCurrentSessionId() === session.id;
-  const isWaiting = isSessionExecuting(session);
-  const isRestoring = runtimeState === "restoring";
+  const isWaiting = statusView.status === CARD_STATUS.running || statusView.status === CARD_STATUS.waiting_confirmation;
+  const isRestoring = session.runtime_binding?.state === RUNTIME_BINDING_STATE.reconnecting;
   const managementDisabled = isRestoring ? "disabled" : "";
   const profileMeta = identitySession.providerId === "hermes"
     ? [identitySession.profileName, identitySession.profileModel].filter(Boolean).join(" · ")
     : "";
-  const shouldShowRuntimeState = runtimeState !== "live";
   const stats = sessionCardStats(session, t);
   const latestOnly = isSessionLatestOnly(session);
   const hasFlowDetails = flowDetailEntriesForSession(session).length > 0;
@@ -2564,8 +2747,7 @@ function renderSessionCard(session) {
   const turnsCollapsed = areSessionTurnsCollapsed(session);
   const { visibleTurnEntries, hiddenTurnCount } = sessionTurnVisibility(session, latestOnly);
   const managementTitleSuffix = isRestoring ? t("action.restoringSuffix") : "";
-  const runtimeLabel = runtimeStateLabel(runtimeState);
-  const canArchiveCard = runtimeState !== LIFECYCLE.archived && runtimeState !== LIFECYCLE.resume_failed;
+  const canArchiveCard = session.record_state !== RECORD_STATE.archived && session.access_mode !== ACCESS_MODE.read_only;
   const turnToggleLabel = turnsCollapsed ? t("action.expandAllTurns") : t("action.collapseAllTurns");
   const latestOnlyLabel = latestOnly ? t("action.showAllTurns") : t("action.latestOnly");
   const flowToggleLabel = flowsOpen ? t("action.collapseFlows") : t("action.expandFlows");
@@ -2581,7 +2763,7 @@ function renderSessionCard(session) {
             ${isActiveReceiver ? `<span class="active-receiver-banner">${t("session.current")}</span>` : ""}
           </div>
           <div class="session-card-actions" role="toolbar" aria-label="${t("session.actionsAria")}">
-            ${isWaiting && runtimeState === "live" ? `<button type="button" class="mini-btn ghost-btn session-action-btn danger-btn session-stop-btn" data-session-id="${session.id}" title="${t("action.stop")}" aria-label="${t("action.stop")}">${renderSessionActionIcon("stop")}</button>` : ""}
+            ${isWaiting && session.record_state === RECORD_STATE.active ? `<button type="button" class="mini-btn ghost-btn session-action-btn danger-btn session-stop-btn" data-session-id="${session.id}" title="${t("action.stop")}" aria-label="${t("action.stop")}">${renderSessionActionIcon("stop")}</button>` : ""}
             <div class="session-tool-group" role="group">
               <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-copy-btn" data-session-id="${session.id}" title="${t("action.copySession")}" aria-label="${t("action.copySession")}" ${session.turns.length ? "" : "disabled"}>${renderSessionActionIcon("copy")}</button>
               <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-latest-only-btn ${latestOnly ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${latestOnly ? "true" : "false"}" title="${latestOnlyLabel}" aria-label="${latestOnlyLabel}" ${session.turns.length > 1 ? "" : "disabled"}>${renderSessionActionIcon(latestOnly ? "all" : "latest")}</button>
@@ -2598,7 +2780,7 @@ function renderSessionCard(session) {
           </div>
         </div>
         <div class="session-card-row session-card-status-line">
-          ${shouldShowRuntimeState ? `<span class="runtime-pill ${runtimeStateClasses[runtimeState] || "runtime-archived"} ${isWaiting ? "is-busy" : ""}" aria-label="${escapeHtml(t("session.statusAria", { state: runtimeLabel }))}">${escapeHtml(runtimeLabel)}</span>` : ""}
+          ${renderSessionStatusChip(statusView)}
           <div class="session-card-stats" aria-label="${t("session.statsAria")}">
             <button type="button" class="session-stat-pill session-turns-toggle-btn ${turnsCollapsed ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${turnsCollapsed ? "true" : "false"}" title="${turnToggleLabel}" aria-label="${turnToggleLabel}" ${session.turns.length ? "" : "disabled"}>${t("session.turns", { count: session.turns.length })}</button>
             ${stats.map((item) => `<span class="session-stat-pill" data-stat-key="${escapeHtml(item.key)}">${escapeHtml(item.label)}</span>`).join("")}
@@ -2609,6 +2791,7 @@ function renderSessionCard(session) {
           <span class="session-task-label">${escapeHtml(t("session.taskLabel"))}</span>
           <span class="session-task-text">${escapeHtml(session.task)}</span>
         </div>
+        ${renderSessionStatusError(statusView)}
       </div>
       <div class="session-card-body">
         ${session.turns.length
@@ -2645,16 +2828,16 @@ function toggleSessionFocus(sessionId) {
 }
 
 function renderSessionMiniCard(session) {
+  ensureSessionStatusShape(session);
   const identitySession = normalizeWorkspaceSession(session);
-  const runtimeState = sessionRuntimeState(session);
+  const statusView = resolveSessionCardStatusView(session, { translate: t });
   const isActive = sessionsStore.getCurrentSessionId() === session.id;
-  const isWaiting = isSessionExecuting(session);
-  const runtimeClass = runtimeStateClasses[runtimeState] || "runtime-archived";
+  const isWaiting = statusView.status === CARD_STATUS.running || statusView.status === CARD_STATUS.waiting_confirmation;
   const taskPreview = (session.task || "").replace(/\s+/g, " ").trim();
   const previewText = taskPreview.length > 64 ? `${taskPreview.slice(0, 64)}\u2026` : taskPreview;
   const identityTitle = sessionIdentityTitle(identitySession);
   return `<button type="button" class="session-mini-card ${isActive ? "is-active" : ""} ${isWaiting ? "is-waiting" : ""}" data-session-id="${escapeHtml(session.id)}" title="${escapeHtml(identityTitle)}">
-    <span class="session-mini-card-state runtime-pill ${runtimeClass} ${isWaiting ? "is-busy" : ""}" aria-hidden="true"></span>
+    <span class="session-mini-card-state runtime-pill session-status-${escapeHtml(statusView.tone)} session-status-${escapeHtml(statusView.status)} ${isWaiting ? "is-busy" : ""}" aria-label="${escapeHtml(statusView.label)}"></span>
     <span class="session-mini-card-body">
       <span class="session-mini-card-title">${escapeHtml(identityTitle)}</span>
       ${previewText ? `<span class="session-mini-card-task">${escapeHtml(previewText)}</span>` : ""}
@@ -2841,6 +3024,29 @@ async function shutdownRuntimeSession(session) {
   const commands = acpCommandsForProvider(session.providerId);
   if (!commands) return false;
   return invoke(commands.shutdown, acpInvokeArgs(commands, session.providerId, { runtimeSessionId: session.id }));
+}
+
+async function verifyAcpSessionAlive(commands, providerId, sessionId) {
+  if (!commands?.aliveIds || !sessionId) return;
+  // Multi-probe handshake check. The backend's alive_ids only reports whether
+  // the ACP child process is still running, so a process that spawned and is
+  // immediately crashing during initialize will look alive for the first few
+  // hundred ms. By probing 3 times across ~1.8s we catch that crash window
+  // before we tell the user "已重连".
+  const probeDelaysMs = [300, 600, 900];
+  for (const delayMs of probeDelaysMs) {
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+    let aliveList;
+    try {
+      aliveList = await invoke(commands.aliveIds, acpInvokeArgs(commands, providerId));
+    } catch (error) {
+      throw new Error(t("restore.aliveCheckFailed"));
+    }
+    const aliveSet = new Set(Array.isArray(aliveList) ? aliveList : []);
+    if (!aliveSet.has(sessionId)) {
+      throw new Error(t("restore.aliveCheckFailed"));
+    }
+  }
 }
 
 function markSessionStopped(session) {
@@ -3155,6 +3361,7 @@ function readableHistoryEntries() {
 function sessionListItems() {
   const sourceSessions = sessions;
   const liveItems = sourceSessions.map((session) => {
+    ensureSessionStatusShape(session);
     const identitySession = normalizeWorkspaceSession(session);
     const lastTurn = session.turns.at(-1);
     const inWorkspace = session.inWorkspace !== false;
@@ -3170,6 +3377,11 @@ function sessionListItems() {
       summary: lastTurn?.finalResponse || lastTurn?.outputs.at(-1) || lastTurn?.logs.at(-1) || t("session.current"),
       turnCount: session.turns.length,
       runtimeState: sessionRuntimeState(session),
+      record_state: session.record_state,
+      access_mode: session.access_mode,
+      runtime_binding: session.runtime_binding,
+      turns: session.turns,
+      activeTurnId: session.activeTurnId || null,
       agentId: identitySession.agentId,
       runtimeInstanceId: identitySession.runtimeInstanceId || null,
       targetId: identitySession.targetId || identitySession.agentId,
@@ -3187,6 +3399,9 @@ function sessionListItems() {
     .map((item) => ({
       ...item,
       runtimeState: item.runtimeState || "archived",
+      record_state: item.record_state || RECORD_STATE.archived,
+      access_mode: item.access_mode || ACCESS_MODE.read_only,
+      runtime_binding: item.runtime_binding || createRuntimeBinding(),
       isInWorkspace: false,
       isRuntimeAttached: false,
     }));
@@ -3252,34 +3467,31 @@ function renderSessionListSection(sectionId, title, note, items, emptyText) {
 }
 
 function renderSessionListItem(item) {
+  ensureSessionStatusShape(item);
+  const statusView = resolveSessionCardStatusView(item, { translate: t });
   const isActiveHistoryItem = sessionsStore.getCurrentSessionId() === item.id;
   const isArchived = isArchivedSessionListItem(item);
-  const isResumeFailed = item.runtimeState === LIFECYCLE.resume_failed;
-  const signalClass = isResumeFailed
-    ? "signal-failed"
-    : isActiveHistoryItem || item.isInWorkspace
-    ? "signal-workspace"
-    : isArchived
-      ? "signal-archive"
-      : "signal-active";
-  const signalLabel = isResumeFailed
-    ? t("history.signal.failed")
-    : isActiveHistoryItem
-    ? t("history.signal.current")
-    : item.isInWorkspace
-      ? t("history.signal.workspace")
-      : isArchived
-        ? t("history.signal.archive")
-        : t("history.signal.live");
+  const isFailedOrBlocked = statusView.status === CARD_STATUS.blocked || statusView.status === CARD_STATUS.failed;
+  const isSendable = canSendToSession(item);
+  let signalClass;
+  let signalLabel;
+  if (isFailedOrBlocked) {
+    signalClass = "signal-failed";
+    signalLabel = statusView.label;
+  } else if (isSendable) {
+    signalClass = "signal-active";
+    signalLabel = t("history.signal.live");
+  } else {
+    signalClass = "signal-archive";
+    signalLabel = statusView.label;
+  }
   const listStateClass = isArchived ? "is-archive" : "is-active-history";
-  const shouldShowState = item.runtimeState !== "archived" && item.runtimeState !== "live";
-  const stateLabel = shouldShowState ? runtimeStateLabel(item.runtimeState) : "";
   return `
     <article class="history-item ${listStateClass} ${isActiveHistoryItem ? "is-active-session" : ""}" data-session-id="${item.id}" data-agent-id="${item.agentId || ""}" ${isActiveHistoryItem ? "aria-current=\"true\"" : ""}>
       <div class="history-item-top">
         <strong class="history-tool-name"><span class="history-signal ${signalClass}" title="${escapeHtml(signalLabel)}" aria-label="${escapeHtml(signalLabel)}"></span>${renderProviderIcon(providerById(item.providerId) || { id: item.providerId, name: item.providerName })}${escapeHtml(item.providerName)}</strong>
         <div class="history-item-actions">
-          ${shouldShowState ? `<span class="history-state-pill ${runtimeStateClasses[item.runtimeState] || ""}">${escapeHtml(stateLabel)}</span>` : ""}
+          <span class="history-state-pill session-status-${escapeHtml(statusView.tone)} session-status-${escapeHtml(statusView.status)}">${escapeHtml(statusView.label)}</span>
           <button type="button" class="history-delete-btn" data-session-id="${item.id}" title="${t("history.delete")}" aria-label="${t("history.delete")}">${renderSessionActionIcon("delete")}</button>
         </div>
       </div>
@@ -3394,6 +3606,9 @@ function workspaceSessionFromArchived(archived, existing = null) {
     acpSessionId: archived.acpSessionId,
     lifecycle: LIFECYCLE.archived,
     runtimeState: LIFECYCLE.archived,
+    record_state: archived.record_state || RECORD_STATE.archived,
+    access_mode: archived.access_mode || ACCESS_MODE.read_only,
+    runtime_binding: archived.runtime_binding || createRuntimeBinding({ state: RUNTIME_BINDING_STATE.idle }),
     profileName: archived.hermesProfile?.profileName || null,
     profileAlias: archived.hermesProfile?.profileAlias || null,
     profileExecutable: archived.profileExecutable || archived.hermesProfile?.profileExecutable || null,
@@ -3432,6 +3647,7 @@ function workspaceSessionFromArchived(archived, existing = null) {
   }
   restored.targetId = restored.targetId || restored.agentId;
   restored.inWorkspace = true;
+  normalizeSessionStatusShape(restored);
   Object.assign(restored, normalizeWorkspaceSession(restored));
   return restored;
 }
@@ -3447,6 +3663,8 @@ function openArchivedTranscript(sessionId) {
     return;
   }
   const restored = workspaceSessionFromArchived(archived, existing);
+  setSessionRecordState(restored, RECORD_STATE.archived);
+  setSessionAccessMode(restored, ACCESS_MODE.read_only);
   if (!existing) sessionsStore.upsertHead(restored);
   markSessionInactive(restored.id);
   saveCurrentTargetAgent(restored.agentId);
@@ -3470,6 +3688,9 @@ async function restoreArchivedSession(sessionId) {
     return;
   }
   const restored = workspaceSessionFromArchived(archived, existing);
+  clearResumeValidation(restored);
+  setSessionRecordState(restored, RECORD_STATE.archived);
+  setSessionAccessMode(restored, ACCESS_MODE.interactive);
   const restoreIntentId = ++restoreIntentSeq;
   const restoreStillFocused = () => restoreIntentId === restoreIntentSeq && sessionsStore.getCurrentSessionId() === restored.id;
   const renderRestoreUpdate = () => {
@@ -3482,11 +3703,12 @@ async function restoreArchivedSession(sessionId) {
   saveCurrentTargetAgent(restored.agentId);
   saveCurrentSession(restored.id);
   renderProviders();
-  renderWorkspace();
-  renderHistory();
+  renderWorkspace({ focusSessionId: restored.id });
+  renderHistory({ scrollSessionId: restored.id });
   focusComposerInput();
   if (!restored.acpSessionId) {
     setSessionLifecycle(restored, LIFECYCLE.archived);
+    setSessionAccessMode(restored, ACCESS_MODE.read_only);
     markSessionInactive(restored.id);
     renderWorkspace();
     renderHistory();
@@ -3494,6 +3716,7 @@ async function restoreArchivedSession(sessionId) {
     return;
   }
   setSessionLifecycle(restored, LIFECYCLE.restoring);
+  setRuntimeBinding(restored, { state: RUNTIME_BINDING_STATE.reconnecting, stage: RUNTIME_BINDING_STAGE.load });
   renderWorkspace();
   renderHistory();
   setAppNotice(t("restore.starting"), "busy");
@@ -3514,7 +3737,11 @@ async function restoreArchivedSession(sessionId) {
       runtimeCommand: restored.runtimeCommand || null,
       profileExecutable: restored.profileExecutable || null,
     }));
+    await verifyAcpSessionAlive(commands, restored.providerId, restored.id);
     setSessionLifecycle(restored, LIFECYCLE.live);
+    setSessionAccessMode(restored, ACCESS_MODE.interactive);
+    clearRuntimeBindingError(restored);
+    markResumeValidationPending(restored);
     markSessionActive(restored.id);
     renderRestoreUpdate();
     setAppNotice(t("restore.reconnected"));
@@ -3534,7 +3761,11 @@ async function restoreArchivedSession(sessionId) {
         runtimeCommand: restored.runtimeCommand || null,
         profileExecutable: restored.profileExecutable || null,
       }));
+      await verifyAcpSessionAlive(commands, restored.providerId, restored.id);
       setSessionLifecycle(restored, LIFECYCLE.live);
+      setSessionAccessMode(restored, ACCESS_MODE.interactive);
+      clearRuntimeBindingError(restored);
+      markResumeValidationPending(restored);
       markSessionActive(restored.id);
       renderRestoreUpdate();
       setAppNotice(t("restore.loadFailedResumed"));
@@ -3550,6 +3781,18 @@ async function restoreArchivedSession(sessionId) {
         9,
       );
       setSessionLifecycle(restored, LIFECYCLE.resume_failed);
+      setSessionAccessMode(restored, ACCESS_MODE.read_only);
+      clearResumeValidation(restored);
+      setRuntimeBinding(restored, {
+        state: RUNTIME_BINDING_STATE.failed,
+        stage: RUNTIME_BINDING_STAGE.resume,
+        error_title: t("restore.failedTitle"),
+        error_detail: [
+          t("restore.loadFailedLine", { error: formattedLoadError }),
+          t("restore.resumeFailedLine", { error: formattedResumeError }),
+        ].join("\n"),
+        error_suggestion: t("restore.failedSuggestion"),
+      });
       markSessionInactive(restored.id);
       renderRestoreUpdate();
       setAppNotice(t("restore.failedNotice", { error: compactNoticeText(formattedResumeError) }), "error");
@@ -3596,16 +3839,19 @@ async function runFallbackSession(session, turn) {
   updateActionLabels();
   if (session.providerId === "hermes") {
     turn.state = 2;
+    turn.status = TURN_STATUS.running;
     session.state = 2;
     prependHermesStartupNoticeIfNeeded(session, turn);
     renderWorkspace();
   }
   setAppNotice(t("runtime.sentNotice", { agent: session.agentName }), "busy");
+  setRuntimeBinding(session, { state: RUNTIME_BINDING_STATE.connected, stage: RUNTIME_BINDING_STAGE.prompt });
   try {
     if (isSessionDeletedTombstone(session.id) || isSessionStoppedTombstone(session.id)) return;
     const saved = updateTurnFromEvents(session.id, turn.id, localizedFallbackEvents(fallback.events));
     if (isSessionDeletedTombstone(session.id) || isSessionStoppedTombstone(session.id)) return;
     if (saved) {
+      clearRuntimeBindingError(session);
       await saveTurnToHistory(session, saved);
       setAppNotice(t("runtime.completedSaved", { agent: session.agentName }));
     }
@@ -3625,15 +3871,18 @@ async function startAcpSession(session, turn) {
     void runFallbackSession(session, turn);
     return;
   }
+  bindResumeValidationTurn(session, turn.id);
   runningSessions += 1;
   updateActionLabels();
   if (session.providerId === "hermes") {
     turn.state = 2;
+    turn.status = TURN_STATUS.running;
     session.state = 2;
     prependHermesStartupNoticeIfNeeded(session, turn);
     renderWorkspace();
   }
   setAppNotice(t("runtime.sentNotice", { agent: session.agentName }), "busy");
+  setRuntimeBinding(session, { state: RUNTIME_BINDING_STATE.connected, stage: RUNTIME_BINDING_STAGE.prompt });
   try {
     await new Promise((resolve) => requestAnimationFrame(resolve));
     const events = await invoke(commands.prompt, acpInvokeArgs(commands, session.providerId, {
@@ -3648,6 +3897,15 @@ async function startAcpSession(session, turn) {
     const saved = updateTurnFromEvents(session.id, turn.id, events);
     if (isSessionDeletedTombstone(session.id) || isSessionStoppedTombstone(session.id)) return;
     if (saved) {
+      const failedBeforeAnyOutput = saved.status === TURN_STATUS.failed && !saved.finalResponse && !saved.outputs?.length;
+      if (isResumeValidationTurn(session, turn.id) && failedBeforeAnyOutput) {
+        const message = saved.logs.at(0) || saved.finalResponse || t("runtime.promptFailedTitle", { agent: session.agentName });
+        rollbackResumeValidationPromptFailure(session, saved, message);
+        await saveTurnToHistory(session, saved);
+        return;
+      }
+      clearResumeValidation(session);
+      clearRuntimeBindingError(session);
       const agent = agentById(session.agentId);
       if (agent) {
         agent.state = session.state;
@@ -3658,7 +3916,12 @@ async function startAcpSession(session, turn) {
     }
   } catch (error) {
     if (isSessionDeletedTombstone(session.id) || isSessionStoppedTombstone(session.id)) return;
-    appendErrorToTurn(session.id, turn.id, formatBackendError(error));
+    const message = formatBackendError(error);
+    if (isResumeValidationTurn(session, turn.id)) {
+      rollbackResumeValidationPromptFailure(session, turn, message);
+    } else {
+      appendErrorToTurn(session.id, turn.id, message);
+    }
     await saveTurnToHistory(session, turn);
   } finally {
     runningSessions = Math.max(0, runningSessions - 1);
@@ -3708,7 +3971,6 @@ function startSessionFromPrompt(forceNewSession = false) {
   promptBox.value = "";
   sendAsNewSession = false;
   updateActionLabels();
-
   const commands = acpCommandsForProvider(provider.id);
   if (commands) {
     void startAcpSession(session, turn);
@@ -3850,6 +4112,13 @@ async function syncRuntimeAliveStates() {
       const aliveIds = aliveByProvider[session.providerId];
       if (declaredLive && hasStartedRuntime && aliveIds && !aliveIds.has(session.id)) {
         setSessionLifecycle(session, LIFECYCLE.resume_failed);
+        setRuntimeBinding(session, {
+          state: RUNTIME_BINDING_STATE.failed,
+          stage: RUNTIME_BINDING_STAGE.runtime,
+          error_title: t("runtime.aliveExitedTitle", { agent: session.agentName || session.providerName }),
+          error_detail: t("runtime.aliveExited"),
+          error_suggestion: t("runtime.aliveExitedSuggestion"),
+        });
         activeSessionIds.delete(session.id);
         mutated = true;
       }
