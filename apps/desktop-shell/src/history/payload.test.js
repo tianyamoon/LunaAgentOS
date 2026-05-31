@@ -50,12 +50,12 @@ test("buildHistoryEntryPayload: copies session/turn fields and falls back to def
   const payload = buildHistoryEntryPayload({
     session: makeSession(),
     turn: makeTurn(),
-    hermesProfile: null,
-    schemaVersion: 3,
+    agentEntrySnapshot: null,
+    schemaVersion: 5,
     runtimeState: "live",
     getStateName,
   });
-  assert.equal(payload.schemaVersion, 3);
+  assert.equal(payload.schemaVersion, 5);
   assert.equal(payload.providerId, "claude");
   assert.equal(payload.sessionId, "session-1");
   assert.equal(payload.runtime_state, "live");
@@ -64,7 +64,7 @@ test("buildHistoryEntryPayload: copies session/turn fields and falls back to def
   assert.deepEqual(payload.runtime_binding, { state: "connected", stage: null });
   assert.equal(payload.status, "completed");
   assert.equal(payload.summary, "消息已结束。");
-  // turn is passed through verbatim when there is no hermes profile.
+  // 没有额外快照时，Turn 仍按原值透传。
   assert.equal(payload.turn.id, "turn-1");
   assert.equal(payload.turn.meta, undefined);
 });
@@ -73,8 +73,8 @@ test("buildHistoryEntryPayload: prefers finalResponse > last output > first log 
   const payloadFinal = buildHistoryEntryPayload({
     session: makeSession(),
     turn: makeTurn({ finalResponse: "final-text" }),
-    hermesProfile: null,
-    schemaVersion: 3,
+    agentEntrySnapshot: null,
+    schemaVersion: 5,
     runtimeState: "live",
     getStateName,
   });
@@ -83,8 +83,8 @@ test("buildHistoryEntryPayload: prefers finalResponse > last output > first log 
   const payloadOutputs = buildHistoryEntryPayload({
     session: makeSession(),
     turn: makeTurn({ outputs: ["a", "b"] }),
-    hermesProfile: null,
-    schemaVersion: 3,
+    agentEntrySnapshot: null,
+    schemaVersion: 5,
     runtimeState: "live",
     getStateName,
   });
@@ -93,33 +93,34 @@ test("buildHistoryEntryPayload: prefers finalResponse > last output > first log 
   const payloadLogs = buildHistoryEntryPayload({
     session: makeSession(),
     turn: makeTurn({ logs: ["log-1", "log-2"] }),
-    hermesProfile: null,
-    schemaVersion: 3,
+    agentEntrySnapshot: null,
+    schemaVersion: 5,
     runtimeState: "live",
     getStateName,
   });
   assert.equal(payloadLogs.summary, "log-1");
 });
 
-test("buildHistoryEntryPayload: hermesProfile is merged into turn.meta", () => {
-  const profile = { profileName: "default", profileModel: "qwen3.6-plus" };
+test("buildHistoryEntryPayload: agentEntrySnapshot is stored without mutating turn.meta", () => {
+  const snapshot = { agentId: "hermes-default", metadata: { profileName: "default" } };
   const payload = buildHistoryEntryPayload({
     session: makeSession({ providerId: "hermes" }),
     turn: makeTurn({ meta: { foo: 1 } }),
-    hermesProfile: profile,
-    schemaVersion: 3,
+    agentEntrySnapshot: snapshot,
+    schemaVersion: 5,
     runtimeState: "live",
     getStateName,
   });
-  assert.deepEqual(payload.turn.meta, { foo: 1, hermesProfile: profile });
+  assert.deepEqual(payload.agentEntrySnapshot, snapshot);
+  assert.deepEqual(payload.turn.meta, { foo: 1 });
 });
 
 test("buildHistoryEntryPayload: targetId / targetName fall back to agent fields", () => {
   const payload = buildHistoryEntryPayload({
     session: makeSession({ targetId: undefined, targetName: undefined }),
     turn: makeTurn(),
-    hermesProfile: null,
-    schemaVersion: 3,
+    agentEntrySnapshot: null,
+    schemaVersion: 5,
     runtimeState: "live",
     getStateName,
   });
@@ -131,8 +132,8 @@ test("buildHistoryEntryPayload: status defaults to UNKNOWN when status and getSt
   const payload = buildHistoryEntryPayload({
     session: makeSession(),
     turn: makeTurn({ state: 99, status: undefined }),
-    hermesProfile: null,
-    schemaVersion: 3,
+    agentEntrySnapshot: null,
+    schemaVersion: 5,
     runtimeState: "live",
   });
   assert.equal(payload.status, "UNKNOWN");
@@ -146,7 +147,7 @@ test("upsertHistoryEntry: inserts a new entry at the head", () => {
   assert.equal(next.length, 2);
   assert.equal(next[0].sessionId, "s2");
   assert.equal(next[1].sessionId, "s1");
-  // Original list must be unchanged.
+  // 原始数组保持不变。
   assert.equal(entries.length, 1);
 });
 

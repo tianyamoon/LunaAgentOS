@@ -1,25 +1,20 @@
-// History entry helpers.
-//
-// Pure transforms over the on-disk history JSON shape that the Tauri
-// backend hands us. Backend keys are snake_case but legacy older entries
-// use camelCase, so the helpers tolerate both.
-//
-// archivedSessionsFromHistory takes a `normalizeSession` callback so it
-// stays decoupled from the runtime-aware session identity layer. main.js
-// passes its own thin wrapper that closes over current providers /
-// runtimeInstances state.
+// History Entries Module。
+// 这里把磁盘条目投影为归档 Session。兼容 snake_case 与旧 camelCase，但不理解具体 Adapter。
 
+// 从新旧字段中提取稳定的 Session 标识。
 export function historySessionKey(entry) {
   if (!entry) return null;
   return entry.sessionId || entry.session_id || entry.acpSessionId || entry.acp_session_id || entry.id || null;
 }
 
+// 使用 Session 与 Turn 标识构造条目去重键。
 export function historyTurnKey(entry) {
   const sessionKey = historySessionKey(entry);
   const turnId = entry?.turn?.id || entry?.id || null;
   return `${sessionKey}:${turnId}`;
 }
 
+// 把磁盘 History 条目聚合为只读归档 Session，并允许调用方补充运行时归一化。
 export function archivedSessionsFromHistory(entries, { normalizeSession } = {}) {
   const list = Array.isArray(entries) ? entries : [];
   const bySession = new Map();
@@ -39,6 +34,8 @@ export function archivedSessionsFromHistory(entries, { normalizeSession } = {}) 
       createdAt,
     };
     const current = bySession.get(key);
+    // 新历史保存通用入口快照；旧 Hermes metadata 仅作为向后兼容读取。
+    const agentEntrySnapshot = entry.agentEntrySnapshot || entry.agent_entry_snapshot || null;
     const hermesProfile = entry.turn?.meta?.hermesProfile || null;
     if (!current) {
       bySession.set(key, {
@@ -66,6 +63,7 @@ export function archivedSessionsFromHistory(entries, { normalizeSession } = {}) 
         record_state: entry.record_state || "archived",
         access_mode: entry.access_mode || "read_only",
         runtime_binding: entry.runtime_binding || null,
+        agentEntrySnapshot,
         hermesProfile,
       });
       return;
@@ -74,6 +72,7 @@ export function archivedSessionsFromHistory(entries, { normalizeSession } = {}) 
     current.summary = entry.summary || current.summary;
     current.turnCount += 1;
     current.turns.push(turn);
+    current.agentEntrySnapshot = current.agentEntrySnapshot || agentEntrySnapshot;
     current.hermesProfile = current.hermesProfile || hermesProfile;
   });
   const normalize = typeof normalizeSession === "function" ? normalizeSession : (session) => session;

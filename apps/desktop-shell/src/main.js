@@ -111,6 +111,7 @@ import {
   formatCompactHistoryNotice,
   upsertHistoryEntry,
 } from "./history/payload.js";
+import { snapshotRuntimeSession } from "./providers/agentEntrySnapshot.js";
 import { createProvidersStore } from "./state/providersStore.js";
 import { createSessionsStore } from "./state/sessionsStore.js";
 import { createWorkspaceViewStore } from "./state/workspaceViewStore.js";
@@ -250,7 +251,7 @@ const FONT_SCALE_KEY = "lunaagentos.fontScale";
 const THEME_KEY = "lunaagentos.theme";
 const PROVIDER_COLLAPSE_KEY = "lunaagentos.providerCollapsedIds";
 const SLASH_COMMAND_USAGE_KEY = "lunaagentos.slashCommandUsage";
-const HISTORY_SCHEMA_VERSION = 4;
+const HISTORY_SCHEMA_VERSION = 5;
 const STREAM_CARD_RENDER_INTERVAL_MS = 100;
 const DEFAULT_HERMES_AGENT_ID = "hermes-wsl:profile:default";
 const SEND_MODE_OPTIONS = ["enter", "ctrlEnter"];
@@ -382,10 +383,6 @@ const sessionTurnStateModel = createSessionTurnState({
   sessionsStore,
   sessionRuntimeState: sessionRuntimeStateModel,
   translate: t,
-  buildTurnMeta: (session) => {
-    const hermesProfile = hermesProfileMetaFromSession(session);
-    return hermesProfile ? { hermesProfile } : {};
-  },
 });
 const {
   appendRuntimeLog: appendRuntimeLogToSession,
@@ -2173,20 +2170,6 @@ function hermesProfileMetaFromAgent(agent) {
   };
 }
 
-function hermesProfileMetaFromSession(session) {
-  if (!session || session.providerId !== "hermes") return null;
-  return {
-    profileName: session.profileName || null,
-    profileAlias: session.profileAlias || null,
-    profileExecutable: session.profileExecutable || null,
-    profilePath: session.profilePath || null,
-    profileModel: session.profileModel || null,
-    gateway: session.gateway || null,
-    skillCount: session.skillCount ?? null,
-    hasSoul: Boolean(session.hasSoul),
-  };
-}
-
 function hermesProfileMetaFromArchived(archived) {
   return archived?.hermesProfile || archived?.turns?.find((turn) => turn.meta?.hermesProfile)?.meta?.hermesProfile || null;
 }
@@ -3569,7 +3552,7 @@ async function saveTurnToHistory(session, turn) {
     entry: buildHistoryEntryPayload({
       session,
       turn,
-      hermesProfile: hermesProfileMetaFromSession(session),
+      agentEntrySnapshot: snapshotRuntimeSession(session),
       schemaVersion: HISTORY_SCHEMA_VERSION,
       runtimeState: sessionRuntimeState(session),
       getStateName: (state) => stateNames[state],

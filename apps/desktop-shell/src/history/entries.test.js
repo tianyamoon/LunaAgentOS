@@ -127,3 +127,19 @@ test("archivedSessionsFromHistory carries hermesProfile from the first entry tha
   const [session] = archivedSessionsFromHistory(entries);
   assert.deepEqual(session.hermesProfile, { profileName: "ai" });
 });
+
+test("archivedSessionsFromHistory carries agentEntrySnapshot from the first entry that has it", () => {
+  const snapshot = { agentId: "demo-main", identityKeys: ["demo-main"] };
+  const entries = [
+    { sessionId: "s1", id: "t1", task: "a", createdAt: "2026-05-01T00:00:00Z" },
+    {
+      sessionId: "s1",
+      id: "t2",
+      task: "b",
+      createdAt: "2026-05-01T01:00:00Z",
+      agentEntrySnapshot: snapshot,
+    },
+  ];
+  const [session] = archivedSessionsFromHistory(entries);
+  assert.deepEqual(session.agentEntrySnapshot, snapshot);
+});

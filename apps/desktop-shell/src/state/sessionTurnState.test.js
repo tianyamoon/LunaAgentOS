@@ -20,8 +20,9 @@ function makeState() {
     sessionsStore,
     sessionRuntimeState,
     translate,
+    // 测试通用 metadata 扩展点，不让 Turn State 理解具体 Adapter。
     buildTurnMeta: (session) => (
-      session.hermesProfile ? { hermesProfile: session.hermesProfile } : {}
+      session.adapterMetadata ? { adapterMetadata: session.adapterMetadata } : {}
     ),
     now: () => 1000,
   });
@@ -39,7 +40,7 @@ function makeSession(id = "session-1", overrides = {}) {
 
 test("sessionTurnState: createTurn owns session and binding mutation", () => {
   const { sessionsStore, sessionTurnState } = makeState();
-  const session = makeSession("create", { hermesProfile: { profileName: "default" } });
+  const session = makeSession("create", { adapterMetadata: { profileName: "default" } });
   sessionsStore.upsertHead(session);
   const turn = sessionTurnState.createTurn(session, "task", {
     runtimePrompt: "runtime task",
@@ -48,7 +49,7 @@ test("sessionTurnState: createTurn owns session and binding mutation", () => {
   assert.equal(turn.id, "turn-1000-1");
   assert.equal(turn.status, TURN_STATUS.running);
   assert.equal(turn.runtimePrompt, "runtime task");
-  assert.deepEqual(turn.meta.hermesProfile, { profileName: "default" });
+  assert.deepEqual(turn.meta.adapterMetadata, { profileName: "default" });
   assert.deepEqual(turn.meta.attachments, [{ name: "a.txt" }]);
   assert.equal(session.activeTurnId, turn.id);
   assert.equal(session.runtime_binding.state, RUNTIME_BINDING_STATE.connected);
