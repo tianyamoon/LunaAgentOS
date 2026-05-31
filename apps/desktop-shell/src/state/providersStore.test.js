@@ -113,17 +113,19 @@ test("providersStore: runtimeAvailability snapshot + patch", () => {
   assert.equal(store.getRuntimeAvailabilityFor("nope"), null);
 });
 
-test("providersStore: replaceRuntimeInstances mutates in place + isolates from caller", () => {
+test("providersStore: runtime instance snapshots isolate callers", () => {
   const store = createProvidersStore();
-  const ref = store.getRuntimeInstancesRef();
   const input = [{ id: "a", providerId: "claude", available: true }];
   store.replaceRuntimeInstances(input);
-  assert.equal(store.getRuntimeInstancesRef(), ref);
-  assert.deepEqual(ref.map((r) => r.id), ["a"]);
+  const snapshot = store.getRuntimeInstancesSnapshot();
+  assert.deepEqual(snapshot.map((r) => r.id), ["a"]);
   input.push({ id: "leaked", providerId: "hermes" });
-  assert.deepEqual(ref.map((r) => r.id), ["a"]);
+  input[0].id = "mutated-input";
+  snapshot.push({ id: "mutated-snapshot" });
+  snapshot[0].id = "mutated-instance";
+  assert.deepEqual(store.getRuntimeInstancesSnapshot().map((r) => r.id), ["a"]);
   store.replaceRuntimeInstances(null);
-  assert.equal(ref.length, 0);
+  assert.equal(store.getRuntimeInstancesSnapshot().length, 0);
 });
 
 test("providersStore: runtime targets per instance + prune + total count", () => {
@@ -187,7 +189,7 @@ test("providersStore: reset restores defaults and notifies", () => {
   });
   store.reset();
   assert.equal(notifyCount, 1);
-  assert.equal(store.getRuntimeInstancesRef().length, 0);
+  assert.equal(store.getRuntimeInstancesSnapshot().length, 0);
   assert.equal(store.totalRuntimeTargetCount(), 0);
   assert.equal(store.getRuntimeAvailabilityFor("claude").summary, "probing");
   assert.equal(store.providerById("hermes").agents.length, 1);

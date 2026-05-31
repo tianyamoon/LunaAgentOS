@@ -373,7 +373,6 @@ localStorage.removeItem(CURRENT_SESSION_KEY);
 let currentTargetAgentId = localStorage.getItem(CURRENT_TARGET_AGENT_KEY) || localStorage.getItem(LEGACY_TARGET_AGENT_KEY) || "claude-main";
 const providersStore = createProvidersStore();
 const providers = providersStore.getProvidersRef();
-const runtimeInstances = providersStore.getRuntimeInstancesRef();
 const sessionsStore = createSessionsStore();
 const workspaceViewStore = createWorkspaceViewStore();
 const sessions = sessionsStore.getSessions();
@@ -414,23 +413,27 @@ let composerAttachments = [];
 
 function allAgents() {
   const dynamicTargets = runtimeTargets();
-  return runtimeInstances.length ? dynamicTargets : providers.flatMap((provider) => provider.agents);
+  return runtimeInstancesSnapshot().length ? dynamicTargets : providers.flatMap((provider) => provider.agents);
 }
 
 function providerById(id) {
   return providersStore.providerById(id);
 }
 
+function runtimeInstancesSnapshot() {
+  return providersStore.getRuntimeInstancesSnapshot();
+}
+
 function runtimeInstancesForProvider(providerId) {
-  return runtimeInstancesForProviderRaw(runtimeInstances, providerId);
+  return runtimeInstancesForProviderRaw(runtimeInstancesSnapshot(), providerId);
 }
 
 function availableRuntimeInstancesForProvider(providerId) {
-  return availableRuntimeInstancesForProviderRaw(runtimeInstances, providerId);
+  return availableRuntimeInstancesForProviderRaw(runtimeInstancesSnapshot(), providerId);
 }
 
 function runtimeInstanceById(id) {
-  return runtimeInstanceByIdRaw(runtimeInstances, id);
+  return runtimeInstanceByIdRaw(runtimeInstancesSnapshot(), id);
 }
 
 function providerRuntimeLabel(provider, instance, availableCount) {
@@ -442,7 +445,7 @@ function runtimeHostForInstance(instance) {
 }
 
 function runtimeDefaultsForProvider(providerId, runtimeInstanceId = null) {
-  return identityRuntimeDefaultsForProvider(providerId, runtimeInstanceId, runtimeInstances);
+  return identityRuntimeDefaultsForProvider(providerId, runtimeInstanceId, runtimeInstancesSnapshot());
 }
 
 function inferHermesProfileExecutable(archived, restored) {
@@ -501,7 +504,7 @@ function renderSessionIdentityTitle(session) {
 function targetsForRuntimeInstance(instance) {
   return targetsForRuntimeInstanceRaw(instance, {
     providers,
-    runtimeInstances,
+    runtimeInstances: runtimeInstancesSnapshot(),
     runtimeTargetsByInstance: providersStore.getRuntimeTargetsByInstanceSnapshot(),
   });
 }
@@ -509,7 +512,7 @@ function targetsForRuntimeInstance(instance) {
 function runtimeTargets() {
   return runtimeTargetsRaw({
     providers,
-    runtimeInstances,
+    runtimeInstances: runtimeInstancesSnapshot(),
     runtimeTargetsByInstance: providersStore.getRuntimeTargetsByInstanceSnapshot(),
   });
 }
@@ -517,7 +520,7 @@ function runtimeTargets() {
 function normalizeWorkspaceSession(session) {
   return normalizeSessionIdentity(session, {
     providers,
-    runtimeInstances,
+    runtimeInstances: runtimeInstancesSnapshot(),
     runtimeTargets: runtimeTargets(),
   });
 }
@@ -1678,7 +1681,7 @@ async function autoFetchProviderBriefs(providerId, root) {
 function availabilityTargetForAgent(target) {
   if (!target) return null;
   const store = getAvailabilityStore();
-  const data = store.refresh(providers, runtimeInstances, currentTargetAgent(), providersStore.getRuntimeAvailabilitySnapshot());
+  const data = store.refresh(providers, runtimeInstancesSnapshot(), currentTargetAgent(), providersStore.getRuntimeAvailabilitySnapshot());
   const provider = data.providers.find((entry) => entry.id === target.providerId);
   return provider?.targets.find((entry) => entry.id === target.id) || null;
 }
@@ -1917,7 +1920,7 @@ function openAvailabilityModal() {
   const data = store.getData();
 
   if (!data.lastCheck) {
-    store.refresh(providers, runtimeInstances, currentTargetAgent(), providersStore.getRuntimeAvailabilitySnapshot());
+    store.refresh(providers, runtimeInstancesSnapshot(), currentTargetAgent(), providersStore.getRuntimeAvailabilitySnapshot());
   }
 
   const freshData = store.getData();
@@ -1965,7 +1968,7 @@ function openAvailabilityModal() {
     setAppNotice(t("availability.rechecking"), "busy");
     try {
       await refreshRuntimeProbe();
-      store.refresh(providers, runtimeInstances, currentTargetAgent(), providersStore.getRuntimeAvailabilitySnapshot());
+      store.refresh(providers, runtimeInstancesSnapshot(), currentTargetAgent(), providersStore.getRuntimeAvailabilitySnapshot());
       const updatedData = store.getData();
       const updatedView = AvailabilityView(updatedData, { showTitle: false, compact: true });
       confirmDialog.querySelector(".availability-dialog-body").innerHTML = updatedView;
@@ -1995,8 +1998,9 @@ async function refreshRuntimeProbe() {
         Object.fromEntries((result?.providers || []).map((item) => [item.providerId, item])),
       );
       providersStore.replaceRuntimeInstances(Array.isArray(result?.instances) ? result.instances : []);
+      const probedInstances = runtimeInstancesSnapshot();
       providersStore.pruneRuntimeTargetsByInstanceIds(
-        runtimeInstances.filter((instance) => instance.available).map((instance) => instance.id),
+        probedInstances.filter((instance) => instance.available).map((instance) => instance.id),
       );
     });
     ensureCurrentTargetAgentExists();
@@ -2004,8 +2008,9 @@ async function refreshRuntimeProbe() {
     renderWorkspace();
     renderHistory();
     renderWorkspaceStatus();
-    getAvailabilityStore().refresh(providers, runtimeInstances, currentTargetAgent(), providersStore.getRuntimeAvailabilitySnapshot());
-    [...new Set(runtimeInstances.filter((instance) => instance.available).map((instance) => instance.providerId))]
+    const probedInstances = runtimeInstancesSnapshot();
+    getAvailabilityStore().refresh(providers, probedInstances, currentTargetAgent(), providersStore.getRuntimeAvailabilitySnapshot());
+    [...new Set(probedInstances.filter((instance) => instance.available).map((instance) => instance.providerId))]
       .forEach((providerId) => {
         loadRuntimeSlashCommandsForProvider(providerId);
       });

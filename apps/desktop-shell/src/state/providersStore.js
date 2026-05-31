@@ -302,12 +302,12 @@ export function createProvidersStore(initial = {}) {
       if (changed) notify();
     },
 
-    getRuntimeInstancesRef() {
-      return runtimeInstances;
+    getRuntimeInstancesSnapshot() {
+      return runtimeInstances.map((instance) => ({ ...instance }));
     },
     replaceRuntimeInstances(next) {
       runtimeInstances.length = 0;
-      if (Array.isArray(next)) runtimeInstances.push(...next);
+      if (Array.isArray(next)) runtimeInstances.push(...next.map((instance) => ({ ...instance })));
       notify();
     },
 
