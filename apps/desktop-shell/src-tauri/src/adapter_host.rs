@@ -1,3 +1,6 @@
+//! Adapter Host Module。
+//! 负责发现 Adapter、解析启动参数与读取品牌资源，不承载具体 Agent Product 规则。
+
 use crate::acp_runtime;
 use crate::adapter_extensions;
 use crate::adapter_registry;
@@ -5,6 +8,8 @@ use crate::runtime_config::load_runtime_config_file;
 use std::fs;
 use tauri::AppHandle;
 
+/// 根据通用上下文解析 Adapter 启动参数。
+/// Adapter Product 特例由 Adapter Extension 消化，通用 Adapter 使用 manifest 声明。
 pub(crate) fn adapter_launch_spec_with_context(
     app: &AppHandle,
     adapter_id: &str,
@@ -31,12 +36,14 @@ pub(crate) fn adapter_launch_spec_with_context(
     adapter_extensions::generic_launch_spec(adapter, runtime_command)
 }
 
+/// 加载内置与用户扩展 Adapter Manifest。
 #[tauri::command]
 pub(crate) fn load_adapters(app: AppHandle) -> adapter_registry::AdapterLoadResult {
     let config = load_runtime_config_file(&app);
     adapter_registry::load_adapters(&config.adapter_plugin_paths)
 }
 
+/// 前端渲染 Adapter 图标所需的 data URL 原料。
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AdapterIconPayload {
@@ -44,6 +51,7 @@ pub(crate) struct AdapterIconPayload {
     base64: String,
 }
 
+/// 根据文件扩展名推导图标 MIME 类型。
 fn icon_mime_for_path(path: &std::path::Path) -> &'static str {
     match path
         .extension()
@@ -60,6 +68,8 @@ fn icon_mime_for_path(path: &std::path::Path) -> &'static str {
     }
 }
 
+/// 读取 Manifest 声明的图标。
+/// 图标缺失属于可恢复情况，返回 None 让前端使用文字占位。
 #[tauri::command]
 pub(crate) fn read_adapter_icon(
     app: AppHandle,

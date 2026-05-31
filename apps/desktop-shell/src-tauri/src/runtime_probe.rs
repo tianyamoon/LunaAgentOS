@@ -1,3 +1,6 @@
+//! Runtime Probe Module。
+//! 集中执行运行环境探测，并把不同 Adapter 的结果归一化为稳定的前端视图数据。
+
 use crate::adapter_extensions;
 use crate::adapter_registry;
 use crate::runtime_config::load_runtime_config_file;
@@ -6,12 +9,14 @@ use serde_json::Value;
 use std::process::Command;
 use tauri::AppHandle;
 
+/// Windows 下隐藏短命探测进程窗口。
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
+/// Provider 级探测摘要。
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct RuntimeProviderProbe {
@@ -23,6 +28,7 @@ pub(crate) struct RuntimeProviderProbe {
     pub(crate) detail: String,
 }
 
+/// 一次完整探测的 Provider 与 Runtime Instance 集合。
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct RuntimeProbeResult {
@@ -30,6 +36,7 @@ pub(crate) struct RuntimeProbeResult {
     instances: Vec<RuntimeInstanceProbe>,
 }
 
+/// 单个运行环境实例的探测结果。
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct RuntimeInstanceProbe {
@@ -51,6 +58,7 @@ pub(crate) struct RuntimeInstanceProbe {
     pub(crate) version: Option<String>,
 }
 
+/// 创建不会在 Windows 上闪出控制台窗口的子进程。
 fn build_command(program: &str) -> Command {
     let mut command = Command::new(program);
     #[cfg(windows)]
@@ -60,6 +68,7 @@ fn build_command(program: &str) -> Command {
     command
 }
 
+/// 执行借用参数的探测命令。
 pub(crate) fn run_shell(shell: &str, args: &[&str]) -> Result<String, String> {
     let output = build_command(shell)
         .args(args)
@@ -76,6 +85,7 @@ pub(crate) fn run_shell(shell: &str, args: &[&str]) -> Result<String, String> {
     }
 }
 
+/// 执行拥有所有权参数的探测命令，供 Manifest healthCheck 使用。
 fn run_shell_owned(shell: &str, args: &[String]) -> Result<String, String> {
     let output = build_command(shell)
         .args(args)
@@ -92,10 +102,12 @@ fn run_shell_owned(shell: &str, args: &[String]) -> Result<String, String> {
     }
 }
 
+/// 判断可选字符串配置是否包含有效内容。
 pub(crate) fn is_configured(value: &Option<String>) -> bool {
     value.as_ref().is_some_and(|item| !item.trim().is_empty())
 }
 
+/// 使用命令输出中的第一条非空行作为版本摘要。
 fn first_output_line(output: &str) -> Option<String> {
     output
         .lines()
@@ -104,6 +116,7 @@ fn first_output_line(output: &str) -> Option<String> {
         .map(ToString::to_string)
 }
 
+/// 把一条探测命令的结果归一化为 Runtime Instance。
 pub(crate) fn runtime_instance_probe(
     id: &str,
     provider_id: &str,
@@ -142,6 +155,7 @@ pub(crate) fn runtime_instance_probe(
     }
 }
 
+/// 根据 Runtime Instance 集合计算 Provider 级摘要。
 pub(crate) fn provider_probe_from_instances(
     provider_id: &str,
     configured: bool,
@@ -172,6 +186,7 @@ pub(crate) fn provider_probe_from_instances(
     }
 }
 
+/// 为没有专用 Extension 的 Manifest Adapter 执行通用探测。
 pub(crate) fn adapter_instance_probe(
     adapter: &adapter_registry::AdapterDefinition,
 ) -> RuntimeInstanceProbe {
@@ -206,6 +221,7 @@ pub(crate) fn adapter_instance_probe(
     }
 }
 
+/// 从通用 Manifest 探测结果生成 Provider 摘要。
 pub(crate) fn adapter_provider_probe(
     adapter: &adapter_registry::AdapterDefinition,
     instance: &RuntimeInstanceProbe,
@@ -220,6 +236,7 @@ pub(crate) fn adapter_provider_probe(
     }
 }
 
+/// 探测指定 Adapter。
 #[tauri::command]
 pub(crate) fn runtime_adapter_probe(
     app: AppHandle,
@@ -233,6 +250,7 @@ pub(crate) fn runtime_adapter_probe(
     Ok(adapter_extensions::probe_adapter(&adapter, &config).provider)
 }
 
+/// 探测全部可运行 Adapter，identity-only Adapter 只展示身份，不参与探测。
 #[tauri::command]
 pub(crate) fn runtime_probe(app: AppHandle) -> RuntimeProbeResult {
     let config = load_runtime_config_file(&app);
@@ -253,6 +271,7 @@ pub(crate) fn runtime_probe(app: AppHandle) -> RuntimeProbeResult {
     }
 }
 
+/// 获取指定 Runtime Instance 暴露的动态 Agent Entry。
 #[tauri::command]
 pub(crate) fn runtime_adapter_targets(
     app: AppHandle,
@@ -265,6 +284,7 @@ pub(crate) fn runtime_adapter_targets(
         .unwrap_or_else(|| Ok(Vec::new()))
 }
 
+/// 获取指定 Runtime Instance 暴露的 slash commands。
 #[tauri::command]
 pub(crate) fn runtime_adapter_slash_commands(
     app: AppHandle,

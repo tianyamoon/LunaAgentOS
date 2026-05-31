@@ -1,3 +1,6 @@
+//! History Repository Module。
+//! 集中管理 History Entry 的 schema、磁盘布局、归档、删除与压缩规则。
+
 use chrono::Local;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -6,16 +9,20 @@ use std::fs;
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
 
+/// 当前写入的历史 schema。旧 schema 仍然可以读取。
 const HISTORY_SCHEMA_VERSION: u32 = 5;
 
+/// Serde 在旧数据缺少 schemaVersion 时使用当前版本。
 fn history_schema_version() -> u32 {
     HISTORY_SCHEMA_VERSION
 }
 
+/// 新写入不得低于当前 schema，避免旧前端把新数据降级。
 fn schema_version_for_write(requested: Option<u32>) -> u32 {
     requested.unwrap_or(HISTORY_SCHEMA_VERSION).max(HISTORY_SCHEMA_VERSION)
 }
 
+/// 单个 Turn 的本地持久化记录。
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct HistoryEntry {
@@ -67,6 +74,7 @@ pub(crate) struct HistoryEntry {
     runtime_binding: Option<Value>,
 }
 
+/// 前端追加 History Entry 时提交的输入。
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct HistoryEntryInput {
@@ -98,6 +106,7 @@ pub(crate) struct HistoryEntryInput {
     runtime_binding: Option<Value>,
 }
 
+/// 历史压缩的统计结果。
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct HistoryCompactResult {
@@ -106,6 +115,7 @@ pub(crate) struct HistoryCompactResult {
     skipped_files: usize,
 }
 
+/// 删除或归档操作的统计结果。
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct HistoryDeleteResult {
@@ -113,6 +123,7 @@ pub(crate) struct HistoryDeleteResult {
     skipped_files: usize,
 }
 
+/// 返回历史根目录，并确保目录存在。
 fn history_dir(app: &AppHandle) -> Result<PathBuf, String> {
     let base_dir = app
         .path()
@@ -123,12 +134,14 @@ fn history_dir(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(history_dir)
 }
 
+/// 返回 live 或 archive 分桶目录。
 fn history_bucket_dir(app: &AppHandle, bucket: &str) -> Result<PathBuf, String> {
     let directory = history_dir(app)?.join(bucket);
     fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
     Ok(directory)
 }
 
+/// 返回当天分桶文件路径、日期和写入时间。
 fn history_file_for_today(
     app: &AppHandle,
     bucket: &str,
@@ -143,10 +156,12 @@ fn history_file_for_today(
     ))
 }
 
+/// 返回指定日期的分桶文件路径。
 fn history_file_for_date(app: &AppHandle, bucket: &str, date: &str) -> Result<PathBuf, String> {
     Ok(history_bucket_dir(app, bucket)?.join(format!("{date}.json")))
 }
 
+/// 从 JSON 文本解析历史记录，空文件视为没有记录。
 fn deserialize_history_entries(raw: &str) -> Result<Vec<HistoryEntry>, String> {
     if raw.trim().is_empty() {
         return Ok(Vec::new());
@@ -154,6 +169,7 @@ fn deserialize_history_entries(raw: &str) -> Result<Vec<HistoryEntry>, String> {
     serde_json::from_str::<Vec<HistoryEntry>>(raw).map_err(|error| error.to_string())
 }
 
+/// 从磁盘读取单个历史文件。
 fn load_history_file(path: &PathBuf) -> Result<Vec<HistoryEntry>, String> {
     if !path.exists() {
         return Ok(Vec::new());
@@ -162,6 +178,7 @@ fn load_history_file(path: &PathBuf) -> Result<Vec<HistoryEntry>, String> {
     deserialize_history_entries(&raw)
 }
 
+/// 容错读取历史文件。损坏文件会被跳过并记录日志。
 fn try_load_history_file(path: &PathBuf) -> Option<Vec<HistoryEntry>> {
     match load_history_file(path) {
         Ok(entries) => Some(entries),
@@ -172,6 +189,7 @@ fn try_load_history_file(path: &PathBuf) -> Option<Vec<HistoryEntry>> {
     }
 }
 
+/// 枚举兼容旧布局与新分桶布局中的所有历史 JSON 文件。
 fn history_json_files(app: &AppHandle) -> Result<Vec<PathBuf>, String> {
     let mut files = Vec::new();
     for directory in [
@@ -190,6 +208,7 @@ fn history_json_files(app: &AppHandle) -> Result<Vec<PathBuf>, String> {
     Ok(files)
 }
 
+/// 提取 Turn 身份，用于同一 Session 内的去重。
 fn history_entry_turn_id(entry: &HistoryEntry) -> Option<String> {
     entry
         .turn
@@ -199,6 +218,7 @@ fn history_entry_turn_id(entry: &HistoryEntry) -> Option<String> {
         .map(ToString::to_string)
 }
 
+/// 提取 Session 身份，兼容只有 ACP session ID 的旧记录。
 fn history_entry_session_key(entry: &HistoryEntry) -> Option<String> {
     entry
         .session_id
@@ -207,6 +227,7 @@ fn history_entry_session_key(entry: &HistoryEntry) -> Option<String> {
         .map(ToString::to_string)
 }
 
+/// 升级 schema 并按 Session + Turn 去重，保留最后写入的副本。
 fn compact_entries(entries: Vec<HistoryEntry>) -> (Vec<HistoryEntry>, usize, usize) {
     let original_len = entries.len();
     let mut seen = HashSet::new();
@@ -231,6 +252,7 @@ fn compact_entries(entries: Vec<HistoryEntry>) -> (Vec<HistoryEntry>, usize, usi
     (compacted, removed_count, upgraded_count)
 }
 
+/// 删除指定 Session 的全部 History Entry。
 fn retain_not_session(entries: Vec<HistoryEntry>, session_id: &str) -> (Vec<HistoryEntry>, usize) {
     let original_len = entries.len();
     let retained = entries
@@ -243,6 +265,7 @@ fn retain_not_session(entries: Vec<HistoryEntry>, session_id: &str) -> (Vec<Hist
     (retained, removed_count)
 }
 
+/// 把指定 Session 的记录标记为只读归档，并与剩余 live 记录分离。
 fn archive_session_entries(
     entries: Vec<HistoryEntry>,
     session_id: &str,
@@ -262,6 +285,7 @@ fn archive_session_entries(
     (retained, moved)
 }
 
+/// 按 Session + Turn 覆盖已有记录，否则追加新记录。
 fn upsert_entry(entries: &mut Vec<HistoryEntry>, saved: HistoryEntry) {
     let saved_turn_id = history_entry_turn_id(&saved);
     let saved_session_key = history_entry_session_key(&saved);
@@ -276,6 +300,7 @@ fn upsert_entry(entries: &mut Vec<HistoryEntry>, saved: HistoryEntry) {
     }
 }
 
+/// 读取全部历史记录，并按时间倒序返回。
 #[tauri::command]
 pub(crate) fn load_history_entries(app: AppHandle) -> Result<Vec<HistoryEntry>, String> {
     let mut entries = Vec::new();
@@ -288,6 +313,7 @@ pub(crate) fn load_history_entries(app: AppHandle) -> Result<Vec<HistoryEntry>, 
     Ok(entries)
 }
 
+/// 扫描全部历史文件，执行 schema 升级与重复记录压缩。
 #[tauri::command]
 pub(crate) fn compact_history_entries(app: AppHandle) -> Result<HistoryCompactResult, String> {
     let mut removed_count = 0;
@@ -314,6 +340,7 @@ pub(crate) fn compact_history_entries(app: AppHandle) -> Result<HistoryCompactRe
     })
 }
 
+/// 从所有分桶中删除指定 Session。
 #[tauri::command]
 pub(crate) fn delete_history_session_entries(
     app: AppHandle,
@@ -344,6 +371,7 @@ pub(crate) fn delete_history_session_entries(
     })
 }
 
+/// 把 live 分桶中的指定 Session 移入 archive 分桶。
 #[tauri::command]
 pub(crate) fn archive_history_session_entries(
     app: AppHandle,
@@ -389,6 +417,7 @@ pub(crate) fn archive_history_session_entries(
     })
 }
 
+/// 追加或覆盖单个 Turn 对应的 History Entry。
 #[tauri::command]
 pub(crate) fn append_history_entry(
     app: AppHandle,
