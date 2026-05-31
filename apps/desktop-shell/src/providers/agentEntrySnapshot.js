@@ -76,7 +76,7 @@ export function readLegacyHermesSnapshot(archived = {}) {
     runtimeHost: archived.runtimeHost,
     runtimeCommand: archived.runtimeCommand,
     ...profile,
-    metadata: { legacyHermesProfile: { ...profile } },
+    metadata: { ...profile, legacyHermesProfile: { ...profile } },
   });
 }
 

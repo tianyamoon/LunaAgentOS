@@ -9,7 +9,6 @@
   renderRichText,
 } from "./markdown/index.js";
 import {
-  hermesProfileNameFromAgentId,
   normalizeSessionIdentity,
   normalizedSessionTitle,
   normalizedSessionTitleParts,
@@ -113,6 +112,10 @@ import { snapshotRuntimeSession } from "./providers/agentEntrySnapshot.js";
 import { createProvidersStore } from "./state/providersStore.js";
 import { createSessionsStore } from "./state/sessionsStore.js";
 import { createWorkspaceViewStore } from "./state/workspaceViewStore.js";
+import {
+  projectSessionFromArchived,
+  restoreAgentEntryFromArchived,
+} from "./state/sessionRestoreProjection.js";
 import { createWorkspaceSessionController } from "./controllers/workspaceSessionController.js";
 import {
   availableRuntimeInstancesForProvider as availableRuntimeInstancesForProviderRaw,
@@ -483,17 +486,6 @@ function runtimeHostForInstance(instance) {
 
 function runtimeDefaultsForProvider(providerId, runtimeInstanceId = null) {
   return identityRuntimeDefaultsForProvider(providerId, runtimeInstanceId, runtimeInstancesSnapshot());
-}
-
-function inferHermesProfileExecutable(archived, restored) {
-  if (restored?.profileExecutable) return restored.profileExecutable;
-  if (archived?.hermesProfile?.profileExecutable) return archived.hermesProfile.profileExecutable;
-  const alias = archived?.hermesProfile?.profileAlias || restored?.profileAlias;
-  if (alias) return alias;
-  const agentId = archived?.agentId || restored?.agentId || "";
-  const profileId = hermesProfileNameFromAgentId(agentId);
-  if (profileId) return profileId === "default" ? null : profileId;
-  return null;
 }
 
 function targetDisplayName(target) {
@@ -2181,10 +2173,6 @@ function hermesProfileMetaFromAgent(agent) {
   };
 }
 
-function hermesProfileMetaFromArchived(archived) {
-  return archived?.hermesProfile || archived?.turns?.find((turn) => turn.meta?.hermesProfile)?.meta?.hermesProfile || null;
-}
-
 function createSessionForAgent(agent, firstTask) {
   const provider = providerById(agent?.providerId);
   if (!agent || !provider) return null;
@@ -3288,14 +3276,15 @@ function renderHistory(options = {}) {
   historyView?.renderHistory(options);
 }
 
-function ensureArchivedAgent(archived) {
-  const provider = providerById(archived.providerId) || providersSnapshot()[0];
-  let agent = agentById(archived.agentId);
+function ensureArchivedAgent(agentEntry) {
+  const provider = providerById(agentEntry.providerId) || providersSnapshot()[0];
+  let agent = agentById(agentEntry.id);
   if (!agent) {
     agent = {
-      id: archived.agentId,
+      ...agentEntry,
+      id: agentEntry.id,
       providerId: provider.id,
-      name: archived.agentName.split(" / ").at(-1) || t("session.historyAgentName"),
+      name: agentEntry.name?.split(" / ").at(-1) || t("session.historyAgentName"),
       subtitle: t("session.historyAgentSubtitle"),
       note: t("session.historyAgentNote"),
       state: 5,
@@ -3303,103 +3292,25 @@ function ensureArchivedAgent(archived) {
     };
     providersStore.appendProviderAgent(provider.id, agent);
   }
-  if (provider.id === "hermes") {
-    const hermesProfile = hermesProfileMetaFromArchived(archived);
-    const liveAgent = [...runtimeTargets(), ...provider.agents].find((entry) =>
-      entry.id === archived.agentId
-      || (hermesProfile?.profileName && entry.profileName === hermesProfile.profileName)
-      || (hermesProfile?.profileAlias && entry.profileAlias === hermesProfile.profileAlias)
-      || (hermesProfile?.profilePath && entry.profilePath === hermesProfile.profilePath)
-    );
-    if (liveAgent) {
-      agent.profileName = liveAgent.profileName || agent.profileName || null;
-      agent.alias = liveAgent.alias || agent.alias || hermesProfile?.profileAlias || null;
-      agent.profileAlias = liveAgent.profileAlias || agent.profileAlias || hermesProfile?.profileAlias || null;
-      agent.profileExecutable = liveAgent.profileExecutable || agent.profileExecutable || hermesProfile?.profileExecutable || null;
-      agent.profilePath = liveAgent.profilePath || agent.profilePath || hermesProfile?.profilePath || null;
-      agent.model = liveAgent.model || agent.model || hermesProfile?.profileModel || null;
-      agent.gateway = liveAgent.gateway || agent.gateway || hermesProfile?.gateway || null;
-      agent.runtimeInstanceId = liveAgent.runtimeInstanceId || agent.runtimeInstanceId || null;
-      agent.runtimeLabel = liveAgent.runtimeLabel || agent.runtimeLabel || null;
-      agent.runtimeHost = liveAgent.runtimeHost || agent.runtimeHost || null;
-      agent.runtimeCommand = liveAgent.runtimeCommand || agent.runtimeCommand || null;
-    } else if (hermesProfile) {
-      agent.profileName = hermesProfile.profileName || agent.profileName || null;
-      agent.alias = hermesProfile.profileAlias || agent.alias || null;
-      agent.profileAlias = hermesProfile.profileAlias || agent.profileAlias || null;
-      agent.profileExecutable = hermesProfile.profileExecutable || agent.profileExecutable || null;
-      agent.profilePath = hermesProfile.profilePath || agent.profilePath || null;
-      agent.model = hermesProfile.profileModel || agent.model || null;
-      agent.gateway = hermesProfile.gateway || agent.gateway || null;
-    }
-  }
+  // 仅回填缺失字段，避免旧归档覆盖当前实时探测结果。
+  Object.entries(agentEntry).forEach(([key, value]) => {
+    if (agent[key] == null && value != null) agent[key] = value;
+  });
   return agent;
 }
 
 function workspaceSessionFromArchived(archived, existing = null) {
-  const restored = existing || {
-    id: archived.id,
-    providerId: archived.providerId,
-    providerName: archived.providerName,
-    agentId: archived.agentId,
-    agentName: archived.agentName,
-    runtimeInstanceId: archived.runtimeInstanceId || null,
-    runtimeLabel: archived.runtimeLabel || null,
-    runtimeHost: archived.runtimeHost || null,
-    runtimeCommand: archived.runtimeCommand || null,
-    targetId: archived.targetId || archived.agentId,
-    targetName: archived.targetName || archived.agentName,
-    task: archived.title,
-    state: 5,
-    turns: archived.turns,
-    createdAt: archived.createdAt,
-    acpSessionId: archived.acpSessionId,
-    lifecycle: LIFECYCLE.archived,
-    runtimeState: LIFECYCLE.archived,
-    record_state: archived.record_state || RECORD_STATE.archived,
-    access_mode: archived.access_mode || ACCESS_MODE.read_only,
-    runtime_binding: archived.runtime_binding || createRuntimeBinding({ state: RUNTIME_BINDING_STATE.idle }),
-    profileName: archived.hermesProfile?.profileName || null,
-    profileAlias: archived.hermesProfile?.profileAlias || null,
-    profileExecutable: archived.profileExecutable || archived.hermesProfile?.profileExecutable || null,
-    profilePath: archived.hermesProfile?.profilePath || null,
-    profileModel: archived.hermesProfile?.profileModel || null,
-    gateway: archived.hermesProfile?.gateway || null,
-    skillCount: archived.hermesProfile?.skillCount ?? null,
-    hasSoul: archived.hermesProfile?.hasSoul || false,
-  };
-  const restoredAgent = ensureArchivedAgent(archived);
-  restored.profileName = restored.profileName || restoredAgent.profileName || null;
-  restored.profileAlias = restored.profileAlias || restoredAgent.profileAlias || restoredAgent.alias || null;
-  restored.profileExecutable = restored.profileExecutable || restoredAgent.profileExecutable || restoredAgent.alias || null;
-  restored.profilePath = restored.profilePath || restoredAgent.profilePath || restoredAgent.path || null;
-  restored.profileModel = restored.profileModel || restoredAgent.model || null;
-  restored.gateway = restored.gateway || restoredAgent.gateway || null;
-  restored.runtimeInstanceId = restored.runtimeInstanceId || restoredAgent.runtimeInstanceId || null;
-  restored.runtimeLabel = restored.runtimeLabel || restoredAgent.runtimeLabel || null;
-  restored.runtimeHost = restored.runtimeHost || restoredAgent.runtimeHost || null;
-  restored.runtimeCommand = restored.runtimeCommand || restoredAgent.runtimeCommand || null;
-  const restoredInstance = runtimeInstanceById(restored.runtimeInstanceId);
-  if (restoredInstance) {
-    restored.runtimeLabel = restored.runtimeLabel || restoredInstance.runtimeLabel || null;
-    restored.runtimeHost = restored.runtimeHost || runtimeHostForInstance(restoredInstance);
-    restored.runtimeCommand = restored.runtimeCommand
-      || (restoredInstance.commandKind === "manifest" ? null : restoredInstance.command)
-      || null;
-  }
-  const runtimeDefaults = runtimeDefaultsForProvider(restored.providerId, restored.runtimeInstanceId);
-  restored.runtimeInstanceId = restored.runtimeInstanceId || runtimeDefaults.runtimeInstanceId || null;
-  restored.runtimeLabel = restored.runtimeLabel || runtimeDefaults.runtimeLabel || null;
-  restored.runtimeHost = restored.runtimeHost || runtimeDefaults.runtimeHost || null;
-  restored.runtimeCommand = restored.runtimeCommand || runtimeDefaults.runtimeCommand || null;
-  if (restored.providerId === "hermes") {
-    restored.profileExecutable = inferHermesProfileExecutable(archived, restored);
-  }
-  restored.targetId = restored.targetId || restored.agentId;
-  restored.inWorkspace = true;
-  ensureSessionStatusShape(restored);
-  Object.assign(restored, normalizeWorkspaceSession(restored));
-  return restored;
+  const agentEntries = [...runtimeTargets(), ...providersSnapshot().flatMap((provider) => provider.agents || [])];
+  const restoredAgent = ensureArchivedAgent(restoreAgentEntryFromArchived(archived, agentEntries));
+  return projectSessionFromArchived(archived, {
+    existing,
+    agentEntry: restoredAgent,
+    runtimeInstances: runtimeInstancesSnapshot(),
+    runtimeDefaultsForProvider,
+    runtimeHostForInstance,
+    normalizeSession: normalizeWorkspaceSession,
+    ensureSessionStatusShape,
+  });
 }
 
 function openArchivedTranscript(sessionId) {
