@@ -218,15 +218,6 @@ export function createSessionsStore() {
     getSessionsRef() {
       return sessions;
     },
-    getActiveSessionIdsRef() {
-      return activeSessionIds;
-    },
-    getStoppedSessionIdsRef() {
-      return stoppedSessionIds;
-    },
-    getDeletedSessionIdsRef() {
-      return deletedSessionIds;
-    },
     // ---- subscribe / batch ----
     subscribe(listener) {
       if (typeof listener !== "function") return () => {};

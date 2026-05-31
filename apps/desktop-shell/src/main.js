@@ -380,7 +380,6 @@ const slashCommandsByProvider = providersStore.getSlashCommandsByProviderRef();
 const sessionsStore = createSessionsStore();
 const workspaceViewStore = createWorkspaceViewStore();
 const sessions = sessionsStore.getSessionsRef();
-const activeSessionIds = sessionsStore.getActiveSessionIdsRef();
 let workspaceSessionController = null;
 let historyView = null;
 let workspaceView = null;
@@ -395,8 +394,6 @@ let fontScaleId = localStorage.getItem(FONT_SCALE_KEY) || "default";
 let themeId = localStorage.getItem(THEME_KEY) || DEFAULT_THEME_ID;
 let runtimeConfigSnapshot = null;
 let agentBriefs = {};
-const deletedSessionIds = sessionsStore.getDeletedSessionIdsRef();
-const stoppedSessionIds = sessionsStore.getStoppedSessionIdsRef();
 const sessionListSectionOpenState = {
   active: true,
   archive: true,
@@ -772,8 +769,8 @@ function sessionLifecycle(session) {
   if (session.lifecycle) return session.lifecycle;
   return lifecycleFromLegacy({
     runtimeState: session.runtimeState,
-    isStopped: stoppedSessionIds.has(session.id),
-    isDeleted: deletedSessionIds.has(session.id),
+    isStopped: sessionsStore.isSessionStopped(session.id),
+    isDeleted: sessionsStore.isSessionDeleted(session.id),
   });
 }
 
@@ -870,11 +867,11 @@ function markSessionDeletedTombstone(sessionId) {
 }
 
 function isSessionDeletedTombstone(sessionId) {
-  return Boolean(sessionId) && deletedSessionIds.has(sessionId);
+  return sessionsStore.isSessionDeleted(sessionId);
 }
 
 function isSessionStoppedTombstone(sessionId) {
-  return Boolean(sessionId) && stoppedSessionIds.has(sessionId);
+  return sessionsStore.isSessionStopped(sessionId);
 }
 
 function canSendToSession(session) {
@@ -2021,7 +2018,7 @@ async function refreshRuntimeProbe() {
 
 function latestActiveSessionForAgent(agentId) {
   return [...sessions]
-    .filter((session) => session.agentId === agentId && activeSessionIds.has(session.id) && canSendToSession(session))
+    .filter((session) => session.agentId === agentId && sessionsStore.isSessionActive(session.id) && canSendToSession(session))
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0] || null;
 }
 
@@ -2389,7 +2386,7 @@ function getOrCreateActiveSession(task, forceNew = false) {
   if (!agent) return null;
   const existing = !forceNew ? currentSession() : null;
   if (existing && existing.agentId !== agent.id) return createSession(task);
-  if (existing && !activeSessionIds.has(existing.id)) return createSession(task);
+  if (existing && !sessionsStore.isSessionActive(existing.id)) return createSession(task);
   return existing || createSession(task);
 }
 
