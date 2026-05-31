@@ -1,17 +1,19 @@
-use chrono::Local;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::Value;
-use std::collections::HashSet;
 use std::fs;
-use std::path::PathBuf;
 use std::process::Command;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 
 mod acp_runtime;
 mod adapter_extensions;
 mod adapter_registry;
+mod history_repository;
 mod runtime_config;
 
+use history_repository::{
+    append_history_entry, archive_history_session_entries, compact_history_entries,
+    delete_history_session_entries, load_history_entries,
+};
 use runtime_config::{
     load_runtime_config, load_runtime_config_file, load_user_themes, save_runtime_config,
     RuntimeConfigFile,
@@ -22,12 +24,6 @@ use std::os::windows::process::CommandExt;
 
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
-
-const HISTORY_SCHEMA_VERSION: u32 = 4;
-
-fn history_schema_version() -> u32 {
-    HISTORY_SCHEMA_VERSION
-}
 
 fn classify_backend_error(error: String) -> String {
     let lower = error.to_lowercase();
@@ -60,85 +56,6 @@ fn classify_backend_error(error: String) -> String {
         "UNKNOWN"
     };
     format!("[{code}] {error}")
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct HistoryEntry {
-    #[serde(default = "history_schema_version")]
-    schema_version: u32,
-    id: String,
-    date: String,
-    #[serde(alias = "created_at")]
-    created_at: String,
-    #[serde(alias = "provider_id")]
-    provider_id: String,
-    #[serde(alias = "provider_name")]
-    provider_name: String,
-    #[serde(alias = "agent_id")]
-    agent_id: String,
-    #[serde(alias = "agent_name")]
-    agent_name: String,
-    #[serde(default, alias = "runtime_instance_id")]
-    runtime_instance_id: Option<String>,
-    #[serde(default, alias = "runtime_label")]
-    runtime_label: Option<String>,
-    #[serde(default, alias = "runtime_host")]
-    runtime_host: Option<String>,
-    #[serde(default, alias = "runtime_command")]
-    runtime_command: Option<String>,
-    #[serde(default, alias = "target_id")]
-    target_id: Option<String>,
-    #[serde(default, alias = "target_name")]
-    target_name: Option<String>,
-    #[serde(default, alias = "profile_executable")]
-    profile_executable: Option<String>,
-    #[serde(alias = "session_id")]
-    session_id: Option<String>,
-    #[serde(alias = "acp_session_id")]
-    acp_session_id: Option<String>,
-    task: String,
-    status: String,
-    summary: String,
-    turn: Option<Value>,
-    #[serde(alias = "runtime_state")]
-    runtime_state: Option<String>,
-    #[serde(default, rename = "record_state")]
-    record_state: Option<String>,
-    #[serde(default, rename = "access_mode")]
-    access_mode: Option<String>,
-    #[serde(default, rename = "runtime_binding")]
-    runtime_binding: Option<Value>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct HistoryEntryInput {
-    schema_version: Option<u32>,
-    provider_id: String,
-    provider_name: String,
-    agent_id: String,
-    agent_name: String,
-    runtime_instance_id: Option<String>,
-    runtime_label: Option<String>,
-    runtime_host: Option<String>,
-    runtime_command: Option<String>,
-    target_id: Option<String>,
-    target_name: Option<String>,
-    profile_executable: Option<String>,
-    session_id: Option<String>,
-    acp_session_id: Option<String>,
-    task: String,
-    status: String,
-    summary: String,
-    turn: Option<Value>,
-    runtime_state: Option<String>,
-    #[serde(default, rename = "record_state")]
-    record_state: Option<String>,
-    #[serde(default, rename = "access_mode")]
-    access_mode: Option<String>,
-    #[serde(default, rename = "runtime_binding")]
-    runtime_binding: Option<Value>,
 }
 
 #[derive(Debug, Serialize)]
@@ -178,21 +95,6 @@ struct RuntimeInstanceProbe {
     summary: String,
     detail: String,
     version: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct HistoryCompactResult {
-    removed_count: usize,
-    upgraded_count: usize,
-    skipped_files: usize,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct HistoryDeleteResult {
-    removed_count: usize,
-    skipped_files: usize,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -467,40 +369,6 @@ fn runtime_adapter_slash_commands(
         .unwrap_or_else(|| Ok(Vec::new()))
 }
 
-fn history_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    let base_dir = app
-        .path()
-        .app_local_data_dir()
-        .map_err(|error| error.to_string())?;
-    let history_dir = base_dir.join("history");
-    fs::create_dir_all(&history_dir).map_err(|error| error.to_string())?;
-    Ok(history_dir)
-}
-
-fn history_bucket_dir(app: &AppHandle, bucket: &str) -> Result<PathBuf, String> {
-    let directory = history_dir(app)?.join(bucket);
-    fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
-    Ok(directory)
-}
-
-fn history_file_for_today(
-    app: &AppHandle,
-    bucket: &str,
-) -> Result<(PathBuf, String, String), String> {
-    let now = Local::now();
-    let date = now.format("%Y-%m-%d").to_string();
-    let timestamp = now.to_rfc3339();
-    Ok((
-        history_bucket_dir(app, bucket)?.join(format!("{date}.json")),
-        date,
-        timestamp,
-    ))
-}
-
-fn history_file_for_date(app: &AppHandle, bucket: &str, date: &str) -> Result<PathBuf, String> {
-    Ok(history_bucket_dir(app, bucket)?.join(format!("{date}.json")))
-}
-
 // Payload returned by `read_adapter_icon`. The shell composes a `data:` URL
 // from `mime` + `base64` and feeds it directly into `<img src>`. We use
 // base64 (vs a Vec<u8>) because Tauri's default JSON encoding would
@@ -579,278 +447,6 @@ fn read_adapter_icon(
         mime: icon_mime_for_path(path).to_string(),
         base64: base64::engine::general_purpose::STANDARD.encode(&bytes),
     }))
-}
-
-fn load_history_file(path: &PathBuf) -> Result<Vec<HistoryEntry>, String> {
-    if !path.exists() {
-        return Ok(Vec::new());
-    }
-    let raw = fs::read_to_string(path).map_err(|error| error.to_string())?;
-    if raw.trim().is_empty() {
-        return Ok(Vec::new());
-    }
-    serde_json::from_str::<Vec<HistoryEntry>>(&raw).map_err(|error| error.to_string())
-}
-
-fn try_load_history_file(path: &PathBuf) -> Option<Vec<HistoryEntry>> {
-    match load_history_file(path) {
-        Ok(entries) => Some(entries),
-        Err(error) => {
-            eprintln!("跳过损坏的历史文件 {}：{}", path.display(), error);
-            None
-        }
-    }
-}
-
-fn history_json_files(app: &AppHandle) -> Result<Vec<PathBuf>, String> {
-    let mut files = Vec::new();
-    for directory in [
-        history_dir(app)?,
-        history_bucket_dir(app, "live")?,
-        history_bucket_dir(app, "archive")?,
-    ] {
-        for item in fs::read_dir(&directory).map_err(|error| error.to_string())? {
-            let item = item.map_err(|error| error.to_string())?;
-            let path = item.path();
-            if path.extension().and_then(|value| value.to_str()) == Some("json") {
-                files.push(path);
-            }
-        }
-    }
-    Ok(files)
-}
-
-fn history_entry_turn_id(entry: &HistoryEntry) -> Option<String> {
-    entry
-        .turn
-        .as_ref()
-        .and_then(|turn| turn.get("id"))
-        .and_then(|id| id.as_str())
-        .map(ToString::to_string)
-}
-
-fn history_entry_session_key(entry: &HistoryEntry) -> Option<String> {
-    entry
-        .session_id
-        .as_ref()
-        .or(entry.acp_session_id.as_ref())
-        .map(ToString::to_string)
-}
-
-#[tauri::command]
-fn load_history_entries(app: AppHandle) -> Result<Vec<HistoryEntry>, String> {
-    let mut entries = Vec::new();
-
-    for path in history_json_files(&app)? {
-        if let Some(mut day_entries) = try_load_history_file(&path) {
-            entries.append(&mut day_entries);
-        }
-    }
-
-    entries.sort_by(|left, right| right.created_at.cmp(&left.created_at));
-    Ok(entries)
-}
-
-#[tauri::command]
-fn compact_history_entries(app: AppHandle) -> Result<HistoryCompactResult, String> {
-    let mut removed_count = 0;
-    let mut upgraded_count = 0;
-    let mut skipped_files = 0;
-
-    for path in history_json_files(&app)? {
-        let Some(entries) = try_load_history_file(&path) else {
-            skipped_files += 1;
-            continue;
-        };
-        let original_len = entries.len();
-        let mut seen = HashSet::new();
-        let mut compacted = Vec::new();
-        let mut upgraded = false;
-
-        for mut entry in entries.into_iter().rev() {
-            if entry.schema_version != HISTORY_SCHEMA_VERSION {
-                entry.schema_version = HISTORY_SCHEMA_VERSION;
-                upgraded = true;
-                upgraded_count += 1;
-            }
-            let key = format!(
-                "{}:{}",
-                history_entry_session_key(&entry).unwrap_or_else(|| entry.id.clone()),
-                history_entry_turn_id(&entry).unwrap_or_else(|| entry.id.clone())
-            );
-            if seen.insert(key) {
-                compacted.push(entry);
-            }
-        }
-
-        compacted.reverse();
-        let removed_for_file = original_len.saturating_sub(compacted.len());
-        removed_count += removed_for_file;
-        if removed_for_file > 0 || upgraded {
-            let json =
-                serde_json::to_string_pretty(&compacted).map_err(|error| error.to_string())?;
-            fs::write(path, json).map_err(|error| error.to_string())?;
-        }
-    }
-
-    Ok(HistoryCompactResult {
-        removed_count,
-        upgraded_count,
-        skipped_files,
-    })
-}
-
-#[tauri::command]
-fn delete_history_session_entries(
-    app: AppHandle,
-    session_id: String,
-) -> Result<HistoryDeleteResult, String> {
-    let session_id = session_id.trim().to_string();
-    if session_id.is_empty() {
-        return Err("session_id 不能为空".to_string());
-    }
-
-    let mut removed_count = 0;
-    let mut skipped_files = 0;
-
-    for path in history_json_files(&app)? {
-        let Some(entries) = try_load_history_file(&path) else {
-            skipped_files += 1;
-            continue;
-        };
-        let original_len = entries.len();
-        let retained: Vec<HistoryEntry> = entries
-            .into_iter()
-            .filter(|entry| {
-                history_entry_session_key(entry).unwrap_or_else(|| entry.id.clone()) != session_id
-            })
-            .collect();
-        let removed_for_file = original_len.saturating_sub(retained.len());
-        if removed_for_file > 0 {
-            removed_count += removed_for_file;
-            let json =
-                serde_json::to_string_pretty(&retained).map_err(|error| error.to_string())?;
-            fs::write(path, json).map_err(|error| error.to_string())?;
-        }
-    }
-
-    Ok(HistoryDeleteResult {
-        removed_count,
-        skipped_files,
-    })
-}
-
-#[tauri::command]
-fn archive_history_session_entries(
-    app: AppHandle,
-    session_id: String,
-) -> Result<HistoryDeleteResult, String> {
-    let session_id = session_id.trim().to_string();
-    if session_id.is_empty() {
-        return Err("session_id 不能为空".to_string());
-    }
-
-    let mut moved_count = 0;
-    let mut skipped_files = 0;
-    let live_dir = history_bucket_dir(&app, "live")?;
-
-    for item in fs::read_dir(&live_dir).map_err(|error| error.to_string())? {
-        let item = item.map_err(|error| error.to_string())?;
-        let path = item.path();
-        if path.extension().and_then(|value| value.to_str()) != Some("json") {
-            continue;
-        }
-        let Some(entries) = try_load_history_file(&path) else {
-            skipped_files += 1;
-            continue;
-        };
-        let mut retained = Vec::new();
-        let mut moved = Vec::new();
-        for mut entry in entries {
-            if history_entry_session_key(&entry).unwrap_or_else(|| entry.id.clone()) == session_id {
-                entry.runtime_state = Some("archived".to_string());
-                entry.record_state = Some("archived".to_string());
-                entry.access_mode = Some("read_only".to_string());
-                moved.push(entry);
-            } else {
-                retained.push(entry);
-            }
-        }
-        if moved.is_empty() {
-            continue;
-        }
-        moved_count += moved.len();
-        let json = serde_json::to_string_pretty(&retained).map_err(|error| error.to_string())?;
-        fs::write(&path, json).map_err(|error| error.to_string())?;
-        for entry in moved {
-            let archive_path = history_file_for_date(&app, "archive", &entry.date)?;
-            let mut archive_entries = load_history_file(&archive_path)?;
-            archive_entries.push(entry);
-            archive_entries.sort_by(|left, right| right.created_at.cmp(&left.created_at));
-            let json = serde_json::to_string_pretty(&archive_entries)
-                .map_err(|error| error.to_string())?;
-            fs::write(archive_path, json).map_err(|error| error.to_string())?;
-        }
-    }
-
-    Ok(HistoryDeleteResult {
-        removed_count: moved_count,
-        skipped_files,
-    })
-}
-
-#[tauri::command]
-fn append_history_entry(app: AppHandle, entry: HistoryEntryInput) -> Result<HistoryEntry, String> {
-    let bucket = if entry.record_state.as_deref() == Some("active")
-        && entry.access_mode.as_deref() != Some("read_only")
-    {
-        "live"
-    } else {
-        "archive"
-    };
-    let (path, date, timestamp) = history_file_for_today(&app, bucket)?;
-    let mut entries = load_history_file(&path)?;
-    let saved = HistoryEntry {
-        schema_version: entry.schema_version.unwrap_or(HISTORY_SCHEMA_VERSION),
-        id: format!("{}-{}", date, timestamp.replace([':', '+'], "-")),
-        date,
-        created_at: timestamp,
-        provider_id: entry.provider_id,
-        provider_name: entry.provider_name,
-        agent_id: entry.agent_id,
-        agent_name: entry.agent_name,
-        runtime_instance_id: entry.runtime_instance_id,
-        runtime_label: entry.runtime_label,
-        runtime_host: entry.runtime_host,
-        runtime_command: entry.runtime_command,
-        target_id: entry.target_id,
-        target_name: entry.target_name,
-        profile_executable: entry.profile_executable,
-        session_id: entry.session_id,
-        acp_session_id: entry.acp_session_id,
-        task: entry.task,
-        status: entry.status,
-        summary: entry.summary,
-        turn: entry.turn,
-        runtime_state: entry.runtime_state,
-        record_state: entry.record_state,
-        access_mode: entry.access_mode,
-        runtime_binding: entry.runtime_binding,
-    };
-    let saved_turn_id = history_entry_turn_id(&saved);
-    let saved_session_key = history_entry_session_key(&saved);
-    if let Some(index) = entries.iter().position(|item| {
-        history_entry_session_key(item) == saved_session_key
-            && saved_turn_id.is_some()
-            && history_entry_turn_id(item) == saved_turn_id
-    }) {
-        entries[index] = saved.clone();
-    } else {
-        entries.push(saved.clone());
-    }
-    let json = serde_json::to_string_pretty(&entries).map_err(|error| error.to_string())?;
-    fs::write(path, json).map_err(|error| error.to_string())?;
-    Ok(saved)
 }
 
 #[tauri::command]
