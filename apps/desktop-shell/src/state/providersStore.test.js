@@ -142,15 +142,13 @@ test("providersStore: runtime targets per instance + prune + total count", () =>
 
 test("providersStore: slash commands per provider are stable and resettable", () => {
   const store = createProvidersStore();
-  const ref = store.getSlashCommandsByProviderRef();
   store.setSlashCommandsForProvider("hermes", [{ name: "demo", kind: "skill" }]);
-  assert.equal(store.getSlashCommandsByProviderRef(), ref);
-  assert.deepEqual(ref.hermes.map((item) => item.name), ["demo"]);
+  assert.deepEqual(store.getSlashCommandsForProvider("hermes").map((item) => item.name), ["demo"]);
   store.setSlashCommandsForProvider("hermes", null);
-  assert.deepEqual(ref.hermes, []);
+  assert.deepEqual(store.getSlashCommandsForProvider("hermes"), []);
   store.setSlashCommandsForProvider("hermes", [{ name: "demo" }]);
   store.reset();
-  assert.deepEqual(ref, {});
+  assert.deepEqual(store.getSlashCommandsForProvider("hermes"), []);
 });
 
 test("providersStore: subscribe is notified on each mutation, batched in batch()", () => {

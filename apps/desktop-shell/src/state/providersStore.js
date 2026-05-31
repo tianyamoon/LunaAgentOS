@@ -314,8 +314,8 @@ export function createProvidersStore(initial = {}) {
     getRuntimeTargetsByInstanceRef() {
       return runtimeTargetsByInstance;
     },
-    getSlashCommandsByProviderRef() {
-      return slashCommandsByProvider;
+    getSlashCommandsForProvider(providerId) {
+      return providerId ? slashCommandsByProvider[providerId] || [] : [];
     },
     setSlashCommandsForProvider(providerId, commands) {
       if (!providerId) return;
@@ -343,9 +343,6 @@ export function createProvidersStore(initial = {}) {
         (sum, items) => sum + (Array.isArray(items) ? items.length : 0),
         0,
       );
-    },
-    getHermesProfilesByInstanceRef() {
-      return runtimeTargetsByInstance;
     },
     setHermesProfilesForInstance(instanceId, profiles) {
       this.setRuntimeTargetsForInstance(instanceId, profiles);

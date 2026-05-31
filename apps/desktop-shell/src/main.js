@@ -376,7 +376,6 @@ const providers = providersStore.getProvidersRef();
 const runtimeAvailability = providersStore.getRuntimeAvailabilityRef();
 const runtimeInstances = providersStore.getRuntimeInstancesRef();
 const runtimeTargetsByInstance = providersStore.getRuntimeTargetsByInstanceRef();
-const slashCommandsByProvider = providersStore.getSlashCommandsByProviderRef();
 const sessionsStore = createSessionsStore();
 const workspaceViewStore = createWorkspaceViewStore();
 const sessions = sessionsStore.getSessions();
@@ -1159,7 +1158,7 @@ function localizedComposerSlashCommands() {
   const provider = currentTargetProvider();
   const providerId = provider?.id;
   const manifestCommands = provider?.adapterManifest?.capabilities?.slashCommands;
-  const dynamicCommands = providerId ? slashCommandsByProvider[providerId] : [];
+  const dynamicCommands = providerId ? providersStore.getSlashCommandsForProvider(providerId) : [];
   return mergeSlashCommands([...(Array.isArray(manifestCommands) ? manifestCommands : []), ...(Array.isArray(dynamicCommands) ? dynamicCommands : [])])
     .map((command) => normalizeSlashCommand(command, {
       providerId,
