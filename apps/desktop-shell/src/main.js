@@ -47,7 +47,6 @@ import { renderTurnEventItemHtml, renderTurnEventsHtml } from "./ui/turnEventsVi
 import { renderProviderIcon, setAdapterIconRegistry } from "./ui/providerIcon.js";
 import {
   LIFECYCLE,
-  isArchivedLifecycle,
 } from "./state/sessionLifecycle.js";
 import { createSessionRuntimeState } from "./state/sessionRuntimeState.js";
 import { createSessionTurnState } from "./state/sessionTurnState.js";
@@ -117,6 +116,7 @@ import {
 } from "./state/sessionRestoreProjection.js";
 import { createWorkspaceSessionController } from "./controllers/workspaceSessionController.js";
 import { createSessionRestoreController } from "./controllers/sessionRestoreController.js";
+import { createSessionLifecycleController } from "./controllers/sessionLifecycleController.js";
 import {
   availableRuntimeInstancesForProvider as availableRuntimeInstancesForProviderRaw,
   providerRuntimeLabel as providerRuntimeLabelRaw,
@@ -417,6 +417,7 @@ const workspaceViewStore = createWorkspaceViewStore();
 const sessions = sessionsStore.getSessions();
 let workspaceSessionController = null;
 let sessionRestoreController = null;
+let sessionLifecycleController = null;
 let historyView = null;
 let workspaceView = null;
 let sessionSeq = 0;
@@ -2977,143 +2978,50 @@ workspaceView = createWorkspaceView({
   escapeHtml,
 });
 
-async function archiveLiveSession(sessionId) {
-  const session = sessions.find((item) => item.id === sessionId);
-  if (!session) return;
-  const shouldMarkStopped = isSessionExecuting(session);
-  if (shouldMarkStopped) setSessionLifecycle(session, LIFECYCLE.stopped);
-  try {
-    await acpRuntimeClient.shutdown(session);
-  } catch (error) {
-    console.error(error);
-  }
-  const stoppedTurn = shouldMarkStopped ? markSessionStopped(session) : null;
-  setSessionLifecycle(session, LIFECYCLE.archived);
-  try {
-    await historyRepository.archiveSession(sessionId);
-    if (stoppedTurn) await saveTurnToHistory(session, stoppedTurn);
-  } catch (error) {
-    console.error(error);
-  }
-  removeSessionFromWorkspace(session.id);
-  renderWorkspace();
-  renderHistory();
-  setAppNotice(t("session.archivedNotice", { agent: session.agentName }));
-}
+// Session Lifecycle Controller 接管 Runtime、History 与工作区清理的联动。
+sessionLifecycleController = createSessionLifecycleController({
+  getSession: (sessionId) => sessions.find((item) => item.id === sessionId) || null,
+  getArchivedSession: (sessionId) => archivedSessionsFromHistory().find((item) => item.id === sessionId) || null,
+  getCurrentSessionId: () => sessionsStore.getCurrentSessionId(),
+  sessionRuntimeState,
+  isSessionExecuting,
+  setSessionLifecycle,
+  markSessionDeletedTombstone,
+  markSessionStopped,
+  acpRuntimeClient,
+  historyRepository,
+  saveTurnToHistory,
+  removeSessionById: (sessionId) => sessionsStore.removeSessionById(sessionId),
+  markSessionInactive,
+  clearCurrentSessionIf,
+  clearScheduledWorkspaceFocus: (sessionId) => {
+    if (scheduledWorkspaceRenderOptions?.focusSessionId === sessionId) {
+      scheduledWorkspaceRenderOptions = { ...scheduledWorkspaceRenderOptions, focusSessionId: null };
+    }
+  },
+  renderProviders,
+  renderWorkspace,
+  renderHistory,
+  openConfirmDialog,
+  formatBackendError,
+  setAppNotice,
+  t,
+});
 
-async function detachRuntimeKeepActive(session) {
-  try {
-    await acpRuntimeClient.shutdown(session);
-  } catch (error) {
-    console.error(error);
-  }
-  setSessionLifecycle(session, LIFECYCLE.live);
+async function archiveLiveSession(sessionId) {
+  return sessionLifecycleController?.archiveLiveSession(sessionId);
 }
 
 async function stopSession(sessionId) {
-  const session = sessions.find((item) => item.id === sessionId);
-  if (!session) return;
-  const runtimeState = sessionRuntimeState(session);
-  if (runtimeState === "restoring") {
-    setAppNotice(t("session.stopRestoringBlocked"), "busy");
-    return;
-  }
-  if (runtimeState !== "live") {
-    setAppNotice(t("session.stopNoLiveRuntime"), "busy");
-    return;
-  }
-  setSessionLifecycle(session, LIFECYCLE.stopped);
-  await detachRuntimeKeepActive(session);
-  const stoppedTurn = markSessionStopped(session);
-  try {
-    if (stoppedTurn) await saveTurnToHistory(session, stoppedTurn);
-  } catch (error) {
-    console.error(error);
-  }
-  renderProviders();
-  renderWorkspace();
-  renderHistory();
-  setAppNotice(t("session.stoppedNotice", { agent: session.agentName }));
-}
-
-function removeSessionFromWorkspace(sessionId) {
-  const session = sessions.find((item) => item.id === sessionId);
-  if (!session) return null;
-  if (scheduledWorkspaceRenderOptions?.focusSessionId === sessionId) {
-    scheduledWorkspaceRenderOptions = { ...scheduledWorkspaceRenderOptions, focusSessionId: null };
-  }
-  sessionsStore.removeSessionById(sessionId);
-  markSessionInactive(session.id);
-  clearCurrentSessionIf(session.id);
-  return session;
+  return sessionLifecycleController?.stopSession(sessionId);
 }
 
 async function dismissWorkspaceSession(sessionId) {
-  const session = sessions.find((item) => item.id === sessionId);
-  if (!session) return;
-  // Display-line only: drop the session from the workspace view but keep it in the
-  // sessions store so any in-flight runtime work (restoring, live ACP, resume_failed
-  // retries) can keep running and routing events. Lifecycle / runtime is untouched.
-  const runtimeState = sessionRuntimeState(session);
-  const wasArchived = isArchivedLifecycle(runtimeState);
-  session.inWorkspace = false;
-  if (sessionsStore.getCurrentSessionId() === sessionId) {
-    clearCurrentSessionIf(sessionId);
-  }
-  if (scheduledWorkspaceRenderOptions?.focusSessionId === sessionId) {
-    scheduledWorkspaceRenderOptions = { ...scheduledWorkspaceRenderOptions, focusSessionId: null };
-  }
-  renderWorkspace();
-  renderHistory();
-  setAppNotice(wasArchived
-    ? t("session.dismissedArchived", { agent: session.agentName })
-    : t("session.dismissedActive", { agent: session.agentName }));
-}
-
-async function deleteSession(sessionId) {
-  const session = sessions.find((item) => item.id === sessionId);
-  const archived = archivedSessionsFromHistory().find((item) => item.id === sessionId);
-  const runtimeState = session ? sessionRuntimeState(session) : archived?.runtimeState || "archived";
-  if (runtimeState === "restoring") {
-    setAppNotice(t("session.deleteRestoringBlocked"), "busy");
-    return;
-  }
-  if (!session && !archived) return;
-  try {
-    if (session) {
-      setSessionLifecycle(session, LIFECYCLE.deleted);
-    } else {
-      markSessionDeletedTombstone(sessionId);
-    }
-    if (session && runtimeState === "live") {
-      try {
-        await acpRuntimeClient.shutdown(session);
-      } catch (shutdownError) {
-        console.error(shutdownError);
-      }
-    }
-    removeSessionFromWorkspace(sessionId);
-    const result = await historyRepository.deleteSession(sessionId);
-    renderWorkspace();
-    renderHistory();
-    const skipped = result?.skippedFiles ? t("session.deleteSkippedFiles", { count: result.skippedFiles }) : "";
-    setAppNotice(t("session.deleted", { count: result?.removedCount || 0, skipped }));
-  } catch (error) {
-    console.error(error);
-    setAppNotice(t("session.deleteFailed", { error: formatBackendError(error) }), "error");
-  }
+  return sessionLifecycleController?.dismissWorkspaceSession(sessionId);
 }
 
 function requestDeleteConfirmation(sessionId) {
-  const session = sessions.find((item) => item.id === sessionId);
-  const archived = archivedSessionsFromHistory().find((item) => item.id === sessionId);
-  const title = session?.task || archived?.title || t("confirm.sessionFallback");
-  openConfirmDialog({
-    title: t("confirm.deleteSessionTitle"),
-    message: t("confirm.deleteSessionMessage", { title }),
-    confirmLabel: t("common.delete"),
-    onConfirm: () => deleteSession(sessionId),
-  });
+  sessionLifecycleController?.requestDeleteConfirmation(sessionId);
 }
 
 function renderWorkspace(options = {}) {
