@@ -50,6 +50,9 @@ const DEFAULT_PROVIDERS = [
     noteKey: "provider.hermes.note",
     // Hermes 使用独立空状态文案，但 Fleet 视图只读取通用元数据。
     noRuntimeKey: "provider.noHermesRuntime",
+    targetCountKey: "provider.profileCount",
+    loadedTargetsNoteKey: "provider.hermes.loadedNote",
+    emptyTargetsNoticeKey: "provider.noHermesProfiles",
     agentDetail: {
       summaryKey: "agentDetail.hermes.summary",
       runtimeEnvironmentKey: "agentDetail.runtime.windowsWsl",

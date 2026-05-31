@@ -122,6 +122,7 @@ import {
   targetStatusForFleet,
 } from "./providers/agentMetadata.js";
 import { sessionSectionsFromEvents } from "./runtime/streamEvents.js";
+import { FALLBACK_SESSIONS } from "./fixtures/fallbackSessions.js";
 
 const { invoke } = window.__TAURI__.core;
 const listenRuntimeEvent = window.__TAURI__?.event?.listen?.bind(window.__TAURI__.event);
@@ -211,25 +212,6 @@ const runtimeStateClasses = {
 
 const executingSessionStates = new Set([0, 2, 3, 4]);
 
-const fallbackSessions = {
-  hermes: {
-    events: [
-      { type: "state", state: 0, contentKey: "fallback.hermes.stateStart" },
-      { type: "thought", state: 2, contentKey: "fallback.hermes.thought" },
-      { type: "response", state: 4, contentKey: "fallback.hermes.response" },
-      { type: "state", state: 5, contentKey: "fallback.hermes.stateDone" },
-    ],
-  },
-  trae: {
-    events: [
-      { type: "state", state: 0, contentKey: "fallback.trae.stateStart" },
-      { type: "thought", state: 2, contentKey: "fallback.trae.thought" },
-      { type: "response", state: 4, contentKey: "fallback.trae.response" },
-      { type: "state", state: 5, contentKey: "fallback.trae.stateDone" },
-    ],
-  },
-};
-
 const LEGACY_TARGET_AGENT_KEY = "lunaagentos.currentTargetAgentId";
 const CURRENT_TARGET_AGENT_KEY = "lunaagentos.currentTargetId";
 const CURRENT_SESSION_KEY = "lunaagentos.currentSessionId";
@@ -238,7 +220,6 @@ const THEME_KEY = "lunaagentos.theme";
 const PROVIDER_COLLAPSE_KEY = "lunaagentos.providerCollapsedIds";
 const HISTORY_SCHEMA_VERSION = 5;
 const STREAM_CARD_RENDER_INTERVAL_MS = 100;
-const DEFAULT_HERMES_AGENT_ID = "hermes-wsl:profile:default";
 const PROVIDER_AVAILABILITY_STATES = {
   probing: { state: 0, key: "provider.probing" },
   available: { state: 1, key: "provider.available" },
@@ -311,7 +292,7 @@ const confirmDialog = document.getElementById("confirmDialog");
 
 localStorage.removeItem(CURRENT_SESSION_KEY);
 
-let currentTargetAgentId = localStorage.getItem(CURRENT_TARGET_AGENT_KEY) || localStorage.getItem(LEGACY_TARGET_AGENT_KEY) || "claude-main";
+let currentTargetAgentId = localStorage.getItem(CURRENT_TARGET_AGENT_KEY) || localStorage.getItem(LEGACY_TARGET_AGENT_KEY) || null;
 const providersStore = createProvidersStore();
 const sessionsStore = createSessionsStore();
 const sessionRuntimeStateModel = createSessionRuntimeState({ sessionsStore });
@@ -440,14 +421,14 @@ function targetDisplayName(target) {
   if (!target) return "";
   const provider = providerById(target.providerId);
   const providerName = target.providerName || provider?.name || "";
-  if (target.providerId === "hermes" && target.kind === "profile") {
+  if (target.kind === "profile") {
     return `${providerName}${target.runtimeLabel ? ` · ${target.runtimeLabel}` : ""} / ${displayAgentName(target)}`;
   }
   return target.name || providerName || displayAgentName(target);
 }
 
 function targetSendBlockNotice(target) {
-  const targetName = targetDisplayName(target) || displayAgentName(target) || "Hermes";
+  const targetName = targetDisplayName(target) || displayAgentName(target) || target?.providerName || "Agent";
   if (isStoppedHermesTarget(target)) {
     return t("composer.blockStoppedTarget", { target: targetName });
   }
@@ -462,20 +443,11 @@ function renderSessionIdentityTitle(session) {
   const parts = normalizedSessionTitleParts(session, providersSnapshot());
   const provider = providerById(session.providerId);
   const icon = renderProviderIcon(provider || { id: session.providerId, name: parts.providerName });
-  if (session.providerId === "hermes") {
-    return [
-      `<span class="session-title-provider">${icon}${escapeHtml(parts.providerName)}</span>`,
-      parts.runtimeLabel ? `<span class="session-title-runtime">${escapeHtml(parts.runtimeLabel)}</span>` : "",
-      parts.targetName ? `<span class="session-title-target">${escapeHtml(parts.targetName)}</span>` : "",
-    ].filter(Boolean).join("");
-  }
-  if (session.providerId === "claude") {
-    return [
-      `<span class="session-title-provider">${icon}${escapeHtml(parts.providerName)}</span>`,
-      parts.runtimeLabel ? `<span class="session-title-runtime">${escapeHtml(parts.runtimeLabel)}</span>` : "",
-    ].filter(Boolean).join("");
-  }
-  return `<span class="session-title-provider">${icon}${escapeHtml(parts.providerName)}</span>`;
+  return [
+    `<span class="session-title-provider">${icon}${escapeHtml(parts.providerName)}</span>`,
+    parts.runtimeLabel ? `<span class="session-title-runtime">${escapeHtml(parts.runtimeLabel)}</span>` : "",
+    parts.targetName ? `<span class="session-title-target">${escapeHtml(parts.targetName)}</span>` : "",
+  ].filter(Boolean).join("");
 }
 
 function targetsForRuntimeInstance(instance) {
@@ -519,20 +491,15 @@ function targetsForProvider(providerId) {
 function compactTargetSubtitle(target) {
   if (!target) return "";
   const parts = [];
-  if (target.providerId === "hermes") {
-    if (target.gateway === "running") parts.push(t("availability.gatewayRunning"));
-    else if (target.gateway) parts.push(t("availability.gatewayStopped"));
-    else if (target.model) parts.push(target.model);
-  }
+  if (target.gateway === "running") parts.push(t("availability.gatewayRunning"));
+  else if (target.gateway) parts.push(t("availability.gatewayStopped"));
+  else if (target.model) parts.push(target.model);
   return parts.filter(Boolean).join(" · ");
 }
 
 function providerMetaLabel(provider, targets, instances) {
-  if (provider.id === "hermes" && targets.length) {
-    return t("provider.profileCount", { count: targets.length });
-  }
   if (targets.length) {
-    return t("provider.targetCount", { count: targets.length });
+    return t(provider.targetCountKey || "provider.targetCount", { count: targets.length });
   }
   if (instances.length) {
     return t("provider.instanceCount", { count: instances.length });
@@ -548,16 +515,6 @@ function providerRuntimeMiniLabel(instances) {
 function ensureCurrentTargetAgentExists() {
   const currentTarget = agentById(currentTargetAgentId);
   if (currentTarget && isTargetSelectable(currentTarget)) return;
-  const defaultHermesTarget = agentById(DEFAULT_HERMES_AGENT_ID);
-  if (defaultHermesTarget && isTargetSendable(defaultHermesTarget)) {
-    saveCurrentTargetAgent(DEFAULT_HERMES_AGENT_ID);
-    return;
-  }
-  const claudeWinTarget = agentById("claude-win");
-  if (claudeWinTarget && isTargetSendable(claudeWinTarget)) {
-    saveCurrentTargetAgent("claude-win");
-    return;
-  }
   const fallbackAgent = allAgents().find(isTargetSendable);
   if (fallbackAgent) {
     saveCurrentTargetAgent(fallbackAgent.id);
@@ -1193,10 +1150,11 @@ function applyRuntimeTargetsForInstance(providerId, runtimeInstanceId, targets) 
   providersStore.batch(() => {
     providersStore.setRuntimeTargetsForInstance(runtimeInstanceId, targets);
     const count = providersStore.totalRuntimeTargetCount();
-    if (providerById(providerId) && count > 0) {
+    const provider = providerById(providerId);
+    if (provider?.loadedTargetsNoteKey && count > 0) {
       providersStore.setProviderNote(providerId, {
         note: null,
-        noteKey: "provider.hermes.loadedNote",
+        noteKey: provider.loadedTargetsNoteKey,
         noteParams: { count },
       });
     }
@@ -1254,15 +1212,12 @@ async function loadRuntimeTargetsForProvider(providerId, runtimeInstanceIds = nu
     ensureCurrentTargetAgentExists();
     renderProviders();
     renderWorkspace();
-    if (!loaded && providerId === "hermes") setAppNotice(t("provider.noHermesProfiles"));
+    const emptyNoticeKey = providerById(providerId)?.emptyTargetsNoticeKey;
+    if (!loaded && emptyNoticeKey) setAppNotice(t(emptyNoticeKey));
   } catch (error) {
     console.error(error);
     setAppNotice(t("provider.runtimeTargetLoadFailed", { error: formatBackendError(error) }), "error");
   }
-}
-
-async function loadHermesProfiles(runtimeInstanceIds = null) {
-  return loadRuntimeTargetsForProvider("hermes", runtimeInstanceIds);
 }
 
 // Agent Brief 与 Composer 共用同一条 Session 创建路径。
@@ -2055,7 +2010,7 @@ sessionExecutionController = createSessionExecutionController({
   getSession: (sessionId) => sessionsStore.getSession(sessionId),
   getAgent: agentById,
   getAdapterCapabilities: (providerId) => providerById(providerId)?.adapterManifest?.capabilities || {},
-  fallbackSessions,
+  fallbackSessions: FALLBACK_SESSIONS,
   acpRuntimeClient,
   sessionTurnState: sessionTurnStateModel,
   sessionRuntimeState: sessionRuntimeStateModel,
@@ -2220,7 +2175,12 @@ setTimeout(() => {
 }, 0);
 setTimeout(() => {
   refreshRuntimeProbe().then(() => {
-    if (availableRuntimeInstancesForProvider("hermes").length) void loadHermesProfiles();
+    const providerIds = [...new Set(runtimeInstancesSnapshot()
+      .filter((instance) => instance.available)
+      .map((instance) => instance.providerId))];
+    providerIds.forEach((providerId) => {
+      void loadRuntimeTargetsForProvider(providerId);
+    });
   });
 }, 0);
 
