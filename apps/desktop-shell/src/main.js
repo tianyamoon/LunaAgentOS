@@ -67,11 +67,6 @@ import {
   statusFromRuntimeStateCode,
 } from "./state/sessionStatus.js";
 import {
-  bindResumeValidationTurn,
-  clearResumeValidation,
-  isResumeValidationTurn,
-} from "./state/resumeValidation.js";
-import {
   canTargetStartSession,
   isStoppedHermesTarget,
   isTargetActivatable,
@@ -117,6 +112,7 @@ import {
 import { createWorkspaceSessionController } from "./controllers/workspaceSessionController.js";
 import { createSessionRestoreController } from "./controllers/sessionRestoreController.js";
 import { createSessionLifecycleController } from "./controllers/sessionLifecycleController.js";
+import { createSessionExecutionController } from "./controllers/sessionExecutionController.js";
 import {
   availableRuntimeInstancesForProvider as availableRuntimeInstancesForProviderRaw,
   providerRuntimeLabel as providerRuntimeLabelRaw,
@@ -387,11 +383,9 @@ const sessionTurnStateModel = createSessionTurnState({
 });
 const {
   appendRuntimeLog: appendRuntimeLogToSession,
-  appendStreamEvent: appendStreamEventToSessionTurn,
   createTurn: createSessionTurn,
   markPromptError: markPromptErrorOnTurn,
   markStopped: markSessionStopped,
-  updateTurnFromEvents: updateSessionTurnFromEvents,
 } = sessionTurnStateModel;
 const acpRuntimeClient = createAcpRuntimeClient({
   invoke,
@@ -418,10 +412,10 @@ const sessions = sessionsStore.getSessions();
 let workspaceSessionController = null;
 let sessionRestoreController = null;
 let sessionLifecycleController = null;
+let sessionExecutionController = null;
 let historyView = null;
 let workspaceView = null;
 let sessionSeq = 0;
-let runningSessions = 0;
 let sendAsNewSession = false;
 let sendMode = localStorage.getItem(SEND_MODE_KEY) || "enter";
 let fontScaleId = localStorage.getItem(FONT_SCALE_KEY) || "default";
@@ -2231,18 +2225,6 @@ function createTurn(session, task, options = {}) {
   return turn;
 }
 
-function prependHermesStartupNoticeIfNeeded(session, turn) {
-  if (session.providerId !== "hermes") return;
-  if (session.acpStartupNoticeShown || session.acpSessionId) return;
-  const profileName = session.profileName || session.agentName;
-  const message = `Hermes profile ${profileName} ${t("runtime.hermesStartupNotice")}`;
-  session.acpStartupNoticeShown = true;
-  if (!turn.logs.includes(message)) {
-    turn.logs = [message, ...turn.logs];
-  }
-}
-
-
 function getOrCreateActiveSession(task, forceNew = false) {
   const agent = currentTargetAgent();
   if (!agent) return null;
@@ -2250,55 +2232,6 @@ function getOrCreateActiveSession(task, forceNew = false) {
   if (existing && existing.agentId !== agent.id) return createSession(task);
   if (existing && !sessionsStore.isSessionActive(existing.id)) return createSession(task);
   return existing || createSession(task);
-}
-
-function updateTurnFromEvents(sessionId, turnId, events) {
-  const turn = updateSessionTurnFromEvents(sessionId, turnId, events);
-  if (!turn) return null;
-  renderWorkspace();
-  renderHistory();
-  return turn;
-}
-
-function appendStreamEventToTurn(sessionId, event) {
-  const result = appendStreamEventToSessionTurn(sessionId, event);
-  if (!result) return;
-  const { session, turn } = result;
-  const validatedByStream = turn.finalResponse
-    || event.type === "thought"
-    || event.type === "tool"
-    || event.type === "plan"
-    || turn.status === TURN_STATUS.waiting_confirmation
-    || turn.status === TURN_STATUS.completed;
-  if (isResumeValidationTurn(session, turn.id) && turn.status !== TURN_STATUS.failed && validatedByStream) {
-    clearResumeValidation(session);
-  }
-  scheduleSessionCardRender(session.id);
-}
-
-function appendErrorToTurn(sessionId, turnId, message) {
-  const session = sessions.find((item) => item.id === sessionId);
-  if (!session) return;
-  const turn = session.turns.find((item) => item.id === turnId);
-  if (!turn) return;
-  markPromptErrorOnTurn(session, turn, message);
-  renderWorkspace();
-  renderHistory();
-  setAppNotice(t("runtime.failed", { agent: session.agentName, message }), "error");
-}
-
-function rollbackResumeValidationPromptFailure(session, turn, message) {
-  sessionRestoreController?.rollbackFirstTurnPromptFailure(session, turn, message);
-}
-
-function localizedFallbackEvents(events) {
-  return events.map((event) => ({
-    ...event,
-    payload: {
-      ...(event.payload || {}),
-      content: event.contentKey ? t(event.contentKey) : event.payload?.content,
-    },
-  }));
 }
 
 function updateWorkspaceEmptyCopy() {
@@ -3263,97 +3196,37 @@ async function saveTurnToHistory(session, turn) {
   renderHistory();
 }
 
+// Session Execution Controller 接管 ACP、fallback、流式事件和错误落盘。
+sessionExecutionController = createSessionExecutionController({
+  getSession: (sessionId) => sessionsStore.getSession(sessionId),
+  getAgent: agentById,
+  getAdapterCapabilities: (providerId) => providerById(providerId)?.adapterManifest?.capabilities || {},
+  fallbackSessions,
+  acpRuntimeClient,
+  sessionTurnState: sessionTurnStateModel,
+  sessionRuntimeState: sessionRuntimeStateModel,
+  saveTurnToHistory,
+  rollbackFirstTurnPromptFailure: (session, turn, message) => (
+    sessionRestoreController?.rollbackFirstTurnPromptFailure(session, turn, message)
+  ),
+  refreshRuntimeTargets: loadRuntimeTargetsForProvider,
+  renderProviders,
+  renderWorkspace,
+  renderHistory,
+  scheduleSessionCardRender,
+  updateActionLabels,
+  formatBackendError,
+  setAppNotice,
+  t,
+  requestFrame: () => new Promise((resolve) => requestAnimationFrame(resolve)),
+});
+
 async function runFallbackSession(session, turn) {
-  const providerId = session.providerId;
-  const fallback = fallbackSessions[providerId];
-  if (!fallback) return;
-  runningSessions += 1;
-  updateActionLabels();
-  if (session.providerId === "hermes") {
-    turn.state = 2;
-    turn.status = TURN_STATUS.running;
-    session.state = 2;
-    prependHermesStartupNoticeIfNeeded(session, turn);
-    renderWorkspace();
-  }
-  setAppNotice(t("runtime.sentNotice", { agent: session.agentName }), "busy");
-  setRuntimeBinding(session, { state: RUNTIME_BINDING_STATE.connected, stage: RUNTIME_BINDING_STAGE.prompt });
-  try {
-    if (isSessionDeletedTombstone(session.id) || isSessionStoppedTombstone(session.id)) return;
-    const saved = updateTurnFromEvents(session.id, turn.id, localizedFallbackEvents(fallback.events));
-    if (isSessionDeletedTombstone(session.id) || isSessionStoppedTombstone(session.id)) return;
-    if (saved) {
-      clearRuntimeBindingError(session);
-      await saveTurnToHistory(session, saved);
-      setAppNotice(t("runtime.completedSaved", { agent: session.agentName }));
-    }
-  } catch (error) {
-    if (isSessionDeletedTombstone(session.id) || isSessionStoppedTombstone(session.id)) return;
-    appendErrorToTurn(session.id, turn.id, formatBackendError(error));
-    await saveTurnToHistory(session, turn);
-  } finally {
-    runningSessions = Math.max(0, runningSessions - 1);
-    updateActionLabels();
-  }
+  return sessionExecutionController?.runFallbackSession(session, turn);
 }
 
 async function startAcpSession(session, turn) {
-  if (!acpRuntimeClient.canHandle(session.providerId)) {
-    void runFallbackSession(session, turn);
-    return;
-  }
-  bindResumeValidationTurn(session, turn.id);
-  runningSessions += 1;
-  updateActionLabels();
-  if (session.providerId === "hermes") {
-    turn.state = 2;
-    turn.status = TURN_STATUS.running;
-    session.state = 2;
-    prependHermesStartupNoticeIfNeeded(session, turn);
-    renderWorkspace();
-  }
-  setAppNotice(t("runtime.sentNotice", { agent: session.agentName }), "busy");
-  setRuntimeBinding(session, { state: RUNTIME_BINDING_STATE.connected, stage: RUNTIME_BINDING_STAGE.prompt });
-  try {
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    const events = await acpRuntimeClient.prompt(session, turn);
-    if (isSessionDeletedTombstone(session.id) || isSessionStoppedTombstone(session.id)) return;
-    const saved = updateTurnFromEvents(session.id, turn.id, events);
-    if (isSessionDeletedTombstone(session.id) || isSessionStoppedTombstone(session.id)) return;
-    if (saved) {
-      const failedBeforeAnyOutput = saved.status === TURN_STATUS.failed && !saved.finalResponse && !saved.outputs?.length;
-      if (isResumeValidationTurn(session, turn.id) && failedBeforeAnyOutput) {
-        const message = saved.logs.at(0) || saved.finalResponse || t("runtime.promptFailedTitle", { agent: session.agentName });
-        rollbackResumeValidationPromptFailure(session, saved, message);
-        await saveTurnToHistory(session, saved);
-        return;
-      }
-      clearResumeValidation(session);
-      clearRuntimeBindingError(session);
-      const agent = agentById(session.agentId);
-      if (agent) {
-        agent.state = session.state;
-      }
-      renderProviders();
-      await saveTurnToHistory(session, saved);
-      if (session.providerId === "hermes") {
-        await loadHermesProfiles(session.runtimeInstanceId ? [session.runtimeInstanceId] : null);
-      }
-      setAppNotice(t("runtime.completedSaved", { agent: session.agentName }));
-    }
-  } catch (error) {
-    if (isSessionDeletedTombstone(session.id) || isSessionStoppedTombstone(session.id)) return;
-    const message = formatBackendError(error);
-    if (isResumeValidationTurn(session, turn.id)) {
-      rollbackResumeValidationPromptFailure(session, turn, message);
-    } else {
-      appendErrorToTurn(session.id, turn.id, message);
-    }
-    await saveTurnToHistory(session, turn);
-  } finally {
-    runningSessions = Math.max(0, runningSessions - 1);
-    updateActionLabels();
-  }
+  return sessionExecutionController?.startAcpSession(session, turn);
 }
 
 function startSessionFromPrompt(forceNewSession = false) {
@@ -3523,7 +3396,7 @@ if (listenRuntimeEvent) {
     const runtimeSessionId = payload?.payload?.runtimeSessionId;
     const event = payload?.payload?.event;
     if (!runtimeSessionId || !event) return;
-    appendStreamEventToTurn(runtimeSessionId, event);
+    sessionExecutionController?.appendStreamEvent(runtimeSessionId, event);
   }).catch((error) => {
     console.error(error);
   });

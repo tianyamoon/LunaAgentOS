@@ -1,0 +1,110 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { createSessionExecutionController } from "./sessionExecutionController.js";
+
+// 创建可观察执行副作用的控制器。
+function makeHarness({ prompt, capabilities = {}, fallbackSessions = {}, tombstoned = false } = {}) {
+  const session = { id: "s1", providerId: "demo", agentId: "a1", agentName: "Demo", turns: [] };
+  const turn = { id: "t1", task: "task", logs: [], outputs: [], finalResponse: "", status: "running" };
+  session.turns.push(turn);
+  const calls = [];
+  const controller = createSessionExecutionController({
+    getSession: () => session,
+    getAgent: () => ({}),
+    getAdapterCapabilities: () => capabilities,
+    fallbackSessions,
+    acpRuntimeClient: {
+      canHandle: () => true,
+      prompt: prompt || (async () => [{ type: "response", state: 5, payload: { content: "done" } }]),
+    },
+    sessionTurnState: {
+      updateTurnFromEvents: (_sessionId, _turnId, events) => {
+        const response = events.find((event) => event.type === "response");
+        turn.finalResponse = response?.payload?.content || "";
+        turn.outputs = turn.finalResponse ? [turn.finalResponse] : [];
+        turn.status = events.some((event) => event.state === 9) ? "failed" : "completed";
+        return turn;
+      },
+      appendStreamEvent: (_sessionId, event) => {
+        turn.status = event.type === "thought" ? "running" : turn.status;
+        return { session, turn };
+      },
+      markPromptError: (_session, _turn, message) => { turn.error = message; turn.status = "failed"; },
+    },
+    sessionRuntimeState: {
+      isSessionDeletedTombstone: () => tombstoned,
+      isSessionStoppedTombstone: () => false,
+      setRuntimeBinding: () => {},
+      clearRuntimeBindingError: () => {},
+    },
+    saveTurnToHistory: async () => calls.push("save"),
+    rollbackFirstTurnPromptFailure: (_session, _turn, message) => calls.push(`rollback:${message}`),
+    refreshRuntimeTargets: async () => calls.push("refresh"),
+    renderProviders: () => {},
+    renderWorkspace: () => {},
+    renderHistory: () => {},
+    scheduleSessionCardRender: () => calls.push("schedule"),
+    updateActionLabels: () => {},
+    formatBackendError: (error) => error.message,
+    setAppNotice: () => {},
+    t: (key) => key,
+  });
+  return { controller, session, turn, calls };
+}
+
+test("sessionExecutionController: ACP success saves turn", async () => {
+  const { controller, session, turn, calls } = makeHarness();
+  await controller.startAcpSession(session, turn);
+  assert.equal(turn.finalResponse, "done");
+  assert.equal(calls.includes("save"), true);
+});
+
+test("sessionExecutionController: ACP error is persisted", async () => {
+  const { controller, session, turn, calls } = makeHarness({ prompt: async () => { throw new Error("boom"); } });
+  await controller.startAcpSession(session, turn);
+  assert.equal(turn.error, "boom");
+  assert.equal(calls.includes("save"), true);
+});
+
+test("sessionExecutionController: stream event schedules card render", () => {
+  const { controller, calls } = makeHarness();
+  controller.appendStreamEvent("s1", { type: "thought", payload: { content: "x" } });
+  assert.equal(calls.includes("schedule"), true);
+});
+
+test("sessionExecutionController: manifest capability controls target refresh", async () => {
+  const { controller, session, turn, calls } = makeHarness({ capabilities: { refreshTargetsAfterPrompt: true } });
+  await controller.startAcpSession(session, turn);
+  assert.equal(calls.includes("refresh"), true);
+});
+
+test("sessionExecutionController: startup notice comes from manifest metadata", async () => {
+  const { controller, session, turn } = makeHarness({
+    capabilities: { startupNotice: { prefix: "Demo", identityField: "profileName", messageKey: "runtime.starting" } },
+  });
+  session.profileName = "default";
+  await controller.startAcpSession(session, turn);
+  assert.equal(turn.logs[0], "Demo default runtime.starting");
+});
+
+test("sessionExecutionController: fallback execution localizes and saves events", async () => {
+  const { controller, session, turn, calls } = makeHarness({
+    fallbackSessions: { demo: { events: [{ type: "response", state: 5, contentKey: "fallback.done" }] } },
+  });
+  await controller.runFallbackSession(session, turn);
+  assert.equal(turn.finalResponse, "fallback.done");
+  assert.equal(calls.includes("save"), true);
+});
+
+test("sessionExecutionController: restored first-turn error triggers rollback", async () => {
+  const { controller, session, turn, calls } = makeHarness({ prompt: async () => { throw new Error("boom"); } });
+  session.resume_validation = { phase: "pending", turn_id: null };
+  await controller.startAcpSession(session, turn);
+  assert.equal(calls.includes("rollback:boom"), true);
+});
+
+test("sessionExecutionController: tombstoned session ignores late ACP result", async () => {
+  const { controller, session, turn, calls } = makeHarness({ tombstoned: true });
+  await controller.startAcpSession(session, turn);
+  assert.equal(calls.includes("save"), false);
+});
