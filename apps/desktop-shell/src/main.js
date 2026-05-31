@@ -21,6 +21,7 @@ import {
   isAtBottom,
 } from "./ui/stickToBottom.js";
 import { createComposerController } from "./ui/composerController.js";
+import { createAgentFleetView } from "./ui/agentFleetView.js";
 import {
   sessionCardStats,
   sessionTurnVisibility,
@@ -368,6 +369,7 @@ let sessionLifecycleController = null;
 let sessionExecutionController = null;
 let sessionLaunchController = null;
 let composerController = null;
+let agentFleetView = null;
 let historyView = null;
 let workspaceView = null;
 let sendAsNewSession = false;
@@ -1575,121 +1577,9 @@ function runtimeConnectionNote(provider, instances) {
     .join(" / ");
 }
 
-function renderRuntimeTarget(target) {
-  const sendable = isTargetSendable(target);
-  const activatable = isTargetActivatable(target);
-  const selectable = sendable || activatable;
-  const selected = selectable && target.id === currentTargetAgentId;
-  const status = target.status || targetStatusForFleet(target);
-  const statusLabel = t(status.labelKey);
-  const subtitle = targetBriefText(target);
-  const name = displayAgentName(target);
-  const shouldShowRuntimeLabel = target.runtimeLabel && !name.includes(target.runtimeLabel);
-  const entryClass = selected ? "is-main-agent" : selectable ? "is-selectable" : "is-unavailable";
-  const disabledAttrs = selectable
-    ? ""
-    : ` aria-disabled="true" title="${escapeHtml(targetSendBlockNotice(target))}"`;
-  return `
-    <div class="agent-entry ${entryClass}" data-agent-id="${target.id}" data-sendable="${String(sendable)}" data-selectable="${String(selectable)}"${disabledAttrs}>
-      <div class="agent-entry-top">
-        <strong>${escapeHtml(name)}</strong>
-        <span class="agent-entry-meta">
-          <span class="target-status-dot ${escapeHtml(status.className)}" title="${escapeHtml(statusLabel)}" aria-label="${escapeHtml(statusLabel)}"></span>
-          ${shouldShowRuntimeLabel ? `<span class="target-runtime-label">${escapeHtml(target.runtimeLabel)}</span>` : ""}
-          <button type="button" class="agent-manage-btn" data-agent-id="${escapeHtml(target.id)}" title="${t("agentDetail.button")}" aria-label="${t("agentDetail.button")}">⚙</button>
-        </span>
-      </div>
-      ${subtitle ? `<div class="agent-entry-sub">${escapeHtml(subtitle)}</div>` : ""}
-    </div>
-  `;
-}
-
+// Shell 只保留重绘入口，具体 Fleet HTML 与点击绑定由视图模块负责。
 function renderProviders() {
-  ensureCurrentTargetAgentExists();
-  agentList.innerHTML = "";
-
-  providersSnapshot().forEach((provider) => {
-    const group = document.createElement("section");
-    const availability = providerAvailability(provider.id);
-    const providerStatus = providerStatusForFleet(provider, availability);
-    const availabilityLabel = t(providerStatus.labelKey);
-    const instances = runtimeInstancesForProvider(provider.id);
-    const targets = targetsForProvider(provider.id);
-    const metaLabel = providerMetaLabel(provider, targets, instances);
-    const runtimeMiniLabel = providerRuntimeMiniLabel(instances);
-    const targetMarkup = targets.map(renderRuntimeTarget).join("");
-    const hasAvailableRuntime = instances.some((instance) => instance.available);
-    const emptyLabel = hasAvailableRuntime
-      ? t("provider.noTargets")
-      : provider.id === "hermes"
-        ? t("provider.noHermesRuntime")
-        : t("provider.noRuntime");
-    const collapsed = collapsedProviderIds.has(provider.id);
-    const collapseLabel = collapsed
-      ? t("provider.expand", { provider: provider.name })
-      : t("provider.collapse", { provider: provider.name });
-    group.className = `provider-group ${providerStatus.mutedCard ? "is-muted-status" : ""}`;
-    group.classList.toggle("is-collapsed", collapsed);
-
-    group.innerHTML = `
-      <div class="provider-header">
-        <button type="button" class="provider-collapse-btn" data-provider-id="${provider.id}" aria-expanded="${collapsed ? "false" : "true"}" aria-controls="provider-targets-${provider.id}" aria-label="${escapeHtml(collapseLabel)}" title="${escapeHtml(collapseLabel)}">
-          <span class="provider-collapse-caret" aria-hidden="true">▸</span>
-          <div class="provider-heading">
-            <div class="provider-title-row">
-              <strong>${renderProviderIcon(provider, { size: "13px" })}${provider.name}</strong>
-              <span class="provider-status-square ${providerStatus.className}" title="${escapeHtml(availabilityLabel)}" aria-label="${escapeHtml(availabilityLabel)}"></span>
-            </div>
-            <div class="provider-meta-row">
-              <span class="provider-count-badge">${escapeHtml(metaLabel)}</span>
-              ${runtimeMiniLabel ? `<span class="provider-runtime-mini">${escapeHtml(runtimeMiniLabel)}</span>` : ""}
-            </div>
-          </div>
-        </button>
-        <button type="button" class="mini-btn ghost-btn provider-manage-btn provider-connection-icon-btn" data-provider-id="${provider.id}" title="${t("common.manage")}" aria-label="${t("common.manage")}">⚙</button>
-      </div>
-      <div class="provider-targets" id="provider-targets-${provider.id}" ${collapsed ? "hidden" : ""}>
-        ${targetMarkup || `<div class="runtime-instance-empty">${emptyLabel}</div>`}
-      </div>
-    `;
-
-    agentList.appendChild(group);
-  });
-
-  agentList.querySelectorAll(".provider-collapse-btn").forEach((button) => {
-    button.addEventListener("click", () => {
-      toggleProviderCollapsed(button.dataset.providerId);
-    });
-  });
-
-  agentList.querySelectorAll(".provider-manage-btn").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.stopPropagation();
-      openProviderManager(button.dataset.providerId);
-    });
-  });
-
-  agentList.querySelectorAll(".agent-manage-btn").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.stopPropagation();
-      openAgentManager(button.dataset.agentId);
-    });
-  });
-
-  agentList.querySelectorAll(".agent-entry").forEach((entry) => {
-    entry.addEventListener("click", () => {
-      const agentId = entry.dataset.agentId;
-      if (!agentId) return;
-      const target = agentById(agentId);
-      if (entry.dataset.selectable === "false" || !isTargetSelectable(target)) {
-        setAppNotice(targetSendBlockNotice(target), "error");
-        return;
-      }
-      if (target.id === currentTargetAgentId) return;
-      setCurrentTargetAgent(agentId);
-    });
-  });
-
+  agentFleetView?.renderProviders();
 }
 
 function applyRuntimeTargetsForInstance(providerId, runtimeInstanceId, targets) {
@@ -2389,6 +2279,37 @@ function focusComposerInput() {
     }
   });
 }
+
+// Agent Fleet View 接管左侧列表 HTML 与点击绑定，Shell 只注入领域查询和命令。
+agentFleetView = createAgentFleetView({
+  agentList,
+  providersSnapshot,
+  ensureCurrentTargetAgentExists,
+  providerAvailability,
+  providerStatusForFleet,
+  runtimeInstancesForProvider,
+  targetsForProvider,
+  providerMetaLabel,
+  providerRuntimeMiniLabel,
+  renderProviderIcon,
+  targetBriefText,
+  displayAgentName,
+  targetStatusForFleet,
+  targetSendBlockNotice,
+  isTargetSendable,
+  isTargetActivatable,
+  isTargetSelectable,
+  agentById,
+  getCurrentTargetAgentId: () => currentTargetAgentId,
+  collapsedProviderIds,
+  toggleProviderCollapsed,
+  openProviderManager,
+  openAgentManager,
+  setCurrentTargetAgent,
+  setAppNotice,
+  t,
+  escapeHtml,
+});
 
 workspaceSessionController = createWorkspaceSessionController({
   getSession: (sessionId) => sessionsStore.getSession(sessionId),
