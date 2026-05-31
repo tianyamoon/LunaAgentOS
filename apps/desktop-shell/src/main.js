@@ -1,10 +1,7 @@
 ﻿import {
   closeStreamingMarkdown,
   escapeHtml,
-  hasMarkdownTable,
   isMarkdownTable,
-  normalizeLooseMarkdownTables,
-  normalizeRuntimeMarkdown,
   renderCodeFence,
   renderInlineMarkdown,
   renderMarkdownTable,
@@ -31,10 +28,21 @@ import {
   slashCommandsForProvider,
 } from "./ui/slashCommands.js";
 import {
+  DEFAULT_ATTACHMENT_LIMITS,
+  attachmentStatus,
+  buildPromptWithAttachments,
+  composerStats,
+  formatAttachmentBytes,
+  isLikelyTextAttachment,
+} from "./ui/composerAttachments.js";
+import {
   sessionCardStats,
   sessionTurnVisibility,
   turnResponseText,
 } from "./ui/sessionCardView.js";
+import { createHistoryView } from "./ui/historyView.js";
+import { createWorkspaceView } from "./ui/workspaceView.js";
+import { renderAssistantResponse as renderAssistantResponseView } from "./ui/assistantResponseView.js";
 import { turnEventsFromTurn } from "./ui/turnEvents.js";
 import { renderTurnEventItemHtml, renderTurnEventsHtml } from "./ui/turnEventsView.js";
 import { renderProviderIcon, setAdapterIconRegistry } from "./ui/providerIcon.js";
@@ -113,6 +121,8 @@ import {
 } from "./history/payload.js";
 import { createProvidersStore } from "./state/providersStore.js";
 import { createSessionsStore } from "./state/sessionsStore.js";
+import { createWorkspaceViewStore } from "./state/workspaceViewStore.js";
+import { createWorkspaceSessionController } from "./controllers/workspaceSessionController.js";
 import {
   availableRuntimeInstancesForProvider as availableRuntimeInstancesForProviderRaw,
   providerRuntimeLabel as providerRuntimeLabelRaw,
@@ -345,6 +355,11 @@ const historyList = document.getElementById("historyList");
 const appNotice = document.getElementById("appNotice");
 const promptBox = document.getElementById("promptBox");
 const composer = promptBox?.closest(".composer");
+const composerInputShell = document.getElementById("composerInputShell");
+const composerAttachmentTray = document.getElementById("composerAttachmentTray");
+const composerFileInput = document.getElementById("composerFileInput");
+const attachBtn = document.getElementById("attachBtn");
+const promptStats = document.getElementById("promptStats");
 const newSessionToggle = document.getElementById("newSessionToggle");
 const sendBtn = document.getElementById("sendBtn");
 const sendModeBtn = document.getElementById("sendModeBtn");
@@ -363,8 +378,12 @@ const runtimeInstances = providersStore.getRuntimeInstancesRef();
 const runtimeTargetsByInstance = providersStore.getRuntimeTargetsByInstanceRef();
 const slashCommandsByProvider = providersStore.getSlashCommandsByProviderRef();
 const sessionsStore = createSessionsStore();
+const workspaceViewStore = createWorkspaceViewStore();
 const sessions = sessionsStore.getSessionsRef();
 const activeSessionIds = sessionsStore.getActiveSessionIdsRef();
+let workspaceSessionController = null;
+let historyView = null;
+let workspaceView = null;
 let historyEntries = [];
 let sessionSeq = 0;
 let turnSeq = 0;
@@ -378,9 +397,6 @@ let runtimeConfigSnapshot = null;
 let agentBriefs = {};
 const deletedSessionIds = sessionsStore.getDeletedSessionIdsRef();
 const stoppedSessionIds = sessionsStore.getStoppedSessionIdsRef();
-const flowDetailOpenState = sessionsStore.getFlowDetailOpenStateRef();
-const collapsedTurnIds = sessionsStore.getCollapsedTurnIdsRef();
-const sessionLatestOnlyState = sessionsStore.getSessionLatestOnlyStateRef();
 const sessionListSectionOpenState = {
   active: true,
   archive: true,
@@ -399,6 +415,8 @@ let composerCommandMenuActiveIndex = 0;
 let composerCommandSearchQuery = "";
 let composerCommandSearchFocused = false;
 let slashCommandUsage = readSlashCommandUsage();
+let composerAttachmentSeq = 0;
+let composerAttachments = [];
 
 function allAgents() {
   const dynamicTargets = runtimeTargets();
@@ -836,19 +854,19 @@ function setSessionLifecycle(session, target) {
     setRuntimeBinding(session, { state: RUNTIME_BINDING_STATE.reconnecting, stage: RUNTIME_BINDING_STAGE.load });
   }
   if (isStoppedLifecycle(next)) {
-    if (session.id) stoppedSessionIds.add(session.id);
+    if (session.id) sessionsStore.markStopped(session.id);
   } else if (next !== LIFECYCLE.deleted) {
-    if (session.id) stoppedSessionIds.delete(session.id);
+    if (session.id) sessionsStore.unmarkStopped(session.id);
   }
   if (isDeletedLifecycle(next) && session.id) {
-    deletedSessionIds.add(session.id);
+    sessionsStore.markDeleted(session.id);
   }
   return next;
 }
 
 function markSessionDeletedTombstone(sessionId) {
   if (!sessionId) return;
-  deletedSessionIds.add(sessionId);
+  sessionsStore.markDeleted(sessionId);
 }
 
 function isSessionDeletedTombstone(sessionId) {
@@ -970,12 +988,17 @@ function openConfirmDialog({ title, message, confirmLabel = t("common.delete"), 
 function updateActionLabels() {
   const composingNewSession = isComposingNewSession();
   sendBtn.textContent = t("composer.send");
+  if (attachBtn) {
+    attachBtn.textContent = t("composer.attach");
+    attachBtn.title = t("composer.attachTitle");
+  }
   newSessionToggle.classList.toggle("is-active", composingNewSession);
   newSessionToggle.setAttribute("aria-pressed", String(composingNewSession));
   composer?.classList.toggle("is-new-session-mode", composingNewSession);
   composer?.classList.toggle("is-current-session-mode", !composingNewSession);
   updateComposerCommandHint();
   updatePromptPlaceholder();
+  updateComposerReadability();
 }
 
 function updatePromptPlaceholder() {
@@ -993,6 +1016,114 @@ function ensureComposerCommandHint() {
   composerCommandHint.setAttribute("aria-live", "polite");
   if (row) composer.insertBefore(composerCommandHint, row);
   else composer.prepend(composerCommandHint);
+}
+
+function updateComposerReadability() {
+  autoResizePromptBox();
+  updatePromptStats();
+  renderComposerAttachments();
+}
+
+function autoResizePromptBox() {
+  if (!promptBox) return;
+  promptBox.style.height = "auto";
+  const nextHeight = Math.min(Math.max(promptBox.scrollHeight, 92), Math.floor(window.innerHeight * 0.32));
+  promptBox.style.height = `${nextHeight}px`;
+}
+
+function updatePromptStats() {
+  if (!promptStats) return;
+  const stats = composerStats(promptBox.value);
+  promptStats.textContent = t("composer.stats", { chars: stats.chars, lines: stats.lines });
+}
+
+function attachmentStatusLabel(attachment) {
+  const status = attachmentStatus(attachment);
+  if (status === "ready") return t("composer.attachment.ready");
+  if (status === "error") return attachment.error || t("composer.attachment.unsupported");
+  return t("composer.attachment.metadataOnly");
+}
+
+function renderComposerAttachments() {
+  if (!composerAttachmentTray) return;
+  composerAttachmentTray.hidden = composerAttachments.length === 0;
+  if (!composerAttachments.length) {
+    composerAttachmentTray.innerHTML = "";
+    return;
+  }
+  composerAttachmentTray.innerHTML = composerAttachments.map((attachment) => {
+    const status = attachmentStatus(attachment);
+    const statusClass = status === "ready" ? "is-ready" : status === "error" ? "is-error" : "is-muted";
+    const size = attachment.sizeLabel || formatAttachmentBytes(attachment.size);
+    return `
+      <span class="composer-attachment-chip ${statusClass}" title="${escapeHtml(attachmentStatusLabel(attachment))}">
+        <span class="composer-attachment-name">${escapeHtml(attachment.name)}</span>
+        <span class="composer-attachment-meta">${escapeHtml(size)}</span>
+        <span class="composer-attachment-state">${escapeHtml(attachmentStatusLabel(attachment))}</span>
+        <button type="button" class="composer-attachment-remove" data-attachment-id="${escapeHtml(attachment.id)}" title="${escapeHtml(t("composer.attachment.remove", { name: attachment.name }))}" aria-label="${escapeHtml(t("composer.attachment.remove", { name: attachment.name }))}">${escapeHtml(t("composer.attachment.removeShort"))}</button>
+      </span>
+    `;
+  }).join("");
+  composerAttachmentTray.querySelectorAll(".composer-attachment-remove").forEach((button) => {
+    button.addEventListener("click", () => {
+      composerAttachments = composerAttachments.filter((item) => item.id !== button.dataset.attachmentId);
+      renderComposerAttachments();
+      promptBox.focus();
+    });
+  });
+}
+
+function clearComposerAttachments() {
+  composerAttachments = [];
+  renderComposerAttachments();
+}
+
+function readFileAsText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(String(reader.result || "")));
+    reader.addEventListener("error", () => reject(reader.error || new Error("read failed")));
+    reader.readAsText(file);
+  });
+}
+
+async function addComposerFiles(fileList) {
+  const files = [...(fileList || [])];
+  if (!files.length) return;
+  const availableSlots = DEFAULT_ATTACHMENT_LIMITS.maxFiles - composerAttachments.length;
+  const accepted = files.slice(0, Math.max(0, availableSlots));
+  if (files.length > accepted.length) {
+    setAppNotice(t("composer.attachment.limit", { count: DEFAULT_ATTACHMENT_LIMITS.maxFiles }), "error");
+  }
+  for (const file of accepted) {
+    const id = `attachment-${Date.now()}-${++composerAttachmentSeq}`;
+    const sizeLabel = formatAttachmentBytes(file.size);
+    const base = {
+      id,
+      name: file.name,
+      type: file.type || "",
+      size: file.size,
+      sizeLabel,
+      content: "",
+    };
+    if (!isLikelyTextAttachment(file)) {
+      composerAttachments.push({ ...base, error: t("composer.attachment.unsupported") });
+      continue;
+    }
+    try {
+      const raw = await readFileAsText(file);
+      const truncated = raw.length > DEFAULT_ATTACHMENT_LIMITS.maxCharsPerFile;
+      composerAttachments.push({
+        ...base,
+        content: truncated ? raw.slice(0, DEFAULT_ATTACHMENT_LIMITS.maxCharsPerFile) : raw,
+        truncated,
+      });
+    } catch {
+      composerAttachments.push({ ...base, error: t("composer.attachment.readFailed") });
+    }
+  }
+  renderComposerAttachments();
+  promptBox.focus();
 }
 
 function ensureComposerCommandMenu() {
@@ -1442,7 +1573,7 @@ async function fetchAgentBriefForTarget(target) {
   if (!session) throw new Error(t("agentBrief.autoUnsupported"));
   saveCurrentTargetAgent(target.id);
   saveCurrentSession(session.id);
-  stoppedSessionIds.delete(session.id);
+  sessionsStore.unmarkStopped(session.id);
   const turn = createTurn(session, prompt);
   closeConfirmDialog();
   renderProviders();
@@ -2188,7 +2319,6 @@ function createSessionForAgent(agent, firstTask) {
     runtime_binding: createRuntimeBinding(),
     turns: [],
     createdAt: new Date().toISOString(),
-    fullscreen: false,
     acpStartupNoticeShown: false,
     profileName: hermesProfile?.profileName || null,
     profileAlias: hermesProfile?.profileAlias || null,
@@ -2212,12 +2342,17 @@ function createSession(firstTask) {
   return createSessionForAgent(currentTargetAgent(), firstTask);
 }
 
-function createTurn(session, task) {
+function createTurn(session, task, options = {}) {
   turnSeq += 1;
   const hermesProfile = hermesProfileMetaFromSession(session);
+  const turnMeta = {
+    ...(hermesProfile ? { hermesProfile } : {}),
+    ...(options.attachments?.length ? { attachments: options.attachments } : {}),
+  };
   const turn = {
     id: `turn-${Date.now()}-${turnSeq}`,
     task,
+    runtimePrompt: options.runtimePrompt || task,
     state: 0,
     status: TURN_STATUS.created,
     thoughts: [],
@@ -2225,7 +2360,7 @@ function createTurn(session, task) {
     finalResponse: t("turn.initialResponse"),
     logs: [t("turn.initialLog")],
     createdAt: new Date().toISOString(),
-    meta: hermesProfile ? { hermesProfile } : {},
+    meta: turnMeta,
   };
   session.task = task;
   session.state = 2;
@@ -2345,7 +2480,7 @@ function appendRuntimeLogToSession(session, message, state = null) {
     turn.status = statusFromRuntimeStateCode(state, Boolean(turn.finalResponse));
     session.state = state;
   }
-  flowDetailOpenState.set(`${turn.id}:logs`, true);
+  sessionsStore.setFlowDetailOpen(`${turn.id}:logs`, true);
 }
 
 function localizedFallbackEvents(events) {
@@ -2416,82 +2551,23 @@ function renderWorkspaceStatus() {
 
 
 function isSessionLatestOnly(session) {
-  return sessionLatestOnlyState.get(session.id) ?? false;
+  return sessionsStore.isLatestOnly(session.id);
 }
 
 function toggleSessionLatestOnly(sessionId) {
   const session = sessions.find((item) => item.id === sessionId);
   if (!session) return;
-  sessionLatestOnlyState.set(sessionId, !isSessionLatestOnly(session));
+  sessionsStore.setLatestOnly(sessionId, !isSessionLatestOnly(session));
   renderWorkspace();
 }
 
-function shouldPreferPlainResponseView(text, phase = "final") {
-  const value = String(text || "");
-  if (!value.trim()) return false;
-  if (phase === "streaming") return false;
-  if (hasMarkdownTable(normalizeLooseMarkdownTables(normalizeRuntimeMarkdown(value)))) return false;
-  const lines = value.split(/\r?\n/);
-  const pipeCount = (value.match(/\|/g) || []).length;
-  const pipeLines = lines.filter((line) => (line.match(/\|/g) || []).length >= 3).length;
-  const densePipeLines = lines.filter((line) => (line.match(/\|/g) || []).length >= 6).length;
-  const longLines = lines.filter((line) => line.length > 180).length;
-  const hasReportHeading = /part\s*\d+|热榜|财务|成交额|涨跌幅|MA\d+|RSI|MACD/i.test(value);
-  return densePipeLines >= 1
-    || pipeLines >= 2
-    || longLines >= 1
-    || (pipeCount >= 4 && hasReportHeading)
-    || (value.length > 1200 && pipeCount >= 2);
-}
-
-function splitAssistantResponseForDisplay(text, phase = "final") {
-  const value = String(text || "");
-  if (phase === "streaming") return { prelude: "", body: value };
-  const match = value.match(/#{1,6}\s*Part\s*\d+[^\n]{0,80}/i);
-  if (!match || match.index == null || match.index < 120) return { prelude: "", body: value };
-  const prelude = value.slice(0, match.index).replace(/[-\s]+$/g, "").trim();
-  const body = value.slice(match.index).trim();
-  const looksLikeProcess = /我|需要|确认|检查|获取|查询|开始|写|todo|Now|Let me|I need/i.test(prelude);
-  if (!prelude || !body || !looksLikeProcess) return { prelude: "", body: value };
-  return { prelude, body };
-}
-
-function renderResponsePrelude(prelude) {
-  if (!prelude) return "";
-  return `
-    <details class="response-prelude-detail">
-      <summary>${t("report.prelude")}</summary>
-      <div class="terminal-pre">${escapeHtml(prelude)}</div>
-    </details>
-  `;
-}
-
 function renderAssistantResponse(text, phase = "final") {
-  const source = phase === "streaming" ? closeStreamingMarkdown(text) : text;
-  const display = splitAssistantResponseForDisplay(source, phase);
-  const preludeHtml = renderResponsePrelude(display.prelude);
-  if (!shouldPreferPlainResponseView(display.body, phase)) {
-    return `
-      <div class="runtime-output-view ${phase === "streaming" ? "is-streaming" : "is-final"}">
-        ${preludeHtml}
-        <div class="rich-text">${renderRichText(display.body)}</div>
-      </div>
-    `;
-  }
-  return `
-    ${preludeHtml}
-    <div class="plain-report-view">
-      <div class="plain-report-toolbar">
-        <span>${t("report.rawView")}</span>
-        <span class="caption">${t("report.rawHint")}</span>
-      </div>
-      <pre>${escapeHtml(display.body)}</pre>
-    </div>
-    <details class="rendered-report-detail">
-      <summary>${t("report.renderedView")}</summary>
-      <div class="rich-text">${renderRichText(display.body)}</div>
-    </details>
-  `;
+  return renderAssistantResponseView(text, phase, {
+    closeStreamingMarkdown,
+    escapeHtml,
+    renderRichText,
+    t,
+  });
 }
 
 function sessionTranscriptText(session) {
@@ -2527,18 +2603,19 @@ function detailKeysForSession(session) {
 function setSessionFlowDetails(sessionId, open) {
   const session = sessions.find((item) => item.id === sessionId);
   if (!session) return;
-  detailKeysForSession(session).forEach((key) => flowDetailOpenState.set(key, open));
+  sessionsStore.batch(() => {
+    detailKeysForSession(session).forEach((key) => sessionsStore.setFlowDetailOpen(key, open));
+  });
   renderWorkspace();
 }
 
 function areSessionFlowDetailsOpen(session) {
   const entries = flowDetailEntriesForSession(session);
-  return entries.length > 0 && entries.every(({ key, defaultOpen }) => flowDetailOpenState.get(key) ?? defaultOpen);
+  return entries.length > 0 && entries.every(({ key, defaultOpen }) => sessionsStore.getFlowDetailOpen(key, defaultOpen));
 }
 
 function detailOpenAttribute(key, defaultOpen) {
-  const stored = flowDetailOpenState.get(key);
-  return (stored ?? defaultOpen) ? "open" : "";
+  return sessionsStore.getFlowDetailOpen(key, defaultOpen) ? "open" : "";
 }
 
 function renderTurnCollapseIcon(collapsed) {
@@ -2596,22 +2673,22 @@ function turnCollapsedSummary(turn) {
 
 function toggleTurnCollapsed(turnId) {
   if (!turnId) return;
-  if (collapsedTurnIds.has(turnId)) collapsedTurnIds.delete(turnId);
-  else collapsedTurnIds.add(turnId);
+  sessionsStore.setTurnCollapsed(turnId, !sessionsStore.isTurnCollapsed(turnId));
   renderWorkspace();
 }
 
 function areSessionTurnsCollapsed(session) {
-  return session.turns.length > 0 && session.turns.every((turn) => collapsedTurnIds.has(turn.id));
+  return session.turns.length > 0 && session.turns.every((turn) => sessionsStore.isTurnCollapsed(turn.id));
 }
 
 function toggleSessionTurnsCollapsed(sessionId) {
   const session = sessions.find((item) => item.id === sessionId);
   if (!session) return;
   const shouldExpand = areSessionTurnsCollapsed(session);
-  session.turns.forEach((turn) => {
-    if (shouldExpand) collapsedTurnIds.delete(turn.id);
-    else collapsedTurnIds.add(turn.id);
+  sessionsStore.batch(() => {
+    session.turns.forEach((turn) => {
+      sessionsStore.setTurnCollapsed(turn.id, !shouldExpand);
+    });
   });
   renderWorkspace();
   setAppNotice(shouldExpand ? t("session.allTurnsExpanded") : t("session.allTurnsCollapsed"));
@@ -2649,7 +2726,7 @@ async function copyTextToClipboard(text) {
 }
 
 function isFlowDetailOpen(key, defaultOpen) {
-  return flowDetailOpenState.get(key) ?? defaultOpen;
+  return sessionsStore.getFlowDetailOpen(key, defaultOpen);
 }
 
 // 跟踪每个 turn 上一次 render 时的 streaming 状态，用于在 streaming → 终态切换时
@@ -2658,12 +2735,7 @@ const prevTurnStreamingById = new Map();
 
 function clearTurnDetailOpenState(turnId) {
   if (!turnId) return;
-  const prefix = `${turnId}:`;
-  const keysToDelete = [];
-  for (const key of flowDetailOpenState.keys()) {
-    if (typeof key === "string" && key.startsWith(prefix)) keysToDelete.push(key);
-  }
-  for (const key of keysToDelete) flowDetailOpenState.delete(key);
+  sessionsStore.clearFlowDetailOpenForTurn(turnId);
 }
 
 function renderTurn(turn, index) {
@@ -2682,7 +2754,7 @@ function renderTurn(turn, index) {
     clearTurnDetailOpenState(turn.id);
   }
   prevTurnStreamingById.set(turn.id, streaming);
-  const collapsed = collapsedTurnIds.has(turn.id);
+  const collapsed = sessionsStore.isTurnCollapsed(turn.id);
   const turnToggleLabel = collapsed ? t("action.expandTurn") : t("action.collapseTurn");
 
   const events = turnEventsFromTurn(turn, { translate: t, streaming });
@@ -2802,11 +2874,12 @@ function renderSessionCard(session) {
   const turnToggleLabel = turnsCollapsed ? t("action.expandAllTurns") : t("action.collapseAllTurns");
   const latestOnlyLabel = latestOnly ? t("action.showAllTurns") : t("action.latestOnly");
   const flowToggleLabel = flowsOpen ? t("action.collapseFlows") : t("action.expandFlows");
-  const fullscreenLabel = session.fullscreen ? t("action.exitFullscreen") : t("action.enterFullscreen");
+  const isFocusedSession = workspaceViewStore.getFocusedSessionId() === session.id;
+  const fullscreenLabel = isFocusedSession ? t("action.exitFullscreen") : t("action.enterFullscreen");
   const identityTitle = sessionIdentityTitle(identitySession);
   const identityTitleMarkup = renderSessionIdentityTitle(identitySession);
   return `
-    <article class="session-card ${session.fullscreen ? "fullscreen" : ""} ${isActiveReceiver ? "is-active-receiver" : ""} ${isWaiting ? "is-waiting" : ""}" data-session-id="${session.id}" tabindex="0" aria-label="${escapeHtml(t("session.ariaSwitch", { task: session.task }))}" ${isActiveReceiver ? "aria-current=\"true\"" : ""}>
+    <article class="session-card ${isFocusedSession ? "fullscreen" : ""} ${isActiveReceiver ? "is-active-receiver" : ""} ${isWaiting ? "is-waiting" : ""}" data-session-id="${session.id}" tabindex="0" aria-label="${escapeHtml(t("session.ariaSwitch", { task: session.task }))}" ${isActiveReceiver ? "aria-current=\"true\"" : ""}>
       <div class="session-card-header">
         <div class="session-card-row session-card-identity-line">
           <div class="session-agent-title">
@@ -2820,7 +2893,7 @@ function renderSessionCard(session) {
               <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-latest-only-btn ${latestOnly ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${latestOnly ? "true" : "false"}" title="${latestOnlyLabel}" aria-label="${latestOnlyLabel}" ${session.turns.length > 1 ? "" : "disabled"}>${renderSessionActionIcon(latestOnly ? "all" : "latest")}</button>
               <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-toggle-flows-btn ${flowsOpen ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${flowsOpen ? "true" : "false"}" title="${flowToggleLabel}" aria-label="${flowToggleLabel}" ${hasFlowDetails ? "" : "disabled"}>${renderSessionActionIcon(flowsOpen ? "collapse" : "expand")}</button>
               <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-scroll-latest-btn" data-session-id="${session.id}" title="${t("action.scrollLatest")}" aria-label="${t("action.scrollLatest")}">${renderSessionActionIcon("latestScroll")}</button>
-              <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-fullscreen-btn ${session.fullscreen ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${session.fullscreen ? "true" : "false"}" title="${fullscreenLabel}" aria-label="${fullscreenLabel}">${renderSessionActionIcon(session.fullscreen ? "fullscreenExit" : "fullscreen")}</button>
+              <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-fullscreen-btn ${isFocusedSession ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${isFocusedSession ? "true" : "false"}" title="${fullscreenLabel}" aria-label="${fullscreenLabel}">${renderSessionActionIcon(isFocusedSession ? "fullscreenExit" : "fullscreen")}</button>
             </div>
             <div class="session-management-group" role="group">
               <button type="button" class="mini-btn ghost-btn session-action-btn session-dismiss-btn" data-session-id="${session.id}" title="${t("action.dismiss")}${managementTitleSuffix}" aria-label="${t("action.dismiss")}" ${managementDisabled}>${renderSessionActionIcon("dismiss")}</button>
@@ -2854,28 +2927,11 @@ function renderSessionCard(session) {
 }
 
 function focusSessionInWorkspace(sessionId) {
-  let changed = false;
-  sessions.forEach((session) => {
-    const shouldBeFocused = session.id === sessionId;
-    if (Boolean(session.fullscreen) !== shouldBeFocused) {
-      session.fullscreen = shouldBeFocused;
-      changed = true;
-    }
-  });
-  if (!changed) return false;
-  renderWorkspace();
-  return true;
+  return workspaceSessionController?.focusSessionInWorkspace(sessionId) || false;
 }
 
 function toggleSessionFocus(sessionId) {
-  const session = sessions.find((item) => item.id === sessionId);
-  if (!session) return;
-  if (session.fullscreen) {
-    session.fullscreen = false;
-    renderWorkspace();
-    return;
-  }
-  focusSessionInWorkspace(sessionId);
+  workspaceSessionController?.toggleSessionFocus(sessionId);
 }
 
 function renderSessionMiniCard(session) {
@@ -2898,14 +2954,7 @@ function renderSessionMiniCard(session) {
 }
 
 function exitFullscreenSessions() {
-  const fullscreenSessions = sessions.filter((session) => session.fullscreen);
-  if (!fullscreenSessions.length) return false;
-  fullscreenSessions.forEach((session) => {
-    session.fullscreen = false;
-  });
-  renderWorkspace();
-  setAppNotice(t("session.exitFullscreenNotice"));
-  return true;
+  return workspaceSessionController?.exitFullscreenSessions() || false;
 }
 
 function bindSessionActions(root = sessionDeck) {
@@ -2956,7 +3005,7 @@ function bindSessionActions(root = sessionDeck) {
     .querySelectorAll(".terminal-detail[data-detail-key], .turn-event-thinking-shell[data-detail-key]")
     .forEach((detail) => {
       detail.addEventListener("toggle", () => {
-        flowDetailOpenState.set(detail.dataset.detailKey, detail.open);
+        sessionsStore.setFlowDetailOpen(detail.dataset.detailKey, detail.open);
       });
     });
   actionRoot.querySelectorAll(".session-scroll-latest-btn").forEach((button) => {
@@ -3036,23 +3085,8 @@ function bindSessionActions(root = sessionDeck) {
 }
 
 function activateWorkspaceSession(sessionId, options = {}) {
-  const session = sessions.find((item) => item.id === sessionId);
-  if (!session) return;
-  saveCurrentTargetAgent(session.agentId);
-  saveCurrentSession(session.id);
-  sendAsNewSession = false;
-  if (canSendToSession(session)) markSessionActive(session.id);
-  updateActionLabels();
-  renderProviders();
-  renderWorkspace({ focusSessionId: options.focusWorkspace ? session.id : null });
-  renderHistory({ scrollSessionId: session.id });
-  const runtimeState = sessionRuntimeState(session);
-  setAppNotice(canSendToSession(session)
-    ? t("session.activated", { task: session.task })
-    : runtimeState === "restoring"
-      ? t("session.restoringFocused")
-      : t("session.readOnlySwitchBlocked"));
-  focusComposerInput();
+  const activated = workspaceSessionController?.activateWorkspaceSession(sessionId, options);
+  if (activated) sendAsNewSession = false;
 }
 
 function focusComposerInput() {
@@ -3070,6 +3104,69 @@ function focusComposerInput() {
     }
   });
 }
+
+workspaceSessionController = createWorkspaceSessionController({
+  sessions,
+  workspaceViewStore,
+  saveCurrentTargetAgent,
+  saveCurrentSession,
+  canSendToSession,
+  markSessionActive,
+  updateActionLabels,
+  renderProviders,
+  renderWorkspace,
+  renderHistory,
+  sessionRuntimeState,
+  setAppNotice,
+  focusComposerInput,
+  t,
+});
+
+historyView = createHistoryView({
+  historyList,
+  sessionListSectionOpenState,
+  sessionListItems,
+  isHistoryLoading: () => isHistoryLoading,
+  isActiveSessionListItem,
+  isArchivedSessionListItem,
+  compareActiveSessionListItems,
+  compareArchivedSessionListItems,
+  ensureSessionStatusShape,
+  resolveSessionCardStatusView,
+  CARD_STATUS,
+  canSendToSession,
+  sessionsStore,
+  t,
+  escapeHtml,
+  renderProviderIcon,
+  providerById,
+  renderSessionActionIcon,
+  formatTime,
+  sessions,
+  requestDeleteConfirmation,
+  restoreArchivedSession,
+  activateWorkspaceSession,
+  openArchivedTranscript,
+});
+
+workspaceView = createWorkspaceView({
+  sessionDeck,
+  workspaceEmpty,
+  sessions,
+  workspaceViewStore,
+  updatePromptPlaceholder,
+  renderWorkspaceStatus,
+  updateWorkspaceEmptyCopy,
+  renderSessionCard,
+  renderSessionMiniCard,
+  bindSessionActions,
+  renderMermaidDiagrams,
+  sampleSessionStickyIntent,
+  syncSessionStickControllers,
+  getCurrentSessionId: () => sessionsStore.getCurrentSessionId(),
+  t,
+  escapeHtml,
+});
 
 async function shutdownRuntimeSession(session) {
   const commands = acpCommandsForProvider(session.providerId);
@@ -3260,59 +3357,7 @@ function requestDeleteConfirmation(sessionId) {
 }
 
 function renderWorkspace(options = {}) {
-  const focusSessionId = options.focusSessionId || null;
-  const preserveDeckScroll = options.preserveDeckScroll === true;
-  const deckScrollLeft = sessionDeck.scrollLeft;
-  const deckScrollTop = sessionDeck.scrollTop;
-  const stickyIntent = sampleSessionStickyIntent();
-  const workspaceSessions = sessions.filter((session) => session.inWorkspace !== false);
-  const visibleSessions = [...workspaceSessions].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
-  updatePromptPlaceholder();
-  renderWorkspaceStatus();
-  workspaceEmpty.style.display = visibleSessions.length ? "none" : "flex";
-  if (!visibleSessions.length) updateWorkspaceEmptyCopy();
-  sessionDeck.classList.toggle("is-single-session", visibleSessions.length === 1);
-  sessionDeck.classList.toggle("is-two-sessions", visibleSessions.length === 2);
-  sessionDeck.classList.toggle("is-many-sessions", visibleSessions.length > 2);
-  const explicitFocusSession = visibleSessions.find((session) => session.fullscreen);
-  const focusedSession = explicitFocusSession || (visibleSessions.length === 1 ? visibleSessions[0] : null);
-  sessionDeck.classList.toggle("is-focused", Boolean(focusedSession));
-  sessionDeck.classList.toggle("is-implicit-focused", Boolean(focusedSession && !explicitFocusSession));
-  if (focusedSession) {
-    sessionDeck.innerHTML = `
-      ${renderSessionCard(focusedSession)}
-      ${visibleSessions.length > 1
-        ? `<div class="session-mini-bar" role="region" aria-label="${escapeHtml(t("session.miniBarAria"))}">
-            ${visibleSessions.map((session) => renderSessionMiniCard(session)).join("")}
-          </div>`
-        : ""}
-    `;
-  } else {
-    sessionDeck.innerHTML = visibleSessions.map(renderSessionCard).join("");
-  }
-  bindSessionActions();
-  renderMermaidDiagrams(sessionDeck).catch((error) => console.error(error));
-  requestAnimationFrame(() => {
-    const focusedSessionId = sessionsStore.getCurrentSessionId();
-    const activeCard = focusedSessionId
-      ? sessionDeck.querySelector(`.session-card[data-session-id="${focusedSessionId}"]`)
-      : null;
-    if (!preserveDeckScroll) {
-      activeCard?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
-    } else {
-      sessionDeck.scrollLeft = deckScrollLeft;
-      sessionDeck.scrollTop = deckScrollTop;
-    }
-    const focusCard = focusSessionId
-      ? sessionDeck.querySelector(`.session-card[data-session-id="${focusSessionId}"]`)
-      : null;
-    focusCard?.focus({ preventScroll: true });
-    syncSessionStickControllers(visibleSessions, stickyIntent);
-    if (preserveDeckScroll) {
-      sessionDeck.scrollLeft = deckScrollLeft;
-      sessionDeck.scrollTop = deckScrollTop;
-    }
-  });
+  workspaceView?.renderWorkspace(options);
 }
 
 function sampleSessionStickyIntent() {
@@ -3460,132 +3505,7 @@ function sessionListItems() {
 }
 
 function renderHistory(options = {}) {
-  const scrollSessionId = options.scrollSessionId || null;
-  if (isHistoryLoading) {
-    historyList.innerHTML = `
-      <div class="history-empty">
-        <strong>${t("history.loadingTitle")}</strong>
-        <p>${t("history.loadingText")}</p>
-      </div>
-    `;
-    return;
-  }
-
-  const sessionItems = sessionListItems();
-  const activeItems = sessionItems.filter(isActiveSessionListItem).sort(compareActiveSessionListItems);
-  const archivedItems = sessionItems.filter(isArchivedSessionListItem).sort(compareArchivedSessionListItems);
-  if (!sessionItems.length) {
-    historyList.innerHTML = `
-      <div class="history-empty">
-        <strong>${t("history.emptyTitle")}</strong>
-        <p>${t("history.emptyText")}</p>
-      </div>
-    `;
-    return;
-  }
-
-  historyList.innerHTML = `
-    ${renderSessionListSection("active", t("history.activeTitle"), t("history.activeNote"), activeItems, t("history.activeEmpty"))}
-    ${renderSessionListSection("archive", t("history.archiveTitle"), t("history.archiveNote"), archivedItems, t("history.archiveEmpty"))}
-  `;
-  bindSessionListActions();
-  if (scrollSessionId) {
-    requestAnimationFrame(() => {
-      const activeItem = historyList.querySelector(`.history-item[data-session-id="${scrollSessionId}"]`);
-      activeItem?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    });
-  }
-}
-
-function renderSessionListSection(sectionId, title, note, items, emptyText) {
-  return `
-    <details class="history-section" data-history-section="${sectionId}" ${sessionListSectionOpenState[sectionId] ? "open" : ""}>
-      <summary class="history-section-summary">
-        <span class="history-section-label">
-          <span class="history-section-caret">▸</span>
-          <span>
-            <strong>${title}</strong>
-            <span class="history-section-note">${note}</span>
-          </span>
-        </span>
-        <span class="history-section-count">${items.length}</span>
-      </summary>
-      ${items.length
-        ? `<div class="history-group-list">${items.map(renderSessionListItem).join("")}</div>`
-        : `<p class="history-section-empty">${emptyText}</p>`}
-    </details>
-  `;
-}
-
-function renderSessionListItem(item) {
-  ensureSessionStatusShape(item);
-  const statusView = resolveSessionCardStatusView(item, { translate: t });
-  const isActiveHistoryItem = sessionsStore.getCurrentSessionId() === item.id;
-  const isArchived = isArchivedSessionListItem(item);
-  const isFailedOrBlocked = statusView.status === CARD_STATUS.blocked || statusView.status === CARD_STATUS.failed;
-  const isSendable = canSendToSession(item);
-  let signalClass;
-  let signalLabel;
-  if (isFailedOrBlocked) {
-    signalClass = "signal-failed";
-    signalLabel = statusView.label;
-  } else if (isSendable) {
-    signalClass = "signal-active";
-    signalLabel = t("history.signal.live");
-  } else {
-    signalClass = "signal-archive";
-    signalLabel = statusView.label;
-  }
-  const listStateClass = isArchived ? "is-archive" : "is-active-history";
-  return `
-    <article class="history-item ${listStateClass} ${isActiveHistoryItem ? "is-active-session" : ""}" data-session-id="${item.id}" data-agent-id="${item.agentId || ""}" ${isActiveHistoryItem ? "aria-current=\"true\"" : ""}>
-      <div class="history-item-top">
-        <strong class="history-tool-name"><span class="history-signal ${signalClass}" title="${escapeHtml(signalLabel)}" aria-label="${escapeHtml(signalLabel)}"></span>${renderProviderIcon(providerById(item.providerId) || { id: item.providerId, name: item.providerName })}${escapeHtml(item.providerName)}</strong>
-        <div class="history-item-actions">
-          <span class="history-state-pill session-status-${escapeHtml(statusView.tone)} session-status-${escapeHtml(statusView.status)}">${escapeHtml(statusView.label)}</span>
-          <button type="button" class="history-delete-btn" data-session-id="${item.id}" title="${t("history.delete")}" aria-label="${t("history.delete")}">${renderSessionActionIcon("delete")}</button>
-        </div>
-      </div>
-      <div class="history-item-meta">
-        <span>${escapeHtml(item.agentName)}</span>
-        <time>${escapeHtml(item.updatedAt.slice(5, 10))} ${formatTime(item.updatedAt)}</time>
-      </div>
-      <p class="history-task-title">${escapeHtml(item.title)}</p>
-    </article>
-  `;
-}
-
-function bindSessionListActions() {
-  historyList.querySelectorAll(".history-section").forEach((section) => {
-    section.addEventListener("toggle", () => {
-      sessionListSectionOpenState[section.dataset.historySection] = section.open;
-    });
-  });
-  historyList.querySelectorAll(".history-delete-btn").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.stopPropagation();
-      requestDeleteConfirmation(button.dataset.sessionId);
-    });
-  });
-  historyList.querySelectorAll(".history-item.is-active-history").forEach((item) => {
-    item.addEventListener("click", () => {
-      const sessionId = item.dataset.sessionId;
-      const existing = sessions.find((entry) => entry.id === sessionId);
-      if (!existing) {
-        restoreArchivedSession(sessionId);
-        return;
-      }
-      // Session is in the store but might have been dismissed from the workspace.
-      // Re-attach it to the workspace display before activating so the card actually shows up.
-      if (existing.inWorkspace === false) existing.inWorkspace = true;
-      activateWorkspaceSession(sessionId, { focusWorkspace: true });
-    });
-  });
-  historyList.querySelectorAll(".history-item.is-archive").forEach((item) => {
-    item.addEventListener("click", () => {
-      openArchivedTranscript(item.dataset.sessionId);
-    });
-  });
+  historyView?.renderHistory(options);
 }
 
 function ensureArchivedAgent(archived) {
@@ -3653,7 +3573,6 @@ function workspaceSessionFromArchived(archived, existing = null) {
     state: 5,
     turns: archived.turns,
     createdAt: archived.createdAt,
-    fullscreen: false,
     acpSessionId: archived.acpSessionId,
     lifecycle: LIFECYCLE.archived,
     runtimeState: LIFECYCLE.archived,
@@ -3938,7 +3857,7 @@ async function startAcpSession(session, turn) {
     await new Promise((resolve) => requestAnimationFrame(resolve));
     const events = await invoke(commands.prompt, acpInvokeArgs(commands, session.providerId, {
       runtimeSessionId: session.id,
-      prompt: turn.task,
+      prompt: turn.runtimePrompt || turn.task,
       cwd: null,
       runtimeHost: session.runtimeHost || null,
       runtimeCommand: session.runtimeCommand || null,
@@ -4020,9 +3939,21 @@ function startSessionFromPrompt(forceNewSession = false) {
   const session = getOrCreateActiveSession(task, composingNewSession);
   if (!session) return;
   saveCurrentSession(session.id);
-  stoppedSessionIds.delete(session.id);
-  const turn = createTurn(session, task);
+  sessionsStore.unmarkStopped(session.id);
+  const attachmentMeta = composerAttachments.map((attachment) => ({
+    name: attachment.name,
+    type: attachment.type,
+    size: attachment.size,
+    status: attachmentStatus(attachment),
+    truncated: Boolean(attachment.truncated),
+  }));
+  const runtimePrompt = buildPromptWithAttachments(task, composerAttachments, {
+    title: t("composer.attachment.promptTitle"),
+    truncated: t("composer.attachment.truncated"),
+  });
+  const turn = createTurn(session, task, { runtimePrompt, attachments: attachmentMeta });
   promptBox.value = "";
+  clearComposerAttachments();
   sendAsNewSession = false;
   updateActionLabels();
   if (isTargetActivatable(agent)) {
@@ -4047,6 +3978,32 @@ sendBtn.addEventListener("click", () => {
 
 sendModeBtn?.addEventListener("click", () => {
   toggleSendMode();
+});
+
+attachBtn?.addEventListener("click", () => {
+  composerFileInput?.click();
+});
+
+composerFileInput?.addEventListener("change", () => {
+  void addComposerFiles(composerFileInput.files);
+  composerFileInput.value = "";
+});
+
+composerInputShell?.addEventListener("dragover", (event) => {
+  if (!event.dataTransfer?.files?.length) return;
+  event.preventDefault();
+  composerInputShell.classList.add("is-drag-over");
+});
+
+composerInputShell?.addEventListener("dragleave", () => {
+  composerInputShell.classList.remove("is-drag-over");
+});
+
+composerInputShell?.addEventListener("drop", (event) => {
+  if (!event.dataTransfer?.files?.length) return;
+  event.preventDefault();
+  composerInputShell.classList.remove("is-drag-over");
+  void addComposerFiles(event.dataTransfer.files);
 });
 
 fontScaleBtn?.addEventListener("click", () => {
@@ -4075,6 +4032,7 @@ promptBox.addEventListener("keydown", (event) => {
 promptBox.addEventListener("input", () => {
   composerCommandSearchFocused = false;
   updateComposerCommandHint();
+  updateComposerReadability();
 });
 
 document.addEventListener("pointerdown", (event) => {
@@ -4123,6 +4081,7 @@ applyFontScale();
 applyTheme();
 void loadUserThemes();
 updateSendModeLabel();
+workspaceViewStore.hydrateFromSessions(sessions);
 renderWorkspace();
 renderHistory();
 updateActionLabels();
@@ -4176,7 +4135,7 @@ async function syncRuntimeAliveStates() {
           error_detail: t("runtime.aliveExited"),
           error_suggestion: t("runtime.aliveExitedSuggestion"),
         });
-        activeSessionIds.delete(session.id);
+        sessionsStore.markInactive(session.id);
         mutated = true;
       }
     });

@@ -53,10 +53,19 @@
 
           <div class="composer">
             <div class="composer-row">
-              <textarea id="promptBox" rows="4" placeholder="输入发送给当前目标的任务。"></textarea>
+              <div id="composerInputShell" class="composer-input-shell">
+                <textarea id="promptBox" rows="4" placeholder="输入发送给当前目标的任务。" spellcheck="true"></textarea>
+                <div id="composerAttachmentTray" class="composer-attachment-tray" hidden></div>
+                <div class="composer-input-footer">
+                  <span id="promptStats" class="composer-input-stats">0 字</span>
+                  <span data-i18n="composer.inputHint">Shift+Enter 换行</span>
+                </div>
+              </div>
               <div class="composer-primary-action">
                 <button id="sendBtn" class="primary compact">发送</button>
                 <div class="composer-options">
+                  <input id="composerFileInput" type="file" multiple hidden>
+                  <button id="attachBtn" type="button" class="mini-btn ghost-btn" data-i18n="composer.attach">附件</button>
                   <button id="sendModeBtn" type="button" class="mini-btn ghost-btn">Enter 发送</button>
                   <span class="composer-options-divider"></span>
                   <button id="newSessionToggle" type="button" class="session-option-toggle" aria-pressed="false">

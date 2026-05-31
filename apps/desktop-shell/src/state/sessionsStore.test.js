@@ -138,6 +138,25 @@ test("sessionsStore: flow detail open default fallback", () => {
   assert.equal(store.getFlowDetailOpen("turn:logs", true), false);
 });
 
+test("sessionsStore: clear flow detail open state for one turn", () => {
+  const store = createSessionsStore();
+  let notifyCount = 0;
+  store.subscribe(() => {
+    notifyCount += 1;
+  });
+  store.setFlowDetailOpen("turn-1:logs", true);
+  store.setFlowDetailOpen("turn-1:thoughts", false);
+  store.setFlowDetailOpen("turn-2:logs", true);
+  notifyCount = 0;
+  store.clearFlowDetailOpenForTurn("turn-1");
+  assert.equal(store.getFlowDetailOpen("turn-1:logs", false), false);
+  assert.equal(store.getFlowDetailOpen("turn-1:thoughts", true), true);
+  assert.equal(store.getFlowDetailOpen("turn-2:logs", false), true);
+  assert.equal(notifyCount, 1);
+  store.clearFlowDetailOpenForTurn("turn-1");
+  assert.equal(notifyCount, 1);
+});
+
 test("sessionsStore: turn collapse only notifies on change", () => {
   const store = createSessionsStore();
   let notifyCount = 0;

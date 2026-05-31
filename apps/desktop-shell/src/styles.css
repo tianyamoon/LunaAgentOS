@@ -1777,54 +1777,35 @@ button:disabled {
   white-space: normal;
 }
 
-.plain-report-view {
-  max-width: 100%;
-  margin-top: 4px;
-  overflow: hidden;
-  border: 1px solid rgba(99, 82, 63, 0.12);
-  border-radius: 12px;
-  background: rgba(var(--surface-raised-rgb), 0.96);
-}
-
-.plain-report-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 7px 10px;
-  border-bottom: 1px solid rgba(99, 82, 63, 0.1);
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
-.plain-report-view pre {
-  max-height: min(62vh, 620px);
-  margin: 0;
-  padding: 12px;
-  overflow-x: hidden;
-  overflow-y: auto;
-  color: var(--code-text);
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  font-size: 0.9rem;
-  line-height: 1.65;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
-
-.rendered-report-detail {
+.response-source-detail {
   margin-top: 8px;
 }
 
-.rendered-report-detail summary {
+.response-source-detail summary {
   cursor: pointer;
   color: var(--muted);
   font-size: 0.78rem;
   font-weight: 700;
 }
 
-.rendered-report-detail .rich-text {
+.response-source-detail pre {
+  max-height: min(48vh, 480px);
+  margin: 8px 0 0;
+  padding: 10px;
+  overflow: auto;
+  border: 1px solid rgba(99, 82, 63, 0.12);
+  border-radius: 10px;
+  background: rgba(var(--surface-raised-rgb), 0.72);
+  color: var(--code-text);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.82rem;
+  line-height: 1.58;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.response-source-detail[open] {
   margin-top: 8px;
 }
 
@@ -2618,6 +2599,23 @@ button:disabled {
   align-items: stretch;
 }
 
+.composer-input-shell {
+  display: flex;
+  min-width: 0;
+  min-height: 116px;
+  flex-direction: column;
+  border: 1px solid rgba(87, 70, 50, 0.16);
+  border-radius: 16px;
+  background: var(--composer-input-bg);
+  transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+}
+
+.composer-input-shell.is-drag-over {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 2px rgba(217, 108, 58, 0.12);
+}
+
 .composer-primary-action {
   display: flex;
   flex-direction: column;
@@ -2712,25 +2710,116 @@ button:disabled {
   background: var(--accent);
 }
 
-textarea {
+.composer-input-shell textarea {
   border-radius: 16px;
-  border: 1px solid rgba(87, 70, 50, 0.16);
-  padding: 12px 14px;
-  resize: none;
-  min-height: 84px;
-  background: var(--composer-input-bg);
+  border: 0;
+  padding: 13px 14px 8px;
+  resize: vertical;
+  min-height: 92px;
+  max-height: 32vh;
+  background: transparent;
+  line-height: 1.58;
   transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
 }
 
-.composer.is-current-session-mode textarea {
+.composer.is-current-session-mode .composer-input-shell {
   border-color: rgba(217, 108, 58, 0.34);
   box-shadow: 0 0 0 1px rgba(217, 108, 58, 0.08);
 }
 
-.composer.is-new-session-mode textarea {
+.composer.is-new-session-mode .composer-input-shell {
   border-color: rgba(191, 74, 74, 0.72);
   background: var(--composer-input-bg);
   box-shadow: 0 0 0 2px rgba(191, 74, 74, 0.1), 0 10px 28px rgba(191, 74, 74, 0.06);
+}
+
+.composer-attachment-tray {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 10px 8px;
+}
+
+.composer-attachment-tray[hidden] {
+  display: none;
+}
+
+.composer-attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: min(100%, 360px);
+  gap: 6px;
+  padding: 4px 5px 4px 8px;
+  border: 1px solid rgba(99, 82, 63, 0.14);
+  border-radius: 999px;
+  background: rgba(var(--surface-raised-rgb), 0.72);
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+.composer-attachment-chip.is-ready {
+  border-color: rgba(62, 146, 94, 0.26);
+  color: var(--done);
+}
+
+.composer-attachment-chip.is-error {
+  border-color: rgba(191, 74, 74, 0.28);
+  color: var(--error);
+}
+
+.composer-attachment-name {
+  overflow: hidden;
+  max-width: 180px;
+  color: var(--text);
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-attachment-meta,
+.composer-attachment-state {
+  white-space: nowrap;
+}
+
+.composer-attachment-remove {
+  width: auto;
+  height: 22px;
+  min-width: auto;
+  padding: 0 7px;
+  border: 1px solid rgba(99, 82, 63, 0.12);
+  border-radius: 999px;
+  background: rgba(87, 70, 50, 0.08);
+  color: inherit;
+  box-shadow: none;
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.composer-attachment-remove:hover {
+  background: rgba(191, 74, 74, 0.14);
+  color: var(--error);
+  box-shadow: none;
+  transform: none;
+}
+
+.composer-input-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 28px;
+  padding: 5px 12px 8px;
+  border-top: 1px solid rgba(99, 82, 63, 0.08);
+  color: rgba(122, 103, 85, 0.72);
+  font-size: 0.74rem;
+}
+
+.composer-input-stats {
+  color: var(--muted);
+  font-weight: 700;
 }
 
 .history-empty {
@@ -3396,7 +3485,9 @@ textarea {
   }
 
   .composer-options {
-    width: 132px;
+    width: auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
 
   .runtime-config-body {

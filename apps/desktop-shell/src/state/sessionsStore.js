@@ -183,6 +183,18 @@ export function createSessionsStore() {
       flowDetailOpenState.set(key, next);
       if (prev !== next) notify();
     },
+    clearFlowDetailOpenForTurn(turnId) {
+      if (!turnId) return;
+      const prefix = `${turnId}:`;
+      let removed = false;
+      for (const key of flowDetailOpenState.keys()) {
+        if (typeof key === "string" && key.startsWith(prefix)) {
+          flowDetailOpenState.delete(key);
+          removed = true;
+        }
+      }
+      if (removed) notify();
+    },
 
     // ---- UI flags: turn collapsed ----
     isTurnCollapsed(turnId) {
@@ -215,16 +227,6 @@ export function createSessionsStore() {
     getDeletedSessionIdsRef() {
       return deletedSessionIds;
     },
-    getFlowDetailOpenStateRef() {
-      return flowDetailOpenState;
-    },
-    getCollapsedTurnIdsRef() {
-      return collapsedTurnIds;
-    },
-    getSessionLatestOnlyStateRef() {
-      return sessionLatestOnlyState;
-    },
-
     // ---- subscribe / batch ----
     subscribe(listener) {
       if (typeof listener !== "function") return () => {};
