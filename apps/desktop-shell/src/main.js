@@ -20,19 +20,7 @@ import {
   createStickToBottomRegistry,
   isAtBottom,
 } from "./ui/stickToBottom.js";
-import {
-  filterComposerSlashCommands,
-  matchComposerSlashQuery,
-  normalizeSlashCommand,
-  slashCommandsForProvider,
-} from "./ui/slashCommands.js";
-import {
-  DEFAULT_ATTACHMENT_LIMITS,
-  attachmentStatus,
-  composerStats,
-  formatAttachmentBytes,
-  isLikelyTextAttachment,
-} from "./ui/composerAttachments.js";
+import { createComposerController } from "./ui/composerController.js";
 import {
   sessionCardStats,
   sessionTurnVisibility,
@@ -244,15 +232,12 @@ const fallbackSessions = {
 const LEGACY_TARGET_AGENT_KEY = "lunaagentos.currentTargetAgentId";
 const CURRENT_TARGET_AGENT_KEY = "lunaagentos.currentTargetId";
 const CURRENT_SESSION_KEY = "lunaagentos.currentSessionId";
-const SEND_MODE_KEY = "lunaagentos.sendMode";
 const FONT_SCALE_KEY = "lunaagentos.fontScale";
 const THEME_KEY = "lunaagentos.theme";
 const PROVIDER_COLLAPSE_KEY = "lunaagentos.providerCollapsedIds";
-const SLASH_COMMAND_USAGE_KEY = "lunaagentos.slashCommandUsage";
 const HISTORY_SCHEMA_VERSION = 5;
 const STREAM_CARD_RENDER_INTERVAL_MS = 100;
 const DEFAULT_HERMES_AGENT_ID = "hermes-wsl:profile:default";
-const SEND_MODE_OPTIONS = ["enter", "ctrlEnter"];
 const PROVIDER_AVAILABILITY_STATES = {
   probing: { state: 0, key: "provider.probing" },
   available: { state: 1, key: "provider.available" },
@@ -292,38 +277,6 @@ function readCollapsedProviderIds() {
   } catch (_) {
     return [];
   }
-}
-
-function readSlashCommandUsage() {
-  try {
-    const stored = JSON.parse(localStorage.getItem(SLASH_COMMAND_USAGE_KEY) || "{}");
-    return stored && typeof stored === "object" && !Array.isArray(stored) ? stored : {};
-  } catch (_) {
-    return {};
-  }
-}
-
-function slashCommandUsageAgentKey() {
-  const target = currentTargetAgent();
-  return target?.id || target?.providerId || currentTargetAgentId || "default";
-}
-
-function slashCommandUsageForCurrentAgent() {
-  const usage = slashCommandUsage[slashCommandUsageAgentKey()];
-  return usage && typeof usage === "object" && !Array.isArray(usage) ? usage : {};
-}
-
-function recordSlashCommandUsage(commandName) {
-  const agentKey = slashCommandUsageAgentKey();
-  const current = slashCommandUsageForCurrentAgent();
-  slashCommandUsage = {
-    ...slashCommandUsage,
-    [agentKey]: {
-      ...current,
-      [commandName]: Number(current[commandName] || 0) + 1,
-    },
-  };
-  localStorage.setItem(SLASH_COMMAND_USAGE_KEY, JSON.stringify(slashCommandUsage));
 }
 
 function saveCollapsedProviderIds() {
@@ -414,10 +367,10 @@ let sessionRestoreController = null;
 let sessionLifecycleController = null;
 let sessionExecutionController = null;
 let sessionLaunchController = null;
+let composerController = null;
 let historyView = null;
 let workspaceView = null;
 let sendAsNewSession = false;
-let sendMode = localStorage.getItem(SEND_MODE_KEY) || "enter";
 let fontScaleId = localStorage.getItem(FONT_SCALE_KEY) || "default";
 let themeId = localStorage.getItem(THEME_KEY) || DEFAULT_THEME_ID;
 let runtimeConfigSnapshot = null;
@@ -431,16 +384,6 @@ let scheduledWorkspaceRenderOptions = null;
 let scheduledWorkspaceRenderFrame = 0;
 let scheduledWorkspaceRenderTimer = 0;
 let pendingConfirmAction = null;
-let composerCommandHint = null;
-let composerCommandMenu = null;
-let composerCommandMenuOpen = false;
-let composerCommandMenuPinned = false;
-let composerCommandMenuActiveIndex = 0;
-let composerCommandSearchQuery = "";
-let composerCommandSearchFocused = false;
-let slashCommandUsage = readSlashCommandUsage();
-let composerAttachmentSeq = 0;
-let composerAttachments = [];
 
 function allAgents() {
   const dynamicTargets = runtimeTargets();
@@ -839,7 +782,6 @@ function applyStaticTranslations() {
   updateActionLabels();
   updateSendModeLabel();
   updatePromptPlaceholder();
-  updateComposerCommandHint();
 }
 
 function toggleLanguage() {
@@ -885,337 +827,11 @@ function openConfirmDialog({ title, message, confirmLabel = t("common.delete"), 
 }
 
 function updateActionLabels() {
-  const composingNewSession = isComposingNewSession();
-  sendBtn.textContent = t("composer.send");
-  if (attachBtn) {
-    attachBtn.textContent = t("composer.attach");
-    attachBtn.title = t("composer.attachTitle");
-  }
-  newSessionToggle.classList.toggle("is-active", composingNewSession);
-  newSessionToggle.setAttribute("aria-pressed", String(composingNewSession));
-  composer?.classList.toggle("is-new-session-mode", composingNewSession);
-  composer?.classList.toggle("is-current-session-mode", !composingNewSession);
-  updateComposerCommandHint();
-  updatePromptPlaceholder();
-  updateComposerReadability();
+  composerController?.updateActionLabels();
 }
 
 function updatePromptPlaceholder() {
-  const target = currentComposerTargetLabel();
-  promptBox.placeholder = target
-    ? t(isComposingNewSession() ? "composer.placeholderNewSession" : "composer.placeholderCurrentSession", { target })
-    : t("composer.placeholderNoTarget");
-}
-
-function ensureComposerCommandHint() {
-  if (!composer || composerCommandHint) return;
-  const row = composer.querySelector(".composer-row");
-  composerCommandHint = document.createElement("div");
-  composerCommandHint.className = "composer-command-hint";
-  composerCommandHint.setAttribute("aria-live", "polite");
-  if (row) composer.insertBefore(composerCommandHint, row);
-  else composer.prepend(composerCommandHint);
-}
-
-function updateComposerReadability() {
-  autoResizePromptBox();
-  updatePromptStats();
-  renderComposerAttachments();
-}
-
-function autoResizePromptBox() {
-  if (!promptBox) return;
-  promptBox.style.height = "auto";
-  const nextHeight = Math.min(Math.max(promptBox.scrollHeight, 92), Math.floor(window.innerHeight * 0.32));
-  promptBox.style.height = `${nextHeight}px`;
-}
-
-function updatePromptStats() {
-  if (!promptStats) return;
-  const stats = composerStats(promptBox.value);
-  promptStats.textContent = t("composer.stats", { chars: stats.chars, lines: stats.lines });
-}
-
-function attachmentStatusLabel(attachment) {
-  const status = attachmentStatus(attachment);
-  if (status === "ready") return t("composer.attachment.ready");
-  if (status === "error") return attachment.error || t("composer.attachment.unsupported");
-  return t("composer.attachment.metadataOnly");
-}
-
-function renderComposerAttachments() {
-  if (!composerAttachmentTray) return;
-  composerAttachmentTray.hidden = composerAttachments.length === 0;
-  if (!composerAttachments.length) {
-    composerAttachmentTray.innerHTML = "";
-    return;
-  }
-  composerAttachmentTray.innerHTML = composerAttachments.map((attachment) => {
-    const status = attachmentStatus(attachment);
-    const statusClass = status === "ready" ? "is-ready" : status === "error" ? "is-error" : "is-muted";
-    const size = attachment.sizeLabel || formatAttachmentBytes(attachment.size);
-    return `
-      <span class="composer-attachment-chip ${statusClass}" title="${escapeHtml(attachmentStatusLabel(attachment))}">
-        <span class="composer-attachment-name">${escapeHtml(attachment.name)}</span>
-        <span class="composer-attachment-meta">${escapeHtml(size)}</span>
-        <span class="composer-attachment-state">${escapeHtml(attachmentStatusLabel(attachment))}</span>
-        <button type="button" class="composer-attachment-remove" data-attachment-id="${escapeHtml(attachment.id)}" title="${escapeHtml(t("composer.attachment.remove", { name: attachment.name }))}" aria-label="${escapeHtml(t("composer.attachment.remove", { name: attachment.name }))}">${escapeHtml(t("composer.attachment.removeShort"))}</button>
-      </span>
-    `;
-  }).join("");
-  composerAttachmentTray.querySelectorAll(".composer-attachment-remove").forEach((button) => {
-    button.addEventListener("click", () => {
-      composerAttachments = composerAttachments.filter((item) => item.id !== button.dataset.attachmentId);
-      renderComposerAttachments();
-      promptBox.focus();
-    });
-  });
-}
-
-function clearComposerAttachments() {
-  composerAttachments = [];
-  renderComposerAttachments();
-}
-
-function readFileAsText(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.addEventListener("load", () => resolve(String(reader.result || "")));
-    reader.addEventListener("error", () => reject(reader.error || new Error("read failed")));
-    reader.readAsText(file);
-  });
-}
-
-async function addComposerFiles(fileList) {
-  const files = [...(fileList || [])];
-  if (!files.length) return;
-  const availableSlots = DEFAULT_ATTACHMENT_LIMITS.maxFiles - composerAttachments.length;
-  const accepted = files.slice(0, Math.max(0, availableSlots));
-  if (files.length > accepted.length) {
-    setAppNotice(t("composer.attachment.limit", { count: DEFAULT_ATTACHMENT_LIMITS.maxFiles }), "error");
-  }
-  for (const file of accepted) {
-    const id = `attachment-${Date.now()}-${++composerAttachmentSeq}`;
-    const sizeLabel = formatAttachmentBytes(file.size);
-    const base = {
-      id,
-      name: file.name,
-      type: file.type || "",
-      size: file.size,
-      sizeLabel,
-      content: "",
-    };
-    if (!isLikelyTextAttachment(file)) {
-      composerAttachments.push({ ...base, error: t("composer.attachment.unsupported") });
-      continue;
-    }
-    try {
-      const raw = await readFileAsText(file);
-      const truncated = raw.length > DEFAULT_ATTACHMENT_LIMITS.maxCharsPerFile;
-      composerAttachments.push({
-        ...base,
-        content: truncated ? raw.slice(0, DEFAULT_ATTACHMENT_LIMITS.maxCharsPerFile) : raw,
-        truncated,
-      });
-    } catch {
-      composerAttachments.push({ ...base, error: t("composer.attachment.readFailed") });
-    }
-  }
-  renderComposerAttachments();
-  promptBox.focus();
-}
-
-function ensureComposerCommandMenu() {
-  if (!composer || composerCommandMenu) return;
-  composerCommandMenu = document.createElement("div");
-  composerCommandMenu.className = "composer-command-menu";
-  composerCommandMenu.hidden = true;
-  composer.appendChild(composerCommandMenu);
-}
-
-function composerInputKind() {
-  return promptBox.value.trimStart().startsWith("/") ? "slash" : "plain";
-}
-
-function composerSlashQuery() {
-  return matchComposerSlashQuery(promptBox.value);
-}
-
-function composerSlashCommands() {
-  return slashCommandsForProvider(localizedComposerSlashCommands(), currentTargetProvider()?.id);
-}
-
-function filteredComposerSlashCommands() {
-  const searchQuery = composerCommandSearchFocused || composerCommandSearchQuery
-    ? composerCommandSearchQuery.trim().toLowerCase()
-    : null;
-  return filterComposerSlashCommands(localizedComposerSlashCommands(), {
-    providerId: currentTargetProvider()?.id,
-    query: searchQuery ?? composerSlashQuery(),
-    pinned: searchQuery === null && composerCommandMenuPinned,
-    usageByName: slashCommandUsageForCurrentAgent(),
-  });
-}
-
-function localizedComposerSlashCommands() {
-  const provider = currentTargetProvider();
-  const providerId = provider?.id;
-  const manifestCommands = provider?.adapterManifest?.capabilities?.slashCommands;
-  const dynamicCommands = providerId ? providersStore.getSlashCommandsForProvider(providerId) : [];
-  return mergeSlashCommands([...(Array.isArray(manifestCommands) ? manifestCommands : []), ...(Array.isArray(dynamicCommands) ? dynamicCommands : [])])
-    .map((command) => normalizeSlashCommand(command, {
-      providerId,
-      description: command.description || t(command.descriptionKey),
-    }))
-    .filter(Boolean);
-}
-
-function closeComposerCommandMenu() {
-  composerCommandMenuOpen = false;
-  composerCommandMenuPinned = false;
-  composerCommandSearchFocused = false;
-  composerCommandMenuActiveIndex = 0;
-  if (composerCommandMenu) composerCommandMenu.hidden = true;
-}
-
-function openComposerCommandMenu({ pinned = false } = {}) {
-  ensureComposerCommandMenu();
-  composerCommandMenuOpen = true;
-  composerCommandMenuPinned = pinned;
-  composerCommandMenuActiveIndex = 0;
-  renderComposerCommandMenu();
-}
-
-function selectComposerCommand(index) {
-  const command = filteredComposerSlashCommands()[index];
-  if (!command) return false;
-  promptBox.value = `/${command.name} `;
-  recordSlashCommandUsage(command.name);
-  composerCommandSearchQuery = "";
-  composerCommandSearchFocused = false;
-  promptBox.focus();
-  promptBox.setSelectionRange(promptBox.value.length, promptBox.value.length);
-  closeComposerCommandMenu();
-  updateComposerCommandHint();
-  return true;
-}
-
-function syncComposerCommandMenuActiveItem({ scrollIntoView = false } = {}) {
-  if (!composerCommandMenu) return;
-  composerCommandMenu.querySelectorAll(".composer-command-menu-item").forEach((button) => {
-    const isActive = Number(button.dataset.commandIndex || 0) === composerCommandMenuActiveIndex;
-    button.classList.toggle("is-active", isActive);
-    button.setAttribute("aria-selected", isActive ? "true" : "false");
-    if (isActive && scrollIntoView) button.scrollIntoView({ block: "nearest" });
-  });
-}
-
-function renderComposerCommandMenu() {
-  ensureComposerCommandMenu();
-  if (!composerCommandMenu) return;
-  const commands = filteredComposerSlashCommands();
-  const usageByName = slashCommandUsageForCurrentAgent();
-  if (!composerCommandMenuOpen) {
-    composerCommandMenu.hidden = true;
-    return;
-  }
-  if (composerCommandMenuActiveIndex >= commands.length) composerCommandMenuActiveIndex = 0;
-  composerCommandMenu.hidden = false;
-  composerCommandMenu.innerHTML = `
-    <div class="composer-command-menu-panel" role="listbox" aria-label="${escapeHtml(t("composer.commandMenu.title"))}">
-      <div class="composer-command-menu-header">
-        <strong>${escapeHtml(t("composer.commandMenu.title"))}</strong>
-        <span>${escapeHtml(t("composer.commandMenu.hint"))}</span>
-      </div>
-      <div class="composer-command-menu-list">
-        ${commands.length ? commands.map((command, index) => `
-          <button type="button" class="composer-command-menu-item ${index === composerCommandMenuActiveIndex ? "is-active" : ""}" role="option" aria-selected="${index === composerCommandMenuActiveIndex ? "true" : "false"}" data-command-index="${index}">
-            <span class="composer-command-menu-name">/${escapeHtml(command.name)}</span>
-            <span class="composer-command-menu-description">${escapeHtml(command.description || t(command.descriptionKey))}</span>
-            ${usageByName[command.name] ? `<span class="composer-command-menu-badge">${escapeHtml(t("composer.commandMenu.frequent"))}</span>` : ""}
-          </button>
-        `).join("") : `<div class="composer-command-menu-empty">${escapeHtml(t("composer.commandMenu.empty"))}</div>`}
-      </div>
-    </div>
-  `;
-  composerCommandMenu.querySelectorAll(".composer-command-menu-item").forEach((button) => {
-    button.addEventListener("mouseenter", () => {
-      composerCommandMenuActiveIndex = Number(button.dataset.commandIndex || 0);
-      syncComposerCommandMenuActiveItem();
-    });
-    button.addEventListener("click", () => {
-      selectComposerCommand(Number(button.dataset.commandIndex || 0));
-    });
-  });
-}
-
-function updateComposerCommandHint() {
-  ensureComposerCommandHint();
-  if (!composerCommandHint) return;
-  const kind = composerInputKind();
-  composer?.classList.toggle("is-slash-input", kind === "slash");
-  composerCommandHint.innerHTML = `
-    <button type="button" class="composer-command-chip composer-command-open-btn ${kind === "slash" ? "is-active" : ""}" aria-haspopup="listbox" aria-expanded="${composerCommandMenuOpen ? "true" : "false"}">${escapeHtml(t("composer.input.slash"))}</button>
-    <input class="composer-command-search" type="search" value="${escapeHtml(composerCommandSearchQuery)}" placeholder="${escapeHtml(t("composer.commandMenu.searchPlaceholder"))}" aria-label="${escapeHtml(t("composer.commandMenu.searchLabel"))}">
-  `;
-  const searchInput = composerCommandHint.querySelector(".composer-command-search");
-  const openSearchMenu = () => {
-    composerCommandSearchFocused = true;
-    openComposerCommandMenu();
-  };
-  composerCommandHint.querySelector(".composer-command-open-btn")?.addEventListener("click", () => {
-    openSearchMenu();
-    searchInput?.focus();
-  });
-  searchInput?.addEventListener("focus", () => {
-    openSearchMenu();
-  });
-  searchInput?.addEventListener("input", () => {
-    composerCommandSearchFocused = true;
-    composerCommandSearchQuery = searchInput.value;
-    openComposerCommandMenu();
-  });
-  searchInput?.addEventListener("keydown", (event) => {
-    handleComposerCommandMenuKeydown(event);
-  });
-  if (composerSlashQuery() !== null) {
-    composerCommandMenuPinned = false;
-    composerCommandMenuOpen = true;
-    renderComposerCommandMenu();
-  } else if (!composerCommandMenuPinned && !composerCommandSearchFocused) {
-    closeComposerCommandMenu();
-  }
-}
-
-function handleComposerCommandMenuKeydown(event) {
-  if (!composerCommandMenuOpen) return false;
-  const commands = filteredComposerSlashCommands();
-  if (event.key === "Escape") {
-    event.preventDefault();
-    closeComposerCommandMenu();
-    return true;
-  }
-  if (event.key === "ArrowDown") {
-    event.preventDefault();
-    composerCommandMenuActiveIndex = commands.length
-      ? (composerCommandMenuActiveIndex + 1) % commands.length
-      : 0;
-    syncComposerCommandMenuActiveItem({ scrollIntoView: true });
-    return true;
-  }
-  if (event.key === "ArrowUp") {
-    event.preventDefault();
-    composerCommandMenuActiveIndex = commands.length
-      ? (composerCommandMenuActiveIndex - 1 + commands.length) % commands.length
-      : 0;
-    syncComposerCommandMenuActiveItem({ scrollIntoView: true });
-    return true;
-  }
-  if (event.key === "Enter" && !event.shiftKey) {
-    event.preventDefault();
-    return selectComposerCommand(composerCommandMenuActiveIndex);
-  }
-  return false;
+  composerController?.updatePromptPlaceholder();
 }
 
 function scheduleWorkspaceRender(options = {}, delayMs = 0) {
@@ -1395,15 +1011,7 @@ async function loadAdapterIcons(adapters) {
 }
 
 function updateSendModeLabel() {
-  if (!sendModeBtn) return;
-  sendModeBtn.textContent = sendMode === "enter" ? t("composer.enterSend") : t("composer.ctrlEnter");
-}
-
-function toggleSendMode() {
-  const index = SEND_MODE_OPTIONS.indexOf(sendMode);
-  sendMode = SEND_MODE_OPTIONS[(index + 1) % SEND_MODE_OPTIONS.length];
-  localStorage.setItem(SEND_MODE_KEY, sendMode);
-  updateSendModeLabel();
+  composerController?.updateSendModeLabel();
 }
 
 function runtimeInstanceDetailMarkup(instance) {
@@ -2124,7 +1732,7 @@ async function loadRuntimeSlashCommandsForProvider(providerId, runtimeInstanceId
       discovered.push(...(Array.isArray(commands) ? commands : []));
     }
     providersStore.setSlashCommandsForProvider(providerId, mergeSlashCommands(discovered));
-    renderComposerCommandMenu();
+    composerController?.refreshCommands();
   } catch (error) {
     console.error(error);
   }
@@ -3167,13 +2775,54 @@ async function startAcpSession(session, turn) {
   return sessionExecutionController?.startAcpSession(session, turn);
 }
 
+// Composer Controller 接管输入交互、附件与斜杠菜单，Shell 只注入领域回调。
+composerController = createComposerController({
+  promptBox,
+  composer,
+  composerInputShell,
+  composerAttachmentTray,
+  composerFileInput,
+  attachBtn,
+  promptStats,
+  newSessionToggle,
+  sendBtn,
+  sendModeBtn,
+  getCurrentTargetProvider: currentTargetProvider,
+  getSlashCommandsForProvider: (providerId) => providersStore.getSlashCommandsForProvider(providerId),
+  mergeSlashCommands,
+  getUsageAgentKey: () => {
+    const target = currentTargetAgent();
+    return target?.id || target?.providerId || currentTargetAgentId || "default";
+  },
+  isComposingNewSession,
+  currentComposerTargetLabel,
+  getSendAsNewSession: () => sendAsNewSession,
+  startSessionFromPrompt: (forceNewSession) => startSessionFromPrompt(forceNewSession),
+  toggleNewSession: () => {
+    if (currentSession()) {
+      saveCurrentSession(null);
+      sendAsNewSession = true;
+      renderWorkspace();
+      renderHistory();
+    } else {
+      sendAsNewSession = !sendAsNewSession;
+    }
+    updateActionLabels();
+    focusComposerInput();
+  },
+  exitFullscreenSessions,
+  setAppNotice,
+  t,
+  escapeHtml,
+});
+
 // Session Launch Controller 接管发送校验、Session 创建与附件 prompt 装配。
 sessionLaunchController = createSessionLaunchController({
   getPromptValue: () => promptBox.value,
   focusPrompt: () => promptBox.focus(),
   clearPrompt: () => { promptBox.value = ""; },
-  getComposerAttachments: () => composerAttachments,
-  clearComposerAttachments,
+  getComposerAttachments: () => composerController.getAttachments(),
+  clearComposerAttachments: () => composerController.clearAttachments(),
   getCurrentTargetAgent: currentTargetAgent,
   getCurrentTargetProvider: currentTargetProvider,
   providerById,
@@ -3214,39 +2863,7 @@ providerManagerBtn?.addEventListener("click", () => {
   openAvailabilityModal();
 });
 
-sendBtn.addEventListener("click", () => {
-  startSessionFromPrompt(sendAsNewSession);
-});
-
-sendModeBtn?.addEventListener("click", () => {
-  toggleSendMode();
-});
-
-attachBtn?.addEventListener("click", () => {
-  composerFileInput?.click();
-});
-
-composerFileInput?.addEventListener("change", () => {
-  void addComposerFiles(composerFileInput.files);
-  composerFileInput.value = "";
-});
-
-composerInputShell?.addEventListener("dragover", (event) => {
-  if (!event.dataTransfer?.files?.length) return;
-  event.preventDefault();
-  composerInputShell.classList.add("is-drag-over");
-});
-
-composerInputShell?.addEventListener("dragleave", () => {
-  composerInputShell.classList.remove("is-drag-over");
-});
-
-composerInputShell?.addEventListener("drop", (event) => {
-  if (!event.dataTransfer?.files?.length) return;
-  event.preventDefault();
-  composerInputShell.classList.remove("is-drag-over");
-  void addComposerFiles(event.dataTransfer.files);
-});
+composerController.bindEvents();
 
 fontScaleBtn?.addEventListener("click", () => {
   cycleFontScale();
@@ -3258,52 +2875,6 @@ themeBtn?.addEventListener("click", () => {
 
 languageBtn?.addEventListener("click", () => {
   toggleLanguage();
-});
-
-promptBox.addEventListener("keydown", (event) => {
-  if (handleComposerCommandMenuKeydown(event)) return;
-  if (event.key !== "Enter" || event.isComposing) return;
-  const shouldSend = sendMode === "enter"
-    ? !event.ctrlKey && !event.shiftKey && !event.altKey
-    : event.ctrlKey && !event.shiftKey && !event.altKey;
-  if (!shouldSend) return;
-  event.preventDefault();
-  startSessionFromPrompt(sendAsNewSession);
-});
-
-promptBox.addEventListener("input", () => {
-  composerCommandSearchFocused = false;
-  updateComposerCommandHint();
-  updateComposerReadability();
-});
-
-document.addEventListener("pointerdown", (event) => {
-  if (!composerCommandMenuOpen) return;
-  if (composer?.contains(event.target)) return;
-  closeComposerCommandMenu();
-});
-
-document.addEventListener("keydown", (event) => {
-  if (event.key !== "Escape") return;
-  if (composerCommandMenuOpen) {
-    closeComposerCommandMenu();
-    event.preventDefault();
-    return;
-  }
-  if (exitFullscreenSessions()) event.preventDefault();
-});
-
-newSessionToggle.addEventListener("click", () => {
-  if (currentSession()) {
-    saveCurrentSession(null);
-    sendAsNewSession = true;
-    renderWorkspace();
-    renderHistory();
-  } else {
-    sendAsNewSession = !sendAsNewSession;
-  }
-  updateActionLabels();
-  focusComposerInput();
 });
 
 if (listenRuntimeEvent) {
