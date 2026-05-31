@@ -137,3 +137,22 @@ _避免使用_：自动多 Agent orchestration
 - “session active” 曾同时表示持久 lifecycle 和进程连接状态。分别使用 **Session Lifecycle** 和 **Runtime Binding**。
 - “fullscreen” 曾表示工作区展示模式。统一使用 **Workspace Focus**；它不是 Runtime Session 字段。
 - “Session Card 任务化”容易被误解为 Runtime Session 等同于 **Task**。**Runtime Session Card** 可以展示任务式摘要，但 **Task** 和 **Task Board** 仍是独立的未来 orchestration 概念。
+
+## 当前模块边界
+
+以下边界已经进入代码，并作为后续修改的默认落点：
+
+- Rust Core 的 `lib.rs` 只负责 Tauri composition root。配置、History Repository、Adapter Host、Runtime Probe 和 Runtime Session Commands 分别位于独立模块。
+- 前端 `historyRepository` 统一管理 History invoke、内存快照、schema 兼容、归档和删除。视图与控制器不应绕过它直接操作 History 后端。
+- `sessionRestoreController`、`sessionLifecycleController`、`sessionExecutionController` 和 `sessionLaunchController` 分别负责恢复、生命周期、执行和发送启动流程。
+- `workspaceViewStore` 独立保存 **Workspace Focus**。切换工作区 session 时，不再把 `fullscreen` 写入 Runtime Session。
+- `composerController` 管理输入框、附件、斜杠菜单和键盘发送模式。
+- `agentFleetView` 与 `agentManagementView` 只消费归一化 Provider、Agent Entry 和 Availability 数据，不包含具体 Adapter 的运行规则。
+- `runtimeSessionCardView` 与 `runtimeSessionCardController` 管理卡片渲染和交互，避免把大段工作区实现重新塞回 `main.js`。
+- `scripts/check-architecture.mjs` 是渐进式架构护栏。它阻止 Shell 重新引入具体 Adapter 特判、History invoke 绕过 Repository、View 直接修改 Store 对象，以及 Rust 专用 ACP 入口复活。
+
+## 兼容策略
+
+- History schema 5 使用通用 `agentEntrySnapshot` 保存 Runtime Session 对应的 Agent Entry 快照。
+- schema 4 和旧 `hermesProfile` 仅保留读取兼容；新写入路径不得继续产生专用字段。
+- `main.js` 仍处于逐步收缩阶段。新增领域实现必须进入职责明确、可测试的 Module，不能以临时方便为理由扩大 Shell。

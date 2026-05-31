@@ -10,3 +10,4 @@
 - [0002：Task 与 Runtime Session 保持分离](./0002-task-and-runtime-session-are-distinct.md)
 - [0003：Workspace Focus 属于视图状态](./0003-workspace-focus-is-view-state.md)
 - [0004：desktop Shell 的 main.js 只承担启动编排](./0004-main-js-is-bootstrap-orchestrator.md)
+- [0005：架构静态检查保护模块边界](./0005-architecture-guard-enforces-module-boundaries.md)
