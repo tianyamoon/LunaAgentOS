@@ -22,6 +22,7 @@ import {
 } from "./ui/stickToBottom.js";
 import { createComposerController } from "./ui/composerController.js";
 import { createAgentFleetView } from "./ui/agentFleetView.js";
+import { createAgentManagementView } from "./ui/agentManagementView.js";
 import {
   sessionCardStats,
   sessionTurnVisibility,
@@ -62,8 +63,6 @@ import {
   isTargetSendable,
 } from "./state/targetActivation.js";
 import { getAvailabilityStore } from "./state/availabilityStore.js";
-import { AvailabilityView } from "./components/availability/AvailabilityView.js";
-import { AgentDetailPanel } from "./components/agentDetail/AgentDetailPanel.js";
 import {
   acpCommandsForProvider as acpCommandsForProviderRaw,
 } from "./runtime/acpCommands.js";
@@ -111,7 +110,6 @@ import {
   sortTargetsForAgentList,
   targetsForRuntimeInstance as targetsForRuntimeInstanceRaw,
 } from "./providers/runtimeView.js";
-import { buildAgentDetail } from "./providers/agentDetail.js";
 import { providerSupportsLaunch } from "./providers/providerCatalog.js";
 import {
   agentBriefTargetKey,
@@ -370,6 +368,7 @@ let sessionExecutionController = null;
 let sessionLaunchController = null;
 let composerController = null;
 let agentFleetView = null;
+let agentManagementView = null;
 let historyView = null;
 let workspaceView = null;
 let sendAsNewSession = false;
@@ -1016,33 +1015,6 @@ function updateSendModeLabel() {
   composerController?.updateSendModeLabel();
 }
 
-function runtimeInstanceDetailMarkup(instance) {
-  const lines = [];
-  const addLine = (value) => {
-    const text = String(value || "").trim();
-    if (text && !lines.includes(text)) lines.push(text);
-  };
-  String(instance.detail || "")
-    .split(/\r?\n/)
-    .forEach(addLine);
-  addLine(instance.version);
-  return lines.map((line) => `<small>${escapeHtml(line)}</small>`).join("");
-}
-
-function connectionInstanceMarkup(instance, title = "") {
-  const state = instance.available ? 1 : 9;
-  return `
-    <article class="connection-instance-card">
-      <div class="connection-instance-top">
-        <strong>${escapeHtml(instance.runtimeLabel || title)}</strong>
-        <span class="state-pill ${stateClasses[state] || "state-idle"}">${instance.available ? t("provider.available") : t("provider.notConnected")}</span>
-      </div>
-      <p>${escapeHtml(instance.summary || "")}</p>
-      ${runtimeInstanceDetailMarkup(instance)}
-    </article>
-  `;
-}
-
 function agentBriefPrompt() {
   return [
     "请用10个字以内给自己起一个普通用户一眼能看懂的职责标题。只返回标题，不要解释，不要标点。",
@@ -1106,392 +1078,17 @@ async function refreshAgentBriefForTarget(target, { quiet = false } = {}) {
   return result;
 }
 
-function agentBriefRowMarkup(target, index) {
-  const sendable = isTargetSendable(target);
-  return `
-    <article class="agent-brief-row" data-agent-id="${escapeHtml(target.id)}">
-      <div class="agent-brief-row-header">
-        <strong>${escapeHtml(targetDisplayName(target) || displayAgentName(target))}</strong>
-        <button type="button" class="mini-btn ghost-btn agent-brief-row-fetch" data-agent-id="${escapeHtml(target.id)}" ${sendable ? "" : "disabled"}>${t("agentBrief.autoFetch")}</button>
-      </div>
-      <label>
-        <span>${t("agentBrief.zhLabel")}</span>
-        <input class="agent-brief-input" data-agent-id="${escapeHtml(target.id)}" data-language="zh-CN" name="brief-${index}-zh" value="${escapeHtml(targetBriefInputValue(target, "zh-CN"))}" placeholder="${escapeHtml(t(fallbackBriefKeyForTarget(target)))}" />
-      </label>
-      <label>
-        <span>${t("agentBrief.enLabel")}</span>
-        <input class="agent-brief-input" data-agent-id="${escapeHtml(target.id)}" data-language="en-US" name="brief-${index}-en" value="${escapeHtml(targetBriefInputValue(target, "en-US"))}" placeholder="${escapeHtml(t("agentBrief.placeholderEn"))}" />
-      </label>
-    </article>
-  `;
-}
-
-async function saveBriefInputs(root) {
-  const next = cloneAgentBriefs();
-  root.querySelectorAll(".agent-brief-input").forEach((input) => {
-    const target = agentById(input.dataset.agentId);
-    if (!target) return;
-    writeBriefValue(next, target, input.dataset.language, input.value, "manual");
-  });
-  await saveAgentBriefRecords(next);
-  renderProviders();
-}
-
-function briefInputFor(root, targetId, language) {
-  return [...root.querySelectorAll(".agent-brief-input")]
-    .find((input) => input.dataset.agentId === targetId && input.dataset.language === language) || null;
-}
-
-async function autoFetchBriefButtons(root) {
-  root.querySelectorAll(".agent-brief-row-fetch").forEach((button) => {
-    button.addEventListener("click", async () => {
-      const target = agentById(button.dataset.agentId);
-      if (!target) return;
-      button.disabled = true;
-      try {
-        const result = await refreshAgentBriefForTarget(target);
-        const zhInput = briefInputFor(root, target.id, "zh-CN");
-        const enInput = briefInputFor(root, target.id, "en-US");
-        if (zhInput) zhInput.value = result["zh-CN"];
-        if (enInput) enInput.value = result["en-US"];
-      } catch (error) {
-        console.error(error);
-        setAppNotice(t("agentBrief.fetchFailed", { error: formatBackendError(error) }), "error");
-      } finally {
-        button.disabled = !isTargetSendable(target);
-      }
-    });
-  });
-}
-
-async function autoFetchProviderBriefs(providerId, root) {
-  const targets = targetsForProvider(providerId).filter(isTargetSendable);
-  if (!targets.length) {
-    setAppNotice(t("agentBrief.noSendableTargets"), "error");
-    return;
-  }
-  for (let index = 0; index < targets.length; index += 1) {
-    const target = targets[index];
-    setAppNotice(t("agentBrief.fetchingProgress", {
-      current: index + 1,
-      total: targets.length,
-      target: targetDisplayName(target),
-    }), "busy");
-    const result = await refreshAgentBriefForTarget(target, { quiet: true });
-    const zhInput = briefInputFor(root, target.id, "zh-CN");
-    const enInput = briefInputFor(root, target.id, "en-US");
-    if (zhInput) zhInput.value = result["zh-CN"];
-    if (enInput) enInput.value = result["en-US"];
-  }
-  setAppNotice(t("agentBrief.fetchAllComplete", { count: targets.length }));
-}
-
-function availabilityTargetForAgent(target) {
-  if (!target) return null;
-  const store = getAvailabilityStore();
-  const data = store.refresh(providersSnapshot(), runtimeInstancesSnapshot(), currentTargetAgent(), providersStore.getRuntimeAvailabilitySnapshot());
-  const provider = data.providers.find((entry) => entry.id === target.providerId);
-  return provider?.targets.find((entry) => entry.id === target.id) || null;
-}
-
+// Shell 只保留弹窗命令入口，具体 HTML 和表单绑定由 Agent 管理视图负责。
 async function openAgentManager(agentId) {
-  const target = agentById(agentId);
-  if (!target || !confirmDialog) return;
-  try {
-    await ensureRuntimeConfigState();
-    const provider = providerById(target.providerId) || { id: target.providerId, name: target.providerName || target.providerId };
-    const runtimeInstance = runtimeInstanceById(target.runtimeInstanceId);
-    const availabilityTarget = availabilityTargetForAgent(target);
-    const detail = buildAgentDetail({
-      target: {
-        ...target,
-        name: targetDisplayName(target) || displayAgentName(target),
-      },
-      provider,
-      runtimeInstance,
-      availabilityTarget,
-      agentBrief: targetBriefText(target),
-    });
-    const title = detail.name || targetDisplayName(target);
-    const instances = runtimeInstance
-      ? [runtimeInstance]
-      : runtimeInstancesForProvider(target.providerId);
-    const instanceMarkup = instances.length
-      ? instances.map((instance) => connectionInstanceMarkup(instance, detail.providerName)).join("")
-      : `<p class="connection-empty">${t("connection.none")}</p>`;
-    confirmDialog.hidden = false;
-    confirmDialog.innerHTML = `
-      <form class="confirm-dialog runtime-config-dialog agent-manager-dialog" role="dialog" aria-modal="true" aria-labelledby="agentManagerTitle">
-        <div class="confirm-dialog-header">
-          <span class="runtime-config-icon" aria-hidden="true">●</span>
-          <div>
-            <h3 id="agentManagerTitle">${t("agentDetail.title")} · ${escapeHtml(title)}</h3>
-            <p class="runtime-config-subtitle">${t("agentDetail.subtitle")}</p>
-          </div>
-          <button type="button" class="confirm-dialog-close agent-manager-close" aria-label="${t("common.close")}">×</button>
-        </div>
-        <div class="runtime-config-body agent-manager-body dialog-tabs">
-          <input class="dialog-tab-input" type="radio" name="agent-manager-tab" id="agentManagerTabOverview" checked>
-          <label class="dialog-tab-label" for="agentManagerTabOverview">${t("agentDetail.tab.overview")}</label>
-          <input class="dialog-tab-input" type="radio" name="agent-manager-tab" id="agentManagerTabBrief">
-          <label class="dialog-tab-label" for="agentManagerTabBrief">${t("agentDetail.tab.brief")}</label>
-          <input class="dialog-tab-input" type="radio" name="agent-manager-tab" id="agentManagerTabConnection">
-          <label class="dialog-tab-label" for="agentManagerTabConnection">${t("agentDetail.tab.connection")}</label>
-          <div class="dialog-tab-panels">
-            <section class="dialog-tab-panel agent-manager-overview">
-              ${AgentDetailPanel(detail)}
-            </section>
-            <section class="dialog-tab-panel agent-manager-brief">
-              <div class="runtime-config-section agent-brief-section">
-                <div class="agent-brief-section-header">
-                  <div>
-                    <h4>${t("agentBrief.sectionTitle")}</h4>
-                    <p>${t("agentBrief.sectionSubtitle")}</p>
-                  </div>
-                </div>
-                <div class="agent-brief-list">${agentBriefRowMarkup(target, 0)}</div>
-              </div>
-            </section>
-            <section class="dialog-tab-panel agent-manager-connection">
-              <div class="runtime-config-section">
-                <h4>${t("connection.detected")}</h4>
-                <div class="connection-instance-list">${instanceMarkup}</div>
-              </div>
-            </section>
-          </div>
-        </div>
-        <div class="confirm-dialog-actions runtime-config-actions">
-          <button type="button" class="confirm-dialog-cancel agent-manager-close">${t("common.close")}</button>
-          <button type="button" class="mini-btn ghost-btn agent-manager-recheck">${t("connection.recheck")}</button>
-          <button type="submit" class="primary runtime-config-save">${t("agentBrief.saveAll")}</button>
-        </div>
-      </form>
-    `;
-    confirmDialog.querySelectorAll(".agent-manager-close").forEach((button) => {
-      button.addEventListener("click", closeConfirmDialog);
-    });
-    await autoFetchBriefButtons(confirmDialog);
-    confirmDialog.querySelector(".agent-manager-recheck")?.addEventListener("click", async (event) => {
-      const button = event.currentTarget;
-      button.disabled = true;
-      setAppNotice(t("connection.rechecking"), "busy");
-      try {
-        await refreshRuntimeProbe();
-        if (target.providerId === "hermes") await loadHermesProfiles();
-        setAppNotice(t("connection.checkComplete"));
-        await openAgentManager(agentId);
-      } catch (error) {
-        console.error(error);
-        button.disabled = false;
-        setAppNotice(t("runtimeConfig.failed", { error: formatBackendError(error) }), "error");
-      }
-    });
-    confirmDialog.querySelector(".agent-manager-dialog")?.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      await saveBriefInputs(confirmDialog);
-      closeConfirmDialog();
-      setAppNotice(t("agentBrief.saved"));
-    });
-  } catch (error) {
-    console.error(error);
-    setAppNotice(t("agentDetail.openFailed", { error: formatBackendError(error) }), "error");
-  }
+  return agentManagementView?.openAgentManager(agentId);
 }
 
-function providerBriefSectionMarkup(providerId) {
-  const targets = targetsForProvider(providerId);
-  const rows = targets.map(agentBriefRowMarkup).join("");
-  return `
-    <section class="runtime-config-section agent-brief-section">
-      <div class="agent-brief-section-header">
-        <div>
-          <h4>${t("agentBrief.sectionTitle")}</h4>
-          <p>${t("agentBrief.sectionSubtitle")}</p>
-        </div>
-        <button type="button" class="mini-btn ghost-btn agent-brief-fetch-all" ${targets.some(isTargetSendable) ? "" : "disabled"}>${t("agentBrief.autoFetchAll")}</button>
-      </div>
-      <div class="agent-brief-list">${rows || `<p class="connection-empty">${t("provider.noTargets")}</p>`}</div>
-      <button type="button" class="mini-btn agent-brief-save-all">${t("agentBrief.saveAll")}</button>
-    </section>
-  `;
-}
-
-async function openProviderManager(providerId = currentTargetProvider()?.id || "claude") {
-  if (!confirmDialog) return;
-  try {
-    const selectedProviderId = providerId || "claude";
-    await ensureRuntimeConfigState();
-    const selectedProvider = providerById(selectedProviderId) || { id: selectedProviderId, name: selectedProviderId };
-    const selectedAvailability = providerAvailability(selectedProviderId);
-    const selectedState = providerAvailabilityLabel(selectedAvailability.summary);
-    const selectedStateClass = stateClasses[PROVIDER_AVAILABILITY_STATES[selectedAvailability.summary]?.state] || "state-idle";
-    const title = selectedProviderId === "claude"
-      ? t("runtimeConfig.claudeTitle")
-      : selectedProviderId === "hermes"
-        ? t("runtimeConfig.hermesTitle")
-        : selectedProvider.name;
-    const instances = runtimeInstancesForProvider(selectedProviderId);
-    const instanceMarkup = instances.length
-      ? instances.map((instance) => connectionInstanceMarkup(instance, title)).join("")
-      : `<p class="connection-empty">${t("connection.none")}</p>`;
-    confirmDialog.hidden = false;
-    confirmDialog.innerHTML = `
-      <form class="confirm-dialog runtime-config-dialog connection-dialog" role="dialog" aria-modal="true" aria-labelledby="runtimeConfigTitle">
-        <div class="confirm-dialog-header">
-          <span class="runtime-config-icon" aria-hidden="true">●</span>
-          <div>
-            <h3 id="runtimeConfigTitle">${t("connection.title")} · ${title}</h3>
-            <p class="runtime-config-subtitle">${t("connection.subtitle")}</p>
-          </div>
-          <button type="button" class="confirm-dialog-close runtime-config-close" aria-label="${t("common.close")}">×</button>
-        </div>
-        <div class="runtime-config-body connection-manager-body dialog-tabs">
-          <aside class="runtime-config-status-card">
-            <span class="runtime-config-kicker">${selectedProviderId}</span>
-            <strong>${title}</strong>
-            <span class="state-pill ${selectedStateClass}">${selectedState}</span>
-            <span>${escapeHtml(runtimeConnectionNote(selectedProvider, instances))}</span>
-          </aside>
-          <input class="dialog-tab-input" type="radio" name="provider-manager-tab" id="providerManagerTabConnection" checked>
-          <label class="dialog-tab-label" for="providerManagerTabConnection">${t("agentDetail.tab.connection")}</label>
-          <input class="dialog-tab-input" type="radio" name="provider-manager-tab" id="providerManagerTabBrief">
-          <label class="dialog-tab-label" for="providerManagerTabBrief">${t("agentDetail.tab.brief")}</label>
-          <div class="dialog-tab-panels">
-            <section class="dialog-tab-panel provider-connection-tab">
-              <div class="runtime-config-section">
-                <h4>${t("connection.detected")}</h4>
-                <div class="connection-instance-list">${instanceMarkup}</div>
-              </div>
-            </section>
-            <section class="dialog-tab-panel provider-brief-tab">
-              ${providerBriefSectionMarkup(selectedProviderId)}
-            </section>
-          </div>
-        </div>
-        <div class="confirm-dialog-actions runtime-config-actions">
-          <button type="button" class="confirm-dialog-cancel runtime-config-close">${t("common.close")}</button>
-          <button type="submit" class="primary runtime-config-save">${t("connection.recheck")}</button>
-        </div>
-      </form>
-    `;
-    confirmDialog.querySelectorAll(".runtime-config-close").forEach((button) => {
-      button.addEventListener("click", closeConfirmDialog);
-    });
-    await autoFetchBriefButtons(confirmDialog);
-    confirmDialog.querySelector(".agent-brief-save-all")?.addEventListener("click", async () => {
-      try {
-        await saveBriefInputs(confirmDialog);
-        setAppNotice(t("agentBrief.saved"));
-      } catch (error) {
-        console.error(error);
-        setAppNotice(t("agentBrief.saveFailed", { error: formatBackendError(error) }), "error");
-      }
-    });
-    confirmDialog.querySelector(".agent-brief-fetch-all")?.addEventListener("click", async (event) => {
-      const button = event.currentTarget;
-      button.disabled = true;
-      try {
-        await autoFetchProviderBriefs(selectedProviderId, confirmDialog);
-      } catch (error) {
-        console.error(error);
-        setAppNotice(t("agentBrief.fetchFailed", { error: formatBackendError(error) }), "error");
-      } finally {
-        button.disabled = !targetsForProvider(selectedProviderId).some(isTargetSendable);
-      }
-    });
-    confirmDialog.querySelector(".runtime-config-dialog")?.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const saveButton = event.currentTarget.querySelector(".runtime-config-save");
-      saveButton.disabled = true;
-      setAppNotice(t("connection.rechecking"), "busy");
-      try {
-        await refreshRuntimeProbe();
-        if (selectedProviderId === "hermes") await loadHermesProfiles();
-        closeConfirmDialog();
-        setAppNotice(t("connection.checkComplete"));
-      } catch (error) {
-        console.error(error);
-        saveButton.disabled = false;
-        setAppNotice(t("runtimeConfig.failed", { error: formatBackendError(error) }), "error");
-      }
-    });
-  } catch (error) {
-    console.error(error);
-    setAppNotice(t("runtimeConfig.failed", { error: formatBackendError(error) }), "error");
-  }
+async function openProviderManager(providerId = currentTargetProvider()?.id || providersSnapshot()[0]?.id || "") {
+  return agentManagementView?.openProviderManager(providerId);
 }
 
 function openAvailabilityModal() {
-  if (!confirmDialog) return;
-
-  const store = getAvailabilityStore();
-  const data = store.getData();
-
-  if (!data.lastCheck) {
-    store.refresh(providersSnapshot(), runtimeInstancesSnapshot(), currentTargetAgent(), providersStore.getRuntimeAvailabilitySnapshot());
-  }
-
-  const freshData = store.getData();
-  const viewHtml = AvailabilityView(freshData, { showTitle: false, compact: true });
-
-  confirmDialog.hidden = false;
-  confirmDialog.innerHTML = `
-    <form class="confirm-dialog availability-dialog" role="dialog" aria-modal="true" aria-labelledby="availabilityTitle">
-      <div class="confirm-dialog-header">
-        <span class="runtime-config-icon" aria-hidden="true">●</span>
-        <div>
-          <h3 id="availabilityTitle">${t("availability.title")}</h3>
-          <p class="runtime-config-subtitle">${t("availability.subtitle")}</p>
-        </div>
-        <button type="button" class="confirm-dialog-close availability-close" aria-label="${t("common.close")}">×</button>
-      </div>
-      <div class="availability-dialog-body">
-        ${viewHtml}
-      </div>
-      <div class="confirm-dialog-actions availability-actions">
-        <button type="button" class="confirm-dialog-cancel availability-close">${t("common.close")}</button>
-        <button type="button" class="mini-btn ghost-btn availability-copy">${t("availability.copyReport")}</button>
-        <button type="submit" class="primary availability-recheck">${t("availability.recheck")}</button>
-      </div>
-    </form>
-  `;
-
-  confirmDialog.querySelectorAll(".availability-close").forEach((button) => {
-    button.addEventListener("click", closeConfirmDialog);
-  });
-
-  confirmDialog.querySelector(".availability-copy")?.addEventListener("click", () => {
-    const report = JSON.stringify(freshData, null, 2);
-    navigator.clipboard?.writeText(report).then(() => {
-      setAppNotice(t("availability.reportCopied"));
-    }).catch(() => {
-      setAppNotice(t("common.copyFailed"), "error");
-    });
-  });
-
-  confirmDialog.querySelector(".availability-dialog")?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const recheckBtn = event.currentTarget.querySelector(".availability-recheck");
-    recheckBtn.disabled = true;
-    setAppNotice(t("availability.rechecking"), "busy");
-    try {
-      await refreshRuntimeProbe();
-      store.refresh(providersSnapshot(), runtimeInstancesSnapshot(), currentTargetAgent(), providersStore.getRuntimeAvailabilitySnapshot());
-      const updatedData = store.getData();
-      const updatedView = AvailabilityView(updatedData, { showTitle: false, compact: true });
-      confirmDialog.querySelector(".availability-dialog-body").innerHTML = updatedView;
-      setAppNotice(t("availability.checkComplete"));
-    } catch (error) {
-      setAppNotice(t("availability.checkFailed", { error: formatBackendError(error) }), "error");
-    } finally {
-      recheckBtn.disabled = false;
-    }
-  });
-}
-
-function showProviderAgents(provider) {
-  const names = provider.agents.map((agent) => displayAgentName(agent)).join(t("common.listSeparator"));
-  setAppNotice(t("provider.agentList", { provider: provider.name, agents: names }));
+  agentManagementView?.openAvailabilityModal();
 }
 
 async function refreshRuntimeProbe() {
@@ -1528,6 +1125,12 @@ async function refreshRuntimeProbe() {
     setAppNotice(t("runtime.probeFailed", { error: formatBackendError(error) }), "error");
     return null;
   }
+}
+
+// 连接弹窗重查时统一刷新探测结果和该 Provider 的目标列表。
+async function refreshProviderConnections(providerId) {
+  await refreshRuntimeProbe();
+  await loadRuntimeTargetsForProvider(providerId);
 }
 
 function latestActiveSessionForAgent(agentId) {
@@ -1568,10 +1171,10 @@ function setCurrentTargetAgent(agentId) {
 function runtimeConnectionNote(provider, instances) {
   if (!providerSupportsLaunch(provider)) return displayProviderNote(provider);
   if (!instances.length) {
-    return provider.id === "hermes" ? t("provider.noHermesRuntime") : t("provider.noRuntime");
+    return t(provider.noRuntimeKey || "provider.noRuntime");
   }
   const available = instances.filter((instance) => instance.available);
-  if (!available.length) return provider.id === "hermes" ? t("provider.noHermesRuntime") : t("provider.noRuntime");
+  if (!available.length) return t(provider.noRuntimeKey || "provider.noRuntime");
   return available
     .map((instance) => instance.runtimeLabel || provider.name)
     .join(" / ");
@@ -2279,6 +1882,46 @@ function focusComposerInput() {
     }
   });
 }
+
+// Agent Management View 统一承接连接详情、职责简报和可用性弹窗。
+agentManagementView = createAgentManagementView({
+  confirmDialog,
+  getAvailabilityStore,
+  providersSnapshot,
+  runtimeInstancesSnapshot,
+  getRuntimeAvailabilitySnapshot: () => providersStore.getRuntimeAvailabilitySnapshot(),
+  currentTargetAgent,
+  getDefaultProviderId: () => currentTargetProvider()?.id || providersSnapshot()[0]?.id || "",
+  providerById,
+  agentById,
+  runtimeInstanceById,
+  runtimeInstancesForProvider,
+  targetsForProvider,
+  providerAvailability,
+  providerAvailabilityLabel,
+  providerAvailabilityState: (summary) => PROVIDER_AVAILABILITY_STATES[summary]?.state,
+  runtimeConnectionNote,
+  targetDisplayName,
+  displayAgentName,
+  targetBriefText,
+  targetBriefInputValue,
+  fallbackBriefKeyForTarget,
+  isTargetSendable,
+  cloneAgentBriefs,
+  writeBriefValue,
+  saveAgentBriefRecords,
+  ensureRuntimeConfigState,
+  refreshAgentBriefForTarget,
+  refreshRuntimeProbe,
+  refreshProviderConnections,
+  renderProviders,
+  closeConfirmDialog,
+  setAppNotice,
+  formatBackendError,
+  stateClasses,
+  t,
+  escapeHtml,
+});
 
 // Agent Fleet View 接管左侧列表 HTML 与点击绑定，Shell 只注入领域查询和命令。
 agentFleetView = createAgentFleetView({
