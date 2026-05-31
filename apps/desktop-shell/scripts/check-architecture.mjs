@@ -1,0 +1,62 @@
+import { readFileSync, readdirSync } from "node:fs";
+import { extname, join, relative, resolve } from "node:path";
+
+// 架构检查只约束稳定边界，不尝试替代领域测试。
+const root = resolve(import.meta.dirname, "..");
+const repoRoot = resolve(root, "..", "..");
+const failures = [];
+
+function read(relativePath) {
+  return readFileSync(resolve(root, relativePath), "utf8");
+}
+
+function fail(message) {
+  failures.push(message);
+}
+
+function walk(relativeDir) {
+  const absoluteDir = resolve(root, relativeDir);
+  return readdirSync(absoluteDir, { withFileTypes: true }).flatMap((entry) => {
+    const absolutePath = join(absoluteDir, entry.name);
+    const child = relative(root, absolutePath).replaceAll("\\", "/");
+    return entry.isDirectory() ? walk(child) : [child];
+  });
+}
+
+// main.js 只允许继续收缩；阈值按当前阶段设置，后续拆分时应继续降低。
+const mainSource = read("src/main.js");
+const mainLines = mainSource.split(/\r?\n/).length;
+if (mainLines > 2400) fail(`src/main.js 行数回升到 ${mainLines}，超过阶段阈值 2400`);
+
+// Shell 编排层不得重新认识具体 Adapter 名称。
+if (/\b(?:hermes|claude|trae)\b/i.test(mainSource)) {
+  fail("src/main.js 出现具体 Adapter 名称，应改为 manifest、Provider 元数据或 Adapter seam");
+}
+
+// History 磁盘调用必须集中经过前端 Repository。
+const historyInvokePattern = /invoke\(\s*["'](?:history_|load_history|append_history|archive_history|delete_history|compact_history)/;
+for (const path of walk("src")) {
+  if (extname(path) !== ".js" || path.endsWith(".test.js") || path === "src/history/historyRepository.js") continue;
+  if (historyInvokePattern.test(read(path))) fail(`${path} 绕过 History Repository 直接调用后端`);
+}
+
+// View 只能发命令，不能直接改写 Store 暴露对象。
+const directViewMutationPattern = /\.(?:inWorkspace|record_state|access_mode|runtime_binding|lifecycle)\s*=(?!=)/;
+for (const path of [...walk("src/ui"), ...walk("src/components")]) {
+  if (extname(path) !== ".js" || path.endsWith(".test.js")) continue;
+  if (directViewMutationPattern.test(read(path))) fail(`${path} 直接修改 Session 字段，应通过 Store 或 Controller`);
+}
+
+// Rust composition root 不得重新注册专用 Adapter command。
+const rustLib = readFileSync(resolve(repoRoot, "apps/desktop-shell/src-tauri/src/lib.rs"), "utf8");
+if (/runtime_acp_(?:claude|hermes)|runtime_hermes_profiles/.test(rustLib)) {
+  fail("src-tauri/src/lib.rs 出现废弃的专用 Adapter command");
+}
+
+if (failures.length) {
+  console.error("Architecture check failed:");
+  failures.forEach((message) => console.error(`- ${message}`));
+  process.exit(1);
+}
+
+console.log(`OK: architecture boundaries hold (main.js ${mainLines} lines)`);

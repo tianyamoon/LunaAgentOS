@@ -17,6 +17,7 @@
     "test:runtime": "node --test src/runtime/streamEvents.test.js",
     "test:all": "node --test \"src/**/*.test.js\"",
     "lint:undef": "node scripts/find-undef.mjs",
+    "lint:architecture": "node scripts/check-architecture.mjs",
     "tauri": "tauri"
   },
   "devDependencies": {
