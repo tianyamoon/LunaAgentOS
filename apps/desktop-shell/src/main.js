@@ -71,7 +71,6 @@ import {
   bindResumeValidationTurn,
   clearResumeValidation,
   isResumeValidationTurn,
-  markResumeValidationPending,
 } from "./state/resumeValidation.js";
 import {
   canTargetStartSession,
@@ -117,6 +116,7 @@ import {
   restoreAgentEntryFromArchived,
 } from "./state/sessionRestoreProjection.js";
 import { createWorkspaceSessionController } from "./controllers/workspaceSessionController.js";
+import { createSessionRestoreController } from "./controllers/sessionRestoreController.js";
 import {
   availableRuntimeInstancesForProvider as availableRuntimeInstancesForProviderRaw,
   providerRuntimeLabel as providerRuntimeLabelRaw,
@@ -416,6 +416,7 @@ const historyRepository = createHistoryRepository({
 const workspaceViewStore = createWorkspaceViewStore();
 const sessions = sessionsStore.getSessions();
 let workspaceSessionController = null;
+let sessionRestoreController = null;
 let historyView = null;
 let workspaceView = null;
 let sessionSeq = 0;
@@ -435,7 +436,6 @@ let scheduledWorkspaceRenderOptions = null;
 let scheduledWorkspaceRenderFrame = 0;
 let scheduledWorkspaceRenderTimer = 0;
 let pendingConfirmAction = null;
-let restoreIntentSeq = 0;
 let composerCommandHint = null;
 let composerCommandMenu = null;
 let composerCommandMenuOpen = false;
@@ -2287,21 +2287,7 @@ function appendErrorToTurn(sessionId, turnId, message) {
 }
 
 function rollbackResumeValidationPromptFailure(session, turn, message) {
-  markPromptErrorOnTurn(session, turn, message);
-  clearResumeValidation(session);
-  setSessionLifecycle(session, LIFECYCLE.resume_failed);
-  setSessionAccessMode(session, ACCESS_MODE.read_only);
-  setRuntimeBinding(session, {
-    state: RUNTIME_BINDING_STATE.failed,
-    stage: RUNTIME_BINDING_STAGE.prompt,
-    error_title: t("restore.firstTurnFailedTitle"),
-    error_detail: message,
-    error_suggestion: t("restore.firstTurnFailedSuggestion"),
-  });
-  markSessionInactive(session.id);
-  renderWorkspace();
-  renderHistory();
-  setAppNotice(t("restore.firstTurnFailedNotice", { error: compactNoticeText(message) }), "error");
+  sessionRestoreController?.rollbackFirstTurnPromptFailure(session, turn, message);
 }
 
 function localizedFallbackEvents(events) {
@@ -3313,137 +3299,44 @@ function workspaceSessionFromArchived(archived, existing = null) {
   });
 }
 
+// Session Restore Controller 接管归档打开、重连与首轮异常回退。
+sessionRestoreController = createSessionRestoreController({
+  getArchivedSessions: archivedSessionsFromHistory,
+  getSessions: () => sessions,
+  getCurrentSessionId: () => sessionsStore.getCurrentSessionId(),
+  workspaceSessionFromArchived,
+  sessionRuntimeState,
+  setSessionRecordState,
+  setSessionAccessMode,
+  setSessionLifecycle,
+  setRuntimeBinding,
+  clearRuntimeBindingError,
+  markSessionInactive,
+  markSessionActive,
+  upsertSession: (session) => sessionsStore.upsertHead(session),
+  unmarkStopped: (sessionId) => sessionsStore.unmarkStopped(sessionId),
+  saveCurrentTargetAgent,
+  saveCurrentSession,
+  activateWorkspaceSession,
+  renderProviders,
+  renderWorkspace,
+  renderHistory,
+  focusComposerInput,
+  acpRuntimeClient,
+  appendRuntimeLog: appendRuntimeLogToSession,
+  markPromptError: markPromptErrorOnTurn,
+  formatBackendError,
+  compactNoticeText,
+  setAppNotice,
+  t,
+});
+
 function openArchivedTranscript(sessionId) {
-  if (!sessionId) return;
-  const archived = archivedSessionsFromHistory().find((item) => item.id === sessionId);
-  if (!archived) return;
-  const existing = sessions.find((item) => item.id === archived.id);
-  if (existing && sessionRuntimeState(existing) === "restoring") {
-    activateWorkspaceSession(existing.id, { focusWorkspace: true });
-    setAppNotice(t("archive.restoring"), "busy");
-    return;
-  }
-  const restored = workspaceSessionFromArchived(archived, existing);
-  setSessionRecordState(restored, RECORD_STATE.archived);
-  setSessionAccessMode(restored, ACCESS_MODE.read_only);
-  if (!existing) sessionsStore.upsertHead(restored);
-  markSessionInactive(restored.id);
-  saveCurrentTargetAgent(restored.agentId);
-  saveCurrentSession(restored.id);
-  renderProviders();
-  renderWorkspace({ focusSessionId: restored.id });
-  renderHistory({ scrollSessionId: restored.id });
-  setAppNotice(restored.acpSessionId
-    ? t("archive.openedRestorable")
-    : t("archive.openedReadOnly"));
-  focusComposerInput();
+  return sessionRestoreController?.openArchivedTranscript(sessionId);
 }
 
 async function restoreArchivedSession(sessionId) {
-  if (!sessionId) return;
-  const archived = archivedSessionsFromHistory().find((item) => item.id === sessionId);
-  if (!archived) return;
-  const existing = sessions.find((item) => item.id === archived.id);
-  if (existing && sessionRuntimeState(existing) === "restoring") {
-    setAppNotice(t("archive.restoring"), "busy");
-    return;
-  }
-  const restored = workspaceSessionFromArchived(archived, existing);
-  clearResumeValidation(restored);
-  setSessionRecordState(restored, RECORD_STATE.archived);
-  setSessionAccessMode(restored, ACCESS_MODE.interactive);
-  const restoreIntentId = ++restoreIntentSeq;
-  const restoreStillFocused = () => restoreIntentId === restoreIntentSeq && sessionsStore.getCurrentSessionId() === restored.id;
-  const renderRestoreUpdate = () => {
-    const focused = restoreStillFocused();
-    renderWorkspace(focused ? {} : { preserveDeckScroll: true });
-    renderHistory(focused ? { scrollSessionId: restored.id } : {});
-  };
-  if (!existing) sessionsStore.upsertHead(restored);
-  sessionsStore.unmarkStopped(restored.id);
-  saveCurrentTargetAgent(restored.agentId);
-  saveCurrentSession(restored.id);
-  renderProviders();
-  renderWorkspace({ focusSessionId: restored.id });
-  renderHistory({ scrollSessionId: restored.id });
-  focusComposerInput();
-  if (!restored.acpSessionId) {
-    setSessionLifecycle(restored, LIFECYCLE.archived);
-    setSessionAccessMode(restored, ACCESS_MODE.read_only);
-    markSessionInactive(restored.id);
-    renderWorkspace();
-    renderHistory();
-    setAppNotice(t("restore.readOnlyMissingSession"));
-    return;
-  }
-  setSessionLifecycle(restored, LIFECYCLE.restoring);
-  setRuntimeBinding(restored, { state: RUNTIME_BINDING_STATE.reconnecting, stage: RUNTIME_BINDING_STAGE.load });
-  renderWorkspace();
-  renderHistory();
-  setAppNotice(t("restore.starting"), "busy");
-  if (!acpRuntimeClient.canHandle(restored.providerId)) {
-    setSessionLifecycle(restored, LIFECYCLE.archived);
-    markSessionInactive(restored.id);
-    renderRestoreUpdate();
-    setAppNotice(t("restore.unsupportedProvider"));
-    return;
-  }
-  try {
-    await acpRuntimeClient.load(restored);
-    await acpRuntimeClient.verifyAlive(restored.providerId, restored.id);
-    setSessionLifecycle(restored, LIFECYCLE.live);
-    setSessionAccessMode(restored, ACCESS_MODE.interactive);
-    clearRuntimeBindingError(restored);
-    markResumeValidationPending(restored);
-    markSessionActive(restored.id);
-    renderRestoreUpdate();
-    setAppNotice(t("restore.reconnected"));
-  } catch (loadError) {
-    const formattedLoadError = formatBackendError(loadError);
-    try {
-      await acpRuntimeClient.shutdown(restored);
-    } catch (shutdownError) {
-      console.error(shutdownError);
-    }
-    try {
-      await acpRuntimeClient.resume(restored);
-      await acpRuntimeClient.verifyAlive(restored.providerId, restored.id);
-      setSessionLifecycle(restored, LIFECYCLE.live);
-      setSessionAccessMode(restored, ACCESS_MODE.interactive);
-      clearRuntimeBindingError(restored);
-      markResumeValidationPending(restored);
-      markSessionActive(restored.id);
-      renderRestoreUpdate();
-      setAppNotice(t("restore.loadFailedResumed"));
-    } catch (resumeError) {
-      const formattedResumeError = formatBackendError(resumeError || loadError);
-      appendRuntimeLogToSession(
-        restored,
-        [
-          t("restore.failedLogHeader"),
-          t("restore.loadFailedLine", { error: formattedLoadError }),
-          t("restore.resumeFailedLine", { error: formattedResumeError }),
-        ].join("\n"),
-        9,
-      );
-      setSessionLifecycle(restored, LIFECYCLE.resume_failed);
-      setSessionAccessMode(restored, ACCESS_MODE.read_only);
-      clearResumeValidation(restored);
-      setRuntimeBinding(restored, {
-        state: RUNTIME_BINDING_STATE.failed,
-        stage: RUNTIME_BINDING_STAGE.resume,
-        error_title: t("restore.failedTitle"),
-        error_detail: [
-          t("restore.loadFailedLine", { error: formattedLoadError }),
-          t("restore.resumeFailedLine", { error: formattedResumeError }),
-        ].join("\n"),
-        error_suggestion: t("restore.failedSuggestion"),
-      });
-      markSessionInactive(restored.id);
-      renderRestoreUpdate();
-      setAppNotice(t("restore.failedNotice", { error: compactNoticeText(formattedResumeError) }), "error");
-    }
-  }
+  return sessionRestoreController?.restoreArchivedSession(sessionId);
 }
 
 async function loadHistory() {
