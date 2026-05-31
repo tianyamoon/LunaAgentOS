@@ -104,13 +104,11 @@ import {
 } from "./themes/index.js";
 import {
   archivedSessionsFromHistory as archivedSessionsFromHistoryRaw,
-  historySessionKey,
 } from "./history/entries.js";
 import {
   buildHistoryEntryPayload,
-  formatCompactHistoryNotice,
-  upsertHistoryEntry,
 } from "./history/payload.js";
+import { createHistoryRepository } from "./history/historyRepository.js";
 import { snapshotRuntimeSession } from "./providers/agentEntrySnapshot.js";
 import { createProvidersStore } from "./state/providersStore.js";
 import { createSessionsStore } from "./state/sessionsStore.js";
@@ -397,15 +395,28 @@ const acpRuntimeClient = createAcpRuntimeClient({
   commandsForProvider: acpCommandsForProvider,
   translate: t,
 });
+// History Repository 统一承接磁盘 IO 与快照管理，Shell 只注入运行时相关投影。
+const historyRepository = createHistoryRepository({
+  invoke,
+  buildPayload: ({ session, turn }) => buildHistoryEntryPayload({
+    session,
+    turn,
+    agentEntrySnapshot: snapshotRuntimeSession(session),
+    schemaVersion: HISTORY_SCHEMA_VERSION,
+    runtimeState: sessionRuntimeState(session),
+    getStateName: (state) => stateNames[state],
+  }),
+  projectArchivedSessions: (entries) => archivedSessionsFromHistoryRaw(entries, {
+    normalizeSession: normalizeWorkspaceSession,
+  }),
+});
 const workspaceViewStore = createWorkspaceViewStore();
 const sessions = sessionsStore.getSessions();
 let workspaceSessionController = null;
 let historyView = null;
 let workspaceView = null;
-let historyEntries = [];
 let sessionSeq = 0;
 let runningSessions = 0;
-let isHistoryLoading = true;
 let sendAsNewSession = false;
 let sendMode = localStorage.getItem(SEND_MODE_KEY) || "enter";
 let fontScaleId = localStorage.getItem(FONT_SCALE_KEY) || "default";
@@ -551,8 +562,8 @@ function normalizeWorkspaceSession(session) {
   });
 }
 
-function archivedSessionsFromHistory(entries) {
-  return archivedSessionsFromHistoryRaw(entries, { normalizeSession: normalizeWorkspaceSession });
+function archivedSessionsFromHistory() {
+  return historyRepository.getArchivedSessions();
 }
 
 function targetsForProvider(providerId) {
@@ -2335,7 +2346,7 @@ function updateWorkspaceEmptyCopy() {
 
 function countRestorableActiveHistoryItems() {
   const liveIds = new Set(sessions.map((session) => session.id));
-  return archivedSessionsFromHistory(readableHistoryEntries())
+  return archivedSessionsFromHistory()
     .filter((item) => !liveIds.has(item.id))
     .filter((item) => item.record_state === RECORD_STATE.active && item.access_mode !== ACCESS_MODE.read_only)
     .length;
@@ -2948,7 +2959,7 @@ historyView = createHistoryView({
   historyList,
   sessionListSectionOpenState,
   sessionListItems,
-  isHistoryLoading: () => isHistoryLoading,
+  isHistoryLoading: () => historyRepository.isLoading(),
   isActiveSessionListItem,
   isArchivedSessionListItem,
   compareActiveSessionListItems,
@@ -2970,6 +2981,8 @@ historyView = createHistoryView({
   activateWorkspaceSession,
   openArchivedTranscript,
 });
+// Repository 快照变化时刷新右侧列表，包含加载态切换与后台写入结果。
+historyRepository.subscribe(() => renderHistory());
 
 workspaceView = createWorkspaceView({
   sessionDeck,
@@ -3003,9 +3016,8 @@ async function archiveLiveSession(sessionId) {
   const stoppedTurn = shouldMarkStopped ? markSessionStopped(session) : null;
   setSessionLifecycle(session, LIFECYCLE.archived);
   try {
-    await invoke("archive_history_session_entries", { sessionId });
+    await historyRepository.archiveSession(sessionId);
     if (stoppedTurn) await saveTurnToHistory(session, stoppedTurn);
-    historyEntries = await invoke("load_history_entries");
   } catch (error) {
     console.error(error);
   }
@@ -3041,7 +3053,6 @@ async function stopSession(sessionId) {
   const stoppedTurn = markSessionStopped(session);
   try {
     if (stoppedTurn) await saveTurnToHistory(session, stoppedTurn);
-    historyEntries = await invoke("load_history_entries");
   } catch (error) {
     console.error(error);
   }
@@ -3087,7 +3098,7 @@ async function dismissWorkspaceSession(sessionId) {
 
 async function deleteSession(sessionId) {
   const session = sessions.find((item) => item.id === sessionId);
-  const archived = archivedSessionsFromHistory(readableHistoryEntries()).find((item) => item.id === sessionId);
+  const archived = archivedSessionsFromHistory().find((item) => item.id === sessionId);
   const runtimeState = session ? sessionRuntimeState(session) : archived?.runtimeState || "archived";
   if (runtimeState === "restoring") {
     setAppNotice(t("session.deleteRestoringBlocked"), "busy");
@@ -3108,8 +3119,7 @@ async function deleteSession(sessionId) {
       }
     }
     removeSessionFromWorkspace(sessionId);
-    const result = await invoke("delete_history_session_entries", { sessionId });
-    historyEntries = historyEntries.filter((entry) => historySessionKey(entry) !== sessionId);
+    const result = await historyRepository.deleteSession(sessionId);
     renderWorkspace();
     renderHistory();
     const skipped = result?.skippedFiles ? t("session.deleteSkippedFiles", { count: result.skippedFiles }) : "";
@@ -3122,7 +3132,7 @@ async function deleteSession(sessionId) {
 
 function requestDeleteConfirmation(sessionId) {
   const session = sessions.find((item) => item.id === sessionId);
-  const archived = archivedSessionsFromHistory(readableHistoryEntries()).find((item) => item.id === sessionId);
+  const archived = archivedSessionsFromHistory().find((item) => item.id === sessionId);
   const title = session?.task || archived?.title || t("confirm.sessionFallback");
   openConfirmDialog({
     title: t("confirm.deleteSessionTitle"),
@@ -3224,12 +3234,6 @@ function syncSessionStickControllers(visibleSessions, stickyIntent) {
 }
 
 
-function readableHistoryEntries() {
-  return [...historyEntries];
-}
-
-
-
 function sessionListItems() {
   const sourceSessions = sessions;
   const liveItems = sourceSessions.map((session) => {
@@ -3266,7 +3270,7 @@ function sessionListItems() {
     };
   });
   const liveIds = new Set(liveItems.map((item) => item.id));
-  const historyItems = archivedSessionsFromHistory(readableHistoryEntries())
+  const historyItems = archivedSessionsFromHistory()
     .filter((item) => !liveIds.has(item.id))
     .map((item) => ({
       ...item,
@@ -3400,7 +3404,7 @@ function workspaceSessionFromArchived(archived, existing = null) {
 
 function openArchivedTranscript(sessionId) {
   if (!sessionId) return;
-  const archived = archivedSessionsFromHistory(readableHistoryEntries()).find((item) => item.id === sessionId);
+  const archived = archivedSessionsFromHistory().find((item) => item.id === sessionId);
   if (!archived) return;
   const existing = sessions.find((item) => item.id === archived.id);
   if (existing && sessionRuntimeState(existing) === "restoring") {
@@ -3426,7 +3430,7 @@ function openArchivedTranscript(sessionId) {
 
 async function restoreArchivedSession(sessionId) {
   if (!sessionId) return;
-  const archived = archivedSessionsFromHistory(readableHistoryEntries()).find((item) => item.id === sessionId);
+  const archived = archivedSessionsFromHistory().find((item) => item.id === sessionId);
   if (!archived) return;
   const existing = sessions.find((item) => item.id === archived.id);
   if (existing && sessionRuntimeState(existing) === "restoring") {
@@ -3533,32 +3537,17 @@ async function restoreArchivedSession(sessionId) {
 
 async function loadHistory() {
   try {
-    const compactResult = await invoke("compact_history_entries");
-    historyEntries = await invoke("load_history_entries");
-    const notice = formatCompactHistoryNotice(compactResult);
+    const { notice } = await historyRepository.load();
     if (notice) setAppNotice(notice.message, notice.kind);
   } catch (error) {
     console.error(error);
-    historyEntries = [];
     setAppNotice(t("history.loadFailed"), "error");
-  } finally {
-    isHistoryLoading = false;
   }
   renderHistory();
 }
 
 async function saveTurnToHistory(session, turn) {
-  const entry = await invoke("append_history_entry", {
-    entry: buildHistoryEntryPayload({
-      session,
-      turn,
-      agentEntrySnapshot: snapshotRuntimeSession(session),
-      schemaVersion: HISTORY_SCHEMA_VERSION,
-      runtimeState: sessionRuntimeState(session),
-      getStateName: (state) => stateNames[state],
-    }),
-  });
-  historyEntries = upsertHistoryEntry(historyEntries, entry);
+  await historyRepository.appendTurn({ session, turn });
   renderHistory();
 }
 
