@@ -132,10 +132,21 @@ const DEFAULT_RUNTIME_AVAILABILITY = {
   trae: { summary: "planned", configured: false, available: false, command: "IDE Bridge" },
 };
 
+function clonePlainData(value) {
+  if (Array.isArray(value)) return value.map(clonePlainData);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, clonePlainData(item)]),
+    );
+  }
+  return value;
+}
+
 function cloneProvider(entry) {
+  const provider = clonePlainData(entry || {});
   return {
-    ...entry,
-    agents: Array.isArray(entry.agents) ? entry.agents.map((agent) => ({ ...agent })) : [],
+    ...provider,
+    agents: Array.isArray(provider.agents) ? provider.agents : [],
   };
 }
 
@@ -202,12 +213,13 @@ export function createProvidersStore(initial = {}) {
   }
 
   return {
-    getProvidersRef() {
-      return providers;
+    getProvidersSnapshot() {
+      return providers.map(cloneProvider);
     },
     providerById(id) {
       if (!id) return null;
-      return providers.find((provider) => provider.id === id) || null;
+      const provider = providers.find((entry) => entry.id === id);
+      return provider ? cloneProvider(provider) : null;
     },
     setProviderNote(id, { note = null, noteKey = null, noteParams = null } = {}) {
       const provider = providers.find((item) => item.id === id);

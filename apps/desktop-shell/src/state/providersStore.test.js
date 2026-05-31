@@ -4,19 +4,23 @@ import { createProvidersStore } from "./providersStore.js";
 
 test("providersStore: default providers contain claude/hermes/trae", () => {
   const store = createProvidersStore();
-  const ids = store.getProvidersRef().map((p) => p.id);
+  const ids = store.getProvidersSnapshot().map((p) => p.id);
   assert.deepEqual(ids, ["claude", "hermes", "trae"]);
 });
 
-test("providersStore: getProvidersRef returns a stable array reference", () => {
+test("providersStore: provider snapshots isolate callers", () => {
   const store = createProvidersStore();
-  const ref = store.getProvidersRef();
+  const snapshot = store.getProvidersSnapshot();
   store.setProviderNote("hermes", { note: null, noteKey: "provider.hermes.loadedNote" });
-  assert.equal(store.getProvidersRef(), ref);
   store.setProviderAgents("hermes", []);
-  assert.equal(store.getProvidersRef(), ref);
+  snapshot.push({ id: "leaked" });
+  snapshot.find((provider) => provider.id === "hermes").agents.push({ id: "leaked-agent" });
+  snapshot.find((provider) => provider.id === "claude").agentDetail.models.available.push("leaked-model");
+  assert.equal(store.getProvidersSnapshot().some((provider) => provider.id === "leaked"), false);
+  assert.deepEqual(store.providerById("hermes").agents, []);
+  assert.deepEqual(store.providerById("claude").agentDetail.models.available, ["agentDetail.model.nativeRuntime"]);
   store.reset();
-  assert.equal(store.getProvidersRef(), ref);
+  assert.deepEqual(store.getProvidersSnapshot().map((provider) => provider.id), ["claude", "hermes", "trae"]);
 });
 
 test("providersStore: providerById returns null for unknown id", () => {
@@ -24,7 +28,10 @@ test("providersStore: providerById returns null for unknown id", () => {
   assert.equal(store.providerById("nope"), null);
   assert.equal(store.providerById(""), null);
   assert.equal(store.providerById(null), null);
-  assert.equal(store.providerById("claude").name, "Claude Code");
+  const claude = store.providerById("claude");
+  assert.equal(claude.name, "Claude Code");
+  claude.agentDetail.models.available.push("leaked-model");
+  assert.deepEqual(store.providerById("claude").agentDetail.models.available, ["agentDetail.model.nativeRuntime"]);
 });
 
 test("providersStore: setProviderNote replaces note/noteKey/noteParams", () => {
@@ -42,9 +49,7 @@ test("providersStore: setProviderNote replaces note/noteKey/noteParams", () => {
 
 test("providersStore: setProviderAgents replaces agents in place", () => {
   const store = createProvidersStore();
-  const ref = store.getProvidersRef();
   store.setProviderAgents("hermes", [{ id: "p1", providerId: "hermes" }]);
-  assert.equal(store.getProvidersRef(), ref);
   assert.deepEqual(
     store.providerById("hermes").agents.map((a) => a.id),
     ["p1"],
@@ -66,7 +71,6 @@ test("providersStore: appendProviderAgent / removeProviderAgent", () => {
 
 test("providersStore: syncAdapterProviders marks built-ins and prunes manifest providers", () => {
   const store = createProvidersStore();
-  const ref = store.getProvidersRef();
   store.syncAdapterProviders([
     {
       id: "codex",
@@ -81,7 +85,6 @@ test("providersStore: syncAdapterProviders marks built-ins and prunes manifest p
       capabilities: { slashCommands: [{ name: "model" }] },
     },
   ]);
-  assert.equal(store.getProvidersRef(), ref);
   assert.equal(store.providerById("claude").dynamicAdapter, true);
   assert.equal(store.providerById("codex").dynamicAdapter, true);
   assert.deepEqual(
