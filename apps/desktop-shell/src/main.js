@@ -24,6 +24,7 @@ import { createComposerController } from "./ui/composerController.js";
 import { createAgentFleetView } from "./ui/agentFleetView.js";
 import { createAgentManagementView } from "./ui/agentManagementView.js";
 import { createRuntimeSessionCardView } from "./ui/runtimeSessionCardView.js";
+import { createRuntimeSessionCardController } from "./ui/runtimeSessionCardController.js";
 import {
   sessionCardStats,
   sessionTurnVisibility,
@@ -371,6 +372,7 @@ let composerController = null;
 let agentFleetView = null;
 let agentManagementView = null;
 let runtimeSessionCardView = null;
+let runtimeSessionCardController = null;
 let historyView = null;
 let workspaceView = null;
 let sendAsNewSession = false;
@@ -1618,130 +1620,7 @@ function exitFullscreenSessions() {
 }
 
 function bindSessionActions(root = sessionDeck) {
-  const actionRoot = root || sessionDeck;
-  const cards = actionRoot.matches?.(".session-card")
-    ? [actionRoot]
-    : [...actionRoot.querySelectorAll(".session-card")];
-  cards.forEach((card) => {
-    card.addEventListener("click", (event) => {
-      if (event.target.closest("button, a, summary, details, input, textarea, select")) return;
-      if (window.getSelection()?.toString()) return;
-      activateWorkspaceSession(card.dataset.sessionId);
-    });
-    card.addEventListener("keydown", (event) => {
-      if (event.target !== card) return;
-      if (!["Enter", " "].includes(event.key)) return;
-      event.preventDefault();
-      activateWorkspaceSession(card.dataset.sessionId);
-    });
-  });
-  actionRoot.querySelectorAll(".session-fullscreen-btn").forEach((button) => {
-    button.addEventListener("click", () => {
-      toggleSessionFocus(button.dataset.sessionId);
-    });
-  });
-  actionRoot.querySelectorAll(".session-mini-card").forEach((button) => {
-    button.addEventListener("click", () => {
-      focusSessionInWorkspace(button.dataset.sessionId);
-      activateWorkspaceSession(button.dataset.sessionId);
-    });
-  });
-  actionRoot.querySelectorAll(".session-dismiss-btn").forEach((button) => {
-    button.addEventListener("click", () => dismissWorkspaceSession(button.dataset.sessionId));
-  });
-  actionRoot.querySelectorAll(".session-archive-btn").forEach((button) => {
-    button.addEventListener("click", () => archiveLiveSession(button.dataset.sessionId));
-  });
-  actionRoot.querySelectorAll(".session-stop-btn").forEach((button) => {
-    button.addEventListener("click", () => stopSession(button.dataset.sessionId));
-  });
-  actionRoot.querySelectorAll(".session-delete-btn").forEach((button) => {
-    button.addEventListener("click", () => requestDeleteConfirmation(button.dataset.sessionId));
-  });
-  actionRoot.querySelectorAll(".session-retry-btn").forEach((button) => {
-    button.addEventListener("click", () => restoreArchivedSession(button.dataset.sessionId));
-  });
-  actionRoot
-    .querySelectorAll(".terminal-detail[data-detail-key], .turn-event-thinking-shell[data-detail-key]")
-    .forEach((detail) => {
-      detail.addEventListener("toggle", () => {
-        sessionsStore.setFlowDetailOpen(detail.dataset.detailKey, detail.open);
-      });
-    });
-  actionRoot.querySelectorAll(".session-scroll-latest-btn").forEach((button) => {
-    button.addEventListener("click", () => {
-      const sessionId = button.dataset.sessionId;
-      const body = sessionDeck.querySelector(`.session-card[data-session-id="${sessionId}"] .session-card-body`);
-      if (!body) return;
-      const controller = sessionStickRegistry.ensure(sessionId, body, { initialStuck: true });
-      controller.scrollToBottom();
-    });
-  });
-  actionRoot.querySelectorAll(".session-copy-btn").forEach((button) => {
-    button.addEventListener("click", async () => {
-      const session = sessionsStore.getSession(button.dataset.sessionId);
-      const text = session ? sessionTranscriptText(session) : "";
-      if (!text) {
-        setAppNotice(t("session.noTranscript"), "busy");
-        return;
-      }
-      const copied = await copyTextToClipboard(text);
-      setAppNotice(copied ? t("session.copiedTranscript") : t("copy.selectManually"), copied ? "muted" : "error");
-    });
-  });
-  actionRoot.querySelectorAll(".session-latest-only-btn").forEach((button) => {
-    button.addEventListener("click", () => toggleSessionLatestOnly(button.dataset.sessionId));
-  });
-  actionRoot.querySelectorAll(".session-turns-toggle-btn").forEach((button) => {
-    button.addEventListener("click", () => toggleSessionTurnsCollapsed(button.dataset.sessionId));
-  });
-  actionRoot.querySelectorAll(".session-toggle-flows-btn").forEach((button) => {
-    button.addEventListener("click", () => {
-      const session = sessionsStore.getSession(button.dataset.sessionId);
-      if (!session) return;
-      const shouldOpen = !areSessionFlowDetailsOpen(session);
-      setSessionFlowDetails(session.id, shouldOpen);
-      setAppNotice(shouldOpen ? t("session.flowsExpanded") : t("session.flowsCollapsed"));
-    });
-  });
-  actionRoot.querySelectorAll(".turn-collapse-btn").forEach((button) => {
-    button.addEventListener("click", () => toggleTurnCollapsed(button.dataset.turnId));
-  });
-  actionRoot.querySelectorAll(".turn-copy-response-btn").forEach((button) => {
-    button.addEventListener("click", async () => {
-      const result = findTurnById(button.dataset.turnId);
-      const text = result ? turnResponseText(result.turn) : "";
-      if (!text) {
-        setAppNotice(t("turn.noResponseCopy"), "busy");
-        return;
-      }
-      const copied = await copyTextToClipboard(text);
-      setAppNotice(copied ? t("turn.copiedResponse") : t("copy.selectManually"), copied ? "muted" : "error");
-    });
-  });
-  actionRoot.querySelectorAll(".turn-copy-btn").forEach((button) => {
-    button.addEventListener("click", async () => {
-      const result = findTurnById(button.dataset.turnId);
-      const text = result ? turnTranscriptText(result.turn, result.turnIndex) : "";
-      if (!text) {
-        setAppNotice(t("turn.noTranscript"), "busy");
-        return;
-      }
-      const copied = await copyTextToClipboard(text);
-      setAppNotice(copied ? t("turn.copiedTranscript") : t("copy.selectManually"), copied ? "muted" : "error");
-    });
-  });
-  actionRoot.querySelectorAll(".md-code-copy-btn").forEach((button) => {
-    button.addEventListener("click", async () => {
-      const code = button.closest(".md-code-block, .md-diagram-block")?.querySelector("code")?.textContent || "";
-      if (!code) {
-        setAppNotice(t("markdown.emptyCode"), "busy");
-        return;
-      }
-      const copied = await copyTextToClipboard(code);
-      setAppNotice(copied ? t("markdown.copiedCode") : t("markdown.copyCodeFailed"), copied ? "muted" : "error");
-    });
-  });
+  runtimeSessionCardController?.bindSessionActions(root);
 }
 
 function activateWorkspaceSession(sessionId, options = {}) {
@@ -1789,6 +1668,39 @@ runtimeSessionCardView = createRuntimeSessionCardView({
   ACCESS_MODE,
   t,
   escapeHtml,
+});
+
+// Runtime Session Card Controller 接管动作绑定、流式局部刷新和滚动粘连。
+runtimeSessionCardController = createRuntimeSessionCardController({
+  sessionDeck,
+  sessionStickRegistry,
+  getSession: (sessionId) => sessionsStore.getSession(sessionId),
+  renderSessionCard,
+  renderMermaidDiagrams,
+  scheduleWorkspaceRender,
+  focusSessionInWorkspace,
+  activateWorkspaceSession,
+  toggleSessionFocus,
+  dismissWorkspaceSession,
+  archiveLiveSession,
+  stopSession,
+  requestDeleteConfirmation,
+  restoreArchivedSession,
+  setFlowDetailOpen: (key, open) => sessionsStore.setFlowDetailOpen(key, open),
+  sessionTranscriptText,
+  copyTextToClipboard,
+  toggleSessionLatestOnly,
+  toggleSessionTurnsCollapsed,
+  areSessionFlowDetailsOpen,
+  setSessionFlowDetails,
+  toggleTurnCollapsed,
+  findTurnById,
+  turnResponseText,
+  turnTranscriptText,
+  setAppNotice,
+  isAtBottom,
+  t,
+  streamRenderIntervalMs: STREAM_CARD_RENDER_INTERVAL_MS,
 });
 
 // Agent Management View 统一承接连接详情、职责简报和可用性弹窗。
@@ -1980,92 +1892,16 @@ function renderWorkspace(options = {}) {
 }
 
 function sampleSessionStickyIntent() {
-  const map = new Map();
-  sessionDeck.querySelectorAll(".session-card-body").forEach((body) => {
-    const sessionId = body.closest(".session-card")?.dataset.sessionId;
-    if (!sessionId) return;
-    const controller = sessionStickRegistry.get(sessionId);
-    map.set(sessionId, controller ? controller.isStuck : isAtBottom(body));
-  });
-  return map;
+  return runtimeSessionCardController?.sampleSessionStickyIntent() || new Map();
 }
-
-const pendingCardRenders = new Set();
-let pendingCardRenderFrame = 0;
-let pendingCardRenderTimer = 0;
-let lastCardRenderAt = 0;
 
 function scheduleSessionCardRender(sessionId) {
-  if (!sessionId) return;
-  pendingCardRenders.add(sessionId);
-  if (pendingCardRenderFrame || pendingCardRenderTimer) return;
-  const elapsed = Date.now() - lastCardRenderAt;
-  const delayMs = Math.max(0, STREAM_CARD_RENDER_INTERVAL_MS - elapsed);
-  const requestCardRender = () => {
-    pendingCardRenderTimer = 0;
-    pendingCardRenderFrame = requestAnimationFrame(() => {
-      lastCardRenderAt = Date.now();
-      pendingCardRenderFrame = 0;
-      flushPendingSessionCardRenders();
-    });
-  };
-  if (delayMs > 0) {
-    pendingCardRenderTimer = window.setTimeout(requestCardRender, delayMs);
-    return;
-  }
-  requestCardRender();
-}
-
-function flushPendingSessionCardRenders() {
-  if (!pendingCardRenders.size) return;
-  const targets = [...pendingCardRenders];
-  pendingCardRenders.clear();
-  targets.forEach((id) => renderSessionCardInPlace(id));
-}
-
-function renderSessionCardInPlace(sessionId) {
-  const session = sessionsStore.getSession(sessionId);
-  if (!session) return;
-  const card = sessionDeck.querySelector(`.session-card[data-session-id="${sessionId}"]`);
-  if (!card) {
-    scheduleWorkspaceRender({ preserveDeckScroll: true });
-    return;
-  }
-  const previousBody = card.querySelector(".session-card-body");
-  const previousController = sessionStickRegistry.get(sessionId);
-  const previousStuck = previousController
-    ? previousController.isStuck
-    : previousBody
-      ? isAtBottom(previousBody)
-      : true;
-  const template = document.createElement("template");
-  template.innerHTML = renderSessionCard(session).trim();
-  const newArticle = template.content.firstElementChild;
-  if (!(newArticle instanceof HTMLElement)) return;
-  card.replaceWith(newArticle);
-  bindSessionActions(newArticle);
-  renderMermaidDiagrams(newArticle).catch((error) => console.error(error));
-  const newBody = newArticle.querySelector(".session-card-body");
-  if (newBody) {
-    const controller = sessionStickRegistry.ensure(sessionId, newBody, { initialStuck: previousStuck });
-    controller.notifyContentChanged();
-  }
+  runtimeSessionCardController?.scheduleSessionCardRender(sessionId);
 }
 
 function syncSessionStickControllers(visibleSessions, stickyIntent) {
-  const ids = [];
-  visibleSessions.forEach((session) => {
-    const card = sessionDeck.querySelector(`.session-card[data-session-id="${session.id}"]`);
-    const body = card?.querySelector(".session-card-body");
-    if (!body) return;
-    const previousStuck = stickyIntent.has(session.id) ? stickyIntent.get(session.id) : true;
-    const controller = sessionStickRegistry.ensure(session.id, body, { initialStuck: previousStuck });
-    controller.notifyContentChanged();
-    ids.push(session.id);
-  });
-  sessionStickRegistry.sweep(ids);
+  runtimeSessionCardController?.syncSessionStickControllers(visibleSessions, stickyIntent);
 }
-
 
 function sessionListItems() {
   const sourceSessions = sessionsSnapshot();
