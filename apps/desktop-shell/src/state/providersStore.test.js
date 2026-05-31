@@ -128,16 +128,18 @@ test("providersStore: replaceRuntimeInstances mutates in place + isolates from c
 
 test("providersStore: runtime targets per instance + prune + total count", () => {
   const store = createProvidersStore();
-  const ref = store.getRuntimeTargetsByInstanceRef();
   store.setRuntimeTargetsForInstance("inst-1", [{ id: "p1" }, { id: "p2" }]);
   store.setRuntimeTargetsForInstance("inst-2", [{ id: "p3" }]);
-  assert.equal(store.getRuntimeTargetsByInstanceRef(), ref);
+  const snapshot = store.getRuntimeTargetsByInstanceSnapshot();
+  assert.deepEqual(snapshot["inst-1"].map((item) => item.id), ["p1", "p2"]);
+  snapshot["inst-1"].push({ id: "leaked" });
+  assert.deepEqual(store.getRuntimeTargetsByInstanceSnapshot()["inst-1"].map((item) => item.id), ["p1", "p2"]);
   assert.equal(store.totalRuntimeTargetCount(), 3);
   store.pruneRuntimeTargetsByInstanceIds(["inst-2"]);
-  assert.deepEqual(Object.keys(ref), ["inst-2"]);
+  assert.deepEqual(Object.keys(store.getRuntimeTargetsByInstanceSnapshot()), ["inst-2"]);
   assert.equal(store.totalRuntimeTargetCount(), 1);
   store.pruneRuntimeTargetsByInstanceIds(["inst-2"]);
-  assert.deepEqual(Object.keys(ref), ["inst-2"]);
+  assert.deepEqual(Object.keys(store.getRuntimeTargetsByInstanceSnapshot()), ["inst-2"]);
 });
 
 test("providersStore: slash commands per provider are stable and resettable", () => {

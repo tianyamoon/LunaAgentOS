@@ -374,7 +374,6 @@ let currentTargetAgentId = localStorage.getItem(CURRENT_TARGET_AGENT_KEY) || loc
 const providersStore = createProvidersStore();
 const providers = providersStore.getProvidersRef();
 const runtimeInstances = providersStore.getRuntimeInstancesRef();
-const runtimeTargetsByInstance = providersStore.getRuntimeTargetsByInstanceRef();
 const sessionsStore = createSessionsStore();
 const workspaceViewStore = createWorkspaceViewStore();
 const sessions = sessionsStore.getSessions();
@@ -503,12 +502,16 @@ function targetsForRuntimeInstance(instance) {
   return targetsForRuntimeInstanceRaw(instance, {
     providers,
     runtimeInstances,
-    runtimeTargetsByInstance,
+    runtimeTargetsByInstance: providersStore.getRuntimeTargetsByInstanceSnapshot(),
   });
 }
 
 function runtimeTargets() {
-  return runtimeTargetsRaw({ providers, runtimeInstances, runtimeTargetsByInstance });
+  return runtimeTargetsRaw({
+    providers,
+    runtimeInstances,
+    runtimeTargetsByInstance: providersStore.getRuntimeTargetsByInstanceSnapshot(),
+  });
 }
 
 function normalizeWorkspaceSession(session) {

@@ -311,8 +311,13 @@ export function createProvidersStore(initial = {}) {
       notify();
     },
 
-    getRuntimeTargetsByInstanceRef() {
-      return runtimeTargetsByInstance;
+    getRuntimeTargetsByInstanceSnapshot() {
+      return Object.fromEntries(
+        Object.entries(runtimeTargetsByInstance).map(([instanceId, targets]) => [
+          instanceId,
+          Array.isArray(targets) ? [...targets] : [],
+        ]),
+      );
     },
     getSlashCommandsForProvider(providerId) {
       return providerId ? slashCommandsByProvider[providerId] || [] : [];
