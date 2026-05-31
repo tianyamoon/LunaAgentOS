@@ -215,9 +215,6 @@ export function createSessionsStore() {
     // 写入。它们存在的唯一目的是让旧代码（main.js 中 .has/.add/.delete/.find/
     // .filter 等大量读路径）可以拿到稳定的 reference 而不需要每个调用点改写。
     // 在迁移到 reactive UI 时可以收紧成只读视图。
-    getSessionsRef() {
-      return sessions;
-    },
     // ---- subscribe / batch ----
     subscribe(listener) {
       if (typeof listener !== "function") return () => {};
