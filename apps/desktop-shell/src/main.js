@@ -29,7 +29,6 @@ import {
 import {
   DEFAULT_ATTACHMENT_LIMITS,
   attachmentStatus,
-  buildPromptWithAttachments,
   composerStats,
   formatAttachmentBytes,
   isLikelyTextAttachment,
@@ -113,6 +112,7 @@ import { createWorkspaceSessionController } from "./controllers/workspaceSession
 import { createSessionRestoreController } from "./controllers/sessionRestoreController.js";
 import { createSessionLifecycleController } from "./controllers/sessionLifecycleController.js";
 import { createSessionExecutionController } from "./controllers/sessionExecutionController.js";
+import { createSessionLaunchController } from "./controllers/sessionLaunchController.js";
 import {
   availableRuntimeInstancesForProvider as availableRuntimeInstancesForProviderRaw,
   providerRuntimeLabel as providerRuntimeLabelRaw,
@@ -413,9 +413,9 @@ let workspaceSessionController = null;
 let sessionRestoreController = null;
 let sessionLifecycleController = null;
 let sessionExecutionController = null;
+let sessionLaunchController = null;
 let historyView = null;
 let workspaceView = null;
-let sessionSeq = 0;
 let sendAsNewSession = false;
 let sendMode = localStorage.getItem(SEND_MODE_KEY) || "enter";
 let fontScaleId = localStorage.getItem(FONT_SCALE_KEY) || "default";
@@ -2154,84 +2154,14 @@ async function loadHermesProfiles(runtimeInstanceIds = null) {
   return loadRuntimeTargetsForProvider("hermes", runtimeInstanceIds);
 }
 
-function hermesProfileMetaFromAgent(agent) {
-  if (!agent || agent.providerId !== "hermes") return null;
-  return {
-    profileName: agent.profileName || null,
-    profileAlias: agent.profileAlias || agent.alias || null,
-    profileExecutable: agent.profileExecutable || agent.alias || null,
-    profilePath: agent.profilePath || agent.path || null,
-    profileModel: agent.model || null,
-    gateway: agent.gateway || null,
-    skillCount: agent.skillCount ?? null,
-    hasSoul: Boolean(agent.hasSoul),
-  };
-}
-
+// Agent Brief 与 Composer 共用同一条 Session 创建路径。
 function createSessionForAgent(agent, firstTask) {
-  const provider = providerById(agent?.providerId);
-  if (!agent || !provider) return null;
-
-  const hermesProfile = hermesProfileMetaFromAgent(agent);
-  sessionSeq += 1;
-  const targetName = targetDisplayName(agent);
-  const session = {
-    id: `session-${Date.now()}-${sessionSeq}`,
-    providerId: provider.id,
-    providerName: provider.name,
-    agentId: agent.id,
-    agentName: targetName,
-    targetId: agent.id,
-    targetName,
-    runtimeInstanceId: agent.runtimeInstanceId || null,
-    runtimeLabel: agent.runtimeLabel || null,
-    runtimeHost: agent.runtimeHost || null,
-    runtimeCommand: agent.runtimeCommand || null,
-    task: firstTask,
-    state: 2,
-    lifecycle: LIFECYCLE.live,
-    runtimeState: LIFECYCLE.live,
-    record_state: RECORD_STATE.active,
-    access_mode: ACCESS_MODE.interactive,
-    runtime_binding: createRuntimeBinding(),
-    turns: [],
-    createdAt: new Date().toISOString(),
-    acpStartupNoticeShown: false,
-    profileName: hermesProfile?.profileName || null,
-    profileAlias: hermesProfile?.profileAlias || null,
-    profileExecutable: hermesProfile?.profileExecutable || null,
-    profilePath: hermesProfile?.profilePath || null,
-    profileModel: hermesProfile?.profileModel || null,
-    gateway: hermesProfile?.gateway || null,
-    skillCount: hermesProfile?.skillCount ?? null,
-    hasSoul: hermesProfile?.hasSoul || false,
-    inWorkspace: true,
-  };
-  Object.assign(session, normalizeWorkspaceSession(session));
-  sessionsStore.upsertHead(session);
-  markSessionActive(session.id);
-  renderWorkspace();
-  renderHistory();
-  return session;
+  return sessionLaunchController?.createSessionForAgent(agent, firstTask) || null;
 }
 
-function createSession(firstTask) {
-  return createSessionForAgent(currentTargetAgent(), firstTask);
-}
-
+// Agent Brief 与 Composer 共用同一条 Turn 创建路径。
 function createTurn(session, task, options = {}) {
-  const turn = createSessionTurn(session, task, options);
-  renderWorkspace();
-  return turn;
-}
-
-function getOrCreateActiveSession(task, forceNew = false) {
-  const agent = currentTargetAgent();
-  if (!agent) return null;
-  const existing = !forceNew ? currentSession() : null;
-  if (existing && existing.agentId !== agent.id) return createSession(task);
-  if (existing && !sessionsStore.isSessionActive(existing.id)) return createSession(task);
-  return existing || createSession(task);
+  return sessionLaunchController?.createTurn(session, task, options) || null;
 }
 
 function updateWorkspaceEmptyCopy() {
@@ -3229,70 +3159,47 @@ async function startAcpSession(session, turn) {
   return sessionExecutionController?.startAcpSession(session, turn);
 }
 
+// Session Launch Controller 接管发送校验、Session 创建与附件 prompt 装配。
+sessionLaunchController = createSessionLaunchController({
+  getPromptValue: () => promptBox.value,
+  focusPrompt: () => promptBox.focus(),
+  clearPrompt: () => { promptBox.value = ""; },
+  getComposerAttachments: () => composerAttachments,
+  clearComposerAttachments,
+  getCurrentTargetAgent: currentTargetAgent,
+  getCurrentTargetProvider: currentTargetProvider,
+  providerById,
+  targetDisplayName,
+  canTargetStartSession,
+  targetSendBlockNotice,
+  canSendToProvider,
+  providerAvailability,
+  providerAvailabilityLabel,
+  getCurrentSession: currentSession,
+  isComposingNewSession,
+  currentSessionSendBlockReason,
+  normalizeWorkspaceSession,
+  upsertSession: (session) => sessionsStore.upsertHead(session),
+  markSessionActive,
+  isSessionActive: (sessionId) => sessionsStore.isSessionActive(sessionId),
+  saveCurrentSession,
+  unmarkStopped: (sessionId) => sessionsStore.unmarkStopped(sessionId),
+  createSessionTurn,
+  renderWorkspace,
+  renderHistory,
+  setSendAsNewSession: (value) => { sendAsNewSession = value; },
+  updateActionLabels,
+  isTargetActivatable,
+  acpCommandsForProvider,
+  startAcpSession,
+  runFallbackSession,
+  setAppNotice,
+  t,
+});
+
+// DOM 事件仅调用 Launch Controller，不再持有发送流程 Implementation。
 function startSessionFromPrompt(forceNewSession = false) {
-  const task = promptBox.value.trim();
-  if (!task) {
-    promptBox.focus();
-    return;
-  }
-
-  const agent = currentTargetAgent();
-  const provider = currentTargetProvider();
-  if (!agent || !provider) {
-    setAppNotice(t("composer.needTargetBeforeSend"), "error");
-    return;
-  }
-  if (!canTargetStartSession(agent)) {
-    setAppNotice(targetSendBlockNotice(agent), "error");
-    promptBox.focus();
-    return;
-  }
-  if (!canSendToProvider(provider.id)) {
-    const availability = providerAvailability(provider.id);
-    const label = providerAvailabilityLabel(availability.summary);
-    setAppNotice(t("composer.providerUnavailable", { provider: provider.name, state: label }), "error");
-    return;
-  }
-
-  const selectedSession = currentSession();
-  const composingNewSession = forceNewSession || isComposingNewSession();
-  const blockReason = !composingNewSession ? currentSessionSendBlockReason(selectedSession, agent) : "";
-  if (blockReason) {
-    setAppNotice(blockReason, "error");
-    promptBox.focus();
-    return;
-  }
-
-  const session = getOrCreateActiveSession(task, composingNewSession);
-  if (!session) return;
-  saveCurrentSession(session.id);
-  sessionsStore.unmarkStopped(session.id);
-  const attachmentMeta = composerAttachments.map((attachment) => ({
-    name: attachment.name,
-    type: attachment.type,
-    size: attachment.size,
-    status: attachmentStatus(attachment),
-    truncated: Boolean(attachment.truncated),
-  }));
-  const runtimePrompt = buildPromptWithAttachments(task, composerAttachments, {
-    title: t("composer.attachment.promptTitle"),
-    truncated: t("composer.attachment.truncated"),
-  });
-  const turn = createTurn(session, task, { runtimePrompt, attachments: attachmentMeta });
-  promptBox.value = "";
-  clearComposerAttachments();
-  sendAsNewSession = false;
-  updateActionLabels();
-  if (isTargetActivatable(agent)) {
-    setAppNotice(t("runtime.activatingTarget", { target: targetDisplayName(agent) }), "busy");
-  }
-  const commands = acpCommandsForProvider(provider.id);
-  if (commands) {
-    void startAcpSession(session, turn);
-    return;
-  }
-
-  void runFallbackSession(session, turn);
+  return sessionLaunchController?.startSessionFromPrompt(forceNewSession);
 }
 
 providerManagerBtn?.addEventListener("click", () => {
