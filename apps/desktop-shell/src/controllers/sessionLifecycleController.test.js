@@ -33,6 +33,10 @@ function makeHarness({ sessionOverrides = {}, archived = null, shutdownError = n
       const index = sessions.findIndex((item) => item.id === id);
       if (index >= 0) sessions.splice(index, 1);
     },
+    setWorkspaceVisibility: (id, visible) => {
+      const session = sessions.find((item) => item.id === id);
+      if (session) session.inWorkspace = visible;
+    },
     markSessionInactive: (id) => calls.push(`inactive:${id}`),
     clearCurrentSessionIf: (id) => { if (currentSessionId === id) currentSessionId = null; },
     clearScheduledWorkspaceFocus: (id) => calls.push(`focus-clear:${id}`),

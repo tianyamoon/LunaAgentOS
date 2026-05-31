@@ -10,34 +10,27 @@ test("sessionsStore: replaceSessions copies the array (no aliasing)", () => {
   const store = createSessionsStore();
   const input = [makeSession("a"), makeSession("b")];
   store.replaceSessions(input);
-  assert.deepEqual(store.getSessions().map((s) => s.id), ["a", "b"]);
+  assert.deepEqual(store.getSessionsSnapshot().map((s) => s.id), ["a", "b"]);
   input.push(makeSession("c"));
   // Mutating the caller's array must not leak into store.
-  assert.deepEqual(store.getSessions().map((s) => s.id), ["a", "b"]);
+  assert.deepEqual(store.getSessionsSnapshot().map((s) => s.id), ["a", "b"]);
 });
 
-test("sessionsStore: getSessions returns a stable array reference across mutations", () => {
+test("sessionsStore: getSessionsSnapshot returns an isolated array", () => {
   const store = createSessionsStore();
-  const ref = store.getSessions();
   store.replaceSessions([makeSession("a")]);
-  assert.equal(store.getSessions(), ref);
-  store.upsertHead(makeSession("b"));
-  assert.equal(store.getSessions(), ref);
-  store.removeSessionById("a");
-  assert.equal(store.getSessions(), ref);
-  store.filterSessions(() => false);
-  assert.equal(store.getSessions(), ref);
-  store.reset();
-  assert.equal(store.getSessions(), ref);
+  const snapshot = store.getSessionsSnapshot();
+  snapshot.push(makeSession("hacked"));
+  assert.deepEqual(store.getSessionsSnapshot().map((session) => session.id), ["a"]);
 });
 
 test("sessionsStore: upsertHead inserts at front and dedupes by id", () => {
   const store = createSessionsStore();
   store.replaceSessions([makeSession("a"), makeSession("b")]);
   store.upsertHead(makeSession("c"));
-  assert.deepEqual(store.getSessions().map((s) => s.id), ["c", "a", "b"]);
+  assert.deepEqual(store.getSessionsSnapshot().map((s) => s.id), ["c", "a", "b"]);
   store.upsertHead(makeSession("a", { task: "updated" }));
-  assert.deepEqual(store.getSessions().map((s) => s.id), ["a", "c", "b"]);
+  assert.deepEqual(store.getSessionsSnapshot().map((s) => s.id), ["a", "c", "b"]);
   assert.equal(store.getSession("a").task, "updated");
 });
 
@@ -57,7 +50,23 @@ test("sessionsStore: removeSessionById and filterSessions only notify on change"
   assert.equal(notifyCount, 1);
   store.filterSessions((session) => session.id !== "b");
   assert.equal(notifyCount, 2);
-  assert.equal(store.getSessions().length, 0);
+  assert.equal(store.getSessionsSnapshot().length, 0);
+});
+
+test("sessionsStore: workspace visibility uses an explicit mutation interface", () => {
+  const store = createSessionsStore();
+  let notifyCount = 0;
+  store.subscribe(() => {
+    notifyCount += 1;
+  });
+  store.replaceSessions([makeSession("a")]);
+  notifyCount = 0;
+  assert.equal(store.setWorkspaceVisibility("a", false), true);
+  assert.equal(store.getSession("a").inWorkspace, false);
+  assert.equal(notifyCount, 1);
+  assert.equal(store.setWorkspaceVisibility("a", false), false);
+  assert.equal(notifyCount, 1);
+  assert.equal(store.setWorkspaceVisibility("missing", true), false);
 });
 
 test("sessionsStore: currentSessionId clear on demand", () => {
@@ -211,7 +220,7 @@ test("sessionsStore: reset clears everything and notifies", () => {
   store.setCurrentSessionId("a");
   notifyCount = 0;
   store.reset();
-  assert.equal(store.getSessions().length, 0);
+  assert.equal(store.getSessionsSnapshot().length, 0);
   assert.equal(store.getCurrentSessionId(), null);
   assert.ok(!store.isSessionActive("a"));
   assert.ok(!store.isSessionStopped("a"));

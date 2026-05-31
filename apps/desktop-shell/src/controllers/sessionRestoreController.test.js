@@ -22,7 +22,7 @@ function makeHarness({ archivedOverrides = {}, runtime = {} } = {}) {
   };
   const controller = createSessionRestoreController({
     getArchivedSessions: () => [archived],
-    getSessions: () => sessions,
+    getSessionsSnapshot: () => [...sessions],
     getCurrentSessionId: () => currentSessionId,
     workspaceSessionFromArchived: (_archived, existing) => existing || restored,
     sessionRuntimeState: (session) => session.lifecycle,

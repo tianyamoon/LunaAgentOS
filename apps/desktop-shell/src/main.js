@@ -408,7 +408,6 @@ const historyRepository = createHistoryRepository({
   }),
 });
 const workspaceViewStore = createWorkspaceViewStore();
-const sessions = sessionsStore.getSessions();
 let workspaceSessionController = null;
 let sessionRestoreController = null;
 let sessionLifecycleController = null;
@@ -449,6 +448,11 @@ function allAgents() {
 
 function providersSnapshot() {
   return providersStore.getProvidersSnapshot();
+}
+
+// Session 列表按需读取快照，Shell 不长期持有 Store 内部数组。
+function sessionsSnapshot() {
+  return sessionsStore.getSessionsSnapshot();
 }
 
 function providerById(id) {
@@ -1915,7 +1919,7 @@ async function refreshRuntimeProbe() {
 }
 
 function latestActiveSessionForAgent(agentId) {
-  return [...sessions]
+  return sessionsSnapshot()
     .filter((session) => session.agentId === agentId && sessionsStore.isSessionActive(session.id) && canSendToSession(session))
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0] || null;
 }
@@ -2183,7 +2187,7 @@ function updateWorkspaceEmptyCopy() {
 }
 
 function countRestorableActiveHistoryItems() {
-  const liveIds = new Set(sessions.map((session) => session.id));
+  const liveIds = new Set(sessionsSnapshot().map((session) => session.id));
   return archivedSessionsFromHistory()
     .filter((item) => !liveIds.has(item.id))
     .filter((item) => item.record_state === RECORD_STATE.active && item.access_mode !== ACCESS_MODE.read_only)
@@ -2193,7 +2197,7 @@ function countRestorableActiveHistoryItems() {
 function renderWorkspaceStatus() {
   const agent = currentTargetAgent();
   const provider = currentTargetProvider();
-  const countedSessions = sessions;
+  const countedSessions = sessionsSnapshot();
   const liveCount = countedSessions.filter((session) => sessionRecordState(session) === RECORD_STATE.active).length;
   if (!agent || !provider) {
     workspaceStatus.textContent = t("composer.placeholderNoTarget");
@@ -2226,7 +2230,7 @@ function isSessionLatestOnly(session) {
 }
 
 function toggleSessionLatestOnly(sessionId) {
-  const session = sessions.find((item) => item.id === sessionId);
+  const session = sessionsStore.getSession(sessionId);
   if (!session) return;
   sessionsStore.setLatestOnly(sessionId, !isSessionLatestOnly(session));
   renderWorkspace();
@@ -2272,7 +2276,7 @@ function detailKeysForSession(session) {
 }
 
 function setSessionFlowDetails(sessionId, open) {
-  const session = sessions.find((item) => item.id === sessionId);
+  const session = sessionsStore.getSession(sessionId);
   if (!session) return;
   sessionsStore.batch(() => {
     detailKeysForSession(session).forEach((key) => sessionsStore.setFlowDetailOpen(key, open));
@@ -2353,7 +2357,7 @@ function areSessionTurnsCollapsed(session) {
 }
 
 function toggleSessionTurnsCollapsed(sessionId) {
-  const session = sessions.find((item) => item.id === sessionId);
+  const session = sessionsStore.getSession(sessionId);
   if (!session) return;
   const shouldExpand = areSessionTurnsCollapsed(session);
   sessionsStore.batch(() => {
@@ -2366,7 +2370,7 @@ function toggleSessionTurnsCollapsed(sessionId) {
 }
 
 function findTurnById(turnId) {
-  for (const session of sessions) {
+  for (const session of sessionsSnapshot()) {
     const turnIndex = session.turns.findIndex((item) => item.id === turnId);
     const turn = session.turns[turnIndex];
     if (turn) return { session, turn, turnIndex };
@@ -2690,7 +2694,7 @@ function bindSessionActions(root = sessionDeck) {
   });
   actionRoot.querySelectorAll(".session-copy-btn").forEach((button) => {
     button.addEventListener("click", async () => {
-      const session = sessions.find((item) => item.id === button.dataset.sessionId);
+      const session = sessionsStore.getSession(button.dataset.sessionId);
       const text = session ? sessionTranscriptText(session) : "";
       if (!text) {
         setAppNotice(t("session.noTranscript"), "busy");
@@ -2708,7 +2712,7 @@ function bindSessionActions(root = sessionDeck) {
   });
   actionRoot.querySelectorAll(".session-toggle-flows-btn").forEach((button) => {
     button.addEventListener("click", () => {
-      const session = sessions.find((item) => item.id === button.dataset.sessionId);
+      const session = sessionsStore.getSession(button.dataset.sessionId);
       if (!session) return;
       const shouldOpen = !areSessionFlowDetailsOpen(session);
       setSessionFlowDetails(session.id, shouldOpen);
@@ -2777,7 +2781,7 @@ function focusComposerInput() {
 }
 
 workspaceSessionController = createWorkspaceSessionController({
-  sessions,
+  getSession: (sessionId) => sessionsStore.getSession(sessionId),
   workspaceViewStore,
   saveCurrentTargetAgent,
   saveCurrentSession,
@@ -2813,7 +2817,8 @@ historyView = createHistoryView({
   providerById,
   renderSessionActionIcon,
   formatTime,
-  sessions,
+  getSession: (sessionId) => sessionsStore.getSession(sessionId),
+  setWorkspaceVisibility: (sessionId, visible) => sessionsStore.setWorkspaceVisibility(sessionId, visible),
   requestDeleteConfirmation,
   restoreArchivedSession,
   activateWorkspaceSession,
@@ -2825,7 +2830,7 @@ historyRepository.subscribe(() => renderHistory());
 workspaceView = createWorkspaceView({
   sessionDeck,
   workspaceEmpty,
-  sessions,
+  getSessionsSnapshot: sessionsSnapshot,
   workspaceViewStore,
   updatePromptPlaceholder,
   renderWorkspaceStatus,
@@ -2843,7 +2848,7 @@ workspaceView = createWorkspaceView({
 
 // Session Lifecycle Controller 接管 Runtime、History 与工作区清理的联动。
 sessionLifecycleController = createSessionLifecycleController({
-  getSession: (sessionId) => sessions.find((item) => item.id === sessionId) || null,
+  getSession: (sessionId) => sessionsStore.getSession(sessionId),
   getArchivedSession: (sessionId) => archivedSessionsFromHistory().find((item) => item.id === sessionId) || null,
   getCurrentSessionId: () => sessionsStore.getCurrentSessionId(),
   sessionRuntimeState,
@@ -2855,6 +2860,7 @@ sessionLifecycleController = createSessionLifecycleController({
   historyRepository,
   saveTurnToHistory,
   removeSessionById: (sessionId) => sessionsStore.removeSessionById(sessionId),
+  setWorkspaceVisibility: (sessionId, visible) => sessionsStore.setWorkspaceVisibility(sessionId, visible),
   markSessionInactive,
   clearCurrentSessionIf,
   clearScheduledWorkspaceFocus: (sessionId) => {
@@ -2936,7 +2942,7 @@ function flushPendingSessionCardRenders() {
 }
 
 function renderSessionCardInPlace(sessionId) {
-  const session = sessions.find((item) => item.id === sessionId);
+  const session = sessionsStore.getSession(sessionId);
   if (!session) return;
   const card = sessionDeck.querySelector(`.session-card[data-session-id="${sessionId}"]`);
   if (!card) {
@@ -2980,7 +2986,7 @@ function syncSessionStickControllers(visibleSessions, stickyIntent) {
 
 
 function sessionListItems() {
-  const sourceSessions = sessions;
+  const sourceSessions = sessionsSnapshot();
   const liveItems = sourceSessions.map((session) => {
     ensureSessionStatusShape(session);
     const identitySession = normalizeWorkspaceSession(session);
@@ -3073,7 +3079,7 @@ function workspaceSessionFromArchived(archived, existing = null) {
 // Session Restore Controller 接管归档打开、重连与首轮异常回退。
 sessionRestoreController = createSessionRestoreController({
   getArchivedSessions: archivedSessionsFromHistory,
-  getSessions: () => sessions,
+  getSessionsSnapshot: sessionsSnapshot,
   getCurrentSessionId: () => sessionsStore.getCurrentSessionId(),
   workspaceSessionFromArchived,
   sessionRuntimeState,
@@ -3315,7 +3321,7 @@ applyFontScale();
 applyTheme();
 void loadUserThemes();
 updateSendModeLabel();
-workspaceViewStore.hydrateFromSessions(sessions);
+workspaceViewStore.hydrateFromSessions(sessionsSnapshot());
 renderWorkspace();
 renderHistory();
 updateActionLabels();
@@ -3338,6 +3344,7 @@ setTimeout(() => {
 }, 0);
 
 async function syncRuntimeAliveStates() {
+  const sessions = sessionsSnapshot();
   const liveSessionsExist = sessions.some(
     (session) => sessionRuntimeState(session) === "live" && session.acpSessionId,
   );

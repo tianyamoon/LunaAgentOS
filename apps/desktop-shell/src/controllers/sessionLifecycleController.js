@@ -17,6 +17,7 @@ export function createSessionLifecycleController({
   historyRepository,
   saveTurnToHistory,
   removeSessionById,
+  setWorkspaceVisibility,
   markSessionInactive,
   clearCurrentSessionIf,
   clearScheduledWorkspaceFocus,
@@ -105,7 +106,7 @@ export function createSessionLifecycleController({
     const session = getSession(sessionId);
     if (!session) return null;
     const wasArchived = isArchivedLifecycle(sessionRuntimeState(session));
-    session.inWorkspace = false;
+    setWorkspaceVisibility(session.id, false);
     if (getCurrentSessionId() === sessionId) clearCurrentSessionIf(sessionId);
     clearScheduledWorkspaceFocus(sessionId);
     renderWorkspace();

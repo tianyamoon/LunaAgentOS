@@ -16,7 +16,7 @@ import {
 // 创建恢复控制器。所有 IO 与视图副作用由 Shell 注入，控制器仅维护恢复编排顺序。
 export function createSessionRestoreController({
   getArchivedSessions,
-  getSessions,
+  getSessionsSnapshot,
   getCurrentSessionId,
   workspaceSessionFromArchived,
   sessionRuntimeState,
@@ -79,7 +79,7 @@ export function createSessionRestoreController({
     if (!sessionId) return null;
     const archived = archivedSessionById(sessionId);
     if (!archived) return null;
-    const existing = getSessions().find((item) => item.id === archived.id);
+    const existing = getSessionsSnapshot().find((item) => item.id === archived.id);
     if (existing && sessionRuntimeState(existing) === LIFECYCLE.restoring) {
       activateWorkspaceSession(existing.id, { focusWorkspace: true });
       setAppNotice(t("archive.restoring"), "busy");
@@ -149,7 +149,7 @@ export function createSessionRestoreController({
     if (!sessionId) return null;
     const archived = archivedSessionById(sessionId);
     if (!archived) return null;
-    const existing = getSessions().find((item) => item.id === archived.id);
+    const existing = getSessionsSnapshot().find((item) => item.id === archived.id);
     if (existing && sessionRuntimeState(existing) === LIFECYCLE.restoring) {
       setAppNotice(t("archive.restoring"), "busy");
       return existing;

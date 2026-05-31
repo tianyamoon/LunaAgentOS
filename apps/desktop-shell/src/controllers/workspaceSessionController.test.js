@@ -14,7 +14,7 @@ function makeHarness(overrides = {}) {
   sessionsStore.replaceSessions(sessions);
   const calls = [];
   const controller = createWorkspaceSessionController({
-    sessions,
+    getSession: (id) => sessionsStore.getSession(id),
     workspaceViewStore,
     saveCurrentTargetAgent: (id) => calls.push(["target", id]),
     saveCurrentSession: (id) => sessionsStore.setCurrentSessionId(id),

@@ -1,5 +1,5 @@
 export function createWorkspaceSessionController({
-  sessions,
+  getSession,
   workspaceViewStore,
   saveCurrentTargetAgent,
   saveCurrentSession,
@@ -22,7 +22,7 @@ export function createWorkspaceSessionController({
   }
 
   function toggleSessionFocus(sessionId) {
-    const session = sessions.find((item) => item.id === sessionId);
+    const session = getSession(sessionId);
     if (!session) return false;
     const changed = workspaceViewStore.toggleFocus(sessionId);
     if (changed) renderWorkspace();
@@ -37,7 +37,7 @@ export function createWorkspaceSessionController({
   }
 
   function activateWorkspaceSession(sessionId, options = {}) {
-    const session = sessions.find((item) => item.id === sessionId);
+    const session = getSession(sessionId);
     if (!session) return false;
     saveCurrentTargetAgent(session.agentId);
     saveCurrentSession(session.id);

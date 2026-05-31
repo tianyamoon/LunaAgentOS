@@ -18,7 +18,8 @@ export function createHistoryView({
   providerById,
   renderSessionActionIcon,
   formatTime,
-  sessions,
+  getSession,
+  setWorkspaceVisibility,
   requestDeleteConfirmation,
   restoreArchivedSession,
   activateWorkspaceSession,
@@ -97,12 +98,12 @@ export function createHistoryView({
     historyList.querySelectorAll(".history-item.is-active-history").forEach((item) => {
       item.addEventListener("click", () => {
         const sessionId = item.dataset.sessionId;
-        const existing = sessions.find((entry) => entry.id === sessionId);
+        const existing = getSession(sessionId);
         if (!existing) {
           restoreArchivedSession(sessionId);
           return;
         }
-        if (existing.inWorkspace === false) existing.inWorkspace = true;
+        setWorkspaceVisibility(existing.id, true);
         activateWorkspaceSession(sessionId, { focusWorkspace: true });
       });
     });

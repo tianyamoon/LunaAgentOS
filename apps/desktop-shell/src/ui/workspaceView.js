@@ -1,7 +1,7 @@
 export function createWorkspaceView({
   sessionDeck,
   workspaceEmpty,
-  sessions,
+  getSessionsSnapshot,
   workspaceViewStore,
   updatePromptPlaceholder,
   renderWorkspaceStatus,
@@ -22,7 +22,8 @@ export function createWorkspaceView({
     const deckScrollLeft = sessionDeck.scrollLeft;
     const deckScrollTop = sessionDeck.scrollTop;
     const stickyIntent = sampleSessionStickyIntent();
-    const workspaceSessions = sessions.filter((session) => session.inWorkspace !== false);
+    // 每次渲染读取快照，View 不长期持有 Store 内部容器。
+    const workspaceSessions = getSessionsSnapshot().filter((session) => session.inWorkspace !== false);
     const visibleSessions = [...workspaceSessions].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
     updatePromptPlaceholder();
     renderWorkspaceStatus();
