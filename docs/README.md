@@ -28,6 +28,8 @@ If you are new here, start with the docs that answer three practical questions f
 ## Architecture and integration
 
 - [Architecture Overview](./architecture-overview.md): current layering and responsibilities
+- [Domain Context](../CONTEXT.md): shared LunaAgentOS vocabulary and model relationships
+- [Architecture Decision Records](./adr/README.md): durable decisions that future architecture work should preserve
 - [Hermes ACP Runtime](./hermes-acp-profile-runtime.md): Hermes runtime semantics and profile loading
 - [Hermes TUI Direction](./hermes-tui-direction.md): visibility goals for live sessions
 - [Protocol](../protocol/README.md): schemas, examples, and the public contract

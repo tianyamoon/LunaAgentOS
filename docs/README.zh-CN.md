@@ -28,6 +28,8 @@
 ## 架构与接入
 
 - [架构概览](./architecture-overview.zh-CN.md)：当前分层与职责
+- [领域上下文](../CONTEXT.md)：LunaAgentOS 的统一词汇与模型关系
+- [架构决策记录](./adr/README.md)：后续架构工作需要保留的长期决策
 - [Hermes ACP Runtime](./hermes-acp-profile-runtime.zh-CN.md)：Hermes runtime 语义与 profile 加载
 - [Hermes TUI 方向](./hermes-tui-direction.zh-CN.md)：活会话可见性的设计方向
 - [Protocol](../protocol/README.md)（暂仅英文）：schema、示例和公开契约
