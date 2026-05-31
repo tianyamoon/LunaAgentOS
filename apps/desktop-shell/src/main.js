@@ -51,6 +51,7 @@ import {
   isArchivedLifecycle,
 } from "./state/sessionLifecycle.js";
 import { createSessionRuntimeState } from "./state/sessionRuntimeState.js";
+import { createSessionTurnState } from "./state/sessionTurnState.js";
 import {
   compareActiveSessionListItems,
   compareArchivedSessionListItems,
@@ -131,11 +132,7 @@ import {
   providerStatusForFleet,
   targetStatusForFleet,
 } from "./providers/agentMetadata.js";
-import {
-  applyEventsToTurn,
-  applyStreamEventToTurn,
-  sessionSectionsFromEvents,
-} from "./runtime/streamEvents.js";
+import { sessionSectionsFromEvents } from "./runtime/streamEvents.js";
 
 const { invoke } = window.__TAURI__.core;
 const listenRuntimeEvent = window.__TAURI__?.event?.listen?.bind(window.__TAURI__.event);
@@ -380,6 +377,23 @@ const {
   setSessionLifecycle,
   setSessionRecordState,
 } = sessionRuntimeStateModel;
+const sessionTurnStateModel = createSessionTurnState({
+  sessionsStore,
+  sessionRuntimeState: sessionRuntimeStateModel,
+  translate: t,
+  buildTurnMeta: (session) => {
+    const hermesProfile = hermesProfileMetaFromSession(session);
+    return hermesProfile ? { hermesProfile } : {};
+  },
+});
+const {
+  appendRuntimeLog: appendRuntimeLogToSession,
+  appendStreamEvent: appendStreamEventToSessionTurn,
+  createTurn: createSessionTurn,
+  markPromptError: markPromptErrorOnTurn,
+  markStopped: markSessionStopped,
+  updateTurnFromEvents: updateSessionTurnFromEvents,
+} = sessionTurnStateModel;
 const workspaceViewStore = createWorkspaceViewStore();
 const sessions = sessionsStore.getSessions();
 let workspaceSessionController = null;
@@ -387,7 +401,6 @@ let historyView = null;
 let workspaceView = null;
 let historyEntries = [];
 let sessionSeq = 0;
-let turnSeq = 0;
 let runningSessions = 0;
 let isHistoryLoading = true;
 let sendAsNewSession = false;
@@ -2228,31 +2241,7 @@ function createSession(firstTask) {
 }
 
 function createTurn(session, task, options = {}) {
-  turnSeq += 1;
-  const hermesProfile = hermesProfileMetaFromSession(session);
-  const turnMeta = {
-    ...(hermesProfile ? { hermesProfile } : {}),
-    ...(options.attachments?.length ? { attachments: options.attachments } : {}),
-  };
-  const turn = {
-    id: `turn-${Date.now()}-${turnSeq}`,
-    task,
-    runtimePrompt: options.runtimePrompt || task,
-    state: 0,
-    status: TURN_STATUS.created,
-    thoughts: [],
-    outputs: [],
-    finalResponse: t("turn.initialResponse"),
-    logs: [t("turn.initialLog")],
-    createdAt: new Date().toISOString(),
-    meta: turnMeta,
-  };
-  session.task = task;
-  session.state = 2;
-  session.activeTurnId = turn.id;
-  turn.status = TURN_STATUS.running;
-  clearRuntimeBindingError(session, { state: RUNTIME_BINDING_STATE.connected, stage: RUNTIME_BINDING_STAGE.prompt });
-  session.turns.push(turn);
+  const turn = createSessionTurn(session, task, options);
   renderWorkspace();
   return turn;
 }
@@ -2279,25 +2268,17 @@ function getOrCreateActiveSession(task, forceNew = false) {
 }
 
 function updateTurnFromEvents(sessionId, turnId, events) {
-  const session = sessions.find((item) => item.id === sessionId);
-  if (!session) return null;
-  const turn = session.turns.find((item) => item.id === turnId);
+  const turn = updateSessionTurnFromEvents(sessionId, turnId, events);
   if (!turn) return null;
-
-  applyEventsToTurn(session, turn, events);
   renderWorkspace();
   renderHistory();
   return turn;
 }
 
 function appendStreamEventToTurn(sessionId, event) {
-  if (isSessionDeletedTombstone(sessionId) || isSessionStoppedTombstone(sessionId)) return;
-  const session = sessions.find((item) => item.id === sessionId);
-  if (!session) return;
-  const turn = session.turns.find((item) => item.id === session.activeTurnId) || session.turns.at(-1);
-  if (!turn) return;
-
-  applyStreamEventToTurn(session, turn, event);
+  const result = appendStreamEventToSessionTurn(sessionId, event);
+  if (!result) return;
+  const { session, turn } = result;
   const validatedByStream = turn.finalResponse
     || event.type === "thought"
     || event.type === "tool"
@@ -2308,21 +2289,6 @@ function appendStreamEventToTurn(sessionId, event) {
     clearResumeValidation(session);
   }
   scheduleSessionCardRender(session.id);
-}
-
-function markPromptErrorOnTurn(session, turn, message) {
-  turn.state = 9;
-  turn.status = TURN_STATUS.failed;
-  turn.logs = [message, ...turn.logs];
-  session.state = 9;
-  setRuntimeBinding(session, {
-    state: RUNTIME_BINDING_STATE.failed,
-    stage: RUNTIME_BINDING_STAGE.prompt,
-    error_title: t("runtime.promptFailedTitle", { agent: session.agentName }),
-    error_detail: message,
-    error_suggestion: t("runtime.promptFailedSuggestion"),
-  });
-  return turn;
 }
 
 function appendErrorToTurn(sessionId, turnId, message) {
@@ -2352,20 +2318,6 @@ function rollbackResumeValidationPromptFailure(session, turn, message) {
   renderWorkspace();
   renderHistory();
   setAppNotice(t("restore.firstTurnFailedNotice", { error: compactNoticeText(message) }), "error");
-}
-
-function appendRuntimeLogToSession(session, message, state = null) {
-  const turn = session?.turns?.at(-1);
-  if (!turn || !message) return;
-  if (!turn.logs.includes(message)) {
-    turn.logs = [message, ...turn.logs];
-  }
-  if (typeof state === "number") {
-    turn.state = state;
-    turn.status = statusFromRuntimeStateCode(state, Boolean(turn.finalResponse));
-    session.state = state;
-  }
-  sessionsStore.setFlowDetailOpen(`${turn.id}:logs`, true);
 }
 
 function localizedFallbackEvents(events) {
@@ -3080,23 +3032,6 @@ async function verifyAcpSessionAlive(commands, providerId, sessionId) {
       throw new Error(t("restore.aliveCheckFailed"));
     }
   }
-}
-
-function markSessionStopped(session) {
-  const turn = session.turns.find((item) => item.id === session.activeTurnId)
-    || [...session.turns].reverse().find((item) => executingSessionStates.has(item.state))
-    || session.turns.at(-1);
-  if (!turn) {
-    session.state = 6;
-    return null;
-  }
-  turn.state = 6;
-  if (!turn.finalResponse || turn.finalResponse === t("turn.initialResponse")) {
-    turn.finalResponse = t("turn.stoppedResponse");
-  }
-  turn.logs = [t("turn.stoppedLog"), ...turn.logs];
-  session.state = 6;
-  return turn;
 }
 
 async function archiveLiveSession(sessionId) {
