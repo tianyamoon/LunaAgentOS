@@ -1,7 +1,7 @@
 use chrono::Local;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
@@ -10,6 +10,12 @@ use tauri::{AppHandle, Emitter, Manager};
 mod acp_runtime;
 mod adapter_extensions;
 mod adapter_registry;
+mod runtime_config;
+
+use runtime_config::{
+    load_runtime_config, load_runtime_config_file, load_user_themes, save_runtime_config,
+    RuntimeConfigFile,
+};
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -133,36 +139,6 @@ struct HistoryEntryInput {
     access_mode: Option<String>,
     #[serde(default, rename = "runtime_binding")]
     runtime_binding: Option<Value>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
-#[serde(rename_all = "camelCase")]
-struct AgentBriefConfig {
-    text: String,
-    #[serde(default)]
-    source: Option<String>,
-    #[serde(default)]
-    updated_at: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
-#[serde(rename_all = "camelCase")]
-struct RuntimeConfigFile {
-    claude_command: Option<String>,
-    #[serde(default)]
-    claude_args: Vec<String>,
-    hermes_host: Option<String>,
-    hermes_command: Option<String>,
-    #[serde(default)]
-    adapter_plugin_paths: Vec<String>,
-    #[serde(default)]
-    agent_briefs: HashMap<String, HashMap<String, AgentBriefConfig>>,
-}
-
-impl From<RuntimeConfigFile> for acp_runtime::RuntimeConfig {
-    fn from(_value: RuntimeConfigFile) -> Self {
-        acp_runtime::RuntimeConfig
-    }
 }
 
 #[derive(Debug, Serialize)]
@@ -523,88 +499,6 @@ fn history_file_for_today(
 
 fn history_file_for_date(app: &AppHandle, bucket: &str, date: &str) -> Result<PathBuf, String> {
     Ok(history_bucket_dir(app, bucket)?.join(format!("{date}.json")))
-}
-
-fn runtime_config_path(app: &AppHandle) -> Result<PathBuf, String> {
-    let base_dir = app
-        .path()
-        .app_local_data_dir()
-        .map_err(|error| error.to_string())?;
-    fs::create_dir_all(&base_dir).map_err(|error| error.to_string())?;
-    Ok(base_dir.join("runtime-config.json"))
-}
-
-fn load_runtime_config_file(app: &AppHandle) -> RuntimeConfigFile {
-    let Ok(path) = runtime_config_path(app) else {
-        return RuntimeConfigFile::default();
-    };
-    let Ok(raw) = fs::read_to_string(path) else {
-        return RuntimeConfigFile::default();
-    };
-    serde_json::from_str::<RuntimeConfigFile>(&raw).unwrap_or_default()
-}
-
-#[tauri::command]
-fn load_runtime_config(app: AppHandle) -> Result<RuntimeConfigFile, String> {
-    Ok(load_runtime_config_file(&app))
-}
-
-// Resolve the on-disk directory where users may drop additional theme
-// JSON files (`~/.lunaagentos/themes/`). Returns None when the OS home
-// directory cannot be resolved; the frontend treats that as an empty set.
-fn user_themes_dir(app: &AppHandle) -> Option<PathBuf> {
-    let home = app.path().home_dir().ok()?;
-    Some(home.join(".lunaagentos").join("themes"))
-}
-
-// Load every `*.json` file under `~/.lunaagentos/themes/` and return them
-// to the frontend as raw JSON values. The frontend validates and merges
-// them via `registerUserThemes()`. Malformed or unreadable files are
-// silently skipped so a single bad file cannot brick the theme picker.
-#[tauri::command]
-fn load_user_themes(app: AppHandle) -> Vec<Value> {
-    let Some(dir) = user_themes_dir(&app) else {
-        return Vec::new();
-    };
-    if !dir.is_dir() {
-        return Vec::new();
-    }
-    let Ok(read_dir) = fs::read_dir(&dir) else {
-        return Vec::new();
-    };
-    let mut themes = Vec::new();
-    for entry in read_dir.flatten() {
-        let path = entry.path();
-        if path.extension().and_then(|value| value.to_str()) != Some("json") {
-            continue;
-        }
-        let Ok(raw) = fs::read_to_string(&path) else {
-            eprintln!("跳过无法读取的用户主题文件 {}", path.display());
-            continue;
-        };
-        match serde_json::from_str::<Value>(&raw) {
-            Ok(value) => themes.push(value),
-            Err(error) => {
-                eprintln!(
-                    "跳过解析失败的用户主题文件 {}：{}",
-                    path.display(),
-                    error
-                );
-            }
-        }
-    }
-    themes
-}
-
-#[tauri::command]
-fn save_runtime_config(
-    app: AppHandle,
-    config: RuntimeConfigFile,
-) -> Result<RuntimeConfigFile, String> {
-    let path = runtime_config_path(&app)?;
-    let json = serde_json::to_string_pretty(&config).map_err(|error| error.to_string())?;
-    fs::write(path, json).map_err(|error| error.to_string())?;
-    Ok(config)
 }
 
 // Payload returned by `read_adapter_icon`. The shell composes a `data:` URL
