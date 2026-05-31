@@ -123,6 +123,7 @@ import {
   targetsForRuntimeInstance as targetsForRuntimeInstanceRaw,
 } from "./providers/runtimeView.js";
 import { buildAgentDetail } from "./providers/agentDetail.js";
+import { providerSupportsLaunch } from "./providers/providerCatalog.js";
 import {
   agentBriefTargetKey,
   briefRecordForTarget,
@@ -558,10 +559,11 @@ function archivedSessionsFromHistory() {
 }
 
 function targetsForProvider(providerId) {
-  if (providerId === "trae") return [];
+  const provider = providerById(providerId);
+  if (!providerSupportsLaunch(provider)) return [];
   const instances = runtimeInstancesForProvider(providerId);
   if (!instances.length) {
-    return providerById(providerId)?.agents || [];
+    return provider.agents || [];
   }
   return sortTargetsForAgentList(instances.flatMap(targetsForRuntimeInstance));
 }
@@ -774,7 +776,7 @@ function providerAvailability(providerId) {
 }
 
 function canSendToProvider(providerId) {
-  if (providerId === "trae") return false;
+  if (!providerSupportsLaunch(providerById(providerId))) return false;
   if (runtimeInstancesForProvider(providerId).length) {
     return runtimeTargets().some((target) => target.providerId === providerId && canTargetStartSession(target));
   }
@@ -1954,7 +1956,7 @@ function setCurrentTargetAgent(agentId) {
 }
 
 function runtimeConnectionNote(provider, instances) {
-  if (provider.id === "trae") return displayProviderNote(provider);
+  if (!providerSupportsLaunch(provider)) return displayProviderNote(provider);
   if (!instances.length) {
     return provider.id === "hermes" ? t("provider.noHermesRuntime") : t("provider.noRuntime");
   }

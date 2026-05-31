@@ -116,6 +116,14 @@ test("providersStore: runtimeAvailability snapshot + patch", () => {
   assert.equal(store.getRuntimeAvailabilityFor("nope"), null);
 });
 
+test("providersStore: identityOnly manifest registers identity without a launch target", () => {
+  const store = createProvidersStore();
+  store.syncAdapterProviders([{ id: "trae", name: "Trae IDE", identityOnly: true }]);
+  const trae = store.providerById("trae");
+  assert.equal(trae.identityOnly, true);
+  assert.deepEqual(trae.agents, []);
+});
+
 test("providersStore: runtime instance snapshots isolate callers", () => {
   const store = createProvidersStore();
   const input = [{ id: "a", providerId: "claude", available: true }];

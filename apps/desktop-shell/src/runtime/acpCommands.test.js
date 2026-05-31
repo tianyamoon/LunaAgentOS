@@ -19,3 +19,7 @@ test("acpCommandsForProvider: non-manifest providers have no ACP command routing
   assert.equal(acpCommandsForProvider({ id: "hermes", dynamicAdapter: false }), null);
   assert.equal(acpCommandsForProvider(null), null);
 });
+
+test("acpCommandsForProvider: identityOnly manifest stays outside ACP routing", () => {
+  assert.equal(acpCommandsForProvider({ id: "trae", dynamicAdapter: true, identityOnly: true }), null);
+});

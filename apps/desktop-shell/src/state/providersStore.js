@@ -1,3 +1,5 @@
+import { isIdentityOnlyProvider } from "../providers/providerCatalog.js";
+
 const DEFAULT_PROVIDERS = [
   {
     id: "claude",
@@ -112,16 +114,8 @@ const DEFAULT_PROVIDERS = [
         "agentDetail.trae.practice.useIde",
       ],
     },
-    agents: [
-      {
-        id: "trae-main",
-        providerId: "trae",
-        nameKey: "agent.main",
-        subtitle: "IDE Bridge",
-        noteKey: "agent.trae.note",
-        state: 1,
-      },
-    ],
+    // Trae 仅注册 IDE 身份；真正 bridge 入口由独立集成提供。
+    agents: [],
   },
 ];
 const BUILTIN_PROVIDER_IDS = new Set(DEFAULT_PROVIDERS.map((provider) => provider.id));
@@ -153,13 +147,15 @@ function cloneProvider(entry) {
 function providerFromAdapter(adapter) {
   const id = adapter?.id;
   if (!id) return null;
+  const identityOnly = adapter.identityOnly === true;
   return {
     id,
     name: adapter.name || id,
     lane: "",
     dynamicAdapter: true,
+    identityOnly,
     adapterManifest: adapter,
-    agents: [
+    agents: identityOnly ? [] : [
       {
         id: `${id}-main`,
         providerId: id,
@@ -253,8 +249,11 @@ export function createProvidersStore(initial = {}) {
         if (existing) {
           existing.name = provider.name;
           existing.dynamicAdapter = true;
+          existing.identityOnly = provider.identityOnly;
           existing.adapterManifest = provider.adapterManifest;
-          if (!Array.isArray(existing.agents) || existing.agents.length === 0) {
+          if (isIdentityOnlyProvider(existing)) {
+            existing.agents = [];
+          } else if (!Array.isArray(existing.agents) || existing.agents.length === 0) {
             existing.agents = provider.agents;
           }
         } else {
@@ -274,6 +273,7 @@ export function createProvidersStore(initial = {}) {
         const provider = providers[index];
         if (provider.dynamicAdapter && BUILTIN_PROVIDER_IDS.has(provider.id) && !adapterIds.has(provider.id)) {
           delete provider.dynamicAdapter;
+          delete provider.identityOnly;
           delete provider.adapterManifest;
           changed = true;
         } else if (provider.dynamicAdapter && !BUILTIN_PROVIDER_IDS.has(provider.id) && !adapterIds.has(provider.id)) {
@@ -361,16 +361,6 @@ export function createProvidersStore(initial = {}) {
         0,
       );
     },
-    setHermesProfilesForInstance(instanceId, profiles) {
-      this.setRuntimeTargetsForInstance(instanceId, profiles);
-    },
-    pruneHermesProfilesByInstanceIds(validIds) {
-      this.pruneRuntimeTargetsByInstanceIds(validIds);
-    },
-    totalHermesProfileCount() {
-      return this.totalRuntimeTargetCount();
-    },
-
     subscribe(listener) {
       if (typeof listener !== "function") return () => {};
       listeners.add(listener);

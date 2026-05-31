@@ -169,6 +169,18 @@ test("targetsForRuntimeInstance: unknown provider yields no targets", () => {
   assert.deepEqual(targets, []);
 });
 
+test("targetsForRuntimeInstance: identityOnly provider does not produce a launch row", () => {
+  const targets = targetsForRuntimeInstance(
+    { id: "trae-bridge", providerId: "trae", available: true, runtimeLabel: "IDE" },
+    {
+      providers: [{ id: "trae", name: "Trae IDE", identityOnly: true }],
+      runtimeInstances: [],
+      runtimeTargetsByInstance: {},
+    },
+  );
+  assert.deepEqual(targets, []);
+});
+
 test("targetsForRuntimeInstance: manifest adapter produces a generic runtime row", () => {
   const codexProvider = { id: "codex", name: "OpenAI Codex", dynamicAdapter: true };
   const codexInstance = {

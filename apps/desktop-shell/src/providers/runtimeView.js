@@ -12,6 +12,7 @@ import {
   isTargetUnavailableForFleet,
   targetStatusForFleet,
 } from "./agentMetadata.js";
+import { providerSupportsLaunch } from "./providerCatalog.js";
 
 export function runtimeInstancesForProvider(runtimeInstances, providerId) {
   if (!Array.isArray(runtimeInstances)) return [];
@@ -49,7 +50,8 @@ export function targetsForRuntimeInstance(
   { providers, runtimeInstances, runtimeTargetsByInstance },
 ) {
   const provider = (providers || []).find((entry) => entry.id === instance.providerId);
-  if (!provider || !instance.available) return [];
+  // identityOnly Provider 保留目录身份，但不会生成可启动 Runtime Target。
+  if (!providerSupportsLaunch(provider) || !instance.available) return [];
   const availableCount = availableRuntimeInstancesForProvider(runtimeInstances, instance.providerId).length;
   const runtimeHost = identityRuntimeHostForInstance(instance);
   const extensionTargets = (runtimeTargetsByInstance && runtimeTargetsByInstance[instance.id]) || [];
