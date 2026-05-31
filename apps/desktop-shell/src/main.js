@@ -23,6 +23,7 @@ import {
 import { createComposerController } from "./ui/composerController.js";
 import { createAgentFleetView } from "./ui/agentFleetView.js";
 import { createAgentManagementView } from "./ui/agentManagementView.js";
+import { createRuntimeSessionCardView } from "./ui/runtimeSessionCardView.js";
 import {
   sessionCardStats,
   sessionTurnVisibility,
@@ -369,6 +370,7 @@ let sessionLaunchController = null;
 let composerController = null;
 let agentFleetView = null;
 let agentManagementView = null;
+let runtimeSessionCardView = null;
 let historyView = null;
 let workspaceView = null;
 let sendAsNewSession = false;
@@ -1594,114 +1596,9 @@ function renderTurn(turn, index) {
   `;
 }
 
-function renderSessionStatusIcon(icon) {
-  const glyphs = {
-    dot: "•",
-    spinner: "◌",
-    warning: "!",
-    check: "✓",
-    archive: "▣",
-    lock: "⌕",
-  };
-  return `<span class="session-status-icon session-status-icon-${escapeHtml(icon || "dot")}" aria-hidden="true">${escapeHtml(glyphs[icon] || glyphs.dot)}</span>`;
-}
-
-function renderSessionStatusChip(statusView) {
-  const secondary = statusView.secondary_status?.label
-    ? `<span class="session-status-secondary">${escapeHtml(statusView.secondary_status.label)}</span>`
-    : "";
-  return `<span class="runtime-pill session-card-status-pill session-status-${escapeHtml(statusView.tone)} session-status-${escapeHtml(statusView.status)}" aria-label="${escapeHtml(t("session.statusAria", { state: statusView.label }))}" title="${escapeHtml(statusView.detail)}">
-    ${renderSessionStatusIcon(statusView.icon)}
-    <span>${escapeHtml(statusView.label)}</span>
-    ${secondary}
-  </span>`;
-}
-
-function renderSessionStatusError(statusView) {
-  if (!statusView.error) return "";
-  const stage = statusView.error.stage
-    ? `<div class="session-status-error-stage">${escapeHtml(t("sessionStatus.errorStage", { stage: statusView.error.stage }))}</div>`
-    : "";
-  return `<div class="session-status-error">
-    <strong>${escapeHtml(statusView.error.title)}</strong>
-    ${stage}
-    ${statusView.error.detail ? `<pre>${escapeHtml(statusView.error.detail)}</pre>` : ""}
-    ${statusView.error.suggestion ? `<p>${escapeHtml(statusView.error.suggestion)}</p>` : ""}
-  </div>`;
-}
-
+// Shell 只暴露 Session Card 渲染入口，HTML 结构由独立视图负责。
 function renderSessionCard(session) {
-  ensureSessionStatusShape(session);
-  const identitySession = normalizeWorkspaceSession(session);
-  const statusView = resolveSessionCardStatusView(session, { translate: t });
-  const isActiveReceiver = sessionsStore.getCurrentSessionId() === session.id;
-  const isWaiting = statusView.status === CARD_STATUS.running || statusView.status === CARD_STATUS.waiting_confirmation;
-  const isRestoring = session.runtime_binding?.state === RUNTIME_BINDING_STATE.reconnecting;
-  const managementDisabled = isRestoring ? "disabled" : "";
-  const profileMeta = identitySession.providerId === "hermes"
-    ? [identitySession.profileName, identitySession.profileModel].filter(Boolean).join(" · ")
-    : "";
-  const stats = sessionCardStats(session, t);
-  const latestOnly = isSessionLatestOnly(session);
-  const hasFlowDetails = flowDetailEntriesForSession(session).length > 0;
-  const flowsOpen = areSessionFlowDetailsOpen(session);
-  const turnsCollapsed = areSessionTurnsCollapsed(session);
-  const { visibleTurnEntries, hiddenTurnCount } = sessionTurnVisibility(session, latestOnly);
-  const managementTitleSuffix = isRestoring ? t("action.restoringSuffix") : "";
-  const canArchiveCard = session.record_state !== RECORD_STATE.archived && session.access_mode !== ACCESS_MODE.read_only;
-  const turnToggleLabel = turnsCollapsed ? t("action.expandAllTurns") : t("action.collapseAllTurns");
-  const latestOnlyLabel = latestOnly ? t("action.showAllTurns") : t("action.latestOnly");
-  const flowToggleLabel = flowsOpen ? t("action.collapseFlows") : t("action.expandFlows");
-  const isFocusedSession = workspaceViewStore.getFocusedSessionId() === session.id;
-  const fullscreenLabel = isFocusedSession ? t("action.exitFullscreen") : t("action.enterFullscreen");
-  const identityTitle = sessionIdentityTitle(identitySession);
-  const identityTitleMarkup = renderSessionIdentityTitle(identitySession);
-  return `
-    <article class="session-card ${isFocusedSession ? "fullscreen" : ""} ${isActiveReceiver ? "is-active-receiver" : ""} ${isWaiting ? "is-waiting" : ""}" data-session-id="${session.id}" tabindex="0" aria-label="${escapeHtml(t("session.ariaSwitch", { task: session.task }))}" ${isActiveReceiver ? "aria-current=\"true\"" : ""}>
-      <div class="session-card-header">
-        <div class="session-card-row session-card-identity-line">
-          <div class="session-agent-title">
-            <strong title="${escapeHtml(identityTitle)}">${identityTitleMarkup}</strong>
-            ${isActiveReceiver ? `<span class="active-receiver-banner">${t("session.current")}</span>` : ""}
-          </div>
-          <div class="session-card-actions" role="toolbar" aria-label="${t("session.actionsAria")}">
-            ${isWaiting && session.record_state === RECORD_STATE.active ? `<button type="button" class="mini-btn ghost-btn session-action-btn danger-btn session-stop-btn" data-session-id="${session.id}" title="${t("action.stop")}" aria-label="${t("action.stop")}">${renderSessionActionIcon("stop")}</button>` : ""}
-            <div class="session-tool-group" role="group">
-              <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-copy-btn" data-session-id="${session.id}" title="${t("action.copySession")}" aria-label="${t("action.copySession")}" ${session.turns.length ? "" : "disabled"}>${renderSessionActionIcon("copy")}</button>
-              <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-latest-only-btn ${latestOnly ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${latestOnly ? "true" : "false"}" title="${latestOnlyLabel}" aria-label="${latestOnlyLabel}" ${session.turns.length > 1 ? "" : "disabled"}>${renderSessionActionIcon(latestOnly ? "all" : "latest")}</button>
-              <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-toggle-flows-btn ${flowsOpen ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${flowsOpen ? "true" : "false"}" title="${flowToggleLabel}" aria-label="${flowToggleLabel}" ${hasFlowDetails ? "" : "disabled"}>${renderSessionActionIcon(flowsOpen ? "collapse" : "expand")}</button>
-              <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-scroll-latest-btn" data-session-id="${session.id}" title="${t("action.scrollLatest")}" aria-label="${t("action.scrollLatest")}">${renderSessionActionIcon("latestScroll")}</button>
-              <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-fullscreen-btn ${isFocusedSession ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${isFocusedSession ? "true" : "false"}" title="${fullscreenLabel}" aria-label="${fullscreenLabel}">${renderSessionActionIcon(isFocusedSession ? "fullscreenExit" : "fullscreen")}</button>
-            </div>
-            <div class="session-management-group" role="group">
-              <button type="button" class="mini-btn ghost-btn session-action-btn session-dismiss-btn" data-session-id="${session.id}" title="${t("action.dismiss")}${managementTitleSuffix}" aria-label="${t("action.dismiss")}" ${managementDisabled}>${renderSessionActionIcon("dismiss")}</button>
-              ${canArchiveCard ? `<button type="button" class="mini-btn ghost-btn session-action-btn session-archive-btn" data-session-id="${session.id}" title="${t("action.archive")}${managementTitleSuffix}" aria-label="${t("action.archive")}" ${managementDisabled}>${renderSessionActionIcon("archive")}</button>` : ""}
-              <button type="button" class="mini-btn ghost-btn session-action-btn danger-btn session-delete-btn" data-session-id="${session.id}" title="${t("action.delete")}${managementTitleSuffix}" aria-label="${t("action.delete")}" ${managementDisabled}>${renderSessionActionIcon("delete")}</button>
-              ${canRestoreSession(session) ? `<button type="button" class="mini-btn ghost-btn session-retry-btn" data-session-id="${session.id}">${t("session.restoreRetry")}</button>` : ""}
-            </div>
-          </div>
-        </div>
-        <div class="session-card-row session-card-status-line">
-          ${renderSessionStatusChip(statusView)}
-          <div class="session-card-stats" aria-label="${t("session.statsAria")}">
-            <button type="button" class="session-stat-pill session-turns-toggle-btn ${turnsCollapsed ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${turnsCollapsed ? "true" : "false"}" title="${turnToggleLabel}" aria-label="${turnToggleLabel}" ${session.turns.length ? "" : "disabled"}>${t("session.turns", { count: session.turns.length })}</button>
-            ${stats.map((item) => `<span class="session-stat-pill" data-stat-key="${escapeHtml(item.key)}">${escapeHtml(item.label)}</span>`).join("")}
-          </div>
-          ${profileMeta ? `<div class="caption session-profile-meta">${escapeHtml(profileMeta)}</div>` : ""}
-        </div>
-        <div class="session-task-line" title="${escapeHtml(session.task)}" aria-label="${escapeHtml(t("session.task", { task: session.task }))}">
-          <span class="session-task-label">${escapeHtml(t("session.taskLabel"))}</span>
-          <span class="session-task-text">${escapeHtml(session.task)}</span>
-        </div>
-        ${renderSessionStatusError(statusView)}
-      </div>
-      <div class="session-card-body">
-        ${session.turns.length
-          ? `${hiddenTurnCount ? `<div class="session-hidden-turns">${t("session.hiddenTurns", { count: hiddenTurnCount })}</div>` : ""}${visibleTurnEntries.map(({ turn, index }) => renderTurn(turn, index)).join("")}<div class="session-latest-anchor">${isWaiting ? t("session.latestAnchorStreaming") : t("session.latestAnchorLatest")}</div>`
-          : `<p class='flow-empty'>${t("session.noMessages")}</p>`}
-      </div>
-    </article>
-  `;
+  return runtimeSessionCardView.renderSessionCard(session);
 }
 
 function focusSessionInWorkspace(sessionId) {
@@ -1713,22 +1610,7 @@ function toggleSessionFocus(sessionId) {
 }
 
 function renderSessionMiniCard(session) {
-  ensureSessionStatusShape(session);
-  const identitySession = normalizeWorkspaceSession(session);
-  const statusView = resolveSessionCardStatusView(session, { translate: t });
-  const isActive = sessionsStore.getCurrentSessionId() === session.id;
-  const isWaiting = statusView.status === CARD_STATUS.running || statusView.status === CARD_STATUS.waiting_confirmation;
-  const taskPreview = (session.task || "").replace(/\s+/g, " ").trim();
-  const previewText = taskPreview.length > 64 ? `${taskPreview.slice(0, 64)}\u2026` : taskPreview;
-  const identityTitle = sessionIdentityTitle(identitySession);
-  return `<button type="button" class="session-mini-card ${isActive ? "is-active" : ""} ${isWaiting ? "is-waiting" : ""}" data-session-id="${escapeHtml(session.id)}" title="${escapeHtml(identityTitle)}">
-    <span class="session-mini-card-state runtime-pill session-status-${escapeHtml(statusView.tone)} session-status-${escapeHtml(statusView.status)} ${isWaiting ? "is-busy" : ""}" aria-label="${escapeHtml(statusView.label)}"></span>
-    <span class="session-mini-card-body">
-      <span class="session-mini-card-title">${escapeHtml(identityTitle)}</span>
-      ${previewText ? `<span class="session-mini-card-task">${escapeHtml(previewText)}</span>` : ""}
-    </span>
-    <span class="session-mini-card-action" aria-hidden="true">\u21F1</span>
-  </button>`;
+  return runtimeSessionCardView.renderSessionMiniCard(session);
 }
 
 function exitFullscreenSessions() {
@@ -1882,6 +1764,32 @@ function focusComposerInput() {
     }
   });
 }
+
+// Runtime Session Card View 只消费状态投影和命令查询，不直接修改 Session Store。
+runtimeSessionCardView = createRuntimeSessionCardView({
+  ensureSessionStatusShape,
+  normalizeWorkspaceSession,
+  resolveSessionCardStatusView,
+  getCurrentSessionId: () => sessionsStore.getCurrentSessionId(),
+  getFocusedSessionId: () => workspaceViewStore.getFocusedSessionId(),
+  sessionCardStats,
+  isSessionLatestOnly,
+  flowDetailEntriesForSession,
+  areSessionFlowDetailsOpen,
+  areSessionTurnsCollapsed,
+  sessionTurnVisibility,
+  sessionIdentityTitle,
+  renderSessionIdentityTitle,
+  renderSessionActionIcon,
+  renderTurn,
+  canRestoreSession,
+  CARD_STATUS,
+  RUNTIME_BINDING_STATE,
+  RECORD_STATE,
+  ACCESS_MODE,
+  t,
+  escapeHtml,
+});
 
 // Agent Management View 统一承接连接详情、职责简报和可用性弹窗。
 agentManagementView = createAgentManagementView({
