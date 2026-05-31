@@ -87,6 +87,7 @@ import { AgentDetailPanel } from "./components/agentDetail/AgentDetailPanel.js";
 import {
   acpCommandsForProvider as acpCommandsForProviderRaw,
 } from "./runtime/acpCommands.js";
+import { createAcpRuntimeClient } from "./runtime/acpRuntimeClient.js";
 import {
   applyDataI18n,
   getLanguage,
@@ -394,6 +395,11 @@ const {
   markStopped: markSessionStopped,
   updateTurnFromEvents: updateSessionTurnFromEvents,
 } = sessionTurnStateModel;
+const acpRuntimeClient = createAcpRuntimeClient({
+  invoke,
+  commandsForProvider: acpCommandsForProvider,
+  translate: t,
+});
 const workspaceViewStore = createWorkspaceViewStore();
 const sessions = sessionsStore.getSessions();
 let workspaceSessionController = null;
@@ -720,10 +726,6 @@ function currentTargetProvider() {
 function acpCommandsForProvider(providerId) {
   if (!providerId) return null;
   return acpCommandsForProviderRaw(providerById(providerId));
-}
-
-function acpInvokeArgs(commands, providerId, args = {}) {
-  return commands?.requiresAdapterId ? { adapterId: providerId, ...args } : args;
 }
 
 function providerState(provider) {
@@ -3005,42 +3007,13 @@ workspaceView = createWorkspaceView({
   escapeHtml,
 });
 
-async function shutdownRuntimeSession(session) {
-  const commands = acpCommandsForProvider(session.providerId);
-  if (!commands) return false;
-  return invoke(commands.shutdown, acpInvokeArgs(commands, session.providerId, { runtimeSessionId: session.id }));
-}
-
-async function verifyAcpSessionAlive(commands, providerId, sessionId) {
-  if (!commands?.aliveIds || !sessionId) return;
-  // Multi-probe handshake check. The backend's alive_ids only reports whether
-  // the ACP child process is still running, so a process that spawned and is
-  // immediately crashing during initialize will look alive for the first few
-  // hundred ms. By probing 3 times across ~1.8s we catch that crash window
-  // before we tell the user "已重连".
-  const probeDelaysMs = [300, 600, 900];
-  for (const delayMs of probeDelaysMs) {
-    await new Promise((resolve) => setTimeout(resolve, delayMs));
-    let aliveList;
-    try {
-      aliveList = await invoke(commands.aliveIds, acpInvokeArgs(commands, providerId));
-    } catch (error) {
-      throw new Error(t("restore.aliveCheckFailed"));
-    }
-    const aliveSet = new Set(Array.isArray(aliveList) ? aliveList : []);
-    if (!aliveSet.has(sessionId)) {
-      throw new Error(t("restore.aliveCheckFailed"));
-    }
-  }
-}
-
 async function archiveLiveSession(sessionId) {
   const session = sessions.find((item) => item.id === sessionId);
   if (!session) return;
   const shouldMarkStopped = isSessionExecuting(session);
   if (shouldMarkStopped) setSessionLifecycle(session, LIFECYCLE.stopped);
   try {
-    await shutdownRuntimeSession(session);
+    await acpRuntimeClient.shutdown(session);
   } catch (error) {
     console.error(error);
   }
@@ -3061,7 +3034,7 @@ async function archiveLiveSession(sessionId) {
 
 async function detachRuntimeKeepActive(session) {
   try {
-    await shutdownRuntimeSession(session);
+    await acpRuntimeClient.shutdown(session);
   } catch (error) {
     console.error(error);
   }
@@ -3146,7 +3119,7 @@ async function deleteSession(sessionId) {
     }
     if (session && runtimeState === "live") {
       try {
-        await shutdownRuntimeSession(session);
+        await acpRuntimeClient.shutdown(session);
       } catch (shutdownError) {
         console.error(shutdownError);
       }
@@ -3510,8 +3483,7 @@ async function restoreArchivedSession(sessionId) {
   renderWorkspace();
   renderHistory();
   setAppNotice(t("restore.starting"), "busy");
-  const commands = acpCommandsForProvider(restored.providerId);
-  if (!commands) {
+  if (!acpRuntimeClient.canHandle(restored.providerId)) {
     setSessionLifecycle(restored, LIFECYCLE.archived);
     markSessionInactive(restored.id);
     renderRestoreUpdate();
@@ -3519,15 +3491,8 @@ async function restoreArchivedSession(sessionId) {
     return;
   }
   try {
-    await invoke(commands.load, acpInvokeArgs(commands, restored.providerId, {
-      runtimeSessionId: restored.id,
-      acpSessionId: restored.acpSessionId,
-      cwd: null,
-      runtimeHost: restored.runtimeHost || null,
-      runtimeCommand: restored.runtimeCommand || null,
-      profileExecutable: restored.profileExecutable || null,
-    }));
-    await verifyAcpSessionAlive(commands, restored.providerId, restored.id);
+    await acpRuntimeClient.load(restored);
+    await acpRuntimeClient.verifyAlive(restored.providerId, restored.id);
     setSessionLifecycle(restored, LIFECYCLE.live);
     setSessionAccessMode(restored, ACCESS_MODE.interactive);
     clearRuntimeBindingError(restored);
@@ -3538,20 +3503,13 @@ async function restoreArchivedSession(sessionId) {
   } catch (loadError) {
     const formattedLoadError = formatBackendError(loadError);
     try {
-      await invoke(commands.shutdown, acpInvokeArgs(commands, restored.providerId, { runtimeSessionId: restored.id }));
+      await acpRuntimeClient.shutdown(restored);
     } catch (shutdownError) {
       console.error(shutdownError);
     }
     try {
-      await invoke(commands.resume, acpInvokeArgs(commands, restored.providerId, {
-        runtimeSessionId: restored.id,
-        acpSessionId: restored.acpSessionId,
-        cwd: null,
-        runtimeHost: restored.runtimeHost || null,
-        runtimeCommand: restored.runtimeCommand || null,
-        profileExecutable: restored.profileExecutable || null,
-      }));
-      await verifyAcpSessionAlive(commands, restored.providerId, restored.id);
+      await acpRuntimeClient.resume(restored);
+      await acpRuntimeClient.verifyAlive(restored.providerId, restored.id);
       setSessionLifecycle(restored, LIFECYCLE.live);
       setSessionAccessMode(restored, ACCESS_MODE.interactive);
       clearRuntimeBindingError(restored);
@@ -3656,8 +3614,7 @@ async function runFallbackSession(session, turn) {
 }
 
 async function startAcpSession(session, turn) {
-  const commands = acpCommandsForProvider(session.providerId);
-  if (!commands) {
+  if (!acpRuntimeClient.canHandle(session.providerId)) {
     void runFallbackSession(session, turn);
     return;
   }
@@ -3675,14 +3632,7 @@ async function startAcpSession(session, turn) {
   setRuntimeBinding(session, { state: RUNTIME_BINDING_STATE.connected, stage: RUNTIME_BINDING_STAGE.prompt });
   try {
     await new Promise((resolve) => requestAnimationFrame(resolve));
-    const events = await invoke(commands.prompt, acpInvokeArgs(commands, session.providerId, {
-      runtimeSessionId: session.id,
-      prompt: turn.runtimePrompt || turn.task,
-      cwd: null,
-      runtimeHost: session.runtimeHost || null,
-      runtimeCommand: session.runtimeCommand || null,
-      profileExecutable: session.profileExecutable || null,
-    }));
+    const events = await acpRuntimeClient.prompt(session, turn);
     if (isSessionDeletedTombstone(session.id) || isSessionStoppedTombstone(session.id)) return;
     const saved = updateTurnFromEvents(session.id, turn.id, events);
     if (isSessionDeletedTombstone(session.id) || isSessionStoppedTombstone(session.id)) return;
@@ -3934,10 +3884,9 @@ async function syncRuntimeAliveStates() {
       .map((session) => session.providerId))];
     const aliveByProvider = {};
     for (const providerId of providerIds) {
-      const commands = acpCommandsForProvider(providerId);
-      if (commands) {
+      if (acpRuntimeClient.canHandle(providerId)) {
         aliveByProvider[providerId] = new Set(
-          await invoke(commands.aliveIds, acpInvokeArgs(commands, providerId)),
+          await acpRuntimeClient.aliveIds(providerId),
         );
       }
     }
