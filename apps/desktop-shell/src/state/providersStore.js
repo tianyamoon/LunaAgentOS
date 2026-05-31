@@ -281,8 +281,8 @@ export function createProvidersStore(initial = {}) {
       notify();
     },
 
-    getRuntimeAvailabilityRef() {
-      return runtimeAvailability;
+    getRuntimeAvailabilitySnapshot() {
+      return { ...runtimeAvailability };
     },
     getRuntimeAvailabilityFor(providerId) {
       return runtimeAvailability[providerId] || null;

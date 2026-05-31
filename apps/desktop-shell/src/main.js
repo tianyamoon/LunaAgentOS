@@ -373,7 +373,6 @@ localStorage.removeItem(CURRENT_SESSION_KEY);
 let currentTargetAgentId = localStorage.getItem(CURRENT_TARGET_AGENT_KEY) || localStorage.getItem(LEGACY_TARGET_AGENT_KEY) || "claude-main";
 const providersStore = createProvidersStore();
 const providers = providersStore.getProvidersRef();
-const runtimeAvailability = providersStore.getRuntimeAvailabilityRef();
 const runtimeInstances = providersStore.getRuntimeInstancesRef();
 const runtimeTargetsByInstance = providersStore.getRuntimeTargetsByInstanceRef();
 const sessionsStore = createSessionsStore();
@@ -706,7 +705,7 @@ function providerState(provider) {
     if (availableCount > 0) return 2;
     return 9;
   }
-  const availability = runtimeAvailability[provider.id];
+  const availability = providersStore.getRuntimeAvailabilityFor(provider.id);
   if (availability) {
     return PROVIDER_AVAILABILITY_STATES[availability.summary]?.state ?? 1;
   }
@@ -741,7 +740,7 @@ function providerAvailability(providerId) {
       detail: "",
     };
   }
-  return runtimeAvailability[providerId] || { summary: "available", configured: true, available: true, command: "" };
+  return providersStore.getRuntimeAvailabilityFor(providerId) || { summary: "available", configured: true, available: true, command: "" };
 }
 
 function canSendToProvider(providerId) {
@@ -1676,7 +1675,7 @@ async function autoFetchProviderBriefs(providerId, root) {
 function availabilityTargetForAgent(target) {
   if (!target) return null;
   const store = getAvailabilityStore();
-  const data = store.refresh(providers, runtimeInstances, currentTargetAgent(), runtimeAvailability);
+  const data = store.refresh(providers, runtimeInstances, currentTargetAgent(), providersStore.getRuntimeAvailabilitySnapshot());
   const provider = data.providers.find((entry) => entry.id === target.providerId);
   return provider?.targets.find((entry) => entry.id === target.id) || null;
 }
@@ -1915,7 +1914,7 @@ function openAvailabilityModal() {
   const data = store.getData();
 
   if (!data.lastCheck) {
-    store.refresh(providers, runtimeInstances, currentTargetAgent(), runtimeAvailability);
+    store.refresh(providers, runtimeInstances, currentTargetAgent(), providersStore.getRuntimeAvailabilitySnapshot());
   }
 
   const freshData = store.getData();
@@ -1963,7 +1962,7 @@ function openAvailabilityModal() {
     setAppNotice(t("availability.rechecking"), "busy");
     try {
       await refreshRuntimeProbe();
-      store.refresh(providers, runtimeInstances, currentTargetAgent(), runtimeAvailability);
+      store.refresh(providers, runtimeInstances, currentTargetAgent(), providersStore.getRuntimeAvailabilitySnapshot());
       const updatedData = store.getData();
       const updatedView = AvailabilityView(updatedData, { showTitle: false, compact: true });
       confirmDialog.querySelector(".availability-dialog-body").innerHTML = updatedView;
@@ -2002,7 +2001,7 @@ async function refreshRuntimeProbe() {
     renderWorkspace();
     renderHistory();
     renderWorkspaceStatus();
-    getAvailabilityStore().refresh(providers, runtimeInstances, currentTargetAgent(), runtimeAvailability);
+    getAvailabilityStore().refresh(providers, runtimeInstances, currentTargetAgent(), providersStore.getRuntimeAvailabilitySnapshot());
     [...new Set(runtimeInstances.filter((instance) => instance.available).map((instance) => instance.providerId))]
       .forEach((providerId) => {
         loadRuntimeSlashCommandsForProvider(providerId);

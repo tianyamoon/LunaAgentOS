@@ -100,15 +100,15 @@ test("providersStore: syncAdapterProviders marks built-ins and prunes manifest p
   assert.equal(store.getRuntimeAvailabilityFor("codex"), null);
 });
 
-test("providersStore: runtimeAvailability stable ref + patch", () => {
+test("providersStore: runtimeAvailability snapshot + patch", () => {
   const store = createProvidersStore();
-  const ref = store.getRuntimeAvailabilityRef();
-  assert.equal(ref.claude.summary, "probing");
+  const snapshot = store.getRuntimeAvailabilitySnapshot();
+  assert.equal(snapshot.claude.summary, "probing");
   store.patchRuntimeAvailability({
     claude: { summary: "available", configured: true, available: true, command: "claude" },
   });
-  assert.equal(store.getRuntimeAvailabilityRef(), ref);
-  assert.equal(ref.claude.summary, "available");
+  assert.equal(snapshot.claude.summary, "probing");
+  assert.equal(store.getRuntimeAvailabilitySnapshot().claude.summary, "available");
   assert.equal(store.getRuntimeAvailabilityFor("claude").available, true);
   assert.equal(store.getRuntimeAvailabilityFor("nope"), null);
 });
