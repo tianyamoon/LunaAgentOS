@@ -4,6 +4,10 @@ import {
   statusFromRuntimeEvent,
   statusFromRuntimeStateCode,
 } from "../state/sessionStatus.js";
+import {
+  appendTurnTimelineEvent,
+  finalizeTurnTimeline,
+} from "./turnTimeline.js";
 
 export function sessionSectionsFromEvents(events) {
   const sections = {
@@ -130,6 +134,12 @@ export function applyEventsToTurn(session, turn, events) {
   turn.outputs = sections.outputs;
   turn.finalResponse = sections.finalResponse;
   turn.logs = sections.logs;
+  // 批量 ACP 与 fallback 结果是完整事件序列，重建 Timeline 可以避免重复追加流式片段。
+  turn.timelineItems = [];
+  turn.activeTimelineItemId = null;
+  turn.timelineStartedAt = null;
+  turn.timelineCompletedAt = null;
+  events.forEach((event) => appendNormalizedTimelineEvent(turn, event));
   turn.state = lastState ? lastState.state : turn.state;
   turn.status = events.reduce(
     (status, event) => statusFromRuntimeEvent(event, status, Boolean(sections.finalResponse)),
@@ -137,6 +147,9 @@ export function applyEventsToTurn(session, turn, events) {
   );
   if (turn.status === TURN_STATUS.running && sections.finalResponse && lastState?.state === 5) {
     turn.status = TURN_STATUS.completed;
+  }
+  if (turn.status === TURN_STATUS.completed || turn.status === TURN_STATUS.failed) {
+    finalizeTurnTimeline(turn);
   }
   if (acpSessionEvent?.payload?.sessionId) session.acpSessionId = acpSessionEvent.payload.sessionId;
   session.task = turn.task;
@@ -147,6 +160,8 @@ export function applyEventsToTurn(session, turn, events) {
 
 export function applyStreamEventToTurn(session, turn, event) {
   const content = eventContentText(event);
+  // 流式事件按到达顺序立即写入 Timeline，保留 Assistant 与 Tool 交叉发生的事实。
+  appendNormalizedTimelineEvent(turn, event, content);
   if (typeof event.state === "number") {
     turn.state = event.state;
     session.state = event.state;
@@ -196,5 +211,20 @@ export function applyStreamEventToTurn(session, turn, event) {
       break;
   }
 
+  if (turn.status === TURN_STATUS.completed || turn.status === TURN_STATUS.failed) {
+    finalizeTurnTimeline(turn);
+  }
+
   return turn;
+}
+
+// Timeline 使用与旧日志相同的可读文本，同时把原始 payload 留在 metadata 中供 Debug 层读取。
+function appendNormalizedTimelineEvent(turn, event, content = eventContentText(event)) {
+  appendTurnTimelineEvent(turn, {
+    ...event,
+    payload: {
+      ...(event.payload || {}),
+      content,
+    },
+  });
 }

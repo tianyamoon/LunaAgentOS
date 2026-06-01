@@ -8,6 +8,11 @@ import {
   applyEventsToTurn,
   applyStreamEventToTurn,
 } from "../runtime/streamEvents.js";
+import {
+  appendTurnTimelineEvent,
+  ensureTurnTimeline,
+  finalizeTurnTimeline,
+} from "../runtime/turnTimeline.js";
 
 export function createSessionTurnState({
   sessionsStore,
@@ -54,6 +59,8 @@ export function createSessionTurnState({
         ...(options.attachments?.length ? { attachments: options.attachments } : {}),
       },
     };
+    // 新 Turn 从创建时就拥有 Timeline，保证启动提示和早期错误也能进入同一条过程流。
+    ensureTurnTimeline(turn, { now });
     session.task = task;
     session.state = 2;
     session.activeTurnId = turn.id;
@@ -92,6 +99,8 @@ export function createSessionTurnState({
     turn.state = 9;
     turn.status = TURN_STATUS.failed;
     turn.logs = [message, ...(turn.logs || [])];
+    appendTurnTimelineEvent(turn, { type: "error", state: 9, payload: { content: message } }, { now });
+    finalizeTurnTimeline(turn, { now });
     session.state = 9;
     sessionRuntimeState.setRuntimeBinding(session, {
       state: RUNTIME_BINDING_STATE.failed,
@@ -108,6 +117,7 @@ export function createSessionTurnState({
     if (!turn || !message) return null;
     if (!turn.logs.includes(message)) {
       turn.logs = [message, ...turn.logs];
+      appendTurnTimelineEvent(turn, { type: "runtime", state, payload: { content: message } }, { now });
     }
     if (typeof state === "number") {
       turn.state = state;
@@ -132,6 +142,11 @@ export function createSessionTurnState({
       turn.finalResponse = translate("turn.stoppedResponse");
     }
     turn.logs = [translate("turn.stoppedLog"), ...(turn.logs || [])];
+    appendTurnTimelineEvent(turn, {
+      type: "runtime",
+      payload: { content: translate("turn.stoppedLog"), status: "completed" },
+    }, { now });
+    finalizeTurnTimeline(turn, { now });
     session.state = 6;
     return turn;
   }

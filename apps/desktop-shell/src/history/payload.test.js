@@ -115,6 +115,20 @@ test("buildHistoryEntryPayload: agentEntrySnapshot is stored without mutating tu
   assert.deepEqual(payload.turn.meta, { foo: 1 });
 });
 
+test("buildHistoryEntryPayload: Timeline 随 Turn 一起持久化", () => {
+  const turn = makeTurn({
+    timelineItems: [{ id: "timeline-1", type: "assistant", content: "done" }],
+  });
+  const payload = buildHistoryEntryPayload({
+    session: makeSession(),
+    turn,
+    schemaVersion: 5,
+    runtimeState: "archived",
+  });
+  assert.equal(payload.turn.timelineItems[0].type, "assistant");
+  assert.equal(payload.turn.timelineItems[0].content, "done");
+});
+
 test("buildHistoryEntryPayload: targetId / targetName fall back to agent fields", () => {
   const payload = buildHistoryEntryPayload({
     session: makeSession({ targetId: undefined, targetName: undefined }),

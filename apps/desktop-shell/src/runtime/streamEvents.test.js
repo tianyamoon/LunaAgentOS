@@ -98,6 +98,19 @@ test("applyEventsToTurn replaces aggregate turn sections and updates session ide
   assert.equal(session.acpSessionId, "acp-1");
 });
 
+test("applyEventsToTurn writes ordered Timeline items for fallback and ACP batch events", () => {
+  const session = makeSession();
+  const turn = makeTurn();
+  applyEventsToTurn(session, turn, [
+    { type: "thought", state: 2, payload: { content: "先检查" } },
+    { type: "tool", state: 3, payload: { title: "Read", status: "done" } },
+    { type: "response", state: 5, payload: { content: "已完成" } },
+  ]);
+  assert.deepEqual(turn.timelineItems.map((item) => item.type), ["thinking", "tool", "assistant"]);
+  assert.equal(turn.timelineItems[1].content, "Read：done");
+  assert.equal(turn.timelineCompletedAt != null, true);
+});
+
 test("applyStreamEventToTurn appends incremental thought and response chunks", () => {
   const session = makeSession();
   const turn = makeTurn();
@@ -112,6 +125,22 @@ test("applyStreamEventToTurn appends incremental thought and response chunks", (
   assert.equal(turn.status, TURN_STATUS.running);
   assert.equal(session.state, 4);
   assert.equal(session.acpSessionId, "acp-2");
+});
+
+test("applyStreamEventToTurn preserves Timeline order when Tool interrupts Assistant stream", () => {
+  const session = makeSession();
+  const turn = makeTurn();
+  applyStreamEventToTurn(session, turn, { type: "response", state: 4, payload: { content: "先检查" } });
+  applyStreamEventToTurn(session, turn, { type: "tool", state: 3, payload: { title: "Read", status: "done" } });
+  applyStreamEventToTurn(session, turn, { type: "response", state: 4, payload: { content: "再处理" } });
+  assert.deepEqual(
+    turn.timelineItems.map((item) => ({ type: item.type, content: item.content })),
+    [
+      { type: "assistant", content: "先检查" },
+      { type: "tool", content: "Read：done" },
+      { type: "assistant", content: "再处理" },
+    ],
+  );
 });
 
 test("applyStreamEventToTurn prepends tool/plan/usage/state logs", () => {

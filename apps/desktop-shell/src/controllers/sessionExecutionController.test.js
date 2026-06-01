@@ -29,6 +29,10 @@ function makeHarness({ prompt, capabilities = {}, fallbackSessions = {}, tombsto
         turn.status = event.type === "thought" ? "running" : turn.status;
         return { session, turn };
       },
+      // 启动提示必须经过统一 Runtime Log API，才能同时进入旧日志和新 Timeline。
+      appendRuntimeLog: (_session, message) => {
+        turn.logs = [message, ...turn.logs];
+      },
       markPromptError: (_session, _turn, message) => { turn.error = message; turn.status = "failed"; },
     },
     sessionRuntimeState: {

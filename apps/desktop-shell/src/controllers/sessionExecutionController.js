@@ -45,7 +45,8 @@ export function createSessionExecutionController({
     const identity = notice.identityField ? session[notice.identityField] : session.agentName;
     const message = [notice.prefix, identity, t(notice.messageKey)].filter(Boolean).join(" ");
     session.acpStartupNoticeShown = true;
-    if (!turn.logs.includes(message)) turn.logs = [message, ...turn.logs];
+    // 启动提示也进入统一 Runtime Timeline，避免出现只在旧日志中可见的旁路事件。
+    sessionTurnState.appendRuntimeLog(session, message);
   }
 
   // 更新批量事件并刷新工作区与列表。
