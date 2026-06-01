@@ -33,8 +33,7 @@ import {
 import { createHistoryView } from "./ui/historyView.js";
 import { createWorkspaceView } from "./ui/workspaceView.js";
 import { renderAssistantResponse as renderAssistantResponseView } from "./ui/assistantResponseView.js";
-import { turnEventsFromTurn } from "./ui/turnEvents.js";
-import { renderTurnEventItemHtml, renderTurnEventsHtml } from "./ui/turnEventsView.js";
+import { createTurnTimelineView } from "./ui/turnTimelineView.js";
 import { renderProviderIcon, setAdapterIconRegistry } from "./ui/providerIcon.js";
 import {
   LIFECYCLE,
@@ -1326,10 +1325,8 @@ function turnTranscriptText(turn, index) {
 function flowDetailEntriesForSession(session) {
   return session.turns.flatMap((turn) => {
     const defaultOpen = turn.state === 2;
-    return [
-      turn.thoughts.length ? { key: `${turn.id}:thoughts`, defaultOpen } : null,
-      turn.logs.length ? { key: `${turn.id}:logs`, defaultOpen } : null,
-    ].filter(Boolean);
+    const hasTimeline = turn.timelineItems?.length || turn.thoughts.length || turn.logs.length;
+    return hasTimeline ? [{ key: `${turn.id}:timeline`, defaultOpen }] : [];
   });
 }
 
@@ -1475,14 +1472,19 @@ function clearTurnDetailOpenState(turnId) {
   sessionsStore.clearFlowDetailOpenForTurn(turnId);
 }
 
+// Timeline View 隔离 Turn 内部排版，Shell 只提供 Markdown 渲染和 Store 查询依赖。
+const turnTimelineView = createTurnTimelineView({
+  renderAssistantResponse,
+  isOpenForKey: isFlowDetailOpen,
+  t,
+  escapeHtml,
+});
+
 function renderTurn(turn, index) {
   const turnStatus = turn.status || statusFromRuntimeStateCode(turn.state, Boolean(turn.finalResponse));
   const streaming = isRunningTurnStatus(turnStatus);
-  const waiting = streaming && !turn.finalResponse;
   const rawResponseText = turnResponseText(turn);
   const responseText = rawResponseText || t("turn.waiting");
-  const thoughtDetailKey = `${turn.id}:thoughts`;
-  const logDetailKey = `${turn.id}:logs`;
 
   // 检测 streaming → 完成的状态转折，清除该 turn 的所有 detail open 状态，
   // 让 streaming 期默认展开、结束后默认收回的 fallback 接管。
@@ -1494,32 +1496,12 @@ function renderTurn(turn, index) {
   const collapsed = sessionsStore.isTurnCollapsed(turn.id);
   const turnToggleLabel = collapsed ? t("action.expandTurn") : t("action.collapseTurn");
 
-  const events = turnEventsFromTurn(turn, { translate: t, streaming });
-  const thinkingEvent = events.find((event) => event.kind === "thinking");
-  const processEvents = events.filter((event) => event.kind !== "thinking");
-  const hasRunningProcess = processEvents.some((event) => event.status === "running");
-  const eventViewOptions = {
-    translate: t,
-    escapeHtml,
-    isOpenForKey: isFlowDetailOpen,
-  };
-  const thinkingHtml = thinkingEvent
-    ? `<ul class="turn-events turn-events--thinking" role="list">${renderTurnEventItemHtml(
-        { ...thinkingEvent, id: thoughtDetailKey },
-        { ...eventViewOptions, detailsExtraClass: "turn-event-thinking-shell" },
-      )}</ul>`
-    : "";
-  const processOpen = isFlowDetailOpen(logDetailKey, streaming);
-  const processHtml = processEvents.length
-    ? `<details class="terminal-detail turn-events-shell" data-detail-key="${escapeHtml(logDetailKey)}"${processOpen ? " open" : ""}>
-        <summary class="turn-events-shell-summary">
-          <span class="turn-event-dot ${hasRunningProcess ? "turn-event-status-running" : "turn-event-status-info"}" aria-hidden="true"></span>
-          <span class="turn-events-shell-label">${t("turn.logs", { count: processEvents.length })}</span>
-          <span class="turn-event-arrow" aria-hidden="true"></span>
-        </summary>
-        ${renderTurnEventsHtml(processEvents, eventViewOptions)}
-      </details>`
-    : "";
+  const timelineHtml = turnTimelineView.renderTurnTimeline(turn, {
+    streaming,
+    failed: turnStatus === TURN_STATUS.failed,
+    responseText,
+    rawResponseText,
+  });
 
   return `
     <section class="turn-block ${collapsed ? "is-collapsed" : ""}" data-turn-id="${escapeHtml(turn.id)}">
@@ -1542,12 +1524,7 @@ function renderTurn(turn, index) {
           <div class="terminal-message user-message">
             <p>${escapeHtml(turn.task)}</p>
           </div>
-          ${thinkingHtml}
-          <div class="terminal-message assistant-message ${waiting ? "is-waiting" : ""}">
-            <div class="terminal-label">assistant</div>
-            ${renderAssistantResponse(responseText, streaming ? "streaming" : "final")}
-          </div>
-          ${processHtml}
+          ${timelineHtml}
         `}
     </section>
   `;
