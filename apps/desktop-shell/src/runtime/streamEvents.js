@@ -125,7 +125,7 @@ export function eventLogText(event) {
   return "";
 }
 
-export function applyEventsToTurn(session, turn, events) {
+export function applyEventsToTurn(session, turn, events, { now = Date.now } = {}) {
   const sections = sessionSectionsFromEvents(events);
   const lastState = [...events].reverse().find((event) => typeof event.state === "number");
   const acpSessionEvent = [...events].reverse().find((event) => event.payload?.sessionId);
@@ -134,12 +134,11 @@ export function applyEventsToTurn(session, turn, events) {
   turn.outputs = sections.outputs;
   turn.finalResponse = sections.finalResponse;
   turn.logs = sections.logs;
-  // 批量 ACP 与 fallback 结果是完整事件序列，重建 Timeline 可以避免重复追加流式片段。
+  // 批量 ACP 与 fallback 结果是完整事件序列，只重建 Item；Turn 创建时间属于生命周期，不得重置。
   turn.timelineItems = [];
   turn.activeTimelineItemId = null;
-  turn.timelineStartedAt = null;
   turn.timelineCompletedAt = null;
-  events.forEach((event) => appendNormalizedTimelineEvent(turn, event));
+  events.forEach((event) => appendNormalizedTimelineEvent(turn, event, undefined, { now }));
   turn.state = lastState ? lastState.state : turn.state;
   turn.status = events.reduce(
     (status, event) => statusFromRuntimeEvent(event, status, Boolean(sections.finalResponse)),
@@ -149,7 +148,7 @@ export function applyEventsToTurn(session, turn, events) {
     turn.status = TURN_STATUS.completed;
   }
   if (turn.status === TURN_STATUS.completed || turn.status === TURN_STATUS.failed) {
-    finalizeTurnTimeline(turn);
+    finalizeTurnTimeline(turn, { now });
   }
   if (acpSessionEvent?.payload?.sessionId) session.acpSessionId = acpSessionEvent.payload.sessionId;
   session.task = turn.task;
@@ -158,10 +157,10 @@ export function applyEventsToTurn(session, turn, events) {
   return turn;
 }
 
-export function applyStreamEventToTurn(session, turn, event) {
+export function applyStreamEventToTurn(session, turn, event, { now = Date.now } = {}) {
   const content = eventContentText(event);
   // 流式事件按到达顺序立即写入 Timeline，保留 Assistant 与 Tool 交叉发生的事实。
-  appendNormalizedTimelineEvent(turn, event, content);
+  appendNormalizedTimelineEvent(turn, event, content, { now });
   if (typeof event.state === "number") {
     turn.state = event.state;
     session.state = event.state;
@@ -212,19 +211,19 @@ export function applyStreamEventToTurn(session, turn, event) {
   }
 
   if (turn.status === TURN_STATUS.completed || turn.status === TURN_STATUS.failed) {
-    finalizeTurnTimeline(turn);
+    finalizeTurnTimeline(turn, { now });
   }
 
   return turn;
 }
 
 // Timeline 使用与旧日志相同的可读文本，同时把原始 payload 留在 metadata 中供 Debug 层读取。
-function appendNormalizedTimelineEvent(turn, event, content = eventContentText(event)) {
+function appendNormalizedTimelineEvent(turn, event, content = eventContentText(event), { now = Date.now } = {}) {
   appendTurnTimelineEvent(turn, {
     ...event,
     payload: {
       ...(event.payload || {}),
       content,
     },
-  });
+  }, { now });
 }

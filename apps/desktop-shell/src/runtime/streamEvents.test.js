@@ -111,6 +111,21 @@ test("applyEventsToTurn writes ordered Timeline items for fallback and ACP batch
   assert.equal(turn.timelineCompletedAt != null, true);
 });
 
+test("applyEventsToTurn preserves Turn start time when final ACP batch completes later", () => {
+  const session = makeSession();
+  const turn = {
+    ...makeTurn(),
+    timelineStartedAt: "1970-01-01T00:00:01.000Z",
+  };
+
+  applyEventsToTurn(session, turn, [
+    { type: "response", state: 5, payload: { content: "已完成" } },
+  ], { now: () => 6000 });
+
+  assert.equal(turn.timelineStartedAt, "1970-01-01T00:00:01.000Z");
+  assert.equal(turn.timelineCompletedAt, "1970-01-01T00:00:06.000Z");
+});
+
 test("applyStreamEventToTurn appends incremental thought and response chunks", () => {
   const session = makeSession();
   const turn = makeTurn();

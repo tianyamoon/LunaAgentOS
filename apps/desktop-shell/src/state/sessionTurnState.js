@@ -76,7 +76,7 @@ export function createSessionTurnState({
   function updateTurnFromEvents(sessionId, turnId, events) {
     const found = findSessionTurn(sessionId, turnId);
     if (!found) return null;
-    applyEventsToTurn(found.session, found.turn, events);
+    applyEventsToTurn(found.session, found.turn, events, { now });
     return found.turn;
   }
 
@@ -90,7 +90,7 @@ export function createSessionTurnState({
     const session = sessionsStore.getSession(sessionId);
     const turn = activeOrLatestTurn(session);
     if (!session || !turn) return null;
-    applyStreamEventToTurn(session, turn, event);
+    applyStreamEventToTurn(session, turn, event, { now });
     return { session, turn };
   }
 
