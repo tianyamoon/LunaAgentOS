@@ -21,6 +21,7 @@ export function createSessionLifecycleController({
   markSessionInactive,
   clearCurrentSessionIf,
   clearScheduledWorkspaceFocus,
+  clearQueuedSubmissions = () => 0,
   renderProviders,
   renderWorkspace,
   renderHistory,
@@ -55,6 +56,7 @@ export function createSessionLifecycleController({
     const session = getSession(sessionId);
     if (!session) return null;
     const shouldMarkStopped = isSessionExecuting(session);
+    clearQueuedSubmissions(session, "archive");
     if (shouldMarkStopped) setSessionLifecycle(session, LIFECYCLE.stopped);
     await shutdownQuietly(session);
     const stoppedTurn = shouldMarkStopped ? markSessionStopped(session) : null;
@@ -86,6 +88,7 @@ export function createSessionLifecycleController({
       return session;
     }
     setSessionLifecycle(session, LIFECYCLE.stopped);
+    clearQueuedSubmissions(session, "stop");
     await shutdownQuietly(session);
     setSessionLifecycle(session, LIFECYCLE.live);
     const stoppedTurn = markSessionStopped(session);
@@ -130,6 +133,7 @@ export function createSessionLifecycleController({
     try {
       if (session) setSessionLifecycle(session, LIFECYCLE.deleted);
       else markSessionDeletedTombstone(sessionId);
+      if (session) clearQueuedSubmissions(session, "delete");
       if (session && runtimeState === LIFECYCLE.live) await shutdownQuietly(session);
       removeSessionFromWorkspace(sessionId);
       const result = await historyRepository.deleteSession(sessionId);

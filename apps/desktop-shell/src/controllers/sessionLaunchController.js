@@ -35,6 +35,7 @@ export function createSessionLaunchController({
   saveCurrentSession,
   unmarkStopped,
   createSessionTurn,
+  sessionPromptQueue,
   renderWorkspace,
   renderHistory,
   setSendAsNewSession,
@@ -163,7 +164,7 @@ export function createSessionLaunchController({
       title: t("composer.attachment.promptTitle"),
       truncated: t("composer.attachment.truncated"),
     });
-    const turn = createTurn(session, task, {
+    const submission = sessionPromptQueue.submit(session, task, {
       runtimePrompt,
       attachments: attachmentMetadata(attachments),
     });
@@ -174,12 +175,7 @@ export function createSessionLaunchController({
     if (isTargetActivatable(agent)) {
       setAppNotice(t("runtime.activatingTarget", { target: targetDisplayName(agent) }), "busy");
     }
-    if (acpCommandsForProvider(provider.id)) {
-      void startAcpSession(session, turn);
-    } else {
-      void runFallbackSession(session, turn);
-    }
-    return { session, turn };
+    return { session, ...submission };
   }
 
   return {

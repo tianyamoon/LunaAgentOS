@@ -40,6 +40,7 @@ function makeHarness({ sessionOverrides = {}, archived = null, shutdownError = n
     markSessionInactive: (id) => calls.push(`inactive:${id}`),
     clearCurrentSessionIf: (id) => { if (currentSessionId === id) currentSessionId = null; },
     clearScheduledWorkspaceFocus: (id) => calls.push(`focus-clear:${id}`),
+    clearQueuedSubmissions: (_session, reason) => calls.push(`queue-clear:${reason}`),
     renderProviders: () => {},
     renderWorkspace: () => {},
     renderHistory: () => {},
@@ -56,7 +57,7 @@ test("sessionLifecycleController: archive stops executing runtime and removes wo
   const { controller, sessions, calls } = makeHarness({ sessionOverrides: { executing: true } });
   await controller.archiveLiveSession("s1");
   assert.deepEqual(sessions, []);
-  assert.deepEqual(calls.slice(0, 5), ["lifecycle:stopped", "shutdown", "lifecycle:archived", "archive:s1", "save"]);
+  assert.deepEqual(calls.slice(0, 6), ["queue-clear:archive", "lifecycle:stopped", "shutdown", "lifecycle:archived", "archive:s1", "save"]);
 });
 
 test("sessionLifecycleController: stop blocks restoring session", async () => {
@@ -78,6 +79,19 @@ test("sessionLifecycleController: dismiss hides session without removing it", as
   await controller.dismissWorkspaceSession("s1");
   assert.equal(sessions[0].inWorkspace, false);
   assert.equal(calls.includes("shutdown"), false);
+  assert.equal(calls.some((item) => item.startsWith("queue-clear:")), false);
+});
+
+test("sessionLifecycleController: stop clears queued follow-ups", async () => {
+  const { controller, calls } = makeHarness();
+  await controller.stopSession("s1");
+  assert.equal(calls.includes("queue-clear:stop"), true);
+});
+
+test("sessionLifecycleController: delete clears queued follow-ups", async () => {
+  const { controller, calls } = makeHarness();
+  await controller.deleteSession("s1");
+  assert.equal(calls.includes("queue-clear:delete"), true);
 });
 
 test("sessionLifecycleController: delete archived-only session writes tombstone", async () => {

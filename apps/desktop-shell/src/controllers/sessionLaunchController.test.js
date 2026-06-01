@@ -19,6 +19,19 @@ function makeHarness({
   let composerAttachments = attachments;
   const agent = { id: "agent-1", providerId: "demo", name: "Demo Agent", runtimeHost: "win" };
   const provider = { id: "demo", name: "Demo" };
+  const sessionPromptQueue = {
+    submit: (session, task, options) => {
+      if (session.activePromptRunId) {
+        session.queuedSubmissions = [...(session.queuedSubmissions || []), { task, ...options }];
+        return { queued: true, turn: null };
+      }
+      const turn = { id: "turn-1", task, ...options };
+      session.turns.push(turn);
+      if (commands) calls.push(`acp:${turn.id}`);
+      else calls.push(`fallback:${turn.id}`);
+      return { queued: false, turn };
+    },
+  };
   const controller = createSessionLaunchController({
     getPromptValue: () => promptValue,
     focusPrompt: () => calls.push("focus"),
@@ -51,6 +64,7 @@ function makeHarness({
       session.turns.push(turn);
       return turn;
     },
+    sessionPromptQueue,
     renderWorkspace: () => calls.push("workspace"),
     renderHistory: () => calls.push("history"),
     setSendAsNewSession: (value) => calls.push(`new:${value}`),
@@ -131,4 +145,14 @@ test("sessionLaunchController: 没有 ACP 命令时路由到 fallback", () => {
 
   assert.equal(calls.includes("fallback:turn-1"), true);
   assert.equal(calls.includes("acp:turn-1"), false);
+});
+
+test("sessionLaunchController: 运行中 Session 的 follow-up 进入队列且不会提前执行", () => {
+  const currentSession = { id: "session-old", agentId: "agent-1", turns: [], activePromptRunId: "run-1" };
+  const { calls, controller } = makeHarness({ currentSession, prompt: "第二条" });
+  const result = controller.startSessionFromPrompt();
+
+  assert.equal(result.queued, true);
+  assert.deepEqual(currentSession.queuedSubmissions.map((item) => item.task), ["第二条"]);
+  assert.equal(calls.some((item) => item.startsWith("acp:")), false);
 });

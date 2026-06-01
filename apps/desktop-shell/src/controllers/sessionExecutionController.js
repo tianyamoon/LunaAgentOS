@@ -28,6 +28,7 @@ export function createSessionExecutionController({
   formatBackendError,
   setAppNotice,
   t,
+  pumpFollowUpQueue = () => null,
   requestFrame = () => Promise.resolve(),
 }) {
   let runningSessions = 0;
@@ -123,6 +124,7 @@ export function createSessionExecutionController({
     renderWorkspace();
     setAppNotice(t("runtime.sentNotice", { agent: session.agentName }), "busy");
     sessionRuntimeState.setRuntimeBinding(session, { state: RUNTIME_BINDING_STATE.connected, stage: RUNTIME_BINDING_STAGE.prompt });
+    let shouldPumpQueue = false;
     try {
       if (isTombstoned(session.id)) return null;
       const saved = updateTurnFromEvents(session.id, turn.id, promptRunId, localizedFallbackEvents(fallback.events));
@@ -131,6 +133,7 @@ export function createSessionExecutionController({
         sessionRuntimeState.clearRuntimeBindingError(session);
         await saveTurnToHistory(session, saved);
         setAppNotice(t("runtime.completedSaved", { agent: session.agentName }));
+        shouldPumpQueue = saved.status === TURN_STATUS.completed;
       }
       return saved;
     } catch (error) {
@@ -141,6 +144,7 @@ export function createSessionExecutionController({
     } finally {
       sessionTurnState.endPromptRun(session, turn, promptRunId);
       changeRunningCount(-1);
+      if (shouldPumpQueue) pumpFollowUpQueue(session);
     }
   }
 
@@ -155,6 +159,7 @@ export function createSessionExecutionController({
     renderWorkspace();
     setAppNotice(t("runtime.sentNotice", { agent: session.agentName }), "busy");
     sessionRuntimeState.setRuntimeBinding(session, { state: RUNTIME_BINDING_STATE.connected, stage: RUNTIME_BINDING_STAGE.prompt });
+    let shouldPumpQueue = false;
     try {
       await requestFrame();
       const events = await acpRuntimeClient.prompt(session, turn, promptRunId);
@@ -179,6 +184,7 @@ export function createSessionExecutionController({
         await refreshRuntimeTargets(session.providerId, session.runtimeInstanceId ? [session.runtimeInstanceId] : null);
       }
       setAppNotice(t("runtime.completedSaved", { agent: session.agentName }));
+      shouldPumpQueue = saved.status === TURN_STATUS.completed;
       return saved;
     } catch (error) {
       if (isTombstoned(session.id)) return null;
@@ -190,6 +196,7 @@ export function createSessionExecutionController({
     } finally {
       sessionTurnState.endPromptRun(session, turn, promptRunId);
       changeRunningCount(-1);
+      if (shouldPumpQueue) pumpFollowUpQueue(session);
     }
   }
 

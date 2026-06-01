@@ -102,6 +102,7 @@ import { createSessionRestoreController } from "./controllers/sessionRestoreCont
 import { createSessionLifecycleController } from "./controllers/sessionLifecycleController.js";
 import { createSessionExecutionController } from "./controllers/sessionExecutionController.js";
 import { createSessionLaunchController } from "./controllers/sessionLaunchController.js";
+import { createSessionPromptQueueController } from "./controllers/sessionPromptQueueController.js";
 import {
   availableRuntimeInstancesForProvider as availableRuntimeInstancesForProviderRaw,
   providerRuntimeLabel as providerRuntimeLabelRaw,
@@ -348,6 +349,7 @@ let sessionRestoreController = null;
 let sessionLifecycleController = null;
 let sessionExecutionController = null;
 let sessionLaunchController = null;
+let sessionPromptQueueController = null;
 let composerController = null;
 let agentFleetView = null;
 let agentManagementView = null;
@@ -1794,6 +1796,7 @@ sessionLifecycleController = createSessionLifecycleController({
       scheduledWorkspaceRenderOptions = { ...scheduledWorkspaceRenderOptions, focusSessionId: null };
     }
   },
+  clearQueuedSubmissions: (session, reason) => sessionPromptQueueController?.clear(session, reason),
   renderProviders,
   renderWorkspace,
   renderHistory,
@@ -2004,6 +2007,7 @@ sessionExecutionController = createSessionExecutionController({
   formatBackendError,
   setAppNotice,
   t,
+  pumpFollowUpQueue: (session) => sessionPromptQueueController?.pump(session),
   requestFrame: () => new Promise((resolve) => requestAnimationFrame(resolve)),
 });
 
@@ -2014,6 +2018,22 @@ async function runFallbackSession(session, turn) {
 async function startAcpSession(session, turn) {
   return sessionExecutionController?.startAcpSession(session, turn);
 }
+
+// 后续输入队列只负责串行化 Prompt Run；具体 Runtime 路由仍由 Shell 注入。
+sessionPromptQueueController = createSessionPromptQueueController({
+  createSessionTurn,
+  dispatchPromptRun: (session, turn) => {
+    if (acpCommandsForProvider(session.providerId)) {
+      void startAcpSession(session, turn);
+    } else {
+      void runFallbackSession(session, turn);
+    }
+  },
+  renderWorkspace,
+  renderHistory,
+  setAppNotice,
+  t,
+});
 
 // Composer Controller 接管输入交互、附件与斜杠菜单，Shell 只注入领域回调。
 composerController = createComposerController({
@@ -2082,6 +2102,7 @@ sessionLaunchController = createSessionLaunchController({
   saveCurrentSession,
   unmarkStopped: (sessionId) => sessionsStore.unmarkStopped(sessionId),
   createSessionTurn,
+  sessionPromptQueue: sessionPromptQueueController,
   renderWorkspace,
   renderHistory,
   setSendAsNewSession: (value) => { sendAsNewSession = value; },

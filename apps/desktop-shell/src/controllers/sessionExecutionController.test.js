@@ -59,6 +59,7 @@ function makeHarness({ prompt, capabilities = {}, fallbackSessions = {}, tombsto
     formatBackendError: (error) => error.message,
     setAppNotice: () => {},
     t: (key) => key,
+    pumpFollowUpQueue: () => calls.push("pump"),
   });
   return { controller, session, turn, calls };
 }
@@ -136,4 +137,16 @@ test("sessionExecutionController: tombstoned session ignores late ACP result", a
   const { controller, session, turn, calls } = makeHarness({ tombstoned: true });
   await controller.startAcpSession(session, turn);
   assert.equal(calls.includes("save"), false);
+});
+
+test("sessionExecutionController: ACP 成功后才泵下一条 follow-up", async () => {
+  const { controller, session, turn, calls } = makeHarness();
+  await controller.startAcpSession(session, turn);
+  assert.equal(calls.includes("pump"), true);
+});
+
+test("sessionExecutionController: ACP 失败后不会自动发送 follow-up", async () => {
+  const { controller, session, turn, calls } = makeHarness({ prompt: async () => { throw new Error("boom"); } });
+  await controller.startAcpSession(session, turn);
+  assert.equal(calls.includes("pump"), false);
 });
