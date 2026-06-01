@@ -60,16 +60,22 @@ test("sessionTurnState: aggregate and stream events update the located turn", ()
   const session = makeSession("events");
   sessionsStore.upsertHead(session);
   const turn = sessionTurnState.createTurn(session, "task");
-  sessionTurnState.updateTurnFromEvents(session.id, turn.id, [
-    { type: "response", state: 5, payload: { content: "done" } },
-  ]);
-  assert.equal(turn.finalResponse, "done");
-  assert.equal(turn.status, TURN_STATUS.completed);
-  sessionTurnState.appendStreamEvent(session.id, {
+  sessionTurnState.beginPromptRun(session, turn, "run-1");
+  sessionTurnState.appendStreamEvent(session.id, turn.id, "run-1", {
     type: "tool",
     payload: { title: "Read", status: "ok" },
   });
   assert.match(turn.logs[0], /Read/);
+  sessionTurnState.updateTurnFromEvents(session.id, turn.id, "run-1", [
+    { type: "response", state: 5, payload: { content: "done" } },
+  ]);
+  assert.equal(turn.finalResponse, "done");
+  assert.equal(turn.status, TURN_STATUS.completed);
+  assert.equal(sessionTurnState.appendStreamEvent(session.id, turn.id, "run-1", {
+    type: "tool",
+    payload: { title: "Late", status: "ok" },
+  }), null);
+  assert.equal(turn.logs.some((item) => /Late/.test(item)), false);
 });
 
 test("sessionTurnState: tombstones block late stream events", () => {
@@ -77,12 +83,45 @@ test("sessionTurnState: tombstones block late stream events", () => {
   const session = makeSession("stopped");
   sessionsStore.upsertHead(session);
   const turn = sessionTurnState.createTurn(session, "task");
+  sessionTurnState.beginPromptRun(session, turn, "run-1");
   sessionRuntimeState.setSessionLifecycle(session, "stopped");
-  assert.equal(sessionTurnState.appendStreamEvent(session.id, {
+  assert.equal(sessionTurnState.appendStreamEvent(session.id, turn.id, "run-1", {
     type: "response",
     payload: { content: "late" },
   }), null);
   assert.notEqual(turn.finalResponse, "late");
+});
+
+test("sessionTurnState: late stream event cannot leak into a newer turn", () => {
+  const { sessionsStore, sessionTurnState } = makeState();
+  const session = makeSession("late-event");
+  sessionsStore.upsertHead(session);
+  const first = sessionTurnState.createTurn(session, "first");
+  sessionTurnState.beginPromptRun(session, first, "run-first");
+  sessionTurnState.endPromptRun(session, first, "run-first");
+  const second = sessionTurnState.createTurn(session, "second");
+  sessionTurnState.beginPromptRun(session, second, "run-second");
+
+  assert.equal(sessionTurnState.appendStreamEvent(session.id, first.id, "run-first", {
+    type: "response",
+    payload: { content: "late answer" },
+  }), null);
+  assert.notEqual(first.finalResponse, "late answer");
+  assert.notEqual(second.finalResponse, "late answer");
+});
+
+test("sessionTurnState: prompt run identity must match the exact turn", () => {
+  const { sessionsStore, sessionTurnState } = makeState();
+  const session = makeSession("mismatch");
+  sessionsStore.upsertHead(session);
+  const turn = sessionTurnState.createTurn(session, "task");
+  sessionTurnState.beginPromptRun(session, turn, "run-1");
+
+  assert.equal(sessionTurnState.appendStreamEvent(session.id, turn.id, "run-other", {
+    type: "response",
+    payload: { content: "wrong" },
+  }), null);
+  assert.notEqual(turn.finalResponse, "wrong");
 });
 
 test("sessionTurnState: prompt failure updates turn, session and runtime binding", () => {

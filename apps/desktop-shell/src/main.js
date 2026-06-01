@@ -2120,9 +2120,11 @@ languageBtn?.addEventListener("click", () => {
 if (listenRuntimeEvent) {
   listenRuntimeEvent("runtime-session-update", (payload) => {
     const runtimeSessionId = payload?.payload?.runtimeSessionId;
+    const turnId = payload?.payload?.turnId;
+    const promptRunId = payload?.payload?.promptRunId;
     const event = payload?.payload?.event;
-    if (!runtimeSessionId || !event) return;
-    sessionExecutionController?.appendStreamEvent(runtimeSessionId, event);
+    if (!runtimeSessionId || !turnId || !promptRunId || !event) return;
+    sessionExecutionController?.appendStreamEvent(runtimeSessionId, turnId, promptRunId, event);
   }).catch((error) => {
     console.error(error);
   });

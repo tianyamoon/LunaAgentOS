@@ -13,6 +13,8 @@ use tauri::{AppHandle, Emitter};
 #[serde(rename_all = "camelCase")]
 struct RuntimeSessionStreamPayload {
     runtime_session_id: String,
+    turn_id: String,
+    prompt_run_id: String,
     event: Value,
 }
 
@@ -55,6 +57,8 @@ pub(crate) async fn runtime_acp_adapter_prompt(
     app: AppHandle,
     adapter_id: String,
     runtime_session_id: String,
+    turn_id: String,
+    prompt_run_id: String,
     prompt: String,
     cwd: Option<String>,
     runtime_host: Option<String>,
@@ -62,6 +66,8 @@ pub(crate) async fn runtime_acp_adapter_prompt(
     profile_executable: Option<String>,
 ) -> Result<Vec<Value>, String> {
     let runtime_session_id_for_emit = runtime_session_id.clone();
+    let turn_id_for_emit = turn_id.clone();
+    let prompt_run_id_for_emit = prompt_run_id.clone();
     let adapter = adapter_launch_spec_with_context(
         &app,
         &adapter_id,
@@ -74,6 +80,8 @@ pub(crate) async fn runtime_acp_adapter_prompt(
         let mut emit_update = |event: Value| {
             let payload = RuntimeSessionStreamPayload {
                 runtime_session_id: runtime_session_id_for_emit.clone(),
+                turn_id: turn_id_for_emit.clone(),
+                prompt_run_id: prompt_run_id_for_emit.clone(),
                 event,
             };
             let _ = app.emit("runtime-session-update", payload);

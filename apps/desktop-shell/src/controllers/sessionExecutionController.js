@@ -31,6 +31,13 @@ export function createSessionExecutionController({
   requestFrame = () => Promise.resolve(),
 }) {
   let runningSessions = 0;
+  let promptRunSeq = 0;
+
+  // Prompt Run 标识一次真实 runtime 执行，避免迟到事件被写入后续 Turn。
+  function createPromptRunId(session, turn) {
+    promptRunSeq += 1;
+    return `${session.id}:${turn.id}:${Date.now()}:${promptRunSeq}`;
+  }
 
   // 判断 Session 是否已被终止，避免晚到事件污染状态。
   function isTombstoned(sessionId) {
@@ -50,8 +57,8 @@ export function createSessionExecutionController({
   }
 
   // 批量事件只刷新对应卡片；完成态也不销毁稳定的滚动容器。
-  function updateTurnFromEvents(sessionId, turnId, events) {
-    const turn = sessionTurnState.updateTurnFromEvents(sessionId, turnId, events);
+  function updateTurnFromEvents(sessionId, turnId, promptRunId, events) {
+    const turn = sessionTurnState.updateTurnFromEvents(sessionId, turnId, promptRunId, events);
     if (!turn) return null;
     scheduleSessionCardRender(sessionId);
     renderHistory();
@@ -59,8 +66,8 @@ export function createSessionExecutionController({
   }
 
   // 路由流式事件，并在出现有效输出后完成首轮健康确认。
-  function appendStreamEvent(sessionId, event) {
-    const result = sessionTurnState.appendStreamEvent(sessionId, event);
+  function appendStreamEvent(sessionId, turnId, promptRunId, event) {
+    const result = sessionTurnState.appendStreamEvent(sessionId, turnId, promptRunId, event);
     if (!result) return null;
     const { session, turn } = result;
     const validatedByStream = turn.finalResponse
@@ -110,13 +117,15 @@ export function createSessionExecutionController({
     const fallback = fallbackSessions[session.providerId];
     if (!fallback) return null;
     changeRunningCount(1);
+    const promptRunId = createPromptRunId(session, turn);
+    sessionTurnState.beginPromptRun(session, turn, promptRunId);
     prependStartupNoticeIfNeeded(session, turn);
     renderWorkspace();
     setAppNotice(t("runtime.sentNotice", { agent: session.agentName }), "busy");
     sessionRuntimeState.setRuntimeBinding(session, { state: RUNTIME_BINDING_STATE.connected, stage: RUNTIME_BINDING_STAGE.prompt });
     try {
       if (isTombstoned(session.id)) return null;
-      const saved = updateTurnFromEvents(session.id, turn.id, localizedFallbackEvents(fallback.events));
+      const saved = updateTurnFromEvents(session.id, turn.id, promptRunId, localizedFallbackEvents(fallback.events));
       if (isTombstoned(session.id)) return null;
       if (saved) {
         sessionRuntimeState.clearRuntimeBindingError(session);
@@ -130,6 +139,7 @@ export function createSessionExecutionController({
       await saveTurnToHistory(session, turn);
       return turn;
     } finally {
+      sessionTurnState.endPromptRun(session, turn, promptRunId);
       changeRunningCount(-1);
     }
   }
@@ -139,15 +149,17 @@ export function createSessionExecutionController({
     if (!acpRuntimeClient.canHandle(session.providerId)) return runFallbackSession(session, turn);
     bindResumeValidationTurn(session, turn.id);
     changeRunningCount(1);
+    const promptRunId = createPromptRunId(session, turn);
+    sessionTurnState.beginPromptRun(session, turn, promptRunId);
     prependStartupNoticeIfNeeded(session, turn);
     renderWorkspace();
     setAppNotice(t("runtime.sentNotice", { agent: session.agentName }), "busy");
     sessionRuntimeState.setRuntimeBinding(session, { state: RUNTIME_BINDING_STATE.connected, stage: RUNTIME_BINDING_STAGE.prompt });
     try {
       await requestFrame();
-      const events = await acpRuntimeClient.prompt(session, turn);
+      const events = await acpRuntimeClient.prompt(session, turn, promptRunId);
       if (isTombstoned(session.id)) return null;
-      const saved = updateTurnFromEvents(session.id, turn.id, events);
+      const saved = updateTurnFromEvents(session.id, turn.id, promptRunId, events);
       if (isTombstoned(session.id)) return null;
       if (!saved) return null;
       const failedBeforeAnyOutput = saved.status === TURN_STATUS.failed && !saved.finalResponse && !saved.outputs?.length;
@@ -176,6 +188,7 @@ export function createSessionExecutionController({
       await saveTurnToHistory(session, turn);
       return turn;
     } finally {
+      sessionTurnState.endPromptRun(session, turn, promptRunId);
       changeRunningCount(-1);
     }
   }

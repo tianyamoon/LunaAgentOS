@@ -18,14 +18,21 @@ function makeHarness({ prompt, capabilities = {}, fallbackSessions = {}, tombsto
       prompt: prompt || (async () => [{ type: "response", state: 5, payload: { content: "done" } }]),
     },
     sessionTurnState: {
-      updateTurnFromEvents: (_sessionId, _turnId, events) => {
+      beginPromptRun: (_session, _turn, promptRunId) => {
+        session.activePromptRunId = promptRunId;
+        turn.promptRunId = promptRunId;
+      },
+      endPromptRun: () => {
+        session.activePromptRunId = null;
+      },
+      updateTurnFromEvents: (_sessionId, _turnId, _promptRunId, events) => {
         const response = events.find((event) => event.type === "response");
         turn.finalResponse = response?.payload?.content || "";
         turn.outputs = turn.finalResponse ? [turn.finalResponse] : [];
         turn.status = events.some((event) => event.state === 9) ? "failed" : "completed";
         return turn;
       },
-      appendStreamEvent: (_sessionId, event) => {
+      appendStreamEvent: (_sessionId, _turnId, _promptRunId, event) => {
         turn.status = event.type === "thought" ? "running" : turn.status;
         return { session, turn };
       },
@@ -72,13 +79,15 @@ test("sessionExecutionController: ACP error is persisted", async () => {
 
 test("sessionExecutionController: stream event schedules card render", () => {
   const { controller, calls } = makeHarness();
-  controller.appendStreamEvent("s1", { type: "thought", payload: { content: "x" } });
+  controller.appendStreamEvent("s1", "t1", "run-1", { type: "thought", payload: { content: "x" } });
   assert.equal(calls.includes("schedule"), true);
 });
 
 test("sessionExecutionController: final batch refresh keeps workspace container stable", () => {
-  const { controller, calls } = makeHarness();
-  controller.updateTurnFromEvents("s1", "t1", [{ type: "response", state: 5, payload: { content: "done" } }]);
+  const { controller, session, turn, calls } = makeHarness();
+  session.activePromptRunId = "run-1";
+  turn.promptRunId = "run-1";
+  controller.updateTurnFromEvents("s1", "t1", "run-1", [{ type: "response", state: 5, payload: { content: "done" } }]);
   assert.equal(calls.includes("schedule"), true);
   assert.equal(calls.includes("history"), true);
   assert.equal(calls.includes("workspace"), false);

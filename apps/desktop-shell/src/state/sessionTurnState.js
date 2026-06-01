@@ -73,23 +73,50 @@ export function createSessionTurnState({
     return turn;
   }
 
-  function updateTurnFromEvents(sessionId, turnId, events) {
+  // Prompt Run 是流事件的写入租约；只有精确匹配的执行才能修改对应 Turn。
+  function beginPromptRun(session, turn, promptRunId) {
+    if (!session || !turn || !promptRunId) return false;
+    session.activePromptRunId = promptRunId;
+    turn.promptRunId = promptRunId;
+    return true;
+  }
+
+  function acceptsPromptRun(session, turn, promptRunId) {
+    return Boolean(
+      session
+      && turn
+      && promptRunId
+      && session.activePromptRunId === promptRunId
+      && turn.promptRunId === promptRunId
+      && [TURN_STATUS.running, TURN_STATUS.waiting_confirmation].includes(turn.status),
+    );
+  }
+
+  function endPromptRun(session, turn, promptRunId) {
+    if (!session || !turn || !promptRunId) return false;
+    if (session.activePromptRunId !== promptRunId || turn.promptRunId !== promptRunId) return false;
+    session.activePromptRunId = null;
+    return true;
+  }
+
+  function updateTurnFromEvents(sessionId, turnId, promptRunId, events) {
     const found = findSessionTurn(sessionId, turnId);
-    if (!found) return null;
+    if (!found || !acceptsPromptRun(found.session, found.turn, promptRunId)) return null;
     applyEventsToTurn(found.session, found.turn, events, { now });
     return found.turn;
   }
 
-  function appendStreamEvent(sessionId, event) {
+  function appendStreamEvent(sessionId, turnId, promptRunId, event) {
     if (
       sessionRuntimeState.isSessionDeletedTombstone(sessionId)
       || sessionRuntimeState.isSessionStoppedTombstone(sessionId)
     ) {
       return null;
     }
-    const session = sessionsStore.getSession(sessionId);
-    const turn = activeOrLatestTurn(session);
-    if (!session || !turn) return null;
+    const found = findSessionTurn(sessionId, turnId);
+    const session = found?.session;
+    const turn = found?.turn;
+    if (!acceptsPromptRun(session, turn, promptRunId)) return null;
     applyStreamEventToTurn(session, turn, event, { now });
     return { session, turn };
   }
@@ -154,7 +181,9 @@ export function createSessionTurnState({
   return {
     appendRuntimeLog,
     appendStreamEvent,
+    beginPromptRun,
     createTurn,
+    endPromptRun,
     findSessionTurn,
     markPromptError,
     markStopped,

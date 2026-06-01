@@ -62,13 +62,15 @@ export function createAcpRuntimeClient({
     );
   }
 
-  async function prompt(session, turn) {
+  async function prompt(session, turn, promptRunId) {
     const runtimeCommands = commands(session?.providerId);
-    if (!runtimeCommands || !session?.id || !turn) return null;
+    if (!runtimeCommands || !session?.id || !turn?.id || !promptRunId) return null;
     return invoke(
       runtimeCommands.prompt,
       invokeArgs(runtimeCommands, session.providerId, runtimeArgs(session, {
         prompt: turn.runtimePrompt || turn.task,
+        turnId: turn.id,
+        promptRunId,
       })),
     );
   }

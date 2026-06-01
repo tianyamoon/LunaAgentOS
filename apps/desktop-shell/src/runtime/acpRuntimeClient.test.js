@@ -42,7 +42,7 @@ function makeSession() {
 
 test("acpRuntimeClient: prompt builds generic adapter args", async () => {
   const { calls, client } = makeClient({ responses: { prompt: ["done"] } });
-  const result = await client.prompt(makeSession(), { task: "fallback", runtimePrompt: "actual" });
+  const result = await client.prompt(makeSession(), { id: "turn-1", task: "fallback", runtimePrompt: "actual" }, "run-1");
   assert.deepEqual(result, ["done"]);
   assert.deepEqual(calls[0], {
     command: "prompt",
@@ -54,6 +54,8 @@ test("acpRuntimeClient: prompt builds generic adapter args", async () => {
       runtimeCommand: "agent",
       profileExecutable: "default",
       prompt: "actual",
+      turnId: "turn-1",
+      promptRunId: "run-1",
     },
   });
 });
@@ -92,7 +94,7 @@ test("acpRuntimeClient: unsupported providers stay inert", async () => {
   const { calls, client } = makeClient({ commandsForProvider: () => null });
   assert.equal(client.canHandle("trae"), false);
   assert.equal(await client.shutdown(makeSession()), false);
-  assert.equal(await client.prompt(makeSession(), { task: "x" }), null);
+  assert.equal(await client.prompt(makeSession(), { id: "turn-1", task: "x" }, "run-1"), null);
   assert.equal(await client.aliveIds("trae"), null);
   assert.deepEqual(calls, []);
 });
