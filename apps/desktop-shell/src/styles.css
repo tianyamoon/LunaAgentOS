@@ -1781,6 +1781,16 @@ button:disabled {
   margin-top: 8px;
 }
 
+.turn-history-integrity-warning {
+  margin: 0;
+  padding: 7px 10px;
+  border-left: 3px solid var(--thinking);
+  background: rgba(178, 107, 0, 0.08);
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
 .response-source-detail summary {
   cursor: pointer;
   color: var(--muted);

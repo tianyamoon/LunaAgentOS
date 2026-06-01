@@ -41,6 +41,9 @@ export function createRuntimeSessionTranscriptView({
       responseText,
       rawResponseText,
     });
+    const historyIntegrityWarning = turn.meta?.historyIntegrity === "legacy_unverified"
+      ? `<p class="turn-history-integrity-warning">${escapeHtml(t("turn.historyIntegrityWarning"))}</p>`
+      : "";
     return `
       <section class="turn-block ${collapsed ? "is-collapsed" : ""}" data-turn-id="${escapeHtml(turn.id)}">
         <div class="turn-header">
@@ -56,6 +59,7 @@ export function createRuntimeSessionTranscriptView({
             <button type="button" class="mini-btn ghost-btn turn-copy-response-btn" data-turn-id="${escapeHtml(turn.id)}" ${rawResponseText ? "" : "disabled"}>${t("turn.copyResponse")}</button>
           </div>
         </div>
+        ${historyIntegrityWarning}
         ${collapsed
           ? `<div class="turn-collapsed-summary">${escapeHtml(collapsedSummary(turn))}</div>`
           : `

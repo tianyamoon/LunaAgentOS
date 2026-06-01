@@ -4,6 +4,7 @@ import {
   archivedSessionsFromHistory,
   historySessionKey,
   historyTurnKey,
+  projectHistoryTurnIntegrity,
 } from "./entries.js";
 
 test("historySessionKey prefers camelCase sessionId, then session_id, then acp ids, then id", () => {
@@ -142,4 +143,18 @@ test("archivedSessionsFromHistory carries agentEntrySnapshot from the first entr
   ];
   const [session] = archivedSessionsFromHistory(entries);
   assert.deepEqual(session.agentEntrySnapshot, snapshot);
+});
+
+test("projectHistoryTurnIntegrity marks old turns as unverified without changing content", () => {
+  const turn = { id: "t1", finalResponse: "keep me", meta: { source: "legacy" } };
+  const projected = projectHistoryTurnIntegrity(turn);
+  assert.equal(projected.finalResponse, "keep me");
+  assert.equal(projected.meta.source, "legacy");
+  assert.equal(projected.meta.historyIntegrity, "legacy_unverified");
+  assert.equal(turn.meta.historyIntegrity, undefined);
+});
+
+test("projectHistoryTurnIntegrity recognizes prompt-run history", () => {
+  const projected = projectHistoryTurnIntegrity({ id: "t1", promptRunId: "run-1" });
+  assert.equal(projected.meta.historyIntegrity, "verified_prompt_run");
 });

@@ -73,3 +73,16 @@ test("runtimeSessionTranscriptView: 空 Session 保留暂无消息提示", () =>
   assert.match(html, /flow-empty/);
   assert.match(html, /session\.noMessages/);
 });
+
+test("runtimeSessionTranscriptView: 可疑旧历史显示保守提示", () => {
+  const view = makeView();
+  const html = view.renderTurn({
+    id: "t1",
+    task: "旧问题",
+    status: "completed",
+    meta: { historyIntegrity: "legacy_unverified" },
+  }, 0);
+
+  assert.match(html, /turn-history-integrity-warning/);
+  assert.match(html, /turn\.historyIntegrityWarning/);
+});

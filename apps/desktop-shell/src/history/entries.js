@@ -14,6 +14,19 @@ export function historyTurnKey(entry) {
   return `${sessionKey}:${turnId}`;
 }
 
+// 旧历史没有 Prompt Run 写入租约，只能保守标记，不能根据正文相似度猜测修复归属。
+export function projectHistoryTurnIntegrity(turn) {
+  if (!turn) return turn;
+  const historyIntegrity = turn.promptRunId ? "verified_prompt_run" : "legacy_unverified";
+  return {
+    ...turn,
+    meta: {
+      ...(turn.meta || {}),
+      historyIntegrity,
+    },
+  };
+}
+
 // 把磁盘 History 条目聚合为只读归档 Session，并允许调用方补充运行时归一化。
 export function archivedSessionsFromHistory(entries, { normalizeSession } = {}) {
   const list = Array.isArray(entries) ? entries : [];
@@ -22,7 +35,7 @@ export function archivedSessionsFromHistory(entries, { normalizeSession } = {}) 
     const key = historySessionKey(entry);
     const createdAt = entry.createdAt || entry.created_at;
     if (!key || !createdAt) return;
-    const turn = entry.turn || {
+    const turn = projectHistoryTurnIntegrity(entry.turn || {
       id: entry.id,
       task: entry.task,
       state: 5,
@@ -32,7 +45,7 @@ export function archivedSessionsFromHistory(entries, { normalizeSession } = {}) 
       finalResponse: entry.summary,
       logs: ["由历史归档恢复，当前不是运行中的 runtime session。"],
       createdAt,
-    };
+    });
     const current = bySession.get(key);
     // 新历史保存通用入口快照；旧 Hermes metadata 仅作为向后兼容读取。
     const agentEntrySnapshot = entry.agentEntrySnapshot || entry.agent_entry_snapshot || null;

@@ -12,3 +12,4 @@
 - [0004：desktop Shell 的 main.js 只承担启动编排](./0004-main-js-is-bootstrap-orchestrator.md)
 - [0005：架构静态检查保护模块边界](./0005-architecture-guard-enforces-module-boundaries.md)
 - [0006：Turn 过程使用有序 Timeline](./0006-turn-process-uses-ordered-timeline.md)
+- [0007：Prompt Run 是 Turn 的流事件写入租约](./0007-prompt-run-is-turn-write-lease.md)

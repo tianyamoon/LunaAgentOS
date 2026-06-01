@@ -64,6 +64,14 @@ _避免使用_：Task、聊天消息、一次性 prompt
 Runtime Session 内的一次用户请求及其 runtime 执行。
 _避免使用_：Runtime Session、Task
 
+**Prompt Run（提示执行）**：
+Turn 对应的一次真实 runtime 执行。`promptRunId` 是流事件写入租约；只有同时匹配 Runtime Session、Turn 和 Prompt Run 的事件才能修改用户正文。
+_避免使用_：根据当前 active Turn 猜测事件归属
+
+**Follow-up Queue（后续输入队列）**：
+Runtime Session 正在执行时保存用户后续输入的 FIFO 队列。队列项在真正开始执行前不创建 Turn；当前 Prompt Run 成功结束后才自动启动下一项。
+_避免使用_：同一 Runtime Session 内伪造并发 Turn
+
 **Runtime Event（运行时事件）**：
 Turn 执行期间发出的归一化观测，例如 thought、tool、plan、usage、state、response 或 error。
 _避免使用_：原始日志行
@@ -115,7 +123,9 @@ _避免使用_：自动多 Agent orchestration
 - 一个 **Runtime Instance** 暴露一个或多个 **Agent Entry**，可以包含 runtime 原生 **Profile**。
 - **Current Send Target** 指向且只指向一个可选择的 **Agent Entry**。
 - 一个 **Runtime Session** 属于且只属于一个 **Agent Entry**，并包含零个或多个 **Turn**。
+- 一个 **Runtime Session** 同时最多拥有一个活跃 **Prompt Run**；运行中的后续输入进入 **Follow-up Queue**。
 - 一个 **Turn** 产生零个或多个 **Runtime Event**，并可持久化为 **History Entry**。
+- 一个 **Prompt Run** 为一个 **Turn** 提供流事件写入租约；迟到或身份不匹配事件不得进入用户正文。
 - 一个 **Turn Timeline** 按到达顺序投影一个 **Turn** 的 **Runtime Event**；旧历史只能近似重建。
 - 一张 **Runtime Session Card** 渲染且只渲染一个 **Runtime Session**。
 - **Workspace Focus** 最多选择一张 **Runtime Session Card**，不改变该 session 的领域状态。
@@ -150,10 +160,12 @@ _避免使用_：自动多 Agent orchestration
 - Rust Core 的 `lib.rs` 只负责 Tauri composition root。配置、History Repository、Adapter Host、Runtime Probe 和 Runtime Session Commands 分别位于独立模块。
 - 前端 `historyRepository` 统一管理 History invoke、内存快照、schema 兼容、归档和删除。视图与控制器不应绕过它直接操作 History 后端。
 - `sessionRestoreController`、`sessionLifecycleController`、`sessionExecutionController` 和 `sessionLaunchController` 分别负责恢复、生命周期、执行和发送启动流程。
+- `sessionPromptQueueController` 管理运行中输入的 FIFO 队列。队列不提前创建 Turn，失败、取消、停止、归档或删除时不自动误发后续输入。
 - `workspaceViewStore` 独立保存 **Workspace Focus**。切换工作区 session 时，不再把 `fullscreen` 写入 Runtime Session。
 - `composerController` 管理输入框、附件、斜杠菜单和键盘发送模式。
 - `agentFleetView` 与 `agentManagementView` 只消费归一化 Provider、Agent Entry 和 Availability 数据，不包含具体 Adapter 的运行规则。
 - `runtimeSessionCardView` 与 `runtimeSessionCardController` 管理卡片渲染和交互，避免把大段工作区实现重新塞回 `main.js`。
+- `runtimeSessionTranscriptProjection` 与 `runtimeSessionTranscriptView` 统一管理 Card 的 latest Turn、历史 Turn 摘要和 follow-up 队列阅读层级。
 - `turnTimeline`、`turnTimelineProjection` 与 `turnTimelineView` 分别负责有序事件模型、展示投影和 HTML 渲染。执行完成后，过程收敛为可展开的 Worked for 摘要，最终 Assistant Markdown 是默认主体。
 - `scripts/check-architecture.mjs` 是渐进式架构护栏。它阻止 Shell 重新引入具体 Adapter 特判、History invoke 绕过 Repository、View 直接修改 Store 对象，以及 Rust 专用 ACP 入口复活。
 
@@ -161,4 +173,5 @@ _避免使用_：自动多 Agent orchestration
 
 - History schema 5 使用通用 `agentEntrySnapshot` 保存 Runtime Session 对应的 Agent Entry 快照。
 - schema 4 和旧 `hermesProfile` 仅保留读取兼容；新写入路径不得继续产生专用字段。
+- 缺少 `promptRunId` 的旧 Turn 标记为 `legacy_unverified`。系统保留原文并提示可能存在旧版事件归属问题，不根据文本相似度自动删改历史。
 - `main.js` 仍处于逐步收缩阶段。新增领域实现必须进入职责明确、可测试的 Module，不能以临时方便为理由扩大 Shell。
