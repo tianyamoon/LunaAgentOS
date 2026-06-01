@@ -25,13 +25,8 @@ test("runtimeSessionCardView: focused 与 active 状态同步到主卡和 mini c
     }),
     getCurrentSessionId: () => "session-a",
     getFocusedSessionId: () => "session-a",
-    projectRuntimeSessionTranscript: (_session, { resolveStatusView, translate }) => ({
-      cardStatus: resolveStatusView(_session, { translate }),
-      previousTurns: [],
-      latestTurn: null,
-      queuedSubmissions: [],
-    }),
-    runtimeSessionTranscriptView: { renderTranscript: () => "" },
+    projectRuntimeSessionMessageList: () => ({ rows: [], scrollTargetRowId: null }),
+    runtimeSessionMessageListView: { renderMessageListShell: () => "<div data-runtime-message-scroller></div>" },
     sessionCardStats: () => [],
     isSessionLatestOnly: () => false,
     flowDetailEntriesForSession: () => [],
@@ -50,5 +45,6 @@ test("runtimeSessionCardView: focused 与 active 状态同步到主卡和 mini c
   });
 
   assert.match(view.renderSessionCard(session), /session-card fullscreen is-active-receiver/);
+  assert.match(view.renderSessionCard(session), /data-runtime-message-scroller/);
   assert.match(view.renderSessionMiniCard(session), /session-mini-card is-active/);
 });

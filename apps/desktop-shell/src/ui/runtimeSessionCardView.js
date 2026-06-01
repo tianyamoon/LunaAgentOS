@@ -6,8 +6,8 @@ export function createRuntimeSessionCardView({
   resolveSessionCardStatusView,
   getCurrentSessionId,
   getFocusedSessionId,
-  projectRuntimeSessionTranscript,
-  runtimeSessionTranscriptView,
+  projectRuntimeSessionMessageList,
+  runtimeSessionMessageListView,
   sessionCardStats,
   isSessionLatestOnly,
   flowDetailEntriesForSession,
@@ -66,11 +66,7 @@ export function createRuntimeSessionCardView({
   function renderSessionCard(session) {
     ensureSessionStatusShape(session);
     const identitySession = normalizeWorkspaceSession(session);
-    const transcript = projectRuntimeSessionTranscript(session, {
-      resolveStatusView: resolveSessionCardStatusView,
-      translate: t,
-    });
-    const statusView = transcript.cardStatus;
+    const statusView = resolveSessionCardStatusView(session, { translate: t });
     const isActiveReceiver = getCurrentSessionId() === session.id;
     const isWaiting = statusView.status === CARD_STATUS.running || statusView.status === CARD_STATUS.waiting_confirmation;
     const isRestoring = session.runtime_binding?.state === RUNTIME_BINDING_STATE.reconnecting;
@@ -78,6 +74,7 @@ export function createRuntimeSessionCardView({
     const profileMeta = [identitySession.profileName, identitySession.profileModel].filter(Boolean).join(" · ");
     const stats = sessionCardStats(session, t);
     const latestOnly = isSessionLatestOnly(session);
+    const messageList = projectRuntimeSessionMessageList(session, { latestOnly });
     const hasFlowDetails = flowDetailEntriesForSession(session).length > 0;
     const flowsOpen = areSessionFlowDetailsOpen(session);
     const turnsCollapsed = areSessionTurnsCollapsed(session);
@@ -130,10 +127,7 @@ export function createRuntimeSessionCardView({
           ${renderSessionStatusError(statusView)}
         </div>
         <div class="session-card-body">
-          ${runtimeSessionTranscriptView.renderTranscript(transcript, {
-            latestOnly,
-            latestAnchor: isWaiting ? t("session.latestAnchorStreaming") : t("session.latestAnchorLatest"),
-          })}
+          ${runtimeSessionMessageListView.renderMessageListShell(messageList)}
         </div>
       </article>
     `;

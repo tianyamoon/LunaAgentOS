@@ -127,6 +127,19 @@ test("runtimeSessionMessageListProjection: usage 不进入默认阅读流", () =
   assert.deepEqual(result.rows.map((row) => row.kind), ["user", "assistant"]);
 });
 
+test("runtimeSessionMessageListProjection: latest-only 只保留当前消息段", () => {
+  const result = projectRuntimeSessionMessageList({
+    activeTurnId: "t2",
+    turns: [
+      { id: "t1", task: "旧问题", status: "completed", finalResponse: "旧回答" },
+      { id: "t2", task: "新问题", status: "running", timelineItems: [item("thinking", "处理中")] },
+    ],
+  }, { latestOnly: true });
+
+  assert.equal(result.rows.some((row) => row.turnId === "t1"), false);
+  assert.equal(result.rows.some((row) => row.turnId === "t2"), true);
+});
+
 function item(type, content, overrides = {}) {
   return {
     id: overrides.id || `${type}-${content}`,

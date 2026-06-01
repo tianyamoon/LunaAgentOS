@@ -40,7 +40,8 @@ export function projectRuntimeSessionMessageList(session, options = {}) {
   const turns = list(session?.turns);
   const activeTurnId = session?.activeTurnId || null;
   const latestTurn = turns.find((turn) => activeTurnId && turn.id === activeTurnId) || turns.at(-1) || null;
-  const rows = turns.flatMap((turn) => projectTurnRows(turn, {
+  const visibleTurns = options.latestOnly && latestTurn ? [latestTurn] : turns;
+  const rows = visibleTurns.flatMap((turn) => projectTurnRows(turn, {
     latestTurnId: latestTurn?.id || null,
     forceLive: Boolean(session?.activePromptRunId && turn.id === activeTurnId),
   }));

@@ -27,6 +27,8 @@ import { createRuntimeSessionCardView } from "./ui/runtimeSessionCardView.js";
 import { createRuntimeSessionCardController } from "./ui/runtimeSessionCardController.js";
 import { projectRuntimeSessionTranscript } from "./ui/runtimeSessionTranscriptProjection.js";
 import { createRuntimeSessionTranscriptView } from "./ui/runtimeSessionTranscriptView.js";
+import { projectRuntimeSessionMessageList } from "./ui/runtimeSessionMessageListProjection.js";
+import { createRuntimeSessionMessageListView } from "./ui/runtimeSessionMessageListView.js";
 import {
   sessionCardStats,
   turnResponseText,
@@ -1489,6 +1491,14 @@ const runtimeSessionTranscriptView = createRuntimeSessionTranscriptView({
   escapeHtml,
 });
 
+// MessageList View 负责稳定 DOM 对账；Shell 只注入 Markdown 与详情展开查询。
+const runtimeSessionMessageListView = createRuntimeSessionMessageListView({
+  renderAssistantResponse,
+  isOpenForKey: isFlowDetailOpen,
+  t,
+  escapeHtml,
+});
+
 // Shell 只暴露 Session Card 渲染入口，HTML 结构由独立视图负责。
 function renderSessionCard(session) {
   return runtimeSessionCardView.renderSessionCard(session);
@@ -1542,8 +1552,8 @@ runtimeSessionCardView = createRuntimeSessionCardView({
   resolveSessionCardStatusView,
   getCurrentSessionId: () => sessionsStore.getCurrentSessionId(),
   getFocusedSessionId: () => workspaceViewStore.getFocusedSessionId(),
-  projectRuntimeSessionTranscript,
-  runtimeSessionTranscriptView,
+  projectRuntimeSessionMessageList,
+  runtimeSessionMessageListView,
   sessionCardStats,
   isSessionLatestOnly,
   flowDetailEntriesForSession,
@@ -1567,6 +1577,9 @@ runtimeSessionCardController = createRuntimeSessionCardController({
   sessionStickRegistry,
   getSession: (sessionId) => sessionsStore.getSession(sessionId),
   renderSessionCard,
+  projectRuntimeSessionMessageList,
+  runtimeSessionMessageListView,
+  isSessionLatestOnly,
   renderMermaidDiagrams,
   scheduleWorkspaceRender,
   focusSessionInWorkspace,

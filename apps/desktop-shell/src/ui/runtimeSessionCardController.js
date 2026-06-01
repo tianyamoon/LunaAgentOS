@@ -5,6 +5,9 @@ export function createRuntimeSessionCardController({
   sessionStickRegistry,
   getSession,
   renderSessionCard,
+  projectRuntimeSessionMessageList,
+  runtimeSessionMessageListView,
+  isSessionLatestOnly,
   renderMermaidDiagrams,
   scheduleWorkspaceRender,
   focusSessionInWorkspace,
@@ -36,6 +39,8 @@ export function createRuntimeSessionCardController({
   isElement = (node) => node instanceof HTMLElement,
 }) {
   const pendingCardRenders = new Set();
+  const delegatedBodies = new WeakSet();
+  const lastScrollTargetRows = new Map();
   let pendingCardRenderFrame = 0;
   let pendingCardRenderTimer = 0;
   let lastCardRenderAt = 0;
@@ -83,7 +88,7 @@ export function createRuntimeSessionCardController({
       button.addEventListener("click", () => restoreArchivedSession(button.dataset.sessionId));
     });
     actionRoot
-      .querySelectorAll(".terminal-detail[data-detail-key], .turn-event-thinking-shell[data-detail-key]")
+      .querySelectorAll(".turn-event-thinking-shell[data-detail-key]")
       .forEach((detail) => {
         detail.addEventListener("toggle", () => setFlowDetailOpen(detail.dataset.detailKey, detail.open));
       });
@@ -92,7 +97,7 @@ export function createRuntimeSessionCardController({
         const sessionId = button.dataset.sessionId;
         const body = sessionDeck.querySelector(`.session-card[data-session-id="${sessionId}"] .session-card-body`);
         if (!body) return;
-        sessionStickRegistry.ensure(sessionId, body, { initialFollowing: true }).resumeFollowing();
+        ensureMessageListStickController(sessionId, body, true)?.resumeFollowing();
       });
     });
     actionRoot.querySelectorAll(".session-copy-btn").forEach((button) => {
@@ -157,7 +162,8 @@ export function createRuntimeSessionCardController({
       const sessionId = body.closest(".session-card")?.dataset.sessionId;
       if (!sessionId) return;
       const controller = sessionStickRegistry.get(sessionId);
-      map.set(sessionId, controller ? controller.isFollowing : isAtBottom(body));
+      const scroller = messageListElements(body).scroller || body;
+      map.set(sessionId, controller ? controller.isFollowing : isAtBottom(scroller));
     });
     return map;
   }
@@ -199,15 +205,20 @@ export function createRuntimeSessionCardController({
     if (!card) return scheduleWorkspaceRender({ preserveDeckScroll: true });
     const previousBody = card.querySelector(".session-card-body");
     const previousController = sessionStickRegistry.get(sessionId);
-    const previousFollowing = previousController ? previousController.isFollowing : previousBody ? isAtBottom(previousBody) : true;
+    const previousScroller = messageListElements(previousBody).scroller || previousBody;
+    const previousFollowing = previousController ? previousController.isFollowing : previousScroller ? isAtBottom(previousScroller) : true;
     const template = createTemplate();
     template.innerHTML = renderSessionCard(session).trim();
     const newArticle = template.content.firstElementChild;
     if (!isElement(newArticle)) return;
-    const newBody = patchSessionCardPreservingBody(card, newArticle);
+    const projection = projectRuntimeSessionMessageList(session, { latestOnly: isSessionLatestOnly(session) });
+    const newBody = patchSessionCardPreservingBody(card, newArticle, {
+      reconcileBody: (body) => runtimeSessionMessageListView.syncMessageList(body, projection),
+    });
     bindSessionActions(newArticle);
+    bindMessageListDelegation(sessionId, newBody);
     renderMermaidDiagrams(newArticle).catch((error) => console.error(error));
-    if (newBody) sessionStickRegistry.ensure(sessionId, newBody, { initialFollowing: previousFollowing }).notifyContentChanged();
+    syncMessageListScroll(sessionId, newBody, projection, previousFollowing);
   }
 
   // 全量工作区重绘后只保留可见 Session 的 sticky 控制器。
@@ -217,10 +228,72 @@ export function createRuntimeSessionCardController({
       const body = sessionDeck.querySelector(`.session-card[data-session-id="${session.id}"]`)?.querySelector(".session-card-body");
       if (!body) return;
       const previousFollowing = stickyIntent.has(session.id) ? stickyIntent.get(session.id) : true;
-      sessionStickRegistry.ensure(session.id, body, { initialFollowing: previousFollowing }).notifyContentChanged();
+      const projection = projectRuntimeSessionMessageList(session, { latestOnly: isSessionLatestOnly(session) });
+      runtimeSessionMessageListView.syncMessageList(body, projection);
+      bindMessageListDelegation(session.id, body);
+      syncMessageListScroll(session.id, body, projection, previousFollowing);
       ids.push(session.id);
     });
     sessionStickRegistry.sweep(ids);
+  }
+
+  // MessageList 事件只绑定在稳定 body 上，局部更新不会重复监听。
+  function bindMessageListDelegation(sessionId, body) {
+    if (!body?.addEventListener || delegatedBodies.has(body)) return;
+    delegatedBodies.add(body);
+    body.addEventListener("click", (event) => {
+      if (!event.target.closest?.("[data-runtime-scroll-latest]")) return;
+      ensureMessageListStickController(sessionId, body, true)?.resumeFollowing();
+    });
+    body.addEventListener("toggle", (event) => {
+      const detail = event.target.closest?.(".terminal-detail[data-detail-key]");
+      if (detail) setFlowDetailOpen(detail.dataset.detailKey, detail.open);
+    }, true);
+  }
+
+  function messageListElements(body) {
+    return {
+      scroller: body?.querySelector?.("[data-runtime-message-scroller]") || null,
+      contentElement: body?.querySelector?.("[data-runtime-message-content]") || null,
+      scrollLatestButton: body?.querySelector?.("[data-runtime-scroll-latest]") || null,
+    };
+  }
+
+  // 滚动状态属于稳定 scroller；浮动按钮只反映状态机，不自行推断位置。
+  function ensureMessageListStickController(sessionId, body, initialFollowing) {
+    const elements = messageListElements(body);
+    const scroller = elements.scroller || body;
+    if (!scroller) return null;
+    const controller = sessionStickRegistry.ensure(sessionId, scroller, {
+      initialFollowing,
+      contentElement: elements.contentElement,
+      onStateChange: ({ showScrollButton }) => {
+        if (elements.scrollLatestButton) elements.scrollLatestButton.hidden = !showScrollButton;
+      },
+    });
+    controller?.setContentElement?.(elements.contentElement);
+    if (elements.scrollLatestButton && controller) {
+      elements.scrollLatestButton.hidden = !controller.showScrollButton;
+    }
+    return controller;
+  }
+
+  // 新 Prompt 显式定位到 user row；普通 delta 仅在 following 状态下跟随底部。
+  function syncMessageListScroll(sessionId, body, projection, previousFollowing) {
+    if (!body) return;
+    const controller = ensureMessageListStickController(sessionId, body, previousFollowing);
+    if (!controller) return;
+    const nextTarget = projection.scrollTargetRowId || null;
+    const elements = messageListElements(body);
+    const targetRow = nextTarget
+      ? elements.contentElement?.querySelector?.(`[data-message-id="${nextTarget}"]`) || null
+      : null;
+    if (projection.activePromptRunId && targetRow && lastScrollTargetRows.get(sessionId) !== nextTarget) {
+      lastScrollTargetRows.set(sessionId, nextTarget);
+      controller.scrollElementIntoView(targetRow, { behavior: "auto", block: "start" });
+      return;
+    }
+    controller.notifyContentChanged();
   }
 
   return {
@@ -232,11 +305,12 @@ export function createRuntimeSessionCardController({
 }
 
 // 流式更新保留滚动容器节点，只替换它的内容和外围 Card；拖动 scrollbar thumb 时浏览器不会失去目标节点。
-export function patchSessionCardPreservingBody(previousCard, nextArticle) {
+export function patchSessionCardPreservingBody(previousCard, nextArticle, { reconcileBody } = {}) {
   const previousBody = previousCard?.querySelector?.(".session-card-body") || null;
   const nextBody = nextArticle?.querySelector?.(".session-card-body") || null;
   if (previousBody && nextBody) {
-    previousBody.innerHTML = nextBody.innerHTML;
+    if (reconcileBody) reconcileBody(previousBody, nextBody);
+    else previousBody.innerHTML = nextBody.innerHTML;
     nextBody.replaceWith(previousBody);
   }
   previousCard?.replaceWith?.(nextArticle);

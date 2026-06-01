@@ -147,10 +147,34 @@ export function createRuntimeSessionMessageListView({
     });
   }
 
+  // 已有壳只对账消息行；首次进入时才创建 scroller，保证拖动中的 scrollbar 不会失效。
+  function syncMessageList(container, projection) {
+    if (!container) return null;
+    let contentElement = container.querySelector?.("[data-runtime-message-content]") || null;
+    if (!contentElement) {
+      container.innerHTML = renderMessageListShell(projection);
+      contentElement = container.querySelector?.("[data-runtime-message-content]") || null;
+    } else {
+      reconcileMessageList(contentElement, projection.rows, {
+        renderMessageRow,
+        renderMessageRowBody,
+      });
+    }
+    return {
+      scroller: container.querySelector?.("[data-runtime-message-scroller]") || null,
+      contentElement,
+      scrollLatestButton: container.querySelector?.("[data-runtime-scroll-latest]") || null,
+      scrollTargetRow: projection.scrollTargetRowId
+        ? contentElement?.querySelector?.(`[data-message-id="${projection.scrollTargetRowId}"]`) || null
+        : null,
+    };
+  }
+
   return {
     renderMessageListShell,
     renderMessageRow,
     renderMessageRowBody,
+    syncMessageList,
   };
 }
 

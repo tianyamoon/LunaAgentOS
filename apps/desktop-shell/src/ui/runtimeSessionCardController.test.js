@@ -67,3 +67,31 @@ test("patchSessionCardPreservingBody: 流式局部更新保留滚动容器身份
   assert.equal(nextBody.replacedWith, previousBody);
   assert.equal(previousCard.replacedWith, nextArticle);
 });
+
+test("patchSessionCardPreservingBody: MessageList 对账时不会替换稳定正文", () => {
+  const previousBody = { innerHTML: "稳定内容" };
+  const nextBody = {
+    innerHTML: "临时新壳",
+    replaceWith(node) {
+      this.replacedWith = node;
+    },
+  };
+  const previousCard = {
+    querySelector: () => previousBody,
+    replaceWith() {},
+  };
+  const nextArticle = {
+    querySelector: () => nextBody,
+  };
+  const calls = [];
+
+  patchSessionCardPreservingBody(previousCard, nextArticle, {
+    reconcileBody(body, candidate) {
+      calls.push([body, candidate]);
+    },
+  });
+
+  assert.deepEqual(calls, [[previousBody, nextBody]]);
+  assert.equal(previousBody.innerHTML, "稳定内容");
+  assert.equal(nextBody.replacedWith, previousBody);
+});

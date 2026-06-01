@@ -81,6 +81,7 @@ body {
 .history-list,
 .session-deck,
 .session-card-body,
+.runtime-message-list-scroller,
 .plain-report-pre,
 .response-prelude-detail .terminal-pre,
 .md-diagram-render,
@@ -94,6 +95,7 @@ body {
 .history-list:hover,
 .session-deck:hover,
 .session-card-body:hover,
+.runtime-message-list-scroller:hover,
 .plain-report-pre:hover,
 .response-prelude-detail .terminal-pre:hover,
 .md-diagram-render:hover,
@@ -106,6 +108,7 @@ body {
 .history-list::-webkit-scrollbar,
 .session-deck::-webkit-scrollbar,
 .session-card-body::-webkit-scrollbar,
+.runtime-message-list-scroller::-webkit-scrollbar,
 .plain-report-pre::-webkit-scrollbar,
 .response-prelude-detail .terminal-pre::-webkit-scrollbar,
 .md-diagram-render::-webkit-scrollbar,
@@ -119,6 +122,7 @@ body {
 .history-list::-webkit-scrollbar-track,
 .session-deck::-webkit-scrollbar-track,
 .session-card-body::-webkit-scrollbar-track,
+.runtime-message-list-scroller::-webkit-scrollbar-track,
 .plain-report-pre::-webkit-scrollbar-track,
 .response-prelude-detail .terminal-pre::-webkit-scrollbar-track,
 .md-diagram-render::-webkit-scrollbar-track,
@@ -131,6 +135,7 @@ body {
 .history-list::-webkit-scrollbar-thumb,
 .session-deck::-webkit-scrollbar-thumb,
 .session-card-body::-webkit-scrollbar-thumb,
+.runtime-message-list-scroller::-webkit-scrollbar-thumb,
 .plain-report-pre::-webkit-scrollbar-thumb,
 .response-prelude-detail .terminal-pre::-webkit-scrollbar-thumb,
 .md-diagram-render::-webkit-scrollbar-thumb,
@@ -147,6 +152,7 @@ body {
 .history-list:hover::-webkit-scrollbar-thumb,
 .session-deck:hover::-webkit-scrollbar-thumb,
 .session-card-body:hover::-webkit-scrollbar-thumb,
+.runtime-message-list-scroller:hover::-webkit-scrollbar-thumb,
 .plain-report-pre:hover::-webkit-scrollbar-thumb,
 .response-prelude-detail .terminal-pre:hover::-webkit-scrollbar-thumb,
 .md-diagram-render:hover::-webkit-scrollbar-thumb,
@@ -160,6 +166,7 @@ body {
 .history-list::-webkit-scrollbar-thumb:active,
 .session-deck::-webkit-scrollbar-thumb:active,
 .session-card-body::-webkit-scrollbar-thumb:active,
+.runtime-message-list-scroller::-webkit-scrollbar-thumb:active,
 .plain-report-pre::-webkit-scrollbar-thumb:active,
 .response-prelude-detail .terminal-pre::-webkit-scrollbar-thumb:active,
 .md-diagram-render::-webkit-scrollbar-thumb:active,
@@ -173,6 +180,7 @@ body {
 .history-list::-webkit-scrollbar-corner,
 .session-deck::-webkit-scrollbar-corner,
 .session-card-body::-webkit-scrollbar-corner,
+.runtime-message-list-scroller::-webkit-scrollbar-corner,
 .plain-report-pre::-webkit-scrollbar-corner,
 .response-prelude-detail .terminal-pre::-webkit-scrollbar-corner,
 .md-diagram-render::-webkit-scrollbar-corner,
@@ -1624,7 +1632,7 @@ button:disabled {
   gap: 8px;
   flex: 1 1 auto;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   overflow-anchor: none;
   overscroll-behavior: contain;
   padding: 0 8px 0 10px;
