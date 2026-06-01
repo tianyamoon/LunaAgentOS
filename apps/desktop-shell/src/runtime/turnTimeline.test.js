@@ -26,6 +26,30 @@ test("appendTurnTimelineEvent: Tool 打断 Assistant 后保留真实执行顺序
   );
 });
 
+test("appendTurnTimelineEvent: 同 id Tool 事件会原地更新而不是重复插入", () => {
+  const turn = {};
+  const now = () => 1000;
+
+  appendTurnTimelineEvent(turn, {
+    type: "tool",
+    payload: { id: "toolu_1", title: "Terminal", status: "pending", content: "Terminal：pending" },
+  }, { now });
+  appendTurnTimelineEvent(turn, {
+    type: "tool",
+    payload: { id: "toolu_1", status: null, content: "toolu_1" },
+  }, { now });
+  appendTurnTimelineEvent(turn, {
+    type: "tool",
+    payload: { id: "toolu_1", status: "failed", content: "" },
+  }, { now });
+
+  assert.equal(turn.timelineItems.length, 1);
+  assert.equal(turn.timelineItems[0].id, "toolu_1");
+  assert.equal(turn.timelineItems[0].status, "failed");
+  assert.equal(turn.timelineItems[0].content, "Terminal");
+  assert.equal(turn.timelineItems[0].metadata.rawEvents.length, 3);
+});
+
 test("appendTurnTimelineEvent: 相邻 Thought 与 Assistant delta 各自在当前片段中合并", () => {
   const turn = {};
   const now = () => 1000;

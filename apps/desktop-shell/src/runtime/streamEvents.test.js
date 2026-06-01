@@ -107,7 +107,7 @@ test("applyEventsToTurn writes ordered Timeline items for fallback and ACP batch
     { type: "response", state: 5, payload: { content: "已完成" } },
   ]);
   assert.deepEqual(turn.timelineItems.map((item) => item.type), ["thinking", "tool", "assistant"]);
-  assert.equal(turn.timelineItems[1].content, "Read：done");
+  assert.equal(turn.timelineItems[1].content, "Read");
   assert.equal(turn.timelineCompletedAt != null, true);
 });
 
@@ -152,7 +152,7 @@ test("applyStreamEventToTurn preserves Timeline order when Tool interrupts Assis
     turn.timelineItems.map((item) => ({ type: item.type, content: item.content })),
     [
       { type: "assistant", content: "先检查" },
-      { type: "tool", content: "Read：done" },
+      { type: "tool", content: "Read" },
       { type: "assistant", content: "再处理" },
     ],
   );

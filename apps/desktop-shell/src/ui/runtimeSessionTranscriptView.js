@@ -66,6 +66,7 @@ export function createRuntimeSessionTranscriptView({
             <div class="terminal-message user-message">
               <p>${escapeHtml(turn.task)}</p>
             </div>
+            ${renderTurnAttachments(turn)}
             ${timelineHtml}
           `}
       </section>
@@ -84,6 +85,22 @@ export function createRuntimeSessionTranscriptView({
           </div>
         `).join("")}
       </section>
+    `;
+  }
+
+  // 附件正文只进入 runtime prompt；卡片显示轻量证据，便于用户确认本轮实际携带了什么。
+  function renderTurnAttachments(turn) {
+    const attachments = Array.isArray(turn.meta?.attachments) ? turn.meta.attachments : [];
+    if (!attachments.length) return "";
+    return `
+      <div class="turn-attachment-strip" aria-label="${escapeHtml(t("turn.attachment.aria"))}">
+        ${attachments.map((attachment) => `
+          <span class="turn-attachment-chip is-${escapeHtml(attachment.status || "metadata")}">
+            <span class="turn-attachment-name">${escapeHtml(attachment.name || t("turn.attachment.unnamed"))}</span>
+            <small>${escapeHtml(t(`turn.attachment.${attachment.status || "metadata"}`))}</small>
+          </span>
+        `).join("")}
+      </div>
     `;
   }
 

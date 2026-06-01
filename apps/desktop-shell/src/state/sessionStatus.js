@@ -139,7 +139,8 @@ export function statusFromRuntimeEvent(event, currentStatus = TURN_STATUS.create
   if (!event) return currentStatus;
   const payloadStatus = normalizeRuntimeStatusText(event.payload?.status || event.status || event.payload?.state);
   if (payloadStatus === "waiting_confirmation") return TURN_STATUS.waiting_confirmation;
-  if (payloadStatus === "failed") return TURN_STATUS.failed;
+  // 单个工具失败仍允许 Agent 自行恢复；只有运行时或 prompt 终态失败才结束整个 Turn。
+  if (payloadStatus === "failed" && event.type !== "tool") return TURN_STATUS.failed;
   if (payloadStatus === "completed" && event.type === "state") return TURN_STATUS.completed;
   if (typeof event.state === "number") return statusFromRuntimeStateCode(event.state, hasFinalResponse);
   if (event.type === "response") return TURN_STATUS.running;

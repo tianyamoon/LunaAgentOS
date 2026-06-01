@@ -152,7 +152,7 @@ test("statusFromRuntimeStateCode maps legacy numeric runtime state to turn.statu
 
 test("statusFromRuntimeEvent detects approvals, failures, completion and active stream events", () => {
   assert.equal(statusFromRuntimeEvent({ type: "tool", payload: { status: "waiting_confirmation" } }), TURN_STATUS.waiting_confirmation);
-  assert.equal(statusFromRuntimeEvent({ type: "tool", payload: { status: "failed" } }), TURN_STATUS.failed);
+  assert.equal(statusFromRuntimeEvent({ type: "tool", payload: { status: "failed" } }), TURN_STATUS.running);
   assert.equal(statusFromRuntimeEvent({ type: "state", state: 5 }), TURN_STATUS.completed);
   assert.equal(statusFromRuntimeEvent({ type: "response", payload: { content: "x" } }), TURN_STATUS.running);
   assert.equal(statusFromRuntimeEvent({ type: "tool", payload: { status: "done" } }), TURN_STATUS.running);

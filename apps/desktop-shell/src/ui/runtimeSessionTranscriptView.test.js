@@ -36,6 +36,27 @@ test("runtimeSessionTranscriptView: 最新轮展开且历史轮默认折叠", ()
   assert.match(html, /新问题/);
 });
 
+test("runtimeSessionTranscriptView: 本轮附件显示名称与嵌入状态", () => {
+  const view = makeView();
+  const html = view.renderTurn({
+    id: "t1",
+    task: "检查附件",
+    status: "completed",
+    meta: {
+      attachments: [
+        { name: "notes.md", status: "ready" },
+        { name: "diagram.png", status: "error" },
+      ],
+    },
+  }, 0);
+
+  assert.match(html, /turn-attachment-strip/);
+  assert.match(html, /notes\.md/);
+  assert.match(html, /diagram\.png/);
+  assert.match(html, /turn\.attachment\.ready/);
+  assert.match(html, /turn\.attachment\.error/);
+});
+
 test("runtimeSessionTranscriptView: 排队输入独立展示附件数量", () => {
   const view = makeView();
   const html = view.renderTranscript({

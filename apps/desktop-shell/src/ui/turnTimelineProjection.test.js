@@ -70,6 +70,19 @@ test("projectLegacyTimeline: 旧历史近似重建但不修改原 Turn", () => {
   assert.equal(turn.timelineItems, undefined);
 });
 
+test("projectLiveTimeline: 默认阅读流隐藏空 usage 与空 Tool", () => {
+  const turn = {
+    timelineItems: [
+      item("usage", ""),
+      item("thinking", "继续检查"),
+      item("tool", ""),
+      item("assistant", "已完成"),
+    ],
+  };
+
+  assert.deepEqual(projectLiveTimeline(turn).map((entry) => entry.type), ["thinking", "assistant"]);
+});
+
 function item(type, content) {
   return {
     id: `${type}-${content}`,

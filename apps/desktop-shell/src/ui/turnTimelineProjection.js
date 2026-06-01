@@ -5,7 +5,7 @@ import { reconstructLegacyTurnTimeline } from "../runtime/turnTimeline.js";
 
 // 运行中按原始顺序展示事件，仅把相邻低价值探索工具压缩成一个局部组。
 export function projectLiveTimeline(turn) {
-  return groupAdjacentExploreTools(timelineItemsForTurn(turn));
+  return groupAdjacentExploreTools(timelineItemsForTurn(turn).filter(isReadableTimelineItem));
 }
 
 // 完成摘要提供 Codex 风格 Worked for 行所需数据，不把文案写死在纯逻辑层。
@@ -68,6 +68,13 @@ export function timelineItemsForTurn(turn) {
 
 function timelineList(items) {
   return Array.isArray(items) ? items : [];
+}
+
+// 默认阅读流只保留有意义的事件；完整 usage 与空 payload 仍可在 Debug 中追溯。
+function isReadableTimelineItem(item) {
+  if (!item || item.type === "usage") return false;
+  if (["tool", "runtime", "plan"].includes(item.type)) return Boolean(String(item.content || "").trim());
+  return true;
 }
 
 function durationBetween(start, end) {

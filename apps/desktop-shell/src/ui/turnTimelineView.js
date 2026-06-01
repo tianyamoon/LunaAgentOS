@@ -175,7 +175,7 @@ export function createTurnTimelineView({
 
   // Debug 是更深一层：保留完整日志和近原始事件，但不在默认阅读路径中抢占视觉空间。
   function renderDebugLayer(turn, items) {
-    const debugPayload = debugPayloadForTurn(turn, items);
+    const debugPayload = debugPayloadForTurn(turn, turn.timelineItems || items);
     if (!debugPayload) return "";
     const detailKey = `${turn.id}:timeline-debug`;
     const open = isOpenForKey(detailKey, false);
@@ -212,7 +212,7 @@ export function createTurnTimelineView({
 // Debug 数据序列化容忍 Adapter 的异常 payload；失败时仍返回可读提示，不让视图崩溃。
 export function debugPayloadForTurn(turn, items) {
   const rawEvents = flattenedTimelineItems(items)
-    .map((item) => item.metadata?.rawEvent)
+    .flatMap((item) => item.metadata?.rawEvents || [item.metadata?.rawEvent])
     .filter(Boolean);
   const logs = Array.isArray(turn?.logs) ? turn.logs : [];
   if (!rawEvents.length && !logs.length) return "";

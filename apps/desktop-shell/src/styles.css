@@ -1791,6 +1791,44 @@ button:disabled {
   line-height: 1.45;
 }
 
+.turn-attachment-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 8px;
+}
+
+.turn-attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 4px 7px;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  background: rgba(var(--surface-raised-rgb), 0.62);
+  color: var(--text);
+  font-size: 0.74rem;
+}
+
+.turn-attachment-chip small {
+  color: var(--muted);
+}
+
+.turn-attachment-chip.is-ready {
+  border-color: rgba(48, 181, 116, 0.38);
+}
+
+.turn-attachment-chip.is-error {
+  border-color: rgba(223, 80, 80, 0.44);
+}
+
+.turn-attachment-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .response-source-detail summary {
   cursor: pointer;
   color: var(--muted);

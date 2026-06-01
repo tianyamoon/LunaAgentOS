@@ -21,6 +21,25 @@ export function appendTurnTimelineEvent(turn, event, { now = Date.now } = {}) {
   const item = timelineItemFromRuntimeEvent(event, { now });
   if (!item) return null;
 
+  // ACP 会把一次工具调用拆成多个 update；同一工具只保留一个可读节点，原始片段仍留给 Debug。
+  const existingTool = item.type === "tool" && item.id
+    ? turn.timelineItems.find((entry) => entry.type === "tool" && entry.id === item.id)
+    : null;
+  if (existingTool) {
+    existingTool.status = item.status;
+    existingTool.updatedAt = item.updatedAt;
+    existingTool.content = preferredToolContent(existingTool.content, item.content, item.id);
+    existingTool.metadata = {
+      ...existingTool.metadata,
+      ...item.metadata,
+      rawEvents: [
+        ...(existingTool.metadata?.rawEvents || [existingTool.metadata?.rawEvent].filter(Boolean)),
+        item.metadata.rawEvent,
+      ],
+    };
+    return existingTool;
+  }
+
   const active = activeTimelineItem(turn);
   if (active && active.type === item.type && MERGEABLE_STREAM_TYPES.has(item.type)) {
     active.content += item.content;
@@ -78,6 +97,7 @@ export function timelineItemFromRuntimeEvent(event, { now = Date.now } = {}) {
       ...(payload.metadata || {}),
       ...(payload.category ? { category: payload.category } : {}),
       rawEvent: event,
+      rawEvents: [event],
     },
   };
 }
@@ -135,11 +155,24 @@ function timelineStatus(event, type) {
 function timelineContent(event, type) {
   const payload = event.payload || {};
   const content = payload.content;
+  // 工具节点标题保持稳定；状态与输出由节点状态和 Debug 承接，避免完成后仍显示 pending。
+  if (type === "tool" && payload.title) return payload.title;
   if (typeof content === "string") return content;
   if (content != null) return JSON.stringify(content);
   if (type === "tool") return payload.title || payload.kind || payload.id || "";
   if (type === "permission") return payload.title || payload.description || "";
   return payload.title || event.message || "";
+}
+
+function preferredToolContent(current, next, toolId) {
+  const readableCurrent = readableToolContent(current, toolId);
+  const readableNext = readableToolContent(next, toolId);
+  return readableNext || readableCurrent || "";
+}
+
+function readableToolContent(content, toolId) {
+  const value = String(content || "").trim();
+  return value && value !== toolId ? value : "";
 }
 
 function timestamp(now) {
