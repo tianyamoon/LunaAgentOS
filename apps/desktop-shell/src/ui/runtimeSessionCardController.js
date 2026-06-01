@@ -204,10 +204,9 @@ export function createRuntimeSessionCardController({
     template.innerHTML = renderSessionCard(session).trim();
     const newArticle = template.content.firstElementChild;
     if (!isElement(newArticle)) return;
-    card.replaceWith(newArticle);
+    const newBody = patchSessionCardPreservingBody(card, newArticle);
     bindSessionActions(newArticle);
     renderMermaidDiagrams(newArticle).catch((error) => console.error(error));
-    const newBody = newArticle.querySelector(".session-card-body");
     if (newBody) sessionStickRegistry.ensure(sessionId, newBody, { initialFollowing: previousFollowing }).notifyContentChanged();
   }
 
@@ -230,4 +229,16 @@ export function createRuntimeSessionCardController({
     scheduleSessionCardRender,
     syncSessionStickControllers,
   };
+}
+
+// 流式更新保留滚动容器节点，只替换它的内容和外围 Card；拖动 scrollbar thumb 时浏览器不会失去目标节点。
+export function patchSessionCardPreservingBody(previousCard, nextArticle) {
+  const previousBody = previousCard?.querySelector?.(".session-card-body") || null;
+  const nextBody = nextArticle?.querySelector?.(".session-card-body") || null;
+  if (previousBody && nextBody) {
+    previousBody.innerHTML = nextBody.innerHTML;
+    nextBody.replaceWith(previousBody);
+  }
+  previousCard?.replaceWith?.(nextArticle);
+  return previousBody || nextBody;
 }
