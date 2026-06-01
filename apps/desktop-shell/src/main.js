@@ -25,8 +25,6 @@ import { createAgentFleetView } from "./ui/agentFleetView.js";
 import { createAgentManagementView } from "./ui/agentManagementView.js";
 import { createRuntimeSessionCardView } from "./ui/runtimeSessionCardView.js";
 import { createRuntimeSessionCardController } from "./ui/runtimeSessionCardController.js";
-import { projectRuntimeSessionTranscript } from "./ui/runtimeSessionTranscriptProjection.js";
-import { createRuntimeSessionTranscriptView } from "./ui/runtimeSessionTranscriptView.js";
 import { projectRuntimeSessionMessageList } from "./ui/runtimeSessionMessageListProjection.js";
 import { createRuntimeSessionMessageListView } from "./ui/runtimeSessionMessageListView.js";
 import {
@@ -36,7 +34,6 @@ import {
 import { createHistoryView } from "./ui/historyView.js";
 import { createWorkspaceView } from "./ui/workspaceView.js";
 import { renderAssistantResponse as renderAssistantResponseView } from "./ui/assistantResponseView.js";
-import { createTurnTimelineView } from "./ui/turnTimelineView.js";
 import { renderProviderIcon, setAdapterIconRegistry } from "./ui/providerIcon.js";
 import {
   LIFECYCLE,
@@ -53,11 +50,9 @@ import {
   RECORD_STATE,
   RUNTIME_BINDING_STAGE,
   RUNTIME_BINDING_STATE,
-  TURN_STATUS,
   createRuntimeBinding,
   isRunningTurnStatus,
   resolveSessionCardStatusView,
-  statusFromRuntimeStateCode,
 } from "./state/sessionStatus.js";
 import {
   canTargetStartSession,
@@ -174,24 +169,6 @@ const stateClasses = {
   9: "state-error",
 };
 
-const turnStatusKeys = {
-  created: "turnStatus.created",
-  running: "turnStatus.running",
-  waiting_confirmation: "turnStatus.waitingConfirmation",
-  completed: "turnStatus.completed",
-  failed: "turnStatus.failed",
-  cancelled: "turnStatus.cancelled",
-};
-
-const turnStatusClasses = {
-  created: "turn-status-created",
-  running: "turn-status-running",
-  waiting_confirmation: "turn-status-waiting-confirmation",
-  completed: "turn-status-completed",
-  failed: "turn-status-failed",
-  cancelled: "turn-status-cancelled",
-};
-
 const runtimeStateLabels = {
   live: "Live",
   archived: "Read-only",
@@ -245,10 +222,6 @@ function providerAvailabilityLabel(summary) {
 
 function stateDisplayLabel(state) {
   return stateDisplayKeys[state] ? t(stateDisplayKeys[state]) : stateDisplayNames[state] || "UNKNOWN";
-}
-
-function turnStatusLabel(status) {
-  return turnStatusKeys[status] ? t(turnStatusKeys[status]) : status || t("turnStatus.created");
 }
 
 function runtimeStateLabel(runtimeState) {
@@ -1327,47 +1300,6 @@ function turnTranscriptText(turn, index) {
   return parts.join("\n\n");
 }
 
-function flowDetailEntriesForSession(session) {
-  return session.turns.flatMap((turn) => {
-    const defaultOpen = turn.state === 2;
-    const hasTimeline = turn.timelineItems?.length || turn.thoughts.length || turn.logs.length;
-    return hasTimeline ? [{ key: `${turn.id}:timeline`, defaultOpen }] : [];
-  });
-}
-
-function detailKeysForSession(session) {
-  return flowDetailEntriesForSession(session).map((entry) => entry.key);
-}
-
-function setSessionFlowDetails(sessionId, open) {
-  const session = sessionsStore.getSession(sessionId);
-  if (!session) return;
-  sessionsStore.batch(() => {
-    detailKeysForSession(session).forEach((key) => sessionsStore.setFlowDetailOpen(key, open));
-  });
-  renderWorkspace();
-}
-
-function areSessionFlowDetailsOpen(session) {
-  const entries = flowDetailEntriesForSession(session);
-  return entries.length > 0 && entries.every(({ key, defaultOpen }) => sessionsStore.getFlowDetailOpen(key, defaultOpen));
-}
-
-function detailOpenAttribute(key, defaultOpen) {
-  return sessionsStore.getFlowDetailOpen(key, defaultOpen) ? "open" : "";
-}
-
-function renderTurnCollapseIcon(collapsed) {
-  const points = collapsed ? "6 9 12 15 18 9" : "6 15 12 9 18 15";
-  return `
-    <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path d="M4 5h16"></path>
-      <path d="M4 19h16"></path>
-      <path d="M${points}"></path>
-    </svg>
-  `;
-}
-
 function renderSessionActionIcon(name) {
   const icons = {
     // 移出工作台 — LogOut（门 + 向右箭头），明确"离开/移出"语义
@@ -1384,10 +1316,6 @@ function renderSessionActionIcon(name) {
     latest: `<path d="M5 7h14"></path><path opacity="0.3" d="M5 12h14"></path><path opacity="0.3" d="M5 17h14"></path>`,
     // 显示全部轮次 — 三条横线同色
     all: `<path d="M5 7h14"></path><path d="M5 12h14"></path><path d="M5 17h14"></path>`,
-    // 折叠 flow 详情 — 双 V 朝上（ChevronsUp）
-    collapse: `<path d="m7 12 5-5 5 5"></path><path d="m7 18 5-5 5 5"></path>`,
-    // 展开 flow 详情 — 双 V 朝下（ChevronsDown）
-    expand: `<path d="m7 6 5 5 5-5"></path><path d="m7 13 5 5 5-5"></path>`,
     // 滚到最新内容 — 圆框 + 向下箭头（与 dismiss/expand 视觉区分）
     latestScroll: `<circle cx="12" cy="12" r="9"></circle><path d="M12 8v7"></path><path d="m8 11 4 4 4-4"></path>`,
     // 全屏（保留）
@@ -1400,40 +1328,6 @@ function renderSessionActionIcon(name) {
       ${icons[name] || icons.copy}
     </svg>
   `;
-}
-
-function toggleTurnCollapsed(turnId) {
-  if (!turnId) return;
-  const found = findTurnById(turnId);
-  const defaultCollapsed = Boolean(found && found.turnIndex < found.session.turns.length - 1);
-  sessionsStore.setTurnCollapsed(turnId, !sessionsStore.isTurnCollapsed(turnId, defaultCollapsed));
-  renderWorkspace();
-}
-
-function areSessionTurnsCollapsed(session) {
-  return session.turns.length > 0 && session.turns.every((turn) => sessionsStore.isTurnCollapsed(turn.id));
-}
-
-function toggleSessionTurnsCollapsed(sessionId) {
-  const session = sessionsStore.getSession(sessionId);
-  if (!session) return;
-  const shouldExpand = areSessionTurnsCollapsed(session);
-  sessionsStore.batch(() => {
-    session.turns.forEach((turn) => {
-      sessionsStore.setTurnCollapsed(turn.id, !shouldExpand);
-    });
-  });
-  renderWorkspace();
-  setAppNotice(shouldExpand ? t("session.allTurnsExpanded") : t("session.allTurnsCollapsed"));
-}
-
-function findTurnById(turnId) {
-  for (const session of sessionsSnapshot()) {
-    const turnIndex = session.turns.findIndex((item) => item.id === turnId);
-    const turn = session.turns[turnIndex];
-    if (turn) return { session, turn, turnIndex };
-  }
-  return null;
 }
 
 async function copyTextToClipboard(text) {
@@ -1461,35 +1355,6 @@ async function copyTextToClipboard(text) {
 function isFlowDetailOpen(key, defaultOpen) {
   return sessionsStore.getFlowDetailOpen(key, defaultOpen);
 }
-
-function clearTurnDetailOpenState(turnId) {
-  if (!turnId) return;
-  sessionsStore.clearFlowDetailOpenForTurn(turnId);
-}
-
-// Timeline View 隔离 Turn 内部排版，Shell 只提供 Markdown 渲染和 Store 查询依赖。
-const turnTimelineView = createTurnTimelineView({
-  renderAssistantResponse,
-  isOpenForKey: isFlowDetailOpen,
-  t,
-  escapeHtml,
-});
-
-// Transcript View 承接 Turn 阅读层级，Shell 只注入状态标签与 Store 查询。
-const runtimeSessionTranscriptView = createRuntimeSessionTranscriptView({
-  turnTimelineView,
-  isTurnCollapsed: (turnId, defaultCollapsed) => sessionsStore.isTurnCollapsed(turnId, defaultCollapsed),
-  clearTurnDetailOpenState,
-  turnResponseText,
-  statusFromRuntimeStateCode,
-  isRunningTurnStatus,
-  turnStatusClasses,
-  turnStatusLabel,
-  renderTurnCollapseIcon,
-  TURN_STATUS,
-  t,
-  escapeHtml,
-});
 
 // MessageList View 负责稳定 DOM 对账；Shell 只注入 Markdown 与详情展开查询。
 const runtimeSessionMessageListView = createRuntimeSessionMessageListView({
@@ -1556,9 +1421,6 @@ runtimeSessionCardView = createRuntimeSessionCardView({
   runtimeSessionMessageListView,
   sessionCardStats,
   isSessionLatestOnly,
-  flowDetailEntriesForSession,
-  areSessionFlowDetailsOpen,
-  areSessionTurnsCollapsed,
   sessionIdentityTitle,
   renderSessionIdentityTitle,
   renderSessionActionIcon,
@@ -1594,13 +1456,6 @@ runtimeSessionCardController = createRuntimeSessionCardController({
   sessionTranscriptText,
   copyTextToClipboard,
   toggleSessionLatestOnly,
-  toggleSessionTurnsCollapsed,
-  areSessionFlowDetailsOpen,
-  setSessionFlowDetails,
-  toggleTurnCollapsed,
-  findTurnById,
-  turnResponseText,
-  turnTranscriptText,
   setAppNotice,
   isAtBottom,
   t,

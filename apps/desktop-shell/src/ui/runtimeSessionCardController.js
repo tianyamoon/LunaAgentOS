@@ -22,13 +22,6 @@ export function createRuntimeSessionCardController({
   sessionTranscriptText,
   copyTextToClipboard,
   toggleSessionLatestOnly,
-  toggleSessionTurnsCollapsed,
-  areSessionFlowDetailsOpen,
-  setSessionFlowDetails,
-  toggleTurnCollapsed,
-  findTurnById,
-  turnResponseText,
-  turnTranscriptText,
   setAppNotice,
   isAtBottom,
   t,
@@ -87,11 +80,6 @@ export function createRuntimeSessionCardController({
     actionRoot.querySelectorAll(".session-retry-btn").forEach((button) => {
       button.addEventListener("click", () => restoreArchivedSession(button.dataset.sessionId));
     });
-    actionRoot
-      .querySelectorAll(".turn-event-thinking-shell[data-detail-key]")
-      .forEach((detail) => {
-        detail.addEventListener("toggle", () => setFlowDetailOpen(detail.dataset.detailKey, detail.open));
-      });
     actionRoot.querySelectorAll(".session-scroll-latest-btn").forEach((button) => {
       button.addEventListener("click", () => {
         const sessionId = button.dataset.sessionId;
@@ -111,47 +99,6 @@ export function createRuntimeSessionCardController({
     });
     actionRoot.querySelectorAll(".session-latest-only-btn").forEach((button) => {
       button.addEventListener("click", () => toggleSessionLatestOnly(button.dataset.sessionId));
-    });
-    actionRoot.querySelectorAll(".session-turns-toggle-btn").forEach((button) => {
-      button.addEventListener("click", () => toggleSessionTurnsCollapsed(button.dataset.sessionId));
-    });
-    actionRoot.querySelectorAll(".session-toggle-flows-btn").forEach((button) => {
-      button.addEventListener("click", () => {
-        const session = getSession(button.dataset.sessionId);
-        if (!session) return;
-        const shouldOpen = !areSessionFlowDetailsOpen(session);
-        setSessionFlowDetails(session.id, shouldOpen);
-        setAppNotice(shouldOpen ? t("session.flowsExpanded") : t("session.flowsCollapsed"));
-      });
-    });
-    actionRoot.querySelectorAll(".turn-collapse-btn").forEach((button) => {
-      button.addEventListener("click", () => toggleTurnCollapsed(button.dataset.turnId));
-    });
-    actionRoot.querySelectorAll(".turn-copy-response-btn").forEach((button) => {
-      button.addEventListener("click", async () => {
-        const result = findTurnById(button.dataset.turnId);
-        const text = result ? turnResponseText(result.turn) : "";
-        if (!text) return setAppNotice(t("turn.noResponseCopy"), "busy");
-        const copied = await copyTextToClipboard(text);
-        setAppNotice(copied ? t("turn.copiedResponse") : t("copy.selectManually"), copied ? "muted" : "error");
-      });
-    });
-    actionRoot.querySelectorAll(".turn-copy-btn").forEach((button) => {
-      button.addEventListener("click", async () => {
-        const result = findTurnById(button.dataset.turnId);
-        const text = result ? turnTranscriptText(result.turn, result.turnIndex) : "";
-        if (!text) return setAppNotice(t("turn.noTranscript"), "busy");
-        const copied = await copyTextToClipboard(text);
-        setAppNotice(copied ? t("turn.copiedTranscript") : t("copy.selectManually"), copied ? "muted" : "error");
-      });
-    });
-    actionRoot.querySelectorAll(".md-code-copy-btn").forEach((button) => {
-      button.addEventListener("click", async () => {
-        const code = button.closest(".md-code-block, .md-diagram-block")?.querySelector("code")?.textContent || "";
-        if (!code) return setAppNotice(t("markdown.emptyCode"), "busy");
-        const copied = await copyTextToClipboard(code);
-        setAppNotice(copied ? t("markdown.copiedCode") : t("markdown.copyCodeFailed"), copied ? "muted" : "error");
-      });
     });
   }
 
@@ -242,8 +189,17 @@ export function createRuntimeSessionCardController({
     if (!body?.addEventListener || delegatedBodies.has(body)) return;
     delegatedBodies.add(body);
     body.addEventListener("click", (event) => {
-      if (!event.target.closest?.("[data-runtime-scroll-latest]")) return;
-      ensureMessageListStickController(sessionId, body, true)?.resumeFollowing();
+      if (event.target.closest?.("[data-runtime-scroll-latest]")) {
+        ensureMessageListStickController(sessionId, body, true)?.resumeFollowing();
+        return;
+      }
+      const copyButton = event.target.closest?.(".md-code-copy-btn");
+      if (!copyButton) return;
+      const code = copyButton.closest(".md-code-block, .md-diagram-block")?.querySelector("code")?.textContent || "";
+      if (!code) return setAppNotice(t("markdown.emptyCode"), "busy");
+      copyTextToClipboard(code).then((copied) => {
+        setAppNotice(copied ? t("markdown.copiedCode") : t("markdown.copyCodeFailed"), copied ? "muted" : "error");
+      });
     });
     body.addEventListener("toggle", (event) => {
       const detail = event.target.closest?.(".terminal-detail[data-detail-key]");

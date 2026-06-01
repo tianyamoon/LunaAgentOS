@@ -1,7 +1,7 @@
 // 集中收纳跟 session 工作台直接相关的可变状态：
 // - 工作台 sessions 数组、当前发送目标 sessionId、活跃 session 集合
 // - stopped / deleted 墓碑 Set
-// - 三个 UI flag 容器（latestOnly / flowDetailOpen / collapsedTurns）
+// - 两个 UI flag 容器（latestOnly / flowDetailOpen）
 // 模块本身不依赖 DOM、不直接驱动渲染。订阅 subscribe(listener) 后，状态发生变化时
 // 调用方有机会自己触发渲染。这里刻意保持纯函数接口，方便单测以及未来切换到
 // reactive UI。
@@ -17,7 +17,6 @@ export function createSessionsStore() {
   const stoppedSessionIds = new Set();
   const deletedSessionIds = new Set();
   const flowDetailOpenState = new Map();
-  const collapsedTurnState = new Map();
   const sessionLatestOnlyState = new Map();
   const listeners = new Set();
   let suppressNotify = 0;
@@ -192,33 +191,6 @@ export function createSessionsStore() {
       flowDetailOpenState.set(key, next);
       if (prev !== next) notify();
     },
-    clearFlowDetailOpenForTurn(turnId) {
-      if (!turnId) return;
-      const prefix = `${turnId}:`;
-      let removed = false;
-      for (const key of flowDetailOpenState.keys()) {
-        if (typeof key === "string" && key.startsWith(prefix)) {
-          flowDetailOpenState.delete(key);
-          removed = true;
-        }
-      }
-      if (removed) notify();
-    },
-
-    // ---- UI flags: turn collapsed ----
-    isTurnCollapsed(turnId, defaultCollapsed = false) {
-      if (!turnId) return false;
-      return collapsedTurnState.has(turnId) ? collapsedTurnState.get(turnId) : Boolean(defaultCollapsed);
-    },
-    setTurnCollapsed(turnId, value) {
-      if (!turnId) return;
-      const next = Boolean(value);
-      const prev = collapsedTurnState.get(turnId);
-      if (next === prev) return;
-      collapsedTurnState.set(turnId, next);
-      notify();
-    },
-
     // ---- subscribe / batch ----
     subscribe(listener) {
       if (typeof listener !== "function") return () => {};
@@ -235,7 +207,6 @@ export function createSessionsStore() {
       stoppedSessionIds.clear();
       deletedSessionIds.clear();
       flowDetailOpenState.clear();
-      collapsedTurnState.clear();
       sessionLatestOnlyState.clear();
       notify();
     },

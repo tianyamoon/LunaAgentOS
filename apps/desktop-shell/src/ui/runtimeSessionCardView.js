@@ -10,9 +10,6 @@ export function createRuntimeSessionCardView({
   runtimeSessionMessageListView,
   sessionCardStats,
   isSessionLatestOnly,
-  flowDetailEntriesForSession,
-  areSessionFlowDetailsOpen,
-  areSessionTurnsCollapsed,
   sessionIdentityTitle,
   renderSessionIdentityTitle,
   renderSessionActionIcon,
@@ -75,14 +72,9 @@ export function createRuntimeSessionCardView({
     const stats = sessionCardStats(session, t);
     const latestOnly = isSessionLatestOnly(session);
     const messageList = projectRuntimeSessionMessageList(session, { latestOnly });
-    const hasFlowDetails = flowDetailEntriesForSession(session).length > 0;
-    const flowsOpen = areSessionFlowDetailsOpen(session);
-    const turnsCollapsed = areSessionTurnsCollapsed(session);
     const managementTitleSuffix = isRestoring ? t("action.restoringSuffix") : "";
     const canArchiveCard = session.record_state !== RECORD_STATE.archived && session.access_mode !== ACCESS_MODE.read_only;
-    const turnToggleLabel = turnsCollapsed ? t("action.expandAllTurns") : t("action.collapseAllTurns");
-    const latestOnlyLabel = latestOnly ? t("action.showAllTurns") : t("action.latestOnly");
-    const flowToggleLabel = flowsOpen ? t("action.collapseFlows") : t("action.expandFlows");
+    const latestOnlyLabel = latestOnly ? t("action.showAllMessages") : t("action.latestMessages");
     const isFocusedSession = getFocusedSessionId() === session.id;
     const fullscreenLabel = isFocusedSession ? t("action.exitFullscreen") : t("action.enterFullscreen");
     const identityTitle = sessionIdentityTitle(identitySession);
@@ -100,7 +92,6 @@ export function createRuntimeSessionCardView({
               <div class="session-tool-group" role="group">
                 <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-copy-btn" data-session-id="${session.id}" title="${t("action.copySession")}" aria-label="${t("action.copySession")}" ${session.turns.length ? "" : "disabled"}>${renderSessionActionIcon("copy")}</button>
                 <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-latest-only-btn ${latestOnly ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${latestOnly ? "true" : "false"}" title="${latestOnlyLabel}" aria-label="${latestOnlyLabel}" ${session.turns.length > 1 ? "" : "disabled"}>${renderSessionActionIcon(latestOnly ? "all" : "latest")}</button>
-                <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-toggle-flows-btn ${flowsOpen ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${flowsOpen ? "true" : "false"}" title="${flowToggleLabel}" aria-label="${flowToggleLabel}" ${hasFlowDetails ? "" : "disabled"}>${renderSessionActionIcon(flowsOpen ? "collapse" : "expand")}</button>
                 <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-scroll-latest-btn" data-session-id="${session.id}" title="${t("action.scrollLatest")}" aria-label="${t("action.scrollLatest")}">${renderSessionActionIcon("latestScroll")}</button>
                 <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-fullscreen-btn ${isFocusedSession ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${isFocusedSession ? "true" : "false"}" title="${fullscreenLabel}" aria-label="${fullscreenLabel}">${renderSessionActionIcon(isFocusedSession ? "fullscreenExit" : "fullscreen")}</button>
               </div>
@@ -115,7 +106,7 @@ export function createRuntimeSessionCardView({
           <div class="session-card-row session-card-status-line">
             ${renderSessionStatusChip(statusView)}
             <div class="session-card-stats" aria-label="${t("session.statsAria")}">
-              <button type="button" class="session-stat-pill session-turns-toggle-btn ${turnsCollapsed ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${turnsCollapsed ? "true" : "false"}" title="${turnToggleLabel}" aria-label="${turnToggleLabel}" ${session.turns.length ? "" : "disabled"}>${t("session.turns", { count: session.turns.length })}</button>
+              <span class="session-stat-pill">${t("session.turns", { count: session.turns.length })}</span>
               ${stats.map((item) => `<span class="session-stat-pill" data-stat-key="${escapeHtml(item.key)}">${escapeHtml(item.label)}</span>`).join("")}
             </div>
             ${profileMeta ? `<div class="caption session-profile-meta">${escapeHtml(profileMeta)}</div>` : ""}
