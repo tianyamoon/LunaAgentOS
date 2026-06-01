@@ -1632,6 +1632,210 @@ button:disabled {
   contain: layout paint;
 }
 
+/* === Runtime MessageList ======================================= */
+.runtime-message-list {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.runtime-message-list-scroller {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overflow-anchor: none;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.runtime-message-list-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 100%;
+  padding: 2px 2px 20px;
+}
+
+.runtime-message-row {
+  min-width: 0;
+}
+
+.runtime-message-row-user {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+}
+
+.runtime-message-user-bubble {
+  max-width: min(78%, 760px);
+  padding: 9px 12px;
+  border-radius: 14px 14px 4px 14px;
+  background: var(--accent-tint-to);
+  color: var(--text);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.runtime-message-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 5px;
+}
+
+.runtime-message-attachments span {
+  padding: 3px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.runtime-message-assistant {
+  padding: 10px 12px;
+  border: 1px solid rgba(var(--surface-raised-rgb), 0.75);
+  border-radius: 10px;
+  background: rgba(var(--surface-raised-rgb), 0.72);
+}
+
+.runtime-message-label,
+.runtime-message-event-kind {
+  color: var(--label-warm);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.runtime-message-thinking {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: 7px;
+  align-items: start;
+  padding: 5px 8px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.runtime-message-event-content {
+  grid-column: 3;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.runtime-message-event,
+.runtime-message-worked-for,
+.runtime-message-debug {
+  padding: 6px 9px;
+}
+
+.runtime-message-event summary,
+.runtime-message-worked-for summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  cursor: pointer;
+  list-style: none;
+}
+
+.runtime-message-event summary::-webkit-details-marker,
+.runtime-message-worked-for summary::-webkit-details-marker {
+  display: none;
+}
+
+.runtime-message-event-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runtime-message-event .terminal-pre,
+.runtime-message-debug .terminal-pre {
+  max-height: 300px;
+  margin-top: 7px;
+  overflow: auto;
+}
+
+.runtime-message-event-tool-group ul,
+.runtime-message-trace {
+  margin: 7px 0 0 20px;
+}
+
+.runtime-message-worked-for {
+  color: var(--label-warm);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.runtime-message-legacy-note,
+.runtime-message-legacy-warning {
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+.runtime-message-legacy-warning {
+  padding: 7px 9px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}
+
+.runtime-message-queue {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 9px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.runtime-message-queue strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runtime-message-scroll-latest-btn {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  z-index: 3;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: rgba(var(--surface-raised-rgb), 0.94);
+  color: var(--text);
+  cursor: pointer;
+  transform: translateX(-50%);
+}
+
+.runtime-message-scroll-latest-btn[hidden] {
+  display: none;
+}
+
+.runtime-message-status-running > .turn-event-dot,
+.runtime-message-status-running .turn-event-dot {
+  background: var(--thinking);
+  animation: turn-event-pulse 1.4s ease-in-out infinite;
+}
+
+.runtime-message-status-failed {
+  border-color: var(--error);
+  background: rgba(var(--surface-raised-rgb), 0.66);
+}
+
 .turn-block {
   display: flex;
   flex-direction: column;
