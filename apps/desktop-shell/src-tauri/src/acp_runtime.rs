@@ -2,12 +2,14 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::env;
 use std::fs;
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::sync::OnceLock;
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::{Duration, Instant};
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -58,7 +60,7 @@ enum SessionStartMode {
 struct AcpSession {
     child: Child,
     stdin: ChildStdin,
-    reader: BufReader<ChildStdout>,
+    inbox: Receiver<Value>,
     stderr_log: Arc<Mutex<String>>,
     next_id: i64,
     session_id: String,
@@ -372,7 +374,7 @@ fn start_acp_session(
             format!("{} adapter stdout 不可用。", runtime.display()),
         )
     })?;
-    let mut reader = BufReader::new(stdout);
+    let inbox = spawn_stdout_reader(stdout);
     let mut next_id: i64 = 0;
 
     let init = json!({
@@ -399,7 +401,7 @@ fn start_acp_session(
     }
     let init_result = match read_response(
         runtime,
-        &mut reader,
+        &inbox,
         &mut stdin,
         init["id"].as_i64().unwrap(),
         Some(&stderr_log),
@@ -461,7 +463,7 @@ fn start_acp_session(
     }
     let session_result = match read_response(
         runtime,
-        &mut reader,
+        &inbox,
         &mut stdin,
         session_request["id"].as_i64().unwrap(),
         Some(&stderr_log),
@@ -509,7 +511,7 @@ fn start_acp_session(
     Ok(AcpSession {
         child,
         stdin,
-        reader,
+        inbox,
         stderr_log,
         next_id,
         session_id,
@@ -530,7 +532,7 @@ fn send_prompt(
     on_event: &mut Option<&mut dyn FnMut(Value)>,
 ) -> Result<(), String> {
     // 上一轮 response 后才进入缓冲区的 update 已失去可靠归属，发送新 prompt 前必须隔离。
-    let discarded_updates = discard_buffered_idle_messages(&mut session.reader, &mut session.stdin)?;
+    let discarded_updates = quarantine_idle_messages(&session.inbox, &mut session.stdin)?;
     if discarded_updates > 0 {
         eprintln!(
             "{} 隔离了 {discarded_updates} 条失去轮次归属的空闲 update。",
@@ -552,7 +554,7 @@ fn send_prompt(
     write_message(&mut session.stdin, &prompt_request)?;
     let prompt_result = read_response(
         runtime,
-        &mut session.reader,
+        &session.inbox,
         &mut session.stdin,
         prompt_request["id"].as_i64().unwrap(),
         Some(&session.stderr_log),
@@ -582,23 +584,41 @@ fn send_prompt(
     Ok(())
 }
 
-fn discard_buffered_idle_messages<R: Read>(
-    reader: &mut BufReader<R>,
+fn spawn_stdout_reader(stdout: ChildStdout) -> Receiver<Value> {
+    let (sender, receiver) = mpsc::channel();
+    thread::spawn(move || {
+        let mut reader = BufReader::new(stdout);
+        let mut line = String::new();
+        while reader.read_line(&mut line).unwrap_or(0) > 0 {
+            if let Ok(message) = serde_json::from_str::<Value>(line.trim()) {
+                if sender.send(message).is_err() {
+                    break;
+                }
+            }
+            line.clear();
+        }
+    });
+    receiver
+}
+
+fn quarantine_idle_messages(
+    inbox: &Receiver<Value>,
     stdin: &mut impl Write,
 ) -> Result<usize, String> {
     let mut discarded_updates = 0;
+    let started_at = Instant::now();
+    let quiet_window = Duration::from_millis(20);
+    let max_wait = Duration::from_millis(200);
     loop {
-        // 只处理已经进入 BufReader 的完整行，避免在空闲阶段阻塞等待 Adapter。
-        if !reader.buffer().contains(&b'\n') {
+        // 新 prompt 前等待一个很短的安静窗口，覆盖刚离开 OS pipe 的迟到 update。
+        let remaining = max_wait.saturating_sub(started_at.elapsed());
+        if remaining.is_zero() {
             return Ok(discarded_updates);
         }
-
-        let mut line = String::new();
-        reader
-            .read_line(&mut line)
-            .map_err(|error| error.to_string())?;
-        let Ok(message) = serde_json::from_str::<Value>(line.trim()) else {
-            continue;
+        let message = match inbox.recv_timeout(quiet_window.min(remaining)) {
+            Ok(message) => message,
+            Err(RecvTimeoutError::Timeout) => return Ok(discarded_updates),
+            Err(RecvTimeoutError::Disconnected) => return Err("ACP adapter stdout 已关闭。".to_string()),
         };
 
         if let Some(id) = message.get("id").and_then(|value| value.as_i64()) {
@@ -675,26 +695,17 @@ fn write_message(stdin: &mut impl Write, message: &Value) -> Result<(), String> 
 
 fn read_response(
     runtime: &AcpRuntime,
-    reader: &mut impl BufRead,
+    inbox: &Receiver<Value>,
     stdin: &mut impl Write,
     target_id: i64,
     stderr_log: Option<&Arc<Mutex<String>>>,
     events: &mut Vec<Value>,
     on_event: &mut Option<&mut dyn FnMut(Value)>,
 ) -> Result<Value, String> {
-    let mut line = String::new();
     loop {
-        line.clear();
-        let bytes = reader
-            .read_line(&mut line)
-            .map_err(|error| error.to_string())?;
-        if bytes == 0 {
-            return Err(format_adapter_stdout_closed(runtime, stderr_log));
-        }
-
-        let Ok(message) = serde_json::from_str::<Value>(line.trim()) else {
-            continue;
-        };
+        let message = inbox
+            .recv()
+            .map_err(|_| format_adapter_stdout_closed(runtime, stderr_log))?;
 
         if let Some(id) = message.get("id").and_then(|value| value.as_i64()) {
             if message.get("method").is_some() {
@@ -771,7 +782,6 @@ fn respond_to_client_request(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Cursor;
 
     #[test]
     fn late_update_after_response_is_quarantined_before_next_prompt() {
@@ -779,18 +789,19 @@ mod tests {
             id: "test".to_string(),
             name: "Test".to_string(),
         };
-        let input = [
-            r#"{"jsonrpc":"2.0","id":1,"result":{"stopReason":"end_turn"}}"#,
-            r#"{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"session-1","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"上一轮迟到正文"}}}}"#,
-        ]
-        .join("\n");
-        let mut reader = BufReader::new(Cursor::new(format!("{input}\n")));
+        let (sender, inbox) = mpsc::channel();
+        sender
+            .send(json!({"jsonrpc":"2.0","id":1,"result":{"stopReason":"end_turn"}}))
+            .unwrap();
+        sender
+            .send(json!({"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"session-1","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"上一轮迟到正文"}}}}))
+            .unwrap();
         let mut stdin = Vec::new();
         let mut first_events = Vec::new();
         let mut first_callback = None;
         read_response(
             &runtime,
-            &mut reader,
+            &inbox,
             &mut stdin,
             1,
             None,
@@ -799,7 +810,24 @@ mod tests {
         )
         .unwrap();
 
-        let discarded = discard_buffered_idle_messages(&mut reader, &mut stdin).unwrap();
+        let discarded = quarantine_idle_messages(&inbox, &mut stdin).unwrap();
+        assert_eq!(discarded, 1);
+    }
+
+    #[test]
+    fn idle_quarantine_waits_for_update_still_leaving_os_pipe() {
+        let (sender, inbox) = mpsc::channel();
+        let delayed_sender = sender.clone();
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(5));
+            delayed_sender
+                .send(json!({"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"session-1","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"稍后抵达的旧正文"}}}}))
+                .unwrap();
+        });
+        let mut stdin = Vec::new();
+
+        let discarded = quarantine_idle_messages(&inbox, &mut stdin).unwrap();
+
         assert_eq!(discarded, 1);
     }
 
@@ -809,18 +837,19 @@ mod tests {
             id: "test".to_string(),
             name: "Test".to_string(),
         };
-        let input = [
-            r#"{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"session-1","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"当前轮正文"}}}}"#,
-            r#"{"jsonrpc":"2.0","id":2,"result":{"stopReason":"end_turn"}}"#,
-        ]
-        .join("\n");
-        let mut reader = BufReader::new(Cursor::new(format!("{input}\n")));
+        let (sender, inbox) = mpsc::channel();
+        sender
+            .send(json!({"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"session-1","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"当前轮正文"}}}}))
+            .unwrap();
+        sender
+            .send(json!({"jsonrpc":"2.0","id":2,"result":{"stopReason":"end_turn"}}))
+            .unwrap();
         let mut stdin = Vec::new();
         let mut second_events = Vec::new();
         let mut second_callback = None;
         read_response(
             &runtime,
-            &mut reader,
+            &inbox,
             &mut stdin,
             2,
             None,
