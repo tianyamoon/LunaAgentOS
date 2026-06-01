@@ -92,7 +92,7 @@ export function createRuntimeSessionCardController({
         const sessionId = button.dataset.sessionId;
         const body = sessionDeck.querySelector(`.session-card[data-session-id="${sessionId}"] .session-card-body`);
         if (!body) return;
-        sessionStickRegistry.ensure(sessionId, body, { initialStuck: true }).scrollToBottom();
+        sessionStickRegistry.ensure(sessionId, body, { initialFollowing: true }).resumeFollowing();
       });
     });
     actionRoot.querySelectorAll(".session-copy-btn").forEach((button) => {
@@ -157,7 +157,7 @@ export function createRuntimeSessionCardController({
       const sessionId = body.closest(".session-card")?.dataset.sessionId;
       if (!sessionId) return;
       const controller = sessionStickRegistry.get(sessionId);
-      map.set(sessionId, controller ? controller.isStuck : isAtBottom(body));
+      map.set(sessionId, controller ? controller.isFollowing : isAtBottom(body));
     });
     return map;
   }
@@ -199,7 +199,7 @@ export function createRuntimeSessionCardController({
     if (!card) return scheduleWorkspaceRender({ preserveDeckScroll: true });
     const previousBody = card.querySelector(".session-card-body");
     const previousController = sessionStickRegistry.get(sessionId);
-    const previousStuck = previousController ? previousController.isStuck : previousBody ? isAtBottom(previousBody) : true;
+    const previousFollowing = previousController ? previousController.isFollowing : previousBody ? isAtBottom(previousBody) : true;
     const template = createTemplate();
     template.innerHTML = renderSessionCard(session).trim();
     const newArticle = template.content.firstElementChild;
@@ -208,7 +208,7 @@ export function createRuntimeSessionCardController({
     bindSessionActions(newArticle);
     renderMermaidDiagrams(newArticle).catch((error) => console.error(error));
     const newBody = newArticle.querySelector(".session-card-body");
-    if (newBody) sessionStickRegistry.ensure(sessionId, newBody, { initialStuck: previousStuck }).notifyContentChanged();
+    if (newBody) sessionStickRegistry.ensure(sessionId, newBody, { initialFollowing: previousFollowing }).notifyContentChanged();
   }
 
   // 全量工作区重绘后只保留可见 Session 的 sticky 控制器。
@@ -217,8 +217,8 @@ export function createRuntimeSessionCardController({
     visibleSessions.forEach((session) => {
       const body = sessionDeck.querySelector(`.session-card[data-session-id="${session.id}"]`)?.querySelector(".session-card-body");
       if (!body) return;
-      const previousStuck = stickyIntent.has(session.id) ? stickyIntent.get(session.id) : true;
-      sessionStickRegistry.ensure(session.id, body, { initialStuck: previousStuck }).notifyContentChanged();
+      const previousFollowing = stickyIntent.has(session.id) ? stickyIntent.get(session.id) : true;
+      sessionStickRegistry.ensure(session.id, body, { initialFollowing: previousFollowing }).notifyContentChanged();
       ids.push(session.id);
     });
     sessionStickRegistry.sweep(ids);

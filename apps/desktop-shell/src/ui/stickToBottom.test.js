@@ -53,7 +53,7 @@ test("user scrolling up unsticks the controller", () => {
   assert.equal(controller.isStuck, false);
 });
 
-test("returning to the bottom re-sticks the controller", () => {
+test("returning to the bottom manually does not resume following", () => {
   const element = createFakeElement({ scrollHeight: 500, clientHeight: 200, scrollTop: 300 });
   const controller = createStickToBottomController(element, { observeResize: false });
 
@@ -63,40 +63,44 @@ test("returning to the bottom re-sticks the controller", () => {
 
   element.scrollTop = element.scrollHeight - element.clientHeight;
   element.emit("scroll");
-  assert.equal(controller.isStuck, true);
+  assert.equal(controller.isFollowing, false);
 });
 
-test("notifyContentChanged scrolls to bottom only when stuck", () => {
+test("notifyContentChanged scrolls to bottom only while following", () => {
   const element = createFakeElement({ scrollHeight: 500, clientHeight: 200, scrollTop: 50 });
-  const controller = createStickToBottomController(element, { observeResize: false, initialStuck: false });
+  const controller = createStickToBottomController(element, { observeResize: false, initialFollowing: false });
 
   element.scrollHeight = 1200;
   controller.notifyContentChanged();
   assert.equal(element.scrollTop, 50);
 
-  element.scrollTop = element.scrollHeight - element.clientHeight;
-  element.emit("scroll");
-  assert.equal(controller.isStuck, true);
-
   element.scrollHeight = 2000;
+  controller.resumeFollowing();
   controller.notifyContentChanged();
   assert.equal(element.scrollTop, 2000);
 });
 
-test("programmatic scrollToBottom does not flip the stuck flag", () => {
+test("resumeFollowing scrolls to bottom and restores following", () => {
   const element = createFakeElement({ scrollHeight: 500, clientHeight: 200, scrollTop: 50 });
-  const controller = createStickToBottomController(element, { observeResize: false, initialStuck: false });
+  const controller = createStickToBottomController(element, { observeResize: false, initialFollowing: false });
 
-  controller.scrollToBottom();
+  controller.resumeFollowing();
   assert.equal(element.scrollTop, 500);
-  assert.equal(controller.isStuck, true);
+  assert.equal(controller.isFollowing, true);
+});
 
-  element.emit("scroll");
-  assert.equal(
-    controller.isStuck,
-    true,
-    "scroll event triggered by programmatic call must not unstick",
-  );
+test("wheel pointer and touch gestures pause following immediately", () => {
+  const element = createFakeElement();
+  const controller = createStickToBottomController(element, { observeResize: false });
+
+  element.emit("wheel");
+  assert.equal(controller.isFollowing, false);
+  controller.resumeFollowing();
+  element.emit("pointerdown");
+  assert.equal(controller.isFollowing, false);
+  controller.resumeFollowing();
+  element.emit("touchstart");
+  assert.equal(controller.isFollowing, false);
 });
 
 test("dispose removes the scroll listener", () => {
@@ -105,7 +109,7 @@ test("dispose removes the scroll listener", () => {
   controller.dispose();
   element.scrollTop = 0;
   element.emit("scroll");
-  assert.equal(controller.isStuck, true, "stuck flag should not move after dispose");
+  assert.equal(controller.isFollowing, true, "following flag should not move after dispose");
 });
 
 test("registry reuses controllers for the same element", () => {

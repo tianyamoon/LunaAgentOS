@@ -10,9 +10,9 @@
 // Design:
 //   - Each scroll container (`.session-card-body`) gets its own controller.
 //   - The controller starts as "stuck to bottom".
-//   - When the user scrolls and ends up above the bottom threshold, we drop
-//     the stuck flag. Programmatic scrolls do NOT toggle the flag.
-//   - When new content arrives we only adjust scrollTop while stuck.
+//   - 用户滚轮、触控或按下滚动条时立即暂停跟随。
+//   - 手动回到底部不会自动恢复，只有明确点击“滚动到最新”才恢复。
+//   - When new content arrives we only adjust scrollTop while following.
 //   - Optional ResizeObserver follows DOM-driven height changes without
 //     touching the flag on its own.
 //
@@ -31,37 +31,41 @@ export function createStickToBottomController(element, options = {}) {
   if (!element) throw new Error("stickToBottom: element is required");
   const threshold = options.threshold ?? DEFAULT_BOTTOM_THRESHOLD;
   const observeResize = options.observeResize !== false;
-  let stuck = options.initialStuck !== false;
-  let programmaticScroll = false;
+  let following = options.initialFollowing ?? options.initialStuck ?? true;
   let disposed = false;
 
-  const setStuckFromDom = () => {
-    stuck = isAtBottom(element, threshold);
+  const pauseFollowing = () => {
+    if (disposed) return;
+    following = false;
   };
 
   const onScroll = () => {
     if (disposed) return;
-    if (programmaticScroll) {
-      programmaticScroll = false;
-      return;
-    }
-    setStuckFromDom();
+    // 非手势来源的滚动也可能来自键盘；只在离开底部时暂停，不从 DOM 位置自动恢复。
+    if (following && !isAtBottom(element, threshold)) pauseFollowing();
   };
 
   const scrollToBottom = () => {
     if (disposed) return;
-    programmaticScroll = true;
     element.scrollTop = element.scrollHeight;
-    stuck = true;
+  };
+
+  const resumeFollowing = () => {
+    if (disposed) return;
+    following = true;
+    scrollToBottom();
   };
 
   const onResize = () => {
     if (disposed) return;
-    if (!stuck) return;
+    if (!following) return;
     scrollToBottom();
   };
 
   element.addEventListener("scroll", onScroll, { passive: true });
+  element.addEventListener("wheel", pauseFollowing, { passive: true });
+  element.addEventListener("pointerdown", pauseFollowing, { passive: true });
+  element.addEventListener("touchstart", pauseFollowing, { passive: true });
 
   let resizeObserver = null;
   if (observeResize && typeof ResizeObserver !== "undefined") {
@@ -74,20 +78,29 @@ export function createStickToBottomController(element, options = {}) {
   }
 
   return {
-    get isStuck() {
-      return stuck;
+    get isFollowing() {
+      return following;
     },
+    // 兼容旧调用方读取；新代码统一使用 isFollowing。
+    get isStuck() {
+      return following;
+    },
+    pauseFollowing,
+    resumeFollowing,
     scrollToBottom,
     notifyContentChanged() {
-      if (stuck) scrollToBottom();
+      if (following) scrollToBottom();
     },
     markUserIntent() {
-      setStuckFromDom();
+      pauseFollowing();
     },
     dispose() {
       if (disposed) return;
       disposed = true;
       element.removeEventListener("scroll", onScroll);
+      element.removeEventListener("wheel", pauseFollowing);
+      element.removeEventListener("pointerdown", pauseFollowing);
+      element.removeEventListener("touchstart", pauseFollowing);
       resizeObserver?.disconnect();
     },
   };
