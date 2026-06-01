@@ -182,6 +182,13 @@ test("sessionsStore: turn collapse only notifies on change", () => {
   assert.equal(notifyCount, 2);
 });
 
+test("sessionsStore: turn collapse supports an explicit expanded override for collapsed defaults", () => {
+  const store = createSessionsStore();
+  assert.equal(store.isTurnCollapsed("turn-1", true), true);
+  store.setTurnCollapsed("turn-1", false);
+  assert.equal(store.isTurnCollapsed("turn-1", true), false);
+});
+
 test("sessionsStore: batch coalesces notifications", () => {
   const store = createSessionsStore();
   let notifyCount = 0;

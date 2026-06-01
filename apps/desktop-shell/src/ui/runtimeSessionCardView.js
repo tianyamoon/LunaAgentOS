@@ -6,16 +6,16 @@ export function createRuntimeSessionCardView({
   resolveSessionCardStatusView,
   getCurrentSessionId,
   getFocusedSessionId,
+  projectRuntimeSessionTranscript,
+  runtimeSessionTranscriptView,
   sessionCardStats,
   isSessionLatestOnly,
   flowDetailEntriesForSession,
   areSessionFlowDetailsOpen,
   areSessionTurnsCollapsed,
-  sessionTurnVisibility,
   sessionIdentityTitle,
   renderSessionIdentityTitle,
   renderSessionActionIcon,
-  renderTurn,
   canRestoreSession,
   CARD_STATUS,
   RUNTIME_BINDING_STATE,
@@ -66,7 +66,11 @@ export function createRuntimeSessionCardView({
   function renderSessionCard(session) {
     ensureSessionStatusShape(session);
     const identitySession = normalizeWorkspaceSession(session);
-    const statusView = resolveSessionCardStatusView(session, { translate: t });
+    const transcript = projectRuntimeSessionTranscript(session, {
+      resolveStatusView: resolveSessionCardStatusView,
+      translate: t,
+    });
+    const statusView = transcript.cardStatus;
     const isActiveReceiver = getCurrentSessionId() === session.id;
     const isWaiting = statusView.status === CARD_STATUS.running || statusView.status === CARD_STATUS.waiting_confirmation;
     const isRestoring = session.runtime_binding?.state === RUNTIME_BINDING_STATE.reconnecting;
@@ -77,7 +81,6 @@ export function createRuntimeSessionCardView({
     const hasFlowDetails = flowDetailEntriesForSession(session).length > 0;
     const flowsOpen = areSessionFlowDetailsOpen(session);
     const turnsCollapsed = areSessionTurnsCollapsed(session);
-    const { visibleTurnEntries, hiddenTurnCount } = sessionTurnVisibility(session, latestOnly);
     const managementTitleSuffix = isRestoring ? t("action.restoringSuffix") : "";
     const canArchiveCard = session.record_state !== RECORD_STATE.archived && session.access_mode !== ACCESS_MODE.read_only;
     const turnToggleLabel = turnsCollapsed ? t("action.expandAllTurns") : t("action.collapseAllTurns");
@@ -127,9 +130,10 @@ export function createRuntimeSessionCardView({
           ${renderSessionStatusError(statusView)}
         </div>
         <div class="session-card-body">
-          ${session.turns.length
-            ? `${hiddenTurnCount ? `<div class="session-hidden-turns">${t("session.hiddenTurns", { count: hiddenTurnCount })}</div>` : ""}${visibleTurnEntries.map(({ turn, index }) => renderTurn(turn, index)).join("")}<div class="session-latest-anchor">${isWaiting ? t("session.latestAnchorStreaming") : t("session.latestAnchorLatest")}</div>`
-            : `<p class='flow-empty'>${t("session.noMessages")}</p>`}
+          ${runtimeSessionTranscriptView.renderTranscript(transcript, {
+            latestOnly,
+            latestAnchor: isWaiting ? t("session.latestAnchorStreaming") : t("session.latestAnchorLatest"),
+          })}
         </div>
       </article>
     `;

@@ -2601,6 +2601,43 @@ button:disabled {
   align-items: stretch;
 }
 
+.session-follow-up-queue {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px dashed rgba(217, 108, 58, 0.28);
+  border-radius: 10px;
+  background: rgba(var(--surface-raised-rgb), 0.58);
+}
+
+.session-follow-up-queue-title {
+  color: var(--accent);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.session-follow-up-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--text);
+  font-size: 0.78rem;
+}
+
+.session-follow-up-item span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-follow-up-item small {
+  flex: none;
+  color: var(--muted);
+}
+
 .composer-input-shell {
   display: flex;
   min-width: 0;

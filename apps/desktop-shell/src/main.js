@@ -25,9 +25,10 @@ import { createAgentFleetView } from "./ui/agentFleetView.js";
 import { createAgentManagementView } from "./ui/agentManagementView.js";
 import { createRuntimeSessionCardView } from "./ui/runtimeSessionCardView.js";
 import { createRuntimeSessionCardController } from "./ui/runtimeSessionCardController.js";
+import { projectRuntimeSessionTranscript } from "./ui/runtimeSessionTranscriptProjection.js";
+import { createRuntimeSessionTranscriptView } from "./ui/runtimeSessionTranscriptView.js";
 import {
   sessionCardStats,
-  sessionTurnVisibility,
   turnResponseText,
 } from "./ui/sessionCardView.js";
 import { createHistoryView } from "./ui/historyView.js";
@@ -1399,17 +1400,11 @@ function renderSessionActionIcon(name) {
   `;
 }
 
-function turnCollapsedSummary(turn) {
-  const response = turnResponseText(turn);
-  const source = [turn.task, response].filter(Boolean).join(" · ");
-  const compact = source.replace(/\s+/g, " ").trim();
-  if (!compact) return t("turn.collapsedEmpty");
-  return compact.length > 108 ? `${compact.slice(0, 108)}...` : compact;
-}
-
 function toggleTurnCollapsed(turnId) {
   if (!turnId) return;
-  sessionsStore.setTurnCollapsed(turnId, !sessionsStore.isTurnCollapsed(turnId));
+  const found = findTurnById(turnId);
+  const defaultCollapsed = Boolean(found && found.turnIndex < found.session.turns.length - 1);
+  sessionsStore.setTurnCollapsed(turnId, !sessionsStore.isTurnCollapsed(turnId, defaultCollapsed));
   renderWorkspace();
 }
 
@@ -1465,10 +1460,6 @@ function isFlowDetailOpen(key, defaultOpen) {
   return sessionsStore.getFlowDetailOpen(key, defaultOpen);
 }
 
-// 跟踪每个 turn 上一次 render 时的 streaming 状态，用于在 streaming → 终态切换时
-// 清除该 turn 的所有 detail open 状态，让"运行中默认展开、结束默认收回"自动生效。
-const prevTurnStreamingById = new Map();
-
 function clearTurnDetailOpenState(turnId) {
   if (!turnId) return;
   sessionsStore.clearFlowDetailOpenForTurn(turnId);
@@ -1482,55 +1473,21 @@ const turnTimelineView = createTurnTimelineView({
   escapeHtml,
 });
 
-function renderTurn(turn, index) {
-  const turnStatus = turn.status || statusFromRuntimeStateCode(turn.state, Boolean(turn.finalResponse));
-  const streaming = isRunningTurnStatus(turnStatus);
-  const rawResponseText = turnResponseText(turn);
-  const responseText = rawResponseText || t("turn.waiting");
-
-  // 检测 streaming → 完成的状态转折，清除该 turn 的所有 detail open 状态，
-  // 让 streaming 期默认展开、结束后默认收回的 fallback 接管。
-  const prevStreaming = prevTurnStreamingById.get(turn.id);
-  if (prevStreaming === true && !streaming) {
-    clearTurnDetailOpenState(turn.id);
-  }
-  prevTurnStreamingById.set(turn.id, streaming);
-  const collapsed = sessionsStore.isTurnCollapsed(turn.id);
-  const turnToggleLabel = collapsed ? t("action.expandTurn") : t("action.collapseTurn");
-
-  const timelineHtml = turnTimelineView.renderTurnTimeline(turn, {
-    streaming,
-    failed: turnStatus === TURN_STATUS.failed,
-    responseText,
-    rawResponseText,
-  });
-
-  return `
-    <section class="turn-block ${collapsed ? "is-collapsed" : ""}" data-turn-id="${escapeHtml(turn.id)}">
-      <div class="turn-header">
-        <div class="turn-title">
-          <button type="button" class="mini-btn ghost-btn turn-collapse-btn ${collapsed ? "is-on" : ""}" data-turn-id="${escapeHtml(turn.id)}" aria-expanded="${collapsed ? "false" : "true"}" title="${turnToggleLabel}" aria-label="${turnToggleLabel}">
-            ${renderTurnCollapseIcon(collapsed)}
-          </button>
-          <strong>${t("turn.title", { index: index + 1 })}</strong>
-        </div>
-        <div class="turn-header-actions">
-          <span class="state-pill ${turnStatusClasses[turnStatus] || "turn-status-created"}">${escapeHtml(turnStatusLabel(turnStatus))}</span>
-          <button type="button" class="mini-btn ghost-btn turn-copy-btn" data-turn-id="${escapeHtml(turn.id)}">${t("turn.copyTurn")}</button>
-          <button type="button" class="mini-btn ghost-btn turn-copy-response-btn" data-turn-id="${escapeHtml(turn.id)}" ${rawResponseText ? "" : "disabled"}>${t("turn.copyResponse")}</button>
-        </div>
-      </div>
-      ${collapsed
-        ? `<div class="turn-collapsed-summary">${escapeHtml(turnCollapsedSummary(turn))}</div>`
-        : `
-          <div class="terminal-message user-message">
-            <p>${escapeHtml(turn.task)}</p>
-          </div>
-          ${timelineHtml}
-        `}
-    </section>
-  `;
-}
+// Transcript View 承接 Turn 阅读层级，Shell 只注入状态标签与 Store 查询。
+const runtimeSessionTranscriptView = createRuntimeSessionTranscriptView({
+  turnTimelineView,
+  isTurnCollapsed: (turnId, defaultCollapsed) => sessionsStore.isTurnCollapsed(turnId, defaultCollapsed),
+  clearTurnDetailOpenState,
+  turnResponseText,
+  statusFromRuntimeStateCode,
+  isRunningTurnStatus,
+  turnStatusClasses,
+  turnStatusLabel,
+  renderTurnCollapseIcon,
+  TURN_STATUS,
+  t,
+  escapeHtml,
+});
 
 // Shell 只暴露 Session Card 渲染入口，HTML 结构由独立视图负责。
 function renderSessionCard(session) {
@@ -1585,16 +1542,16 @@ runtimeSessionCardView = createRuntimeSessionCardView({
   resolveSessionCardStatusView,
   getCurrentSessionId: () => sessionsStore.getCurrentSessionId(),
   getFocusedSessionId: () => workspaceViewStore.getFocusedSessionId(),
+  projectRuntimeSessionTranscript,
+  runtimeSessionTranscriptView,
   sessionCardStats,
   isSessionLatestOnly,
   flowDetailEntriesForSession,
   areSessionFlowDetailsOpen,
   areSessionTurnsCollapsed,
-  sessionTurnVisibility,
   sessionIdentityTitle,
   renderSessionIdentityTitle,
   renderSessionActionIcon,
-  renderTurn,
   canRestoreSession,
   CARD_STATUS,
   RUNTIME_BINDING_STATE,

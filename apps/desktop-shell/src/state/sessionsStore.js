@@ -17,7 +17,7 @@ export function createSessionsStore() {
   const stoppedSessionIds = new Set();
   const deletedSessionIds = new Set();
   const flowDetailOpenState = new Map();
-  const collapsedTurnIds = new Set();
+  const collapsedTurnState = new Map();
   const sessionLatestOnlyState = new Map();
   const listeners = new Set();
   let suppressNotify = 0;
@@ -206,16 +206,16 @@ export function createSessionsStore() {
     },
 
     // ---- UI flags: turn collapsed ----
-    isTurnCollapsed(turnId) {
-      return Boolean(turnId) && collapsedTurnIds.has(turnId);
+    isTurnCollapsed(turnId, defaultCollapsed = false) {
+      if (!turnId) return false;
+      return collapsedTurnState.has(turnId) ? collapsedTurnState.get(turnId) : Boolean(defaultCollapsed);
     },
     setTurnCollapsed(turnId, value) {
       if (!turnId) return;
       const next = Boolean(value);
-      const prev = collapsedTurnIds.has(turnId);
+      const prev = collapsedTurnState.get(turnId);
       if (next === prev) return;
-      if (next) collapsedTurnIds.add(turnId);
-      else collapsedTurnIds.delete(turnId);
+      collapsedTurnState.set(turnId, next);
       notify();
     },
 
@@ -235,7 +235,7 @@ export function createSessionsStore() {
       stoppedSessionIds.clear();
       deletedSessionIds.clear();
       flowDetailOpenState.clear();
-      collapsedTurnIds.clear();
+      collapsedTurnState.clear();
       sessionLatestOnlyState.clear();
       notify();
     },
