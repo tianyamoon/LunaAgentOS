@@ -49,6 +49,7 @@ test("sessionTurnState: createTurn owns session and binding mutation", () => {
   assert.equal(turn.id, "turn-1000-1");
   assert.equal(turn.status, TURN_STATUS.running);
   assert.equal(turn.runtimePrompt, "runtime task");
+  assert.equal(turn.finalResponse, "");
   assert.deepEqual(turn.meta.adapterMetadata, { profileName: "default" });
   assert.deepEqual(turn.meta.attachments, [{ name: "a.txt" }]);
   assert.equal(session.activeTurnId, turn.id);
@@ -149,6 +150,23 @@ test("sessionTurnState: runtime logs dedupe and stopped turn gets a final respon
   assert.equal(turn.state, 6);
   assert.equal(turn.finalResponse, "turn.stoppedResponse");
   assert.equal(session.state, 6);
+});
+
+test("sessionTurnState: runtime log prefers active turn over array tail", () => {
+  const { sessionsStore, sessionTurnState } = makeState();
+  const session = makeSession("log-order", {
+    activeTurnId: "executing",
+    turns: [
+      { id: "executing", state: 2, logs: [], finalResponse: "", status: TURN_STATUS.running },
+      { id: "tail", state: 5, logs: [], finalResponse: "old", status: TURN_STATUS.completed },
+    ],
+  });
+  sessionsStore.upsertHead(session);
+
+  sessionTurnState.appendRuntimeLog(session, "active-only");
+
+  assert.deepEqual(session.turns[0].logs, ["active-only"]);
+  assert.deepEqual(session.turns[1].logs, []);
 });
 
 test("sessionTurnState: markStopped prefers an executing turn over a newer idle turn", () => {

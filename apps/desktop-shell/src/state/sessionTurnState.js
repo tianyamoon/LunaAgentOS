@@ -51,7 +51,8 @@ export function createSessionTurnState({
       status: TURN_STATUS.running,
       thoughts: [],
       outputs: [],
-      finalResponse: translate("turn.initialResponse"),
+      // 等待提示属于视图状态，不得冒充 Runtime 已返回的正文。
+      finalResponse: "",
       logs: [translate("turn.initialLog")],
       createdAt: new Date(now()).toISOString(),
       meta: {
@@ -140,7 +141,7 @@ export function createSessionTurnState({
   }
 
   function appendRuntimeLog(session, message, state = null) {
-    const turn = session?.turns?.at(-1);
+    const turn = activeOrLatestTurn(session);
     if (!turn || !message) return null;
     if (!turn.logs.includes(message)) {
       turn.logs = [message, ...turn.logs];

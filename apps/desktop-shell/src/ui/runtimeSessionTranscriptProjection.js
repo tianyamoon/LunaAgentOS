@@ -46,7 +46,9 @@ export function projectRuntimeSessionTranscript(session, {
   translate,
 } = {}) {
   const turns = list(session?.turns);
-  const latestTurn = turns.at(-1) || null;
+  // 正文主体与状态投影共享 activeTurnId，避免恢复或异步追加时数组尾部抢占当前轮。
+  const activeTurn = turns.find((turn) => turn.id === session?.activeTurnId);
+  const latestTurn = activeTurn || turns.at(-1) || null;
   const queuedSubmissions = list(session?.queuedSubmissions).map(projectQueuedSubmission);
   const cardStatus = resolveStatusView(session, { translate });
   return {
@@ -57,9 +59,11 @@ export function projectRuntimeSessionTranscript(session, {
     },
     cardStatus,
     latestTurn,
-    previousTurns: turns.slice(0, -1).map(projectPreviousTurn),
+    previousTurns: turns
+      .map((turn, index) => ({ turn, index }))
+      .filter((item) => item.turn !== latestTurn)
+      .map((item) => projectPreviousTurn(item.turn, item.index)),
     queuedSubmissions,
     scrollMode: session?.activePromptRunId ? "following_active_run" : "stable",
   };
 }
-

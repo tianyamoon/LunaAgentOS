@@ -2,7 +2,7 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::env;
 use std::fs;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::path::PathBuf;
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::OnceLock;
@@ -529,6 +529,14 @@ fn send_prompt(
     events: &mut Vec<Value>,
     on_event: &mut Option<&mut dyn FnMut(Value)>,
 ) -> Result<(), String> {
+    // 上一轮 response 后才进入缓冲区的 update 已失去可靠归属，发送新 prompt 前必须隔离。
+    let discarded_updates = discard_buffered_idle_messages(&mut session.reader, &mut session.stdin)?;
+    if discarded_updates > 0 {
+        eprintln!(
+            "{} 隔离了 {discarded_updates} 条失去轮次归属的空闲 update。",
+            runtime.display()
+        );
+    }
     let prompt_request = json!({
         "jsonrpc": "2.0",
         "id": next_request_id(&mut session.next_id),
@@ -572,6 +580,38 @@ fn send_prompt(
 
     let _ = session.child.id();
     Ok(())
+}
+
+fn discard_buffered_idle_messages<R: Read>(
+    reader: &mut BufReader<R>,
+    stdin: &mut impl Write,
+) -> Result<usize, String> {
+    let mut discarded_updates = 0;
+    loop {
+        // 只处理已经进入 BufReader 的完整行，避免在空闲阶段阻塞等待 Adapter。
+        if !reader.buffer().contains(&b'\n') {
+            return Ok(discarded_updates);
+        }
+
+        let mut line = String::new();
+        reader
+            .read_line(&mut line)
+            .map_err(|error| error.to_string())?;
+        let Ok(message) = serde_json::from_str::<Value>(line.trim()) else {
+            continue;
+        };
+
+        if let Some(id) = message.get("id").and_then(|value| value.as_i64()) {
+            if message.get("method").is_some() {
+                respond_to_client_request(stdin, id, &message)?;
+                continue;
+            }
+        }
+
+        if message.get("method").and_then(|value| value.as_str()) == Some("session/update") {
+            discarded_updates += 1;
+        }
+    }
 }
 
 fn build_acp_command(cwd: &PathBuf, adapter: Option<&AdapterLaunchSpec>) -> Command {
@@ -726,6 +766,71 @@ fn respond_to_client_request(
             "result": result
         }),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    #[test]
+    fn late_update_after_response_is_quarantined_before_next_prompt() {
+        let runtime = AcpRuntime::Adapter {
+            id: "test".to_string(),
+            name: "Test".to_string(),
+        };
+        let input = [
+            r#"{"jsonrpc":"2.0","id":1,"result":{"stopReason":"end_turn"}}"#,
+            r#"{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"session-1","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"上一轮迟到正文"}}}}"#,
+        ]
+        .join("\n");
+        let mut reader = BufReader::new(Cursor::new(format!("{input}\n")));
+        let mut stdin = Vec::new();
+        let mut first_events = Vec::new();
+        let mut first_callback = None;
+        read_response(
+            &runtime,
+            &mut reader,
+            &mut stdin,
+            1,
+            None,
+            &mut first_events,
+            &mut first_callback,
+        )
+        .unwrap();
+
+        let discarded = discard_buffered_idle_messages(&mut reader, &mut stdin).unwrap();
+        assert_eq!(discarded, 1);
+    }
+
+    #[test]
+    fn current_prompt_update_is_still_collected_before_response() {
+        let runtime = AcpRuntime::Adapter {
+            id: "test".to_string(),
+            name: "Test".to_string(),
+        };
+        let input = [
+            r#"{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"session-1","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"当前轮正文"}}}}"#,
+            r#"{"jsonrpc":"2.0","id":2,"result":{"stopReason":"end_turn"}}"#,
+        ]
+        .join("\n");
+        let mut reader = BufReader::new(Cursor::new(format!("{input}\n")));
+        let mut stdin = Vec::new();
+        let mut second_events = Vec::new();
+        let mut second_callback = None;
+        read_response(
+            &runtime,
+            &mut reader,
+            &mut stdin,
+            2,
+            None,
+            &mut second_events,
+            &mut second_callback,
+        )
+        .unwrap();
+
+        assert_eq!(second_events.len(), 1);
+    }
 }
 
 fn select_permission(message: &Value) -> Value {

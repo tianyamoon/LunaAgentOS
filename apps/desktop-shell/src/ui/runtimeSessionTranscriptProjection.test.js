@@ -22,6 +22,19 @@ test("runtimeSessionTranscriptProjection: 最新 Turn 与历史 Turn 分层投�
   assert.equal(result.previousTurns[0].summary, "旧回答");
 });
 
+test("runtimeSessionTranscriptProjection: 运行中的 active Turn 必须成为正文主体", () => {
+  const result = project({
+    activeTurnId: "t1",
+    turns: [
+      { id: "t1", task: "正在执行的问题", finalResponse: "", status: "running" },
+      { id: "t2", task: "数组尾部的旧记录", finalResponse: "旧回答", status: "completed" },
+    ],
+  });
+
+  assert.equal(result.latestTurn.id, "t1");
+  assert.deepEqual(result.previousTurns.map((item) => item.id), ["t2"]);
+});
+
 test("runtimeSessionTranscriptProjection: follow-up 队列只暴露紧凑输入摘要", () => {
   const result = project({
     turns: [],
@@ -51,4 +64,3 @@ test("runtimeSessionTranscriptProjection: Card 状态沿用统一状态模块", 
   assert.deepEqual(result.header.cardStatus, { status: "running", label: "运行中" });
   assert.equal(result.cardStatus, result.header.cardStatus);
 });
-
