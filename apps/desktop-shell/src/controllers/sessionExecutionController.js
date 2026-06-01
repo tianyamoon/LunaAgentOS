@@ -49,11 +49,11 @@ export function createSessionExecutionController({
     sessionTurnState.appendRuntimeLog(session, message);
   }
 
-  // 更新批量事件并刷新工作区与列表。
+  // 批量事件只刷新对应卡片；完成态也不销毁稳定的滚动容器。
   function updateTurnFromEvents(sessionId, turnId, events) {
     const turn = sessionTurnState.updateTurnFromEvents(sessionId, turnId, events);
     if (!turn) return null;
-    renderWorkspace();
+    scheduleSessionCardRender(sessionId);
     renderHistory();
     return turn;
   }
@@ -76,13 +76,13 @@ export function createSessionExecutionController({
     return result;
   }
 
-  // 把 prompt 错误写入 Turn，并同步用户可见状态。
+  // 把 prompt 错误写入 Turn，并局部刷新卡片，避免错误落盘时滚动位置跳动。
   function appendErrorToTurn(sessionId, turnId, message) {
     const session = getSession(sessionId);
     const turn = session?.turns?.find((item) => item.id === turnId);
     if (!session || !turn) return null;
     sessionTurnState.markPromptError(session, turn, message);
-    renderWorkspace();
+    scheduleSessionCardRender(sessionId);
     renderHistory();
     setAppNotice(t("runtime.failed", { agent: session.agentName, message }), "error");
     return turn;

@@ -45,8 +45,8 @@ function makeHarness({ prompt, capabilities = {}, fallbackSessions = {}, tombsto
     rollbackFirstTurnPromptFailure: (_session, _turn, message) => calls.push(`rollback:${message}`),
     refreshRuntimeTargets: async () => calls.push("refresh"),
     renderProviders: () => {},
-    renderWorkspace: () => {},
-    renderHistory: () => {},
+    renderWorkspace: () => calls.push("workspace"),
+    renderHistory: () => calls.push("history"),
     scheduleSessionCardRender: () => calls.push("schedule"),
     updateActionLabels: () => {},
     formatBackendError: (error) => error.message,
@@ -74,6 +74,22 @@ test("sessionExecutionController: stream event schedules card render", () => {
   const { controller, calls } = makeHarness();
   controller.appendStreamEvent("s1", { type: "thought", payload: { content: "x" } });
   assert.equal(calls.includes("schedule"), true);
+});
+
+test("sessionExecutionController: final batch refresh keeps workspace container stable", () => {
+  const { controller, calls } = makeHarness();
+  controller.updateTurnFromEvents("s1", "t1", [{ type: "response", state: 5, payload: { content: "done" } }]);
+  assert.equal(calls.includes("schedule"), true);
+  assert.equal(calls.includes("history"), true);
+  assert.equal(calls.includes("workspace"), false);
+});
+
+test("sessionExecutionController: prompt error refresh keeps workspace container stable", () => {
+  const { controller, calls } = makeHarness();
+  controller.appendErrorToTurn("s1", "t1", "boom");
+  assert.equal(calls.includes("schedule"), true);
+  assert.equal(calls.includes("history"), true);
+  assert.equal(calls.includes("workspace"), false);
 });
 
 test("sessionExecutionController: manifest capability controls target refresh", async () => {
