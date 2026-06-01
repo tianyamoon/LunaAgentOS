@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createTurnTimelineView, formatTimelineDuration } from "./turnTimelineView.js";
+import {
+  createTurnTimelineView,
+  debugPayloadForTurn,
+  formatTimelineDuration,
+} from "./turnTimelineView.js";
 
 test("formatTimelineDuration: Worked for 使用紧凑时长", () => {
   assert.equal(formatTimelineDuration(642000), "10m 42s");
@@ -53,6 +57,35 @@ test("turnTimelineView: 旧历史过程会明确标记为近似摘要", () => {
   assert.match(html, /历史过程摘要/);
 });
 
+test("turnTimelineView: Permission、File Changes 与 Error 保持原地并使用明确样式", () => {
+  const html = view().renderTurnTimeline({
+    id: "turn-4",
+    timelineItems: [
+      item("permission", "允许修改文件？"),
+      item("file_change", "src/main.js +2 -1"),
+      { ...item("error", "测试失败"), status: "failed" },
+    ],
+  }, { streaming: true });
+
+  assert.ok(html.indexOf("允许修改文件？") < html.indexOf("src/main.js +2 -1"));
+  assert.ok(html.indexOf("src/main.js +2 -1") < html.indexOf("测试失败"));
+  assert.match(html, /turn-timeline-item-permission/);
+  assert.match(html, /turn-timeline-item-file-change/);
+  assert.match(html, /turn-timeline-item-error/);
+});
+
+test("debugPayloadForTurn: Debug 层收纳近原始事件与完整日志", () => {
+  const payload = debugPayloadForTurn({
+    logs: ["完整日志"],
+  }, [{
+    ...item("tool", "读取文件"),
+    metadata: { rawEvent: { type: "tool", payload: { title: "读取文件" } } },
+  }]);
+
+  assert.match(payload, /"rawEvents"/);
+  assert.match(payload, /完整日志/);
+});
+
 function view() {
   return createTurnTimelineView({
     renderAssistantResponse: (content) => `<div class="rendered">${content}</div>`,
@@ -71,6 +104,9 @@ function translate(key, params = {}) {
     "turn.waiting": "等待响应...",
     "turn.timeline.assistant": "Assistant",
     "turn.timeline.emptyEvent": "事件",
+    "turn.timeline.permissionWaiting": "等待权限确认",
+    "turn.timeline.error": "执行错误",
+    "turn.timeline.debug": "Debug",
     "turn.timeline.exploreTools": `读取 ${params.count} 个文件`,
     "turn.timeline.legacyApproximation": "历史过程摘要 · 顺序为近似重建",
     "turn.timeline.toolCount": ` · ${params.count} tools`,

@@ -21,11 +21,15 @@ export function createTurnTimelineView({
   } = {}) {
     const items = projectLiveTimeline(turn);
     if (streaming) {
-      return renderLiveTimeline(items, { waitingText: responseText });
+      return `
+        ${renderLiveTimeline(items, { waitingText: responseText })}
+        ${renderDebugLayer(turn, items)}
+      `;
     }
     return `
       ${renderFinalResponse(responseText, { waiting: !rawResponseText })}
       ${renderCompletedTrace(turn, items, { defaultOpen: failed })}
+      ${renderDebugLayer(turn, items)}
     `;
   }
 
@@ -75,6 +79,9 @@ export function createTurnTimelineView({
     if (item.type === "tool_group") return renderToolGroup(item, { live });
     if (item.type === "assistant") return renderAssistantTimelineItem(item, { live });
     if (item.type === "thinking") return renderThinkingTimelineItem(item);
+    if (item.type === "permission") return renderPermissionTimelineItem(item);
+    if (item.type === "file_change") return renderFileChangeTimelineItem(item);
+    if (item.type === "error" || item.status === "failed") return renderErrorTimelineItem(item);
     return renderCompactTimelineItem(item, { live });
   }
 
@@ -111,6 +118,35 @@ export function createTurnTimelineView({
     `;
   }
 
+  // Permission 必须保留在发生位置，避免用户在独立区域寻找当前阻塞原因。
+  function renderPermissionTimelineItem(item) {
+    return `
+      <section class="turn-timeline-item turn-timeline-item-permission ${statusClass(item)}">
+        ${renderTimelineHeading(item, { title: t("turn.timeline.permissionWaiting") })}
+        <div class="turn-timeline-content">${escapeHtml(item.content || t("turn.timeline.emptyEvent"))}</div>
+      </section>
+    `;
+  }
+
+  // 文件变更紧跟相关工具事件，以紧凑节点展示；更完整内容仍可进入 Debug 排查。
+  function renderFileChangeTimelineItem(item) {
+    return `
+      <section class="turn-timeline-item turn-timeline-item-file-change ${statusClass(item)}">
+        ${renderTimelineHeading(item)}
+      </section>
+    `;
+  }
+
+  // 错误节点不折叠，保证运行故障不会被普通日志淹没。
+  function renderErrorTimelineItem(item) {
+    return `
+      <section class="turn-timeline-item turn-timeline-item-error ${statusClass(item)}">
+        ${renderTimelineHeading(item, { title: t("turn.timeline.error") })}
+        <div class="turn-timeline-content">${escapeHtml(item.content || t("turn.timeline.emptyEvent"))}</div>
+      </section>
+    `;
+  }
+
   function renderToolGroup(item, { live }) {
     const detailKey = `${item.id}:timeline-group`;
     const open = isOpenForKey(detailKey, live && item.status === "running");
@@ -137,6 +173,20 @@ export function createTurnTimelineView({
     `;
   }
 
+  // Debug 是更深一层：保留完整日志和近原始事件，但不在默认阅读路径中抢占视觉空间。
+  function renderDebugLayer(turn, items) {
+    const debugPayload = debugPayloadForTurn(turn, items);
+    if (!debugPayload) return "";
+    const detailKey = `${turn.id}:timeline-debug`;
+    const open = isOpenForKey(detailKey, false);
+    return `
+      <details class="terminal-detail turn-timeline-debug" data-detail-key="${escapeHtml(detailKey)}"${open ? " open" : ""}>
+        <summary>${escapeHtml(t("turn.timeline.debug"))}</summary>
+        <pre class="terminal-pre turn-timeline-debug-content">${escapeHtml(debugPayload)}</pre>
+      </details>
+    `;
+  }
+
   function renderFinalResponse(responseText, { waiting = false, phase = "final" } = {}) {
     return `
       <div class="terminal-message assistant-message ${waiting ? "is-waiting" : ""}">
@@ -157,6 +207,24 @@ export function createTurnTimelineView({
   return {
     renderTurnTimeline,
   };
+}
+
+// Debug 数据序列化容忍 Adapter 的异常 payload；失败时仍返回可读提示，不让视图崩溃。
+export function debugPayloadForTurn(turn, items) {
+  const rawEvents = flattenedTimelineItems(items)
+    .map((item) => item.metadata?.rawEvent)
+    .filter(Boolean);
+  const logs = Array.isArray(turn?.logs) ? turn.logs : [];
+  if (!rawEvents.length && !logs.length) return "";
+  try {
+    return JSON.stringify({ rawEvents, logs }, null, 2);
+  } catch (error) {
+    return String(error?.message || error);
+  }
+}
+
+function flattenedTimelineItems(items) {
+  return (Array.isArray(items) ? items : []).flatMap((item) => item.type === "tool_group" ? item.items : [item]);
 }
 
 // Worked for 摘要使用稳定的短格式，避免摘要行在窄屏被时间文本撑开。
