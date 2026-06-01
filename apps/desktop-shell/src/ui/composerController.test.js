@@ -44,6 +44,7 @@ function makeHarness() {
   documentRoot.createElement = makeElement;
   const storageValues = new Map();
   const sent = [];
+  const notices = [];
   class FileReaderStub {
     addEventListener(type, listener) {
       this[type] = listener;
@@ -75,8 +76,10 @@ function makeHarness() {
     startSessionFromPrompt: (forceNew) => sent.push(forceNew),
     toggleNewSession: () => {},
     exitFullscreenSessions: () => false,
-    setAppNotice: () => {},
-    t: (key) => key,
+    setAppNotice: (message, tone) => notices.push({ message, tone }),
+    t: (key, values = {}) => key === "composer.attachment.count"
+      ? `${values.count}/${values.max}`
+      : key,
     escapeHtml: (value) => String(value),
     storage: {
       getItem: (key) => storageValues.get(key) || null,
@@ -89,6 +92,8 @@ function makeHarness() {
   });
   return {
     controller,
+    attachBtn,
+    notices,
     promptBox,
     sendModeBtn,
     sent,
@@ -116,4 +121,37 @@ test("composerController: Enter 与 Ctrl+Enter 发送模式可切换", () => {
   assert.deepEqual(sent, [false]);
   promptBox.listeners.keydown({ key: "Enter", isComposing: false, ctrlKey: true, shiftKey: false, altKey: false, preventDefault() {} });
   assert.deepEqual(sent, [false, false]);
+});
+
+test("composerController: 多次追加附件并独立删除任意一个", async () => {
+  const { controller, attachBtn } = makeHarness();
+  await controller.addFiles([
+    { name: "a.md", type: "text/markdown", size: 1, content: "a" },
+    { name: "b.md", type: "text/markdown", size: 1, content: "b" },
+  ]);
+  await controller.addFiles([
+    { name: "c.md", type: "text/markdown", size: 1, content: "c" },
+  ]);
+
+  assert.deepEqual(controller.getAttachments().map((item) => item.name), ["a.md", "b.md", "c.md"]);
+  assert.match(attachBtn.innerHTML, /3\/6/);
+
+  controller.removeAttachment(controller.getAttachments()[1].id);
+  assert.deepEqual(controller.getAttachments().map((item) => item.name), ["a.md", "c.md"]);
+  assert.match(attachBtn.innerHTML, /2\/6/);
+});
+
+test("composerController: 超出六个附件时保留上限并显示提示", async () => {
+  const { controller, notices } = makeHarness();
+  const files = Array.from({ length: 7 }, (_, index) => ({
+    name: `${index}.md`,
+    type: "text/markdown",
+    size: 1,
+    content: String(index),
+  }));
+
+  await controller.addFiles(files);
+
+  assert.equal(controller.getAttachments().length, 6);
+  assert.equal(notices.at(-1).tone, "error");
 });

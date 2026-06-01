@@ -114,9 +114,38 @@ export function createComposerController({
     return t("composer.attachment.metadataOnly");
   }
 
+  // 回形针入口显示当前数量，让多附件能力在输入框内部保持可见。
+  function renderAttachButton() {
+    if (!attachBtn) return;
+    const countLabel = t("composer.attachment.count", {
+      count: attachments.length,
+      max: DEFAULT_ATTACHMENT_LIMITS.maxFiles,
+    });
+    const ariaLabel = t("composer.attachAria", {
+      count: attachments.length,
+      max: DEFAULT_ATTACHMENT_LIMITS.maxFiles,
+    });
+    attachBtn.title = `${t("composer.attachTitle")} · ${countLabel}`;
+    attachBtn.setAttribute("aria-label", ariaLabel);
+    attachBtn.innerHTML = `
+      <svg class="composer-attach-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+      </svg>
+      <span class="composer-attach-count">${escapeHtml(countLabel)}</span>
+    `;
+  }
+
+  // 单个删除是显式命令，便于托盘按钮和测试共享同一路径。
+  function removeAttachment(attachmentId) {
+    attachments = attachments.filter((item) => item.id !== attachmentId);
+    renderAttachments();
+    promptBox.focus();
+  }
+
   // 渲染附件托盘，并为每个附件绑定删除动作。
   function renderAttachments() {
     if (!composerAttachmentTray) return;
+    renderAttachButton();
     composerAttachmentTray.hidden = attachments.length === 0;
     if (!attachments.length) {
       composerAttachmentTray.innerHTML = "";
@@ -132,15 +161,13 @@ export function createComposerController({
           <span class="composer-attachment-name">${escapeHtml(attachment.name)}</span>
           <span class="composer-attachment-meta">${escapeHtml(size)}</span>
           <span class="composer-attachment-state">${escapeHtml(attachmentStatusLabel(attachment))}</span>
-          <button type="button" class="composer-attachment-remove" data-attachment-id="${escapeHtml(attachment.id)}" title="${escapeHtml(removeLabel)}" aria-label="${escapeHtml(removeLabel)}">${escapeHtml(t("composer.attachment.removeShort"))}</button>
+          <button type="button" class="composer-attachment-remove" data-attachment-id="${escapeHtml(attachment.id)}" title="${escapeHtml(removeLabel)}" aria-label="${escapeHtml(removeLabel)}">&times;</button>
         </span>
       `;
     }).join("");
     composerAttachmentTray.querySelectorAll(".composer-attachment-remove").forEach((button) => {
       button.addEventListener("click", () => {
-        attachments = attachments.filter((item) => item.id !== button.dataset.attachmentId);
-        renderAttachments();
-        promptBox.focus();
+        removeAttachment(button.dataset.attachmentId);
       });
     });
   }
@@ -429,8 +456,7 @@ export function createComposerController({
     const composingNewSession = isComposingNewSession();
     sendBtn.textContent = t("composer.send");
     if (attachBtn) {
-      attachBtn.textContent = t("composer.attach");
-      attachBtn.title = t("composer.attachTitle");
+      renderAttachButton();
     }
     newSessionToggle.classList.toggle("is-active", composingNewSession);
     newSessionToggle.setAttribute("aria-pressed", String(composingNewSession));
@@ -506,6 +532,7 @@ export function createComposerController({
     bindEvents,
     clearAttachments,
     getAttachments: () => attachments,
+    removeAttachment,
     refreshCommands,
     updateActionLabels,
     updatePromptPlaceholder,
