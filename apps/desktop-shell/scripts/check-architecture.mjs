@@ -26,7 +26,7 @@ function walk(relativeDir) {
 // main.js 只允许继续收缩；阈值按当前阶段设置，后续拆分时应继续降低。
 const mainSource = read("src/main.js");
 const mainLines = mainSource.split(/\r?\n/).length;
-if (mainLines > 2400) fail(`src/main.js 行数回升到 ${mainLines}，超过阶段阈值 2400`);
+if (mainLines > 2200) fail(`src/main.js 行数回升到 ${mainLines}，超过阶段阈值 2200`);
 
 // Shell 编排层不得重新认识具体 Adapter 名称。
 if (/\b(?:hermes|claude|trae)\b/i.test(mainSource)) {
@@ -34,11 +34,23 @@ if (/\b(?:hermes|claude|trae)\b/i.test(mainSource)) {
 }
 
 // Turn 过程必须保持有序 Timeline；旧的按事件类型分区视图不得复活。
-for (const path of ["src/ui/turnEvents.js", "src/ui/turnEventsView.js"]) {
-  if (existsSync(resolve(root, path))) fail(`${path} 是废弃的固定过程分区视图，应使用 Turn Timeline`);
+for (const path of [
+  "src/ui/turnEvents.js",
+  "src/ui/turnEventsView.js",
+  "src/ui/runtimeSessionTranscriptProjection.js",
+  "src/ui/runtimeSessionTranscriptView.js",
+  "src/ui/turnTimelineView.js",
+]) {
+  if (existsSync(resolve(root, path))) fail(`${path} 是废弃的固定过程分区视图，应使用 Runtime MessageList`);
 }
 if (/turnEventsFromTurn|renderTurnEventsHtml|renderTurnEventItemHtml/.test(mainSource)) {
-  fail("src/main.js 重新引入固定过程分区渲染，应使用 turnTimelineView");
+  fail("src/main.js 重新引入固定过程分区渲染，应使用 Runtime MessageList");
+}
+
+// 用户侧只显示连续 MessageList；Turn 继续作为内部语义，不得恢复可见轮次套娃。
+const stylesSource = read("src/styles.css");
+if (/\.turn-block\b|\.session-latest-anchor\b/.test(stylesSource)) {
+  fail("src/styles.css 重新引入旧版可见轮次容器，应使用 Runtime MessageList");
 }
 
 // History 磁盘调用必须集中经过前端 Repository。

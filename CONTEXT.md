@@ -80,6 +80,10 @@ _避免使用_：原始日志行
 按照到达顺序保存 Runtime Event 的 Turn 内过程投影。执行中保留 Thinking、Tool、Permission、File Change、Runtime Event 和 Assistant 片段的因果顺序；完成后可收敛为 Worked for 摘要。
 _避免使用_：按事件类型拆开的固定面板、精确回放旧历史
 
+**Runtime MessageList（运行时连续消息流）**：
+Runtime Session Card 内部面向阅读的连续消息投影。它把一个或多个 Turn Timeline 转换为稳定消息行；Turn 仍是内部执行语义，但不是默认视觉容器。
+_避免使用_：第 N 轮套娃卡片、按消息类型拆开的固定区域
+
 **Runtime Binding（运行时绑定）**：
 Runtime Session 与当前前端进程、协议连接之间的附着状态。
 _避免使用_：Session Lifecycle
@@ -127,6 +131,7 @@ _避免使用_：自动多 Agent orchestration
 - 一个 **Turn** 产生零个或多个 **Runtime Event**，并可持久化为 **History Entry**。
 - 一个 **Prompt Run** 为一个 **Turn** 提供流事件写入租约；迟到或身份不匹配事件不得进入用户正文。
 - 一个 **Turn Timeline** 按到达顺序投影一个 **Turn** 的 **Runtime Event**；旧历史只能近似重建。
+- 一个 **Runtime MessageList** 把一个 **Runtime Session** 的内部 Turn Timeline 投影为连续、稳定的阅读流。
 - 一张 **Runtime Session Card** 渲染且只渲染一个 **Runtime Session**。
 - **Workspace Focus** 最多选择一张 **Runtime Session Card**，不改变该 session 的领域状态。
 - 未来一个 **Task** 可以创建或协调多个 **Runtime Session**。
@@ -164,9 +169,10 @@ _避免使用_：自动多 Agent orchestration
 - `workspaceViewStore` 独立保存 **Workspace Focus**。切换工作区 session 时，不再把 `fullscreen` 写入 Runtime Session。
 - `composerController` 管理输入框、附件、斜杠菜单和键盘发送模式。
 - `agentFleetView` 与 `agentManagementView` 只消费归一化 Provider、Agent Entry 和 Availability 数据，不包含具体 Adapter 的运行规则。
-- `runtimeSessionCardView` 与 `runtimeSessionCardController` 管理卡片渲染和交互，避免把大段工作区实现重新塞回 `main.js`。
-- `runtimeSessionTranscriptProjection` 与 `runtimeSessionTranscriptView` 统一管理 Card 的 latest Turn、历史 Turn 摘要和 follow-up 队列阅读层级。
-- `turnTimeline`、`turnTimelineProjection` 与 `turnTimelineView` 分别负责有序事件模型、展示投影和 HTML 渲染。执行完成后，过程收敛为可展开的 Worked for 摘要，最终 Assistant Markdown 是默认主体。
+- `runtimeSessionCardView` 与 `runtimeSessionCardController` 管理卡片外层和交互，避免把大段工作区实现重新塞回 `main.js`。
+- `turnTimeline` 与 `turnTimelineProjection` 保存并整理 Turn 内部有序事件事实。
+- `runtimeSessionMessageListProjection` 与 `runtimeSessionMessageListView` 把内部 Turn Timeline 转换为连续消息行。执行完成后，过程收敛为可展开的 Worked for 摘要，最终 Assistant Markdown 是默认主体。
+- `stickToBottom` 管理桌面 WebView 中的滚动跟随意图。用户介入滚动后暂停自动跟随，新 Prompt 到来时显式定位到对应 user row。
 - `scripts/check-architecture.mjs` 是渐进式架构护栏。它阻止 Shell 重新引入具体 Adapter 特判、History invoke 绕过 Repository、View 直接修改 Store 对象，以及 Rust 专用 ACP 入口复活。
 
 ## 兼容策略

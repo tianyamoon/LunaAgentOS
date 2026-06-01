@@ -13,3 +13,4 @@
 - [0005：架构静态检查保护模块边界](./0005-architecture-guard-enforces-module-boundaries.md)
 - [0006：Turn 过程使用有序 Timeline](./0006-turn-process-uses-ordered-timeline.md)
 - [0007：Prompt Run 是 Turn 的流事件写入租约](./0007-prompt-run-is-turn-write-lease.md)
+- [0008：Runtime Session Card 使用连续 MessageList](./0008-runtime-session-card-uses-continuous-message-list.md)
