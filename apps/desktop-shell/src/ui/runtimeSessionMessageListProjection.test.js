@@ -1,0 +1,138 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import { projectRuntimeSessionMessageList } from "./runtimeSessionMessageListProjection.js";
+
+test("runtimeSessionMessageListProjection: 运行中按真实 Timeline 顺序输出连续消息", () => {
+  const result = projectRuntimeSessionMessageList({
+    activeTurnId: "t1",
+    activePromptRunId: "run-1",
+    turns: [{
+      id: "t1",
+      task: "检查项目",
+      status: "running",
+      promptRunId: "run-1",
+      timelineItems: [
+        item("thinking", "先看结构"),
+        item("tool", "Read", { id: "tool-1", metadata: { category: "explore" } }),
+        item("assistant", "找到入口"),
+      ],
+    }],
+  });
+
+  assert.deepEqual(result.rows.map((row) => row.kind), ["user", "thinking", "tool", "assistant"]);
+  assert.equal(result.scrollTargetRowId, "t1:user");
+  assert.equal(result.rows.every((row) => row.turnId === "t1"), true);
+  assert.equal(result.rows[1].promptRunId, "run-1");
+});
+
+test("runtimeSessionMessageListProjection: 只聚合相邻 explore 工具且不跨越 Thinking", () => {
+  const result = projectRuntimeSessionMessageList({
+    turns: [{
+      id: "t1",
+      task: "读文件",
+      status: "running",
+      timelineItems: [
+        item("tool", "Read A", { id: "read-a", metadata: { category: "explore" } }),
+        item("tool", "Read B", { id: "read-b", metadata: { category: "explore" } }),
+        item("thinking", "判断"),
+        item("tool", "Read C", { id: "read-c", metadata: { category: "explore" } }),
+      ],
+    }],
+  });
+
+  assert.deepEqual(result.rows.map((row) => row.kind), ["user", "tool_group", "thinking", "tool"]);
+  assert.deepEqual(result.rows[1].metadata.items.map((row) => row.id), ["t1:timeline:read-a", "t1:timeline:read-b"]);
+});
+
+test("runtimeSessionMessageListProjection: 完成态最终回答为主体并生成 Worked 行", () => {
+  const result = projectRuntimeSessionMessageList({
+    turns: [{
+      id: "t1",
+      task: "总结",
+      status: "completed",
+      finalResponse: "完成总结",
+      timelineStartedAt: "2026-06-01T00:00:00.000Z",
+      timelineCompletedAt: "2026-06-01T00:00:05.000Z",
+      timelineItems: [
+        item("thinking", "分析"),
+        item("tool", "Read", { id: "read-1" }),
+        item("assistant", "完成总结"),
+      ],
+    }],
+  });
+
+  assert.deepEqual(result.rows.map((row) => row.kind), ["user", "assistant", "worked_for"]);
+  assert.equal(result.rows[1].content, "完成总结");
+  assert.equal(result.rows[2].metadata.summary.durationMs, 5000);
+  assert.deepEqual(result.rows[2].metadata.rows.map((row) => row.kind), ["thinking", "tool"]);
+});
+
+test("runtimeSessionMessageListProjection: Debug 行收纳 rawEvents 与日志", () => {
+  const result = projectRuntimeSessionMessageList({
+    turns: [{
+      id: "t1",
+      task: "失败任务",
+      status: "failed",
+      logs: ["工具失败"],
+      timelineItems: [
+        item("tool", "Terminal", {
+          id: "tool-1",
+          status: "failed",
+          metadata: { rawEvent: { type: "tool", payload: { id: "tool-1" } } },
+        }),
+      ],
+    }],
+  });
+
+  const debugRow = result.rows.find((row) => row.kind === "debug");
+  assert.equal(debugRow.metadata.rawEvents.length, 1);
+  assert.deepEqual(debugRow.metadata.logs, ["工具失败"]);
+});
+
+test("runtimeSessionMessageListProjection: 旧历史与队列使用独立消息行", () => {
+  const result = projectRuntimeSessionMessageList({
+    turns: [{
+      id: "t1",
+      task: "旧问题",
+      status: "completed",
+      finalResponse: "旧回答",
+      meta: { historyIntegrity: "legacy_unverified" },
+    }],
+    queuedSubmissions: [{
+      id: "q1",
+      task: "后续输入",
+      attachments: [{ name: "a.md" }],
+      createdAt: "2026-06-01T00:00:00.000Z",
+    }],
+  });
+
+  assert.deepEqual(result.rows.map((row) => row.kind), ["legacy_warning", "user", "assistant", "queue"]);
+  assert.equal(result.rows.at(-1).metadata.attachmentCount, 1);
+});
+
+test("runtimeSessionMessageListProjection: usage 不进入默认阅读流", () => {
+  const result = projectRuntimeSessionMessageList({
+    turns: [{
+      id: "t1",
+      task: "检查用量",
+      status: "running",
+      timelineItems: [
+        item("usage", ""),
+        item("assistant", "继续"),
+      ],
+    }],
+  });
+
+  assert.deepEqual(result.rows.map((row) => row.kind), ["user", "assistant"]);
+});
+
+function item(type, content, overrides = {}) {
+  return {
+    id: overrides.id || `${type}-${content}`,
+    type,
+    status: overrides.status || "completed",
+    content,
+    metadata: overrides.metadata || {},
+  };
+}
