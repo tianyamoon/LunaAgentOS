@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { extname, join, relative, resolve } from "node:path";
 
 // 架构检查只约束稳定边界，不尝试替代领域测试。
@@ -31,6 +31,14 @@ if (mainLines > 2400) fail(`src/main.js 行数回升到 ${mainLines}，超过阶
 // Shell 编排层不得重新认识具体 Adapter 名称。
 if (/\b(?:hermes|claude|trae)\b/i.test(mainSource)) {
   fail("src/main.js 出现具体 Adapter 名称，应改为 manifest、Provider 元数据或 Adapter seam");
+}
+
+// Turn 过程必须保持有序 Timeline；旧的按事件类型分区视图不得复活。
+for (const path of ["src/ui/turnEvents.js", "src/ui/turnEventsView.js"]) {
+  if (existsSync(resolve(root, path))) fail(`${path} 是废弃的固定过程分区视图，应使用 Turn Timeline`);
+}
+if (/turnEventsFromTurn|renderTurnEventsHtml|renderTurnEventItemHtml/.test(mainSource)) {
+  fail("src/main.js 重新引入固定过程分区渲染，应使用 turnTimelineView");
 }
 
 // History 磁盘调用必须集中经过前端 Repository。

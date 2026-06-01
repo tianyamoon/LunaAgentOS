@@ -2130,47 +2130,7 @@ button:disabled {
   white-space: normal;
 }
 
-/* === Turn event stream =========================================== */
-.turn-events {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 4px 0 6px 4px;
-  margin: 4px 0 6px;
-  list-style: none;
-  border-left: 1px solid rgba(99, 82, 63, 0.12);
-}
-
-.turn-event {
-  position: relative;
-  padding: 0 0 0 10px;
-}
-
-.turn-event-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 6px;
-  border-radius: 8px;
-  font-size: 0.78rem;
-  line-height: 1.4;
-  color: var(--muted);
-  cursor: default;
-  list-style: none;
-}
-
-.turn-event-details > summary.turn-event-row {
-  cursor: pointer;
-}
-
-.turn-event-details > summary.turn-event-row::-webkit-details-marker {
-  display: none;
-}
-
-.turn-event-row:hover {
-  background: rgba(99, 82, 63, 0.05);
-}
-
+/* Timeline 节点共用小圆点与展开箭头。 */
 .turn-event-dot {
   flex-shrink: 0;
   width: 8px;
@@ -2180,94 +2140,9 @@ button:disabled {
   box-shadow: 0 0 0 2px rgba(var(--surface-raised-rgb), 1);
 }
 
-.turn-event-status-running .turn-event-dot {
-  background: #d97706;
-  animation: turn-event-pulse 1.4s ease-in-out infinite;
-}
-
-.turn-event-status-done .turn-event-dot {
-  background: #059669;
-}
-
-.turn-event-status-error .turn-event-dot {
-  background: #dc2626;
-}
-
-.turn-event-status-info .turn-event-dot {
-  background: rgba(99, 82, 63, 0.4);
-}
-
-.turn-event-kind-thinking .turn-event-dot {
-  background: #6366f1;
-}
-
-.turn-event-kind-thinking.turn-event-status-running .turn-event-dot {
-  background: #6366f1;
-  animation: turn-event-pulse 1.4s ease-in-out infinite;
-}
-
 @keyframes turn-event-pulse {
   0%, 100% { box-shadow: 0 0 0 2px rgba(var(--surface-raised-rgb), 1); }
   50% { box-shadow: 0 0 0 4px rgba(217, 119, 6, 0.18); }
-}
-
-.turn-event-kind {
-  flex-shrink: 0;
-  padding: 1px 7px;
-  border-radius: 999px;
-  font-size: 0.66rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--label-warm);
-  background: rgba(99, 82, 63, 0.08);
-  border: 1px solid rgba(99, 82, 63, 0.12);
-}
-
-.turn-event-kind-thinking .turn-event-kind {
-  color: #4338ca;
-  background: rgba(99, 102, 241, 0.1);
-  border-color: rgba(99, 102, 241, 0.18);
-}
-
-.turn-event-kind-tool .turn-event-kind {
-  color: #1d4ed8;
-  background: rgba(59, 130, 246, 0.08);
-  border-color: rgba(59, 130, 246, 0.18);
-}
-
-.turn-event-kind-plan .turn-event-kind {
-  color: #047857;
-  background: rgba(16, 185, 129, 0.08);
-  border-color: rgba(16, 185, 129, 0.18);
-}
-
-.turn-event-kind-usage .turn-event-kind {
-  color: #6b21a8;
-  background: rgba(147, 51, 234, 0.08);
-  border-color: rgba(147, 51, 234, 0.18);
-}
-
-.turn-event-kind-error .turn-event-kind {
-  color: #b91c1c;
-  background: rgba(220, 38, 38, 0.08);
-  border-color: rgba(220, 38, 38, 0.18);
-}
-
-.turn-event-title {
-  flex: 1 1 auto;
-  min-width: 0;
-  font-size: 0.78rem;
-  color: var(--text);
-  font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.turn-event-details[open] > summary.turn-event-row .turn-event-title {
-  white-space: normal;
-  overflow: visible;
 }
 
 .turn-event-arrow {
@@ -2278,63 +2153,6 @@ button:disabled {
   border-right: 4px solid transparent;
   border-top: 5px solid rgba(99, 82, 63, 0.5);
   transition: transform 120ms ease;
-}
-
-.turn-event-details[open] .turn-event-arrow {
-  transform: rotate(180deg);
-}
-
-.turn-event-detail {
-  margin: 4px 0 6px 26px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: rgba(var(--surface-raised-rgb), 0.7);
-  border: 1px solid rgba(99, 82, 63, 0.08);
-  font-size: 0.76rem;
-  line-height: 1.5;
-  color: var(--text);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  max-height: 320px;
-  overflow: auto;
-}
-
-.turn-events--thinking {
-  border-left-color: rgba(99, 102, 241, 0.25);
-}
-
-.turn-events-shell {
-  padding: 6px 10px;
-}
-
-.turn-events-shell-summary {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  list-style: none;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--label-warm);
-  padding: 2px 0;
-}
-
-.turn-events-shell-summary::-webkit-details-marker {
-  display: none;
-}
-
-.turn-events-shell-label {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.turn-events-shell[open] > .turn-events-shell-summary .turn-event-arrow {
-  transform: rotate(180deg);
-}
-
-.turn-events-shell > .turn-events {
-  margin-top: 6px;
-  margin-left: 4px;
 }
 
 /* === Ordered Turn timeline ====================================== */

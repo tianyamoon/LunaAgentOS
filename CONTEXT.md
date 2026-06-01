@@ -68,6 +68,10 @@ _避免使用_：Runtime Session、Task
 Turn 执行期间发出的归一化观测，例如 thought、tool、plan、usage、state、response 或 error。
 _避免使用_：原始日志行
 
+**Turn Timeline（轮次时间线）**：
+按照到达顺序保存 Runtime Event 的 Turn 内过程投影。执行中保留 Thinking、Tool、Permission、File Change、Runtime Event 和 Assistant 片段的因果顺序；完成后可收敛为 Worked for 摘要。
+_避免使用_：按事件类型拆开的固定面板、精确回放旧历史
+
 **Runtime Binding（运行时绑定）**：
 Runtime Session 与当前前端进程、协议连接之间的附着状态。
 _避免使用_：Session Lifecycle
@@ -112,6 +116,7 @@ _避免使用_：自动多 Agent orchestration
 - **Current Send Target** 指向且只指向一个可选择的 **Agent Entry**。
 - 一个 **Runtime Session** 属于且只属于一个 **Agent Entry**，并包含零个或多个 **Turn**。
 - 一个 **Turn** 产生零个或多个 **Runtime Event**，并可持久化为 **History Entry**。
+- 一个 **Turn Timeline** 按到达顺序投影一个 **Turn** 的 **Runtime Event**；旧历史只能近似重建。
 - 一张 **Runtime Session Card** 渲染且只渲染一个 **Runtime Session**。
 - **Workspace Focus** 最多选择一张 **Runtime Session Card**，不改变该 session 的领域状态。
 - 未来一个 **Task** 可以创建或协调多个 **Runtime Session**。
@@ -149,6 +154,7 @@ _避免使用_：自动多 Agent orchestration
 - `composerController` 管理输入框、附件、斜杠菜单和键盘发送模式。
 - `agentFleetView` 与 `agentManagementView` 只消费归一化 Provider、Agent Entry 和 Availability 数据，不包含具体 Adapter 的运行规则。
 - `runtimeSessionCardView` 与 `runtimeSessionCardController` 管理卡片渲染和交互，避免把大段工作区实现重新塞回 `main.js`。
+- `turnTimeline`、`turnTimelineProjection` 与 `turnTimelineView` 分别负责有序事件模型、展示投影和 HTML 渲染。执行完成后，过程收敛为可展开的 Worked for 摘要，最终 Assistant Markdown 是默认主体。
 - `scripts/check-architecture.mjs` 是渐进式架构护栏。它阻止 Shell 重新引入具体 Adapter 特判、History invoke 绕过 Repository、View 直接修改 Store 对象，以及 Rust 专用 ACP 入口复活。
 
 ## 兼容策略
