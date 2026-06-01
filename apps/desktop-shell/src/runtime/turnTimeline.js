@@ -2,6 +2,7 @@
 // 这里保存 Runtime Event 的到达顺序，让 UI 可以按因果关系展示过程，而不是按事件类型分区。
 
 const MERGEABLE_STREAM_TYPES = new Set(["thinking", "assistant"]);
+let generatedTimelineItemSequence = 0;
 
 // 初始化 Timeline 字段时保留已有数据，便于历史恢复和流式增量更新共用同一入口。
 export function ensureTurnTimeline(turn, { now = Date.now } = {}) {
@@ -67,7 +68,7 @@ export function timelineItemFromRuntimeEvent(event, { now = Date.now } = {}) {
   const createdAt = timestamp(now);
   const payload = event.payload || {};
   return {
-    id: payload.id || event.id || `timeline-${createdAt}-${type}`,
+    id: payload.id || event.id || generatedTimelineItemId(createdAt, type),
     type,
     status: timelineStatus(event, type),
     content: timelineContent(event, type),
@@ -79,6 +80,12 @@ export function timelineItemFromRuntimeEvent(event, { now = Date.now } = {}) {
       rawEvent: event,
     },
   };
+}
+
+// 同一毫秒内可能连续收到多个片段；本地序号避免 active item 错误指向较早的同类型节点。
+function generatedTimelineItemId(createdAt, type) {
+  generatedTimelineItemSequence += 1;
+  return `timeline-${createdAt}-${type}-${generatedTimelineItemSequence}`;
 }
 
 function activeTimelineItem(turn) {

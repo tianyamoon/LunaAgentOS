@@ -56,6 +56,19 @@ test("appendTurnTimelineEvent: Permission 与 File Changes 保留原地顺序", 
   assert.equal(turn.timelineItems[1].status, "waiting");
 });
 
+test("appendTurnTimelineEvent: 同一毫秒内被工具打断的同类型片段仍使用独立标识", () => {
+  const turn = {};
+  const now = () => 1000;
+
+  appendTurnTimelineEvent(turn, { type: "response", payload: { content: "先检查" } }, { now });
+  appendTurnTimelineEvent(turn, { type: "tool", payload: { title: "读取文件" } }, { now });
+  appendTurnTimelineEvent(turn, { type: "response", payload: { content: "再修改" } }, { now });
+  appendTurnTimelineEvent(turn, { type: "response", payload: { content: "并验证" } }, { now });
+
+  assert.equal(new Set(turn.timelineItems.map((item) => item.id)).size, 3);
+  assert.equal(turn.timelineItems[2].content, "再修改并验证");
+});
+
 test("finalizeTurnTimeline: 完成 Turn 后关闭 active item 并记录完成时间", () => {
   const turn = {};
   const now = () => 1000;
