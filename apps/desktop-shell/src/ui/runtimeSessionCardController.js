@@ -1,6 +1,7 @@
 // Runtime Session Card Controller 负责卡片事件绑定、局部刷新和滚动粘连。
 // 领域动作全部通过回调注入，控制器不自行修改 Session 生命周期。
 import { patchSessionCardFromViewModel, patchSessionCardShell } from "./runtimeSessionCardPatch.js";
+import { createRuntimeSessionVirtualList } from "./runtimeSessionVirtualList.js";
 
 export function createRuntimeSessionCardController({
   sessionDeck,
@@ -38,6 +39,8 @@ export function createRuntimeSessionCardController({
   const delegatedCards = new WeakSet();
   const delegatedBodies = new WeakSet();
   const lastScrollTargetRows = new Map();
+  const virtualListRegistry = new Map();
+  const virtualListCache = new Map();
   let pendingCardRenderFrame = 0;
   let pendingCardRenderTimer = 0;
   let lastCardRenderAt = 0;
@@ -166,9 +169,36 @@ export function createRuntimeSessionCardController({
     const viewModel = buildSessionCardViewModel(session);
     const newBody = patchSessionCardFromViewModel(card, viewModel);
 
-    // 对账 MessageList 正文
+    // 对账 MessageList 正文（通过虚拟列表）
     const projection = projectRuntimeSessionMessageList(session, { latestOnly: isSessionLatestOnly(session) });
-    if (newBody) runtimeSessionMessageListView.syncMessageList(newBody, projection);
+    if (newBody) {
+      const elements = messageListElements(newBody);
+      if (elements.scroller && elements.contentElement) {
+        let virtualList = virtualListRegistry.get(sessionId);
+        if (!virtualList) {
+          virtualList = createRuntimeSessionVirtualList({
+            scroller: elements.scroller,
+            content: elements.contentElement,
+            estimateRowSize: 80,
+            overscan: 6,
+            getActiveRowId: () => session.activePromptRunId
+              ? projection.rows.find((r) => r.promptRunId === session.activePromptRunId && r.kind === "assistant")?.id || null
+              : null,
+          });
+          if (virtualList) {
+            const cached = virtualListCache.get(sessionId);
+            if (cached) virtualList.restoreCache(cached);
+            virtualListRegistry.set(sessionId, virtualList);
+          }
+        }
+        if (virtualList) {
+          virtualList.reconcile(projection.rows, {
+            renderRow: (row) => runtimeSessionMessageListView.renderMessageRow(row),
+            renderRowBody: (row) => runtimeSessionMessageListView.renderMessageRowBody(row),
+          });
+        }
+      }
+    }
 
     // 动作委托已在首次绑定时设置，流式路径不需要重复绑定
     bindMessageListDelegation(sessionId, newBody);
@@ -260,11 +290,22 @@ export function createRuntimeSessionCardController({
     controller.notifyContentChanged();
   }
 
+  // 释放指定 Session 的虚拟列表
+  function disposeVirtualList(sessionId) {
+    const virtualList = virtualListRegistry.get(sessionId);
+    if (virtualList) {
+      virtualListCache.set(sessionId, virtualList.snapshotCache());
+      virtualList.dispose();
+      virtualListRegistry.delete(sessionId);
+    }
+  }
+
   return {
     bindSessionActions,
     sampleSessionStickyIntent,
     scheduleSessionCardRender,
     syncSessionStickControllers,
+    disposeVirtualList,
   };
 }
 
