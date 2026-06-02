@@ -39,24 +39,38 @@ test("runtimeSessionCardController: mini card 点击统一切换焦点与当前 
 });
 
 test("patchSessionCardPreservingBody: 流式局部更新保留滚动容器身份", () => {
+  const previousHeader = { innerHTML: "旧头部" };
   const previousBody = { innerHTML: "旧内容" };
+  const calls = [];
   const nextBody = {
     innerHTML: "新内容",
-    replaceWith(node) {
-      this.replacedWith = node;
-    },
   };
+  const nextHeader = { innerHTML: "新头部" };
   const nextArticle = {
+    className: "session-card is-waiting",
+    getAttribute(name) {
+      return name === "aria-label" ? "新标签" : null;
+    },
     querySelector(selector) {
+      if (selector === ".session-card-header") return nextHeader;
       return selector === ".session-card-body" ? nextBody : null;
     },
   };
   const previousCard = {
+    className: "session-card",
+    attrs: {},
+    setAttribute(name, value) {
+      this.attrs[name] = value;
+    },
+    removeAttribute(name) {
+      this.attrs[name] = undefined;
+    },
     querySelector(selector) {
+      if (selector === ".session-card-header") return previousHeader;
       return selector === ".session-card-body" ? previousBody : null;
     },
-    replaceWith(node) {
-      this.replacedWith = node;
+    replaceWith() {
+      calls.push("replace-card");
     },
   };
 
@@ -64,24 +78,32 @@ test("patchSessionCardPreservingBody: 流式局部更新保留滚动容器身份
 
   assert.equal(body, previousBody);
   assert.equal(previousBody.innerHTML, "新内容");
-  assert.equal(nextBody.replacedWith, previousBody);
-  assert.equal(previousCard.replacedWith, nextArticle);
+  assert.equal(previousHeader.innerHTML, "新头部");
+  assert.equal(previousCard.className, "session-card is-waiting");
+  assert.equal(previousCard.attrs["aria-label"], "新标签");
+  assert.deepEqual(calls, []);
 });
 
 test("patchSessionCardPreservingBody: MessageList 对账时不会替换稳定正文", () => {
   const previousBody = { innerHTML: "稳定内容" };
   const nextBody = {
     innerHTML: "临时新壳",
-    replaceWith(node) {
-      this.replacedWith = node;
-    },
   };
   const previousCard = {
-    querySelector: () => previousBody,
-    replaceWith() {},
+    querySelector(selector) {
+      if (selector === ".session-card-header") return null;
+      return selector === ".session-card-body" ? previousBody : null;
+    },
+    replaceWith() {
+      throw new Error("不应替换 Card 外壳");
+    },
   };
   const nextArticle = {
-    querySelector: () => nextBody,
+    getAttribute: () => null,
+    querySelector(selector) {
+      if (selector === ".session-card-header") return null;
+      return selector === ".session-card-body" ? nextBody : null;
+    },
   };
   const calls = [];
 
@@ -93,5 +115,4 @@ test("patchSessionCardPreservingBody: MessageList 对账时不会替换稳定正
 
   assert.deepEqual(calls, [[previousBody, nextBody]]);
   assert.equal(previousBody.innerHTML, "稳定内容");
-  assert.equal(nextBody.replacedWith, previousBody);
 });

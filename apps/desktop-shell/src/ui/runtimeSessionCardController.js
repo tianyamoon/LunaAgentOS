@@ -1,5 +1,7 @@
 // Runtime Session Card Controller 负责卡片事件绑定、局部刷新和滚动粘连。
 // 领域动作全部通过回调注入，控制器不自行修改 Session 生命周期。
+import { patchSessionCardShell } from "./runtimeSessionCardPatch.js";
+
 export function createRuntimeSessionCardController({
   sessionDeck,
   sessionStickRegistry,
@@ -32,6 +34,7 @@ export function createRuntimeSessionCardController({
   isElement = (node) => node instanceof HTMLElement,
 }) {
   const pendingCardRenders = new Set();
+  const delegatedCards = new WeakSet();
   const delegatedBodies = new WeakSet();
   const lastScrollTargetRows = new Map();
   let pendingCardRenderFrame = 0;
@@ -45,6 +48,8 @@ export function createRuntimeSessionCardController({
       ? [actionRoot]
       : [...actionRoot.querySelectorAll(".session-card")];
     cards.forEach((card) => {
+      if (delegatedCards.has(card)) return;
+      delegatedCards.add(card);
       card.addEventListener("click", (event) => {
         if (event.target.closest("button, a, summary, details, input, textarea, select")) return;
         if (window.getSelection()?.toString()) return;
@@ -159,12 +164,12 @@ export function createRuntimeSessionCardController({
     const newArticle = template.content.firstElementChild;
     if (!isElement(newArticle)) return;
     const projection = projectRuntimeSessionMessageList(session, { latestOnly: isSessionLatestOnly(session) });
-    const newBody = patchSessionCardPreservingBody(card, newArticle, {
+    const newBody = patchSessionCardShell(card, newArticle, {
       reconcileBody: (body) => runtimeSessionMessageListView.syncMessageList(body, projection),
     });
-    bindSessionActions(newArticle);
+    bindSessionActions(card);
     bindMessageListDelegation(sessionId, newBody);
-    renderMermaidDiagrams(newArticle).catch((error) => console.error(error));
+    renderMermaidDiagrams(card).catch((error) => console.error(error));
     syncMessageListScroll(sessionId, newBody, projection, previousFollowing);
   }
 
@@ -260,15 +265,7 @@ export function createRuntimeSessionCardController({
   };
 }
 
-// 流式更新保留滚动容器节点，只替换它的内容和外围 Card；拖动 scrollbar thumb 时浏览器不会失去目标节点。
+// 兼容旧测试入口：新实现不再替换外围 Card，只 patch 稳定外壳与正文 seam。
 export function patchSessionCardPreservingBody(previousCard, nextArticle, { reconcileBody } = {}) {
-  const previousBody = previousCard?.querySelector?.(".session-card-body") || null;
-  const nextBody = nextArticle?.querySelector?.(".session-card-body") || null;
-  if (previousBody && nextBody) {
-    if (reconcileBody) reconcileBody(previousBody, nextBody);
-    else previousBody.innerHTML = nextBody.innerHTML;
-    nextBody.replaceWith(previousBody);
-  }
-  previousCard?.replaceWith?.(nextArticle);
-  return previousBody || nextBody;
+  return patchSessionCardShell(previousCard, nextArticle, { reconcileBody });
 }
