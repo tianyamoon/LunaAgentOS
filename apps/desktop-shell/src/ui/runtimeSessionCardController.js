@@ -192,10 +192,14 @@ export function createRuntimeSessionCardController({
           }
         }
         if (virtualList) {
-          virtualList.reconcile(projection.rows, {
+          const report = virtualList.reconcile(projection.rows, {
             renderRow: (row) => runtimeSessionMessageListView.renderMessageRow(row),
             renderRowBody: (row) => runtimeSessionMessageListView.renderMessageRowBody(row),
           });
+          // 保存 mutation report 供滚动模块消费
+          if (elements.contentElement) {
+            elements.contentElement.dataset.lastMutationReport = JSON.stringify(report);
+          }
         }
       }
     }
@@ -273,21 +277,44 @@ export function createRuntimeSessionCardController({
   }
 
   // 新 Prompt 显式定位到 user row；普通 delta 仅在 following 状态下跟随底部。
+  // 虚拟列表测量变化只触发一次 requestAnimationFrame 对齐。
   function syncMessageListScroll(sessionId, body, projection, previousFollowing) {
     if (!body) return;
     const controller = ensureMessageListStickController(sessionId, body, previousFollowing);
     if (!controller) return;
     const nextTarget = projection.scrollTargetRowId || null;
-    const elements = messageListElements(body);
-    const targetRow = nextTarget
-      ? elements.contentElement?.querySelector?.(`[data-message-id="${nextTarget}"]`) || null
-      : null;
-    if (projection.activePromptRunId && targetRow && lastScrollTargetRows.get(sessionId) !== nextTarget) {
+    const virtualList = virtualListRegistry.get(sessionId);
+
+    // 新 Prompt：通过虚拟列表定位到 user row
+    if (projection.activePromptRunId && nextTarget && lastScrollTargetRows.get(sessionId) !== nextTarget) {
       lastScrollTargetRows.set(sessionId, nextTarget);
-      controller.scrollElementIntoView(targetRow, { behavior: "auto", block: "start" });
+      if (virtualList) {
+        virtualList.scrollToRow(nextTarget, { align: "start" });
+      } else {
+        const elements = messageListElements(body);
+        const targetRow = elements.contentElement?.querySelector?.(`[data-message-id="${nextTarget}"]`) || null;
+        if (targetRow) controller.scrollElementIntoView(targetRow, { behavior: "auto", block: "start" });
+      }
       return;
     }
+
+    // 流式 delta：通知内容变化，stickToBottom 自行判断是否跟随
     controller.notifyContentChanged();
+
+    // 虚拟列表测量变化行（来自 mutation report）
+    if (virtualList) {
+      const elements = messageListElements(body);
+      const reportText = elements.contentElement?.dataset?.lastMutationReport;
+      if (reportText) {
+        try {
+          const report = JSON.parse(reportText);
+          const changedIds = [...(report.changedIds || []), ...(report.addedIds || [])];
+          if (changedIds.length) virtualList.measureChangedRows(changedIds);
+        } catch (_) {
+          // 忽略解析错误
+        }
+      }
+    }
   }
 
   // 释放指定 Session 的虚拟列表

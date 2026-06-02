@@ -70,10 +70,11 @@ export function createRuntimeSessionVirtualList({
     });
   }
 
-  // 对账 rows 并更新虚拟列表
+  // 对账 rows 并更新虚拟列表，返回 mutation report
   function reconcile(rows, { renderRow, renderRowBody } = {}) {
-    if (!rows) return;
+    if (!rows) return emptyMutationReport();
 
+    const report = emptyMutationReport();
     const prevCount = virtualizer.options.count;
     virtualizer.options.count = rows.length;
 
@@ -86,6 +87,7 @@ export function createRuntimeSessionVirtualList({
       if (!activeIds.has(id)) {
         rowElements.delete(id);
         rowHeights.delete(id);
+        report.removedIds.push(id);
       }
     });
 
@@ -119,6 +121,7 @@ export function createRuntimeSessionVirtualList({
           node.dataset.messageId = row.id;
         }
         rowElements.set(row.id, node);
+        report.addedIds.push(row.id);
       }
 
       // 定位到正确位置
@@ -129,6 +132,9 @@ export function createRuntimeSessionVirtualList({
         } else {
           content.append(node);
         }
+        if (!report.addedIds.includes(row.id)) report.movedIds.push(row.id);
+      } else {
+        report.stableIds.push(row.id);
       }
 
       // 更新样式
@@ -150,6 +156,7 @@ export function createRuntimeSessionVirtualList({
           template.innerHTML = renderRow(activeRow).trim();
           node = template.content.firstElementChild;
           rowElements.set(activeRowId, node);
+          report.addedIds.push(activeRowId);
         }
         if (node) {
           const estimatedStart = activeIndex * estimateRowSize;
@@ -179,6 +186,8 @@ export function createRuntimeSessionVirtualList({
         child.remove();
       }
     });
+
+    return report;
   }
 
   // 滚动到指定行
@@ -232,5 +241,15 @@ export function createRuntimeSessionVirtualList({
     restoreCache,
     snapshotCache,
     getVirtualItems: () => virtualizer.getVirtualItems(),
+  };
+}
+
+function emptyMutationReport() {
+  return {
+    addedIds: [],
+    changedIds: [],
+    movedIds: [],
+    removedIds: [],
+    stableIds: [],
   };
 }
