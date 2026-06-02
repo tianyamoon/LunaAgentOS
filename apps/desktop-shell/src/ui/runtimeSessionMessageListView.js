@@ -155,11 +155,13 @@ export function createRuntimeSessionMessageListView({
       container.innerHTML = renderMessageListShell(projection);
       contentElement = container.querySelector?.("[data-runtime-message-content]") || null;
     } else {
-      reconcileMessageList(contentElement, projection.rows, {
+      const result = reconcileMessageList(contentElement, projection.rows, {
         renderMessageRow,
         renderMessageRowBody,
       });
+      contentElement.dataset.lastMutationReport = JSON.stringify(result.report);
     }
+    const reportText = contentElement.dataset.lastMutationReport;
     return {
       scroller: container.querySelector?.("[data-runtime-message-scroller]") || null,
       contentElement,
@@ -167,6 +169,7 @@ export function createRuntimeSessionMessageListView({
       scrollTargetRow: projection.scrollTargetRowId
         ? contentElement?.querySelector?.(`[data-message-id="${projection.scrollTargetRowId}"]`) || null
         : null,
+      mutationReport: reportText ? JSON.parse(reportText) : emptyMutationReport(),
     };
   }
 
@@ -192,21 +195,16 @@ export function reconcileMessageList(contentElement, rows, {
   renderMessageRowBody,
   createRowElement = defaultCreateRowElement,
 } = {}) {
-  if (!contentElement) return [];
-  const report = {
-    addedIds: [],
-    changedIds: [],
-    movedIds: [],
-    removedIds: [],
-    stableIds: [],
-  };
+  if (!contentElement) return { nodes: [], report: emptyMutationReport() };
+  const report = emptyMutationReport();
   const existing = new Map(
     [...contentElement.querySelectorAll(":scope > [data-message-id]")]
       .map((node) => [node.dataset.messageId, node]),
   );
   const activeIds = new Set();
-  const result = [];
-  rows.forEach((row, index) => {
+  const nodes = [];
+  let cursor = 0;
+  rows.forEach((row) => {
     const signature = rowSignature(row);
     let node = existing.get(row.id) || null;
     if (!node) {
@@ -223,16 +221,18 @@ export function reconcileMessageList(contentElement, rows, {
     }
     if (!node) return;
     activeIds.add(row.id);
-    const currentNode = contentElement.children?.[index] || null;
-    if (currentNode !== node) {
-      if (currentNode && typeof contentElement.insertBefore === "function") {
-        contentElement.insertBefore(node, currentNode);
+    // 游标顺序检查：只在位置确实不同时才移动 DOM
+    const currentChild = contentElement.children?.[cursor] || null;
+    if (currentChild !== node) {
+      if (currentChild && typeof contentElement.insertBefore === "function") {
+        contentElement.insertBefore(node, currentChild);
       } else {
         contentElement.append(node);
       }
       if (!report.addedIds.includes(row.id)) report.movedIds.push(row.id);
     }
-    result.push(node);
+    cursor++;
+    nodes.push(node);
   });
   existing.forEach((node, id) => {
     if (!activeIds.has(id)) {
@@ -240,18 +240,72 @@ export function reconcileMessageList(contentElement, rows, {
       node.remove();
     }
   });
-  result.report = report;
-  return result;
+  return { nodes, report };
 }
 
+// 按动画帧合并高频 delta：同一帧内多次对账只执行最后一次。
+export function createMergedReconciler({
+  requestFrame = (cb) => requestAnimationFrame(cb),
+  cancelFrame = (id) => cancelAnimationFrame(id),
+} = {}) {
+  let pendingFrameId = 0;
+  let pendingCall = null;
+
+  function mergeReconcile(contentElement, rows, options) {
+    if (pendingCall) cancelFrame(pendingFrameId);
+    pendingCall = { contentElement, rows, options };
+    pendingFrameId = requestFrame(() => {
+      const call = pendingCall;
+      pendingCall = null;
+      pendingFrameId = 0;
+      if (!call) return;
+      reconcileMessageList(call.contentElement, call.rows, call.options);
+    });
+  }
+
+  function flushPending() {
+    if (!pendingCall) return null;
+    cancelFrame(pendingFrameId);
+    pendingFrameId = 0;
+    const call = pendingCall;
+    pendingCall = null;
+    return reconcileMessageList(call.contentElement, call.rows, call.options);
+  }
+
+  return { mergeReconcile, flushPending };
+}
+
+// 签名只包含影响渲染的字段，避免 JSON.stringify 全量序列化。
 export function rowSignature(row) {
-  return JSON.stringify(row);
+  const meta = row.metadata || {};
+  const items = Array.isArray(meta.items) ? meta.items.map((item) => item.content || "").join(",") : "";
+  const traceRows = Array.isArray(meta.rows) ? meta.rows.map((r) => rowSignature(r)).join(";") : "";
+  return [
+    row.kind,
+    row.status,
+    row.content,
+    meta.final ? "final" : "",
+    meta.summary ? JSON.stringify(meta.summary) : "",
+    items,
+    traceRows,
+    meta.attachmentCount ?? "",
+  ].join("|");
 }
 
 function defaultCreateRowElement(html) {
   const template = document.createElement("template");
   template.innerHTML = html.trim();
   return template.content.firstElementChild;
+}
+
+function emptyMutationReport() {
+  return {
+    addedIds: [],
+    changedIds: [],
+    movedIds: [],
+    removedIds: [],
+    stableIds: [],
+  };
 }
 
 function stringifyDebug(metadata) {

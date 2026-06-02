@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  createMergedReconciler,
   createRuntimeSessionMessageListView,
   formatRuntimeMessageDuration,
   reconcileMessageList,
@@ -58,11 +59,18 @@ test("runtimeSessionMessageListView: 对账保留已有行节点并只移除过�
     createRowElement: (id) => fakeNode(id, rowSignature(rows.find((row) => row.id === id))),
   });
 
-  assert.equal(result[0], oldStable);
-  assert.equal(result[1], oldChanged);
+  assert.equal(result.nodes[0], oldStable);
+  assert.equal(result.nodes[1], oldChanged);
   assert.equal(oldChanged.innerHTML, "body:更新");
   assert.equal(oldRemoved.removed, true);
   assert.deepEqual(content.children.map((node) => node.dataset.messageId), ["stable", "changed", "added"]);
+  assert.deepEqual(result.report, {
+    addedIds: ["added"],
+    changedIds: ["changed"],
+    movedIds: [],
+    removedIds: ["removed"],
+    stableIds: ["stable"],
+  });
 });
 
 test("runtimeSessionMessageListView: 未变化且顺序稳定的行不应被重新 append", () => {
@@ -78,7 +86,8 @@ test("runtimeSessionMessageListView: 未变化且顺序稳定的行不应被重�
     createRowElement: (id) => fakeNode(id, ""),
   });
 
-  assert.equal(result[0], stable);
+  assert.equal(result.nodes[0], stable);
+  assert.deepEqual(result.report.stableIds, ["stable"]);
   assert.deepEqual(content.operations, []);
 });
 
@@ -100,6 +109,26 @@ test("runtimeSessionMessageListView: active row 变化时只更新该行内容",
   assert.equal(stable.innerHTML, "");
   assert.equal(active.innerHTML, "body:最新 delta");
   assert.deepEqual(content.operations, []);
+});
+
+test("runtimeSessionMessageListView: 换序时只移动真实错位的行", () => {
+  const first = fakeNode("first", rowSignature({ id: "first", kind: "tool", content: "1" }));
+  const second = fakeNode("second", rowSignature({ id: "second", kind: "tool", content: "2" }));
+  const content = fakeContent([first, second]);
+  content.operations = [];
+
+  const result = reconcileMessageList(content, [
+    { id: "second", kind: "tool", content: "2" },
+    { id: "first", kind: "tool", content: "1" },
+  ], {
+    renderMessageRow: (row) => row.id,
+    renderMessageRowBody: (row) => `body:${row.content}`,
+    createRowElement: (id) => fakeNode(id, ""),
+  });
+
+  assert.deepEqual(content.children.map((node) => node.dataset.messageId), ["second", "first"]);
+  assert.deepEqual(result.report.movedIds, ["second"]);
+  assert.deepEqual(content.operations, [["insertBefore", "second", "first"]]);
 });
 
 function createView() {
@@ -170,3 +199,88 @@ function fakeNode(messageId, messageSignature) {
     },
   };
 }
+
+test("createMergedReconciler: 同一帧内多次对账只执行最后一次", () => {
+  const frames = [];
+  const reconciler = createMergedReconciler({
+    requestFrame: (cb) => { frames.push(cb); return frames.length; },
+    cancelFrame: () => {},
+  });
+
+  const active = fakeNode("active", "sig-old");
+  const content = fakeContent([active]);
+  content.operations = [];
+
+  // 同一帧内三次对账
+  reconciler.mergeReconcile(content, [
+    { id: "active", kind: "assistant", content: "delta 1", status: "running", metadata: {} },
+  ], {
+    renderMessageRow: (row) => row.id,
+    renderMessageRowBody: (row) => `body:${row.content}`,
+    createRowElement: (id) => fakeNode(id, ""),
+  });
+  reconciler.mergeReconcile(content, [
+    { id: "active", kind: "assistant", content: "delta 2", status: "running", metadata: {} },
+  ], {
+    renderMessageRow: (row) => row.id,
+    renderMessageRowBody: (row) => `body:${row.content}`,
+    createRowElement: (id) => fakeNode(id, ""),
+  });
+  reconciler.mergeReconcile(content, [
+    { id: "active", kind: "assistant", content: "delta 3", status: "running", metadata: {} },
+  ], {
+    renderMessageRow: (row) => row.id,
+    renderMessageRowBody: (row) => `body:${row.content}`,
+    createRowElement: (id) => fakeNode(id, ""),
+  });
+
+  // 帧回调尚未执行，内容未变
+  assert.equal(active.innerHTML, "");
+
+  // 执行帧回调
+  frames.forEach((cb) => cb());
+
+  // 只有最后一次 delta 生效
+  assert.equal(active.innerHTML, "body:delta 3");
+});
+
+test("createMergedReconciler: flushPending 立即执行待处理对账", () => {
+  const reconciler = createMergedReconciler({
+    requestFrame: () => 1,
+    cancelFrame: () => {},
+  });
+
+  const active = fakeNode("active", "sig-old");
+  const content = fakeContent([active]);
+  content.operations = [];
+
+  reconciler.mergeReconcile(content, [
+    { id: "active", kind: "assistant", content: "立即生效", status: "running", metadata: {} },
+  ], {
+    renderMessageRow: (row) => row.id,
+    renderMessageRowBody: (row) => `body:${row.content}`,
+    createRowElement: (id) => fakeNode(id, ""),
+  });
+
+  const result = reconciler.flushPending();
+  assert.equal(active.innerHTML, "body:立即生效");
+  assert.ok(result);
+});
+
+test("rowSignature: 相同内容产生相同签名", () => {
+  const row1 = { id: "a", kind: "assistant", content: "hello", status: "completed", metadata: {} };
+  const row2 = { id: "a", kind: "assistant", content: "hello", status: "completed", metadata: {} };
+  assert.equal(rowSignature(row1), rowSignature(row2));
+});
+
+test("rowSignature: 不同内容产生不同签名", () => {
+  const row1 = { id: "a", kind: "assistant", content: "hello", status: "completed", metadata: {} };
+  const row2 = { id: "a", kind: "assistant", content: "world", status: "completed", metadata: {} };
+  assert.notEqual(rowSignature(row1), rowSignature(row2));
+});
+
+test("rowSignature: 忽略不影响渲染的字段", () => {
+  const row1 = { id: "a", kind: "assistant", content: "hello", status: "completed", metadata: {}, turnId: "t1" };
+  const row2 = { id: "b", kind: "assistant", content: "hello", status: "completed", metadata: {}, turnId: "t2" };
+  assert.equal(rowSignature(row1), rowSignature(row2));
+});
