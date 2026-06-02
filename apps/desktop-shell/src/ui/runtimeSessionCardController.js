@@ -1,12 +1,13 @@
 // Runtime Session Card Controller 负责卡片事件绑定、局部刷新和滚动粘连。
 // 领域动作全部通过回调注入，控制器不自行修改 Session 生命周期。
-import { patchSessionCardShell } from "./runtimeSessionCardPatch.js";
+import { patchSessionCardFromViewModel, patchSessionCardShell } from "./runtimeSessionCardPatch.js";
 
 export function createRuntimeSessionCardController({
   sessionDeck,
   sessionStickRegistry,
   getSession,
   renderSessionCard,
+  buildSessionCardViewModel,
   projectRuntimeSessionMessageList,
   runtimeSessionMessageListView,
   isSessionLatestOnly,
@@ -149,7 +150,8 @@ export function createRuntimeSessionCardController({
     targets.forEach(renderSessionCardInPlace);
   }
 
-  // 局部替换 Card 时重新绑定动作并恢复原有 sticky 意图。
+  // 流式路径：从 viewModel 直接 patch Card 外壳，不生成完整 HTML。
+  // 首次创建、Session 增删、Workspace Focus 切换时仍允许完整渲染。
   function renderSessionCardInPlace(sessionId) {
     const session = getSession(sessionId);
     if (!session) return;
@@ -159,15 +161,16 @@ export function createRuntimeSessionCardController({
     const previousController = sessionStickRegistry.get(sessionId);
     const previousScroller = messageListElements(previousBody).scroller || previousBody;
     const previousFollowing = previousController ? previousController.isFollowing : previousScroller ? isAtBottom(previousScroller) : true;
-    const template = createTemplate();
-    template.innerHTML = renderSessionCard(session).trim();
-    const newArticle = template.content.firstElementChild;
-    if (!isElement(newArticle)) return;
+
+    // 流式路径：从 viewModel 直接 patch，不生成完整 HTML
+    const viewModel = buildSessionCardViewModel(session);
+    const newBody = patchSessionCardFromViewModel(card, viewModel);
+
+    // 对账 MessageList 正文
     const projection = projectRuntimeSessionMessageList(session, { latestOnly: isSessionLatestOnly(session) });
-    const newBody = patchSessionCardShell(card, newArticle, {
-      reconcileBody: (body) => runtimeSessionMessageListView.syncMessageList(body, projection),
-    });
-    bindSessionActions(card);
+    if (newBody) runtimeSessionMessageListView.syncMessageList(newBody, projection);
+
+    // 动作委托已在首次绑定时设置，流式路径不需要重复绑定
     bindMessageListDelegation(sessionId, newBody);
     renderMermaidDiagrams(card).catch((error) => console.error(error));
     syncMessageListScroll(sessionId, newBody, projection, previousFollowing);

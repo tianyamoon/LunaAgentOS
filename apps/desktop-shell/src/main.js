@@ -1439,6 +1439,7 @@ runtimeSessionCardController = createRuntimeSessionCardController({
   sessionStickRegistry,
   getSession: (sessionId) => sessionsStore.getSession(sessionId),
   renderSessionCard,
+  buildSessionCardViewModel: (session) => runtimeSessionCardView.buildSessionCardViewModel(session),
   projectRuntimeSessionMessageList,
   runtimeSessionMessageListView,
   isSessionLatestOnly,

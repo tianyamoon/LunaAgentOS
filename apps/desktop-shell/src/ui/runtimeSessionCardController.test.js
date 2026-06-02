@@ -25,6 +25,7 @@ test("runtimeSessionCardController: mini card 点击统一切换焦点与当前 
   const controller = createRuntimeSessionCardController({
     sessionDeck,
     sessionStickRegistry: {},
+    buildSessionCardViewModel: () => ({ className: "", headerHtml: "", headerDigest: "" }),
     focusSessionInWorkspace: (id) => calls.push(["focus", id]),
     activateWorkspaceSession: (id) => calls.push(["activate", id]),
   });

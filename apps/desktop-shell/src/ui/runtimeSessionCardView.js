@@ -144,8 +144,95 @@ export function createRuntimeSessionCardView({
     </button>`;
   }
 
+  // 流式路径：构建轻量 viewModel，避免生成完整 Card HTML。
+  function buildSessionCardViewModel(session) {
+    ensureSessionStatusShape(session);
+    const identitySession = normalizeWorkspaceSession(session);
+    const statusView = resolveSessionCardStatusView(session, { translate: t });
+    const isActiveReceiver = getCurrentSessionId() === session.id;
+    const isWaiting = statusView.status === CARD_STATUS.running || statusView.status === CARD_STATUS.waiting_confirmation;
+    const isRestoring = session.runtime_binding?.state === RUNTIME_BINDING_STATE.reconnecting;
+    const profileMeta = [identitySession.profileName, identitySession.profileModel].filter(Boolean).join(" · ");
+    const stats = sessionCardStats(session, t);
+    const isFocusedSession = getFocusedSessionId() === session.id;
+    const identityTitle = sessionIdentityTitle(identitySession);
+    const identityTitleMarkup = renderSessionIdentityTitle(identitySession);
+    const canArchiveCard = session.record_state !== RECORD_STATE.archived && session.access_mode !== ACCESS_MODE.read_only;
+    const managementDisabled = isRestoring ? "disabled" : "";
+    const managementTitleSuffix = isRestoring ? t("action.restoringSuffix") : "";
+    const latestOnly = isSessionLatestOnly(session);
+    const latestOnlyLabel = latestOnly ? t("action.showAllMessages") : t("action.latestMessages");
+    const fullscreenLabel = isFocusedSession ? t("action.exitFullscreen") : t("action.enterFullscreen");
+
+    const className = `session-card ${isFocusedSession ? "fullscreen" : ""} ${isActiveReceiver ? "is-active-receiver" : ""} ${isWaiting ? "is-waiting" : ""}`;
+    const ariaLabel = t("session.ariaSwitch", { task: session.task });
+    const ariaCurrent = isActiveReceiver ? "true" : null;
+
+    const headerHtml = `
+      <div class="session-card-row session-card-identity-line">
+        <div class="session-agent-title">
+          <strong title="${escapeHtml(identityTitle)}">${identityTitleMarkup}</strong>
+          ${isActiveReceiver ? `<span class="active-receiver-banner">${t("session.current")}</span>` : ""}
+        </div>
+        <div class="session-card-actions" role="toolbar" aria-label="${t("session.actionsAria")}">
+          ${isWaiting && session.record_state === RECORD_STATE.active ? `<button type="button" class="mini-btn ghost-btn session-action-btn danger-btn session-stop-btn" data-session-id="${session.id}" title="${t("action.stop")}" aria-label="${t("action.stop")}">${renderSessionActionIcon("stop")}</button>` : ""}
+          <div class="session-tool-group" role="group">
+            <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-copy-btn" data-session-id="${session.id}" title="${t("action.copySession")}" aria-label="${t("action.copySession")}" ${session.turns.length ? "" : "disabled"}>${renderSessionActionIcon("copy")}</button>
+            <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-latest-only-btn ${latestOnly ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${latestOnly ? "true" : "false"}" title="${latestOnlyLabel}" aria-label="${latestOnlyLabel}" ${session.turns.length > 1 ? "" : "disabled"}>${renderSessionActionIcon(latestOnly ? "all" : "latest")}</button>
+            <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-scroll-latest-btn" data-session-id="${session.id}" title="${t("action.scrollLatest")}" aria-label="${t("action.scrollLatest")}">${renderSessionActionIcon("latestScroll")}</button>
+            <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-fullscreen-btn ${isFocusedSession ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${isFocusedSession ? "true" : "false"}" title="${fullscreenLabel}" aria-label="${fullscreenLabel}">${renderSessionActionIcon(isFocusedSession ? "fullscreenExit" : "fullscreen")}</button>
+          </div>
+          <div class="session-management-group" role="group">
+            <button type="button" class="mini-btn ghost-btn session-action-btn session-dismiss-btn" data-session-id="${session.id}" title="${t("action.dismiss")}${managementTitleSuffix}" aria-label="${t("action.dismiss")}" ${managementDisabled}>${renderSessionActionIcon("dismiss")}</button>
+            ${canArchiveCard ? `<button type="button" class="mini-btn ghost-btn session-action-btn session-archive-btn" data-session-id="${session.id}" title="${t("action.archive")}${managementTitleSuffix}" aria-label="${t("action.archive")}" ${managementDisabled}>${renderSessionActionIcon("archive")}</button>` : ""}
+            <button type="button" class="mini-btn ghost-btn session-action-btn danger-btn session-delete-btn" data-session-id="${session.id}" title="${t("action.delete")}${managementTitleSuffix}" aria-label="${t("action.delete")}" ${managementDisabled}>${renderSessionActionIcon("delete")}</button>
+            ${canRestoreSession(session) ? `<button type="button" class="mini-btn ghost-btn session-retry-btn" data-session-id="${session.id}">${t("session.restoreRetry")}</button>` : ""}
+          </div>
+        </div>
+      </div>
+      <div class="session-card-row session-card-status-line">
+        ${renderSessionStatusChip(statusView)}
+        <div class="session-card-stats" aria-label="${t("session.statsAria")}">
+          <span class="session-stat-pill">${t("session.turns", { count: session.turns.length })}</span>
+          ${stats.map((item) => `<span class="session-stat-pill" data-stat-key="${escapeHtml(item.key)}">${escapeHtml(item.label)}</span>`).join("")}
+        </div>
+        ${profileMeta ? `<div class="caption session-profile-meta">${escapeHtml(profileMeta)}</div>` : ""}
+      </div>
+      <div class="session-task-line" title="${escapeHtml(session.task)}" aria-label="${escapeHtml(t("session.task", { task: session.task }))}">
+        <span class="session-task-label">${escapeHtml(t("session.taskLabel"))}</span>
+        <span class="session-task-text">${escapeHtml(session.task)}</span>
+      </div>
+      ${renderSessionStatusError(statusView)}
+    `;
+
+    const headerDigest = [
+      identityTitle,
+      isActiveReceiver,
+      isWaiting,
+      isFocusedSession,
+      isRestoring,
+      session.record_state,
+      session.turns.length,
+      stats.map((s) => s.key + s.label).join(","),
+      profileMeta,
+      session.task,
+      statusView.status,
+      statusView.tone,
+      statusView.error?.title || "",
+    ].join("|");
+
+    return {
+      className,
+      ariaLabel,
+      ariaCurrent,
+      headerHtml,
+      headerDigest,
+    };
+  }
+
   return {
     renderSessionCard,
     renderSessionMiniCard,
+    buildSessionCardViewModel,
   };
 }
