@@ -193,31 +193,54 @@ export function reconcileMessageList(contentElement, rows, {
   createRowElement = defaultCreateRowElement,
 } = {}) {
   if (!contentElement) return [];
+  const report = {
+    addedIds: [],
+    changedIds: [],
+    movedIds: [],
+    removedIds: [],
+    stableIds: [],
+  };
   const existing = new Map(
     [...contentElement.querySelectorAll(":scope > [data-message-id]")]
       .map((node) => [node.dataset.messageId, node]),
   );
   const activeIds = new Set();
   const result = [];
-  rows.forEach((row) => {
+  rows.forEach((row, index) => {
     const signature = rowSignature(row);
     let node = existing.get(row.id) || null;
     if (!node) {
       node = createRowElement(renderMessageRow(row));
+      report.addedIds.push(row.id);
     } else if (node.dataset.messageSignature !== signature) {
       node.className = `runtime-message-row runtime-message-row-${row.kind}`;
       node.dataset.messageKind = row.kind;
       node.dataset.messageSignature = signature;
       node.innerHTML = renderMessageRowBody(row);
+      report.changedIds.push(row.id);
+    } else {
+      report.stableIds.push(row.id);
     }
     if (!node) return;
     activeIds.add(row.id);
-    contentElement.append(node);
+    const currentNode = contentElement.children?.[index] || null;
+    if (currentNode !== node) {
+      if (currentNode && typeof contentElement.insertBefore === "function") {
+        contentElement.insertBefore(node, currentNode);
+      } else {
+        contentElement.append(node);
+      }
+      if (!report.addedIds.includes(row.id)) report.movedIds.push(row.id);
+    }
     result.push(node);
   });
   existing.forEach((node, id) => {
-    if (!activeIds.has(id)) node.remove();
+    if (!activeIds.has(id)) {
+      report.removedIds.push(id);
+      node.remove();
+    }
   });
+  result.report = report;
   return result;
 }
 

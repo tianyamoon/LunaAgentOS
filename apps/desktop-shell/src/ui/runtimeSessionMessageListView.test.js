@@ -65,6 +65,43 @@ test("runtimeSessionMessageListView: 对账保留已有行节点并只移除过�
   assert.deepEqual(content.children.map((node) => node.dataset.messageId), ["stable", "changed", "added"]);
 });
 
+test("runtimeSessionMessageListView: 未变化且顺序稳定的行不应被重新 append", () => {
+  const stable = fakeNode("stable", rowSignature({ id: "stable", kind: "assistant", content: "不变" }));
+  const content = fakeContent([stable]);
+  content.operations = [];
+
+  const result = reconcileMessageList(content, [
+    { id: "stable", kind: "assistant", content: "不变" },
+  ], {
+    renderMessageRow: (row) => row.id,
+    renderMessageRowBody: (row) => `body:${row.content}`,
+    createRowElement: (id) => fakeNode(id, ""),
+  });
+
+  assert.equal(result[0], stable);
+  assert.deepEqual(content.operations, []);
+});
+
+test("runtimeSessionMessageListView: active row 变化时只更新该行内容", () => {
+  const stable = fakeNode("stable", rowSignature({ id: "stable", kind: "assistant", content: "历史" }));
+  const active = fakeNode("active", "old-signature");
+  const content = fakeContent([stable, active]);
+  content.operations = [];
+
+  reconcileMessageList(content, [
+    { id: "stable", kind: "assistant", content: "历史" },
+    { id: "active", kind: "assistant", content: "最新 delta" },
+  ], {
+    renderMessageRow: (row) => row.id,
+    renderMessageRowBody: (row) => `body:${row.content}`,
+    createRowElement: (id) => fakeNode(id, ""),
+  });
+
+  assert.equal(stable.innerHTML, "");
+  assert.equal(active.innerHTML, "body:最新 delta");
+  assert.deepEqual(content.operations, []);
+});
+
 function createView() {
   return createRuntimeSessionMessageListView({
     renderAssistantResponse: (content, phase) => `<article data-phase="${phase}">${content}</article>`,
@@ -95,15 +132,27 @@ function createView() {
 function fakeContent(nodes) {
   const content = {
     children: [],
+    operations: [],
     querySelectorAll: () => content.children,
     append(node) {
+      content.operations.push(["append", node.dataset.messageId]);
       const previousIndex = content.children.indexOf(node);
       if (previousIndex >= 0) content.children.splice(previousIndex, 1);
       node.parent = content;
       content.children.push(node);
     },
+    insertBefore(node, before) {
+      content.operations.push(["insertBefore", node.dataset.messageId, before?.dataset?.messageId || null]);
+      const previousIndex = content.children.indexOf(node);
+      if (previousIndex >= 0) content.children.splice(previousIndex, 1);
+      const nextIndex = content.children.indexOf(before);
+      node.parent = content;
+      if (nextIndex >= 0) content.children.splice(nextIndex, 0, node);
+      else content.children.push(node);
+    },
   };
   nodes.forEach((node) => content.append(node));
+  content.operations = [];
   return content;
 }
 
