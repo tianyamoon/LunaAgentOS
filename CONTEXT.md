@@ -170,6 +170,10 @@ _避免使用_：自动多 Agent orchestration
 - `composerController` 管理输入框、附件、斜杠菜单和键盘发送模式。
 - `agentFleetView` 与 `agentManagementView` 只消费归一化 Provider、Agent Entry 和 Availability 数据，不包含具体 Adapter 的运行规则。
 - `runtimeSessionCardView` 与 `runtimeSessionCardController` 管理卡片外层和交互，避免把大段工作区实现重新塞回 `main.js`。
+- `runtimeSessionCardPatch` 提供 `patchSessionCardFromViewModel`：流式路径从轻量 viewModel 直接更新 Card 外壳（class、header、stats、task），不生成完整 HTML。Card 首次创建、Session 增删、Workspace Focus 切换时仍允许完整渲染。
+- `runtimeSessionMessageListView` 与 `reconcileMessageList` 负责行级对账：使用高效 `rowSignature`、游标顺序检查避免无效 `insertBefore`、签名未变化时完全跳过。`createMergedReconciler` 按动画帧合并高频 delta。
+- `runtimeSessionVirtualList` 基于 `@tanstack/virtual-core` 实现动态高度虚拟列表：只挂载可视区 + overscan 区 + 当前 active row；使用 `data-message-id` 作为稳定 key；动态测量行高度；Session 切换时释放 observer，再次进入时恢复测量缓存和滚动位置。
+- 三层职责分离：Card Shell 只在结构变化时完整重建，流式 delta 永远走局部刷新；MessageList 对账不得无条件 append 已有节点；VirtualList 只挂载必要行，不扫描整列 DOM。
 - `turnTimeline` 与 `turnTimelineProjection` 保存并整理 Turn 内部有序事件事实。
 - `runtimeSessionMessageListProjection` 与 `runtimeSessionMessageListView` 把内部 Turn Timeline 转换为连续消息行。执行完成后，过程收敛为可展开的 Worked for 摘要，最终 Assistant Markdown 是默认主体。
 - `stickToBottom` 管理桌面 WebView 中的滚动跟随意图。用户介入滚动后暂停自动跟随，新 Prompt 到来时显式定位到对应 user row。

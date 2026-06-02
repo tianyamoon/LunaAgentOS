@@ -206,7 +206,8 @@ export function createRuntimeSessionCardController({
 
     // 动作委托已在首次绑定时设置，流式路径不需要重复绑定
     bindMessageListDelegation(sessionId, newBody);
-    renderMermaidDiagrams(card).catch((error) => console.error(error));
+    // Mermaid 只处理 mutation report 中变化的 Assistant row
+    renderMermaidForChangedRows(card, newBody).catch((error) => console.error(error));
     syncMessageListScroll(sessionId, newBody, projection, previousFollowing);
   }
 
@@ -314,6 +315,32 @@ export function createRuntimeSessionCardController({
           // 忽略解析错误
         }
       }
+    }
+  }
+
+  // 只对 mutation report 中变化的 Assistant row 渲染 Mermaid，避免全量扫描。
+  async function renderMermaidForChangedRows(card, body) {
+    if (!card || !body || !renderMermaidDiagrams) return;
+    const elements = messageListElements(body);
+    const reportText = elements.contentElement?.dataset?.lastMutationReport;
+    if (!reportText) {
+      // 无 mutation report 时回退到全量渲染（首次创建等场景）
+      return renderMermaidDiagrams(card);
+    }
+    try {
+      const report = JSON.parse(reportText);
+      const changedAssistantIds = report.changedIds.filter((id) => id.includes(":assistant"));
+      const addedAssistantIds = report.addedIds.filter((id) => id.includes(":assistant"));
+      const targetIds = [...new Set([...changedAssistantIds, ...addedAssistantIds])];
+      if (!targetIds.length) return;
+      // 只对变化的 Assistant row 渲染 Mermaid
+      for (const id of targetIds) {
+        const row = elements.contentElement?.querySelector?.(`[data-message-id="${id}"]`);
+        if (row) await renderMermaidDiagrams(row);
+      }
+    } catch (_) {
+      // 解析失败时回退到全量渲染
+      return renderMermaidDiagrams(card);
     }
   }
 

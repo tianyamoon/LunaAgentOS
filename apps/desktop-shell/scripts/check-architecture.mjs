@@ -73,6 +73,23 @@ if (/runtime_acp_(?:claude|hermes)|runtime_hermes_profiles/.test(rustLib)) {
   fail("src-tauri/src/lib.rs 出现废弃的专用 Adapter command");
 }
 
+// 流式路径静态护栏：Card 外壳不得被 replaceWith 替换。
+const cardControllerSource = read("src/ui/runtimeSessionCardController.js");
+if (/\.replaceWith\(/.test(cardControllerSource)) {
+  fail("runtimeSessionCardController.js 流式路径调用了 Card replaceWith，应使用 patchSessionCardFromViewModel");
+}
+
+// MessageList 对账不得无条件 append 已有节点。
+const messageListViewSource = read("src/ui/runtimeSessionMessageListView.js");
+if (/contentElement\.append\(node\)/.test(messageListViewSource) && !/insertBefore/.test(messageListViewSource)) {
+  fail("runtimeSessionMessageListView.js 对账无条件 append，应使用游标顺序检查");
+}
+
+// History 列表渲染不得参与 Card transcript 渲染路径。
+if (/renderHistory\(\).*renderSessionCard|renderSessionCard.*renderHistory\(\)/.test(mainSource)) {
+  fail("src/main.js History 列表渲染与 Card transcript 渲染耦合，应分离刷新频率");
+}
+
 if (failures.length) {
   console.error("Architecture check failed:");
   failures.forEach((message) => console.error(`- ${message}`));

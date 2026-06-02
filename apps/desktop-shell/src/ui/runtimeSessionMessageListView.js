@@ -109,9 +109,11 @@ export function createRuntimeSessionMessageListView({
   function renderDebugRow(row) {
     const detailKey = `${row.id}:message-debug`;
     const open = isOpenForKey(detailKey, false);
+    // 默认只保留摘要节点，完整 JSON 仅在展开时渲染
+    const summary = debugSummary(row.metadata);
     return `
       <details class="terminal-detail runtime-message-debug" data-detail-key="${escapeHtml(detailKey)}"${open ? " open" : ""}>
-        <summary>${escapeHtml(t("turn.timeline.debug"))}</summary>
+        <summary>${escapeHtml(t("turn.timeline.debug"))}<span class="debug-summary">${escapeHtml(summary)}</span></summary>
         <pre class="terminal-pre">${escapeHtml(stringifyDebug(row.metadata))}</pre>
       </details>
     `;
@@ -314,6 +316,16 @@ function stringifyDebug(metadata) {
   } catch (error) {
     return String(error?.message || error);
   }
+}
+
+function debugSummary(metadata) {
+  if (!metadata) return "";
+  const parts = [];
+  const rawEvents = Array.isArray(metadata.rawEvents) ? metadata.rawEvents : [];
+  const logs = Array.isArray(metadata.logs) ? metadata.logs : [];
+  if (rawEvents.length) parts.push(`${rawEvents.length} events`);
+  if (logs.length) parts.push(`${logs.length} logs`);
+  return parts.length ? ` (${parts.join(", ")})` : "";
 }
 
 function statusClass(row) {
