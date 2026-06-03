@@ -67,6 +67,10 @@ import {
 } from "./runtime/acpCommands.js";
 import { createAcpRuntimeClient } from "./runtime/acpRuntimeClient.js";
 import {
+  createRuntimeAdapterCatalog,
+  mergeSlashCommands,
+} from "./runtime/runtimeAdapterCatalog.js";
+import {
   applyDataI18n,
   getLanguage,
   t,
@@ -302,6 +306,7 @@ const acpRuntimeClient = createAcpRuntimeClient({
   commandsForProvider: acpCommandsForProvider,
   translate: t,
 });
+const runtimeAdapterCatalog = createRuntimeAdapterCatalog({ invoke });
 // History Repository 统一承接磁盘 IO 与快照管理，Shell 只注入运行时相关投影。
 const historyRepository = createHistoryRepository({
   invoke,
@@ -897,25 +902,6 @@ async function loadUserThemes() {
   }
 }
 
-async function loadAdapterIcons(adapters) {
-  if (typeof invoke !== "function") return;
-  const iconEntries = {};
-  await Promise.all(
-    (Array.isArray(adapters) ? adapters : []).map(async (adapter) => {
-      if (!adapter?.id || !adapter?.iconPath) return;
-      try {
-        const payload = await invoke("read_adapter_icon", { adapterId: adapter.id });
-        if (payload?.mime && payload?.base64) {
-          iconEntries[adapter.id] = `data:${payload.mime};base64,${payload.base64}`;
-        }
-      } catch (error) {
-        console.warn("read_adapter_icon failed", adapter.id, error);
-      }
-    }),
-  );
-  setAdapterIconRegistry(iconEntries);
-}
-
 function updateSendModeLabel() {
   composerController?.updateSendModeLabel();
 }
@@ -998,10 +984,9 @@ function openAvailabilityModal() {
 
 async function refreshRuntimeProbe() {
   try {
-    const adapterResult = await invoke("load_adapters");
-    const adapters = adapterResult?.adapters || [];
-    await loadAdapterIcons(adapters);
-    const result = await invoke("runtime_probe");
+    const result = await runtimeAdapterCatalog.probeRuntime();
+    const adapters = result.adapters || [];
+    setAdapterIconRegistry(result.iconEntries || {});
     providersStore.batch(() => {
       providersStore.syncAdapterProviders(adapters);
       providersStore.patchRuntimeAvailability(
@@ -1024,7 +1009,7 @@ async function refreshRuntimeProbe() {
       .forEach((providerId) => {
         loadRuntimeSlashCommandsForProvider(providerId);
       });
-    return result;
+    return result.raw;
   } catch (error) {
     console.error(error);
     setAppNotice(t("runtime.probeFailed", { error: formatBackendError(error) }), "error");
@@ -1105,16 +1090,6 @@ function applyRuntimeTargetsForInstance(providerId, runtimeInstanceId, targets) 
   });
 }
 
-function mergeSlashCommands(commands) {
-  const byKey = new Map();
-  for (const command of Array.isArray(commands) ? commands : []) {
-    if (!command?.name) continue;
-    const key = command.name;
-    if (!byKey.has(key)) byKey.set(key, command);
-  }
-  return [...byKey.values()];
-}
-
 async function loadRuntimeSlashCommandsForProvider(providerId, runtimeInstanceIds = null) {
   const instances = (runtimeInstanceIds || availableRuntimeInstancesForProvider(providerId).map((instance) => instance.id))
     .map(runtimeInstanceById)
@@ -1122,15 +1097,11 @@ async function loadRuntimeSlashCommandsForProvider(providerId, runtimeInstanceId
     .filter((instance) => instance.available);
   if (!instances.length) return;
   try {
-    const discovered = [];
-    for (const instance of instances) {
-      const commands = await invoke("runtime_adapter_slash_commands", {
-        adapterId: providerId,
-        runtimeInstanceId: instance.id,
-      });
-      discovered.push(...(Array.isArray(commands) ? commands : []));
-    }
-    providersStore.setSlashCommandsForProvider(providerId, mergeSlashCommands(discovered));
+    const commands = await runtimeAdapterCatalog.loadSlashCommands({
+      providerId,
+      runtimeInstances: instances,
+    });
+    providersStore.setSlashCommandsForProvider(providerId, commands);
     composerController?.refreshCommands();
   } catch (error) {
     console.error(error);
@@ -1144,20 +1115,18 @@ async function loadRuntimeTargetsForProvider(providerId, runtimeInstanceIds = nu
     .filter((instance) => instance.available);
   if (!instances.length) return;
   try {
-    let loaded = 0;
-    for (const instance of instances) {
-      const targets = await invoke("runtime_adapter_targets", {
-        adapterId: providerId,
-        runtimeInstanceId: instance.id,
-      });
-      applyRuntimeTargetsForInstance(providerId, instance.id, targets);
-      loaded += Array.isArray(targets) ? targets.length : 0;
-    }
+    const { targetsByInstanceId, loadedCount } = await runtimeAdapterCatalog.loadTargets({
+      providerId,
+      runtimeInstances: instances,
+    });
+    Object.entries(targetsByInstanceId).forEach(([runtimeInstanceId, targets]) => {
+      applyRuntimeTargetsForInstance(providerId, runtimeInstanceId, targets);
+    });
     ensureCurrentTargetAgentExists();
     renderProviders();
     renderWorkspace();
     const emptyNoticeKey = providerById(providerId)?.emptyTargetsNoticeKey;
-    if (!loaded && emptyNoticeKey) setAppNotice(t(emptyNoticeKey));
+    if (!loadedCount && emptyNoticeKey) setAppNotice(t(emptyNoticeKey));
   } catch (error) {
     console.error(error);
     setAppNotice(t("provider.runtimeTargetLoadFailed", { error: formatBackendError(error) }), "error");
