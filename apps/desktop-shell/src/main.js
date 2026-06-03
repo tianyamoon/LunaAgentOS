@@ -132,6 +132,10 @@ import {
   providerStatusForFleet,
   targetStatusForFleet,
 } from "./providers/agentMetadata.js";
+import {
+  buildAgentBriefPrompt,
+  parseAgentBriefResponse,
+} from "./providers/agentBrief.js";
 import { sessionSectionsFromEvents } from "./runtime/streamEvents.js";
 import { FALLBACK_SESSIONS } from "./fixtures/fallbackSessions.js";
 
@@ -750,41 +754,11 @@ function updateSendModeLabel() {
   composerController?.updateSendModeLabel();
 }
 
-function agentBriefPrompt() {
-  return [
-    "请用10个字以内给自己起一个普通用户一眼能看懂的职责标题。只返回标题，不要解释，不要标点。",
-    "Give yourself a clear role title in 4 words or fewer. Return only the title. No punctuation.",
-    "Return both titles in strict JSON only.",
-    "Return strict JSON only: {\"zh-CN\":\"...\",\"en-US\":\"...\"}",
-  ].join("\n");
-}
-
-function sanitizeBriefText(value, language) {
-  const text = String(value || "")
-    .replace(/^[`"“”'‘’\s]+|[`"“”'‘’\s]+$/g, "")
-    .replace(/[。.!！?？,，;；:：]+$/g, "")
-    .trim();
-  if (!text) return "";
-  if (language === "en-US") return text.split(/\s+/).slice(0, 4).join(" ");
-  return Array.from(text).slice(0, 10).join("");
-}
-
-function parseAgentBriefResponse(text) {
-  const raw = String(text || "").trim();
-  if (!raw) throw new Error(t("agentBrief.emptyResponse"));
-  const jsonText = raw.match(/\{[\s\S]*\}/)?.[0] || raw;
-  const parsed = JSON.parse(jsonText);
-  const zh = sanitizeBriefText(parsed["zh-CN"] || parsed.zh || parsed.zhCN, "zh-CN");
-  const en = sanitizeBriefText(parsed["en-US"] || parsed.en || parsed.enUS, "en-US");
-  if (!zh || !en) throw new Error(t("agentBrief.invalidResponse"));
-  return { "zh-CN": zh, "en-US": en };
-}
-
 async function fetchAgentBriefForTarget(target) {
   if (!target || !isTargetSendable(target)) throw new Error(t("agentBrief.targetUnavailable"));
   const commands = acpCommandsForProvider(target.providerId);
   if (!commands?.prompt) throw new Error(t("agentBrief.autoUnsupported"));
-  const prompt = agentBriefPrompt();
+  const prompt = buildAgentBriefPrompt();
   const session = createSessionForAgent(target, prompt);
   if (!session) throw new Error(t("agentBrief.autoUnsupported"));
   saveCurrentTargetAgent(target.id);
@@ -797,7 +771,7 @@ async function fetchAgentBriefForTarget(target) {
   renderHistory({ scrollSessionId: session.id });
   await startAcpSession(session, turn);
   const response = turn.finalResponse || turn.outputs.join("\n");
-  return parseAgentBriefResponse(response);
+  return parseAgentBriefResponse(response, { translate: t });
 }
 
 async function refreshAgentBriefForTarget(target, { quiet = false } = {}) {
