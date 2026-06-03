@@ -31,6 +31,7 @@ import {
   formatBackendError as formatBackendErrorValue,
   formatTime as formatTimeValue,
 } from "./ui/appFormatters.js";
+import { createAppChromeController } from "./ui/appChromeController.js";
 import { createConfirmDialogController } from "./ui/confirmDialogController.js";
 import { createRenderScheduler } from "./ui/renderScheduler.js";
 import { createRuntimeSessionCardView } from "./ui/runtimeSessionCardView.js";
@@ -249,6 +250,35 @@ const acpRuntimeClient = createAcpRuntimeClient({
 });
 const runtimeAdapterCatalog = createRuntimeAdapterCatalog({ invoke });
 const userThemeCatalog = createUserThemeCatalog({ invoke, registerUserThemes });
+const appChromeController = createAppChromeController({
+  documentRef: document,
+  providerManagerBtn,
+  languageBtn,
+  fontScaleBtn,
+  themeBtn,
+  appPreferences,
+  userThemeCatalog,
+  applyDataI18n,
+  getLanguage,
+  t,
+  toggleLanguagePreference: toggleLanguagePref,
+  fontScaleOptions: FONT_SCALE_OPTIONS,
+  findTheme,
+  nextThemeId,
+  defaultThemeId: DEFAULT_THEME_ID,
+  themes: THEMES,
+  themeLabel,
+  afterStaticTranslations: () => {
+    updateActionLabels();
+    updateSendModeLabel();
+    updatePromptPlaceholder();
+  },
+  afterLanguageChanged: () => {
+    renderProviders();
+    renderWorkspace();
+    renderHistory();
+  },
+});
 // History Repository 统一承接磁盘 IO 与快照管理，Shell 只注入运行时相关投影。
 const historyRepository = createHistoryRepository({
   invoke,
@@ -281,8 +311,6 @@ let historyView = null;
 let workspaceView = null;
 let runtimeProbeController = null;
 let sendAsNewSession = false;
-let fontScaleId = appPreferences.getFontScaleId();
-let themeId = appPreferences.getThemeId();
 const sessionListSectionOpenState = {
   active: true,
   archive: true,
@@ -567,25 +595,11 @@ function setAppNotice(message, tone = "muted") {
 }
 
 function applyStaticTranslations() {
-  const lang = getLanguage();
-  document.documentElement.lang = lang;
-  applyDataI18n(document);
-  document.title = t("app.title");
-  if (providerManagerBtn) providerManagerBtn.textContent = t("availability.button");
-  if (languageBtn) languageBtn.textContent = t("topbar.language");
-  applyFontScale();
-  applyTheme();
-  updateActionLabels();
-  updateSendModeLabel();
-  updatePromptPlaceholder();
+  appChromeController.applyStaticTranslations();
 }
 
 function toggleLanguage() {
-  toggleLanguagePref();
-  applyStaticTranslations();
-  renderProviders();
-  renderWorkspace();
-  renderHistory();
+  appChromeController.toggleLanguage();
 }
 
 function closeConfirmDialog() {
@@ -667,57 +681,31 @@ function currentSessionSendBlockReason(session, agent) {
 }
 
 function currentFontScaleOption() {
-  return FONT_SCALE_OPTIONS.find((item) => item.id === fontScaleId) || FONT_SCALE_OPTIONS[1];
+  return appChromeController.currentFontScaleOption();
 }
 
 function applyFontScale() {
-  const option = currentFontScaleOption();
-  document.documentElement.style.setProperty("--ui-scale", String(option.scale));
-  if (fontScaleBtn) fontScaleBtn.textContent = t(option.labelKey);
+  appChromeController.applyFontScale();
 }
 
 function cycleFontScale() {
-  const index = FONT_SCALE_OPTIONS.findIndex((item) => item.id === fontScaleId);
-  const next = FONT_SCALE_OPTIONS[(index + 1) % FONT_SCALE_OPTIONS.length];
-  fontScaleId = next.id;
-  appPreferences.setFontScaleId(fontScaleId);
-  applyFontScale();
+  appChromeController.cycleFontScale();
 }
 
 function currentTheme() {
-  return findTheme(themeId) || findTheme(DEFAULT_THEME_ID) || THEMES[0];
+  return appChromeController.currentTheme();
 }
 
 function applyTheme() {
-  const theme = currentTheme();
-  if (!theme) return;
-  const root = document.documentElement;
-  const vars = theme.vars || {};
-  Object.entries(vars).forEach(([name, value]) => {
-    if (name && value !== undefined && value !== null) {
-      root.style.setProperty(name, String(value));
-    }
-  });
-  if (theme.colorScheme) {
-    root.style.setProperty("color-scheme", theme.colorScheme);
-  }
-  root.classList.toggle("theme-dark", theme.colorScheme === "dark");
-  root.classList.toggle("theme-light", theme.colorScheme !== "dark");
-  root.dataset.theme = theme.id;
-  if (themeBtn) {
-    themeBtn.textContent = t("topbar.theme", { name: themeLabel(theme, getLanguage()) });
-  }
+  appChromeController.applyTheme();
 }
 
 function cycleTheme() {
-  themeId = nextThemeId(themeId);
-  appPreferences.setThemeId(themeId);
-  applyTheme();
+  appChromeController.cycleTheme();
 }
 
 async function loadUserThemes() {
-  const result = await userThemeCatalog.loadUserThemes();
-  if (result.registeredCount > 0) applyTheme();
+  return appChromeController.loadUserThemes();
 }
 
 function updateSendModeLabel() {
