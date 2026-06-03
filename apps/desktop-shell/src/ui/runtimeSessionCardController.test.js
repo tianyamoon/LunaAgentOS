@@ -10,13 +10,19 @@ test("runtimeSessionCardController: mini card 点击统一切换焦点与当前 
   const listeners = {};
   const miniCard = {
     dataset: { sessionId: "session-b" },
-    addEventListener(type, listener) {
-      listeners[type] = listener;
+    disabled: false,
+    closest(selector) {
+      if (selector === ".session-action-btn, .session-retry-btn, .session-mini-card") return this;
+      if (selector === ".session-mini-card") return this;
+      return null;
     },
   };
   const sessionDeck = {
     matches() {
       return false;
+    },
+    addEventListener(type, listener) {
+      listeners[type] = listener;
     },
     querySelectorAll(selector) {
       return selector === ".session-mini-card" ? [miniCard] : [];
@@ -31,7 +37,7 @@ test("runtimeSessionCardController: mini card 点击统一切换焦点与当前 
   });
 
   controller.bindSessionActions();
-  listeners.click();
+  listeners.click({ target: miniCard });
 
   assert.deepEqual(calls, [
     ["focus", "session-b"],

@@ -42,6 +42,22 @@ test("runtimeSessionMessageListView: Worked 行使用独立用时格式化并收
   assert.equal(formatRuntimeMessageDuration(5_000), "5s");
 });
 
+test("runtimeSessionMessageListView: Debug 折叠态保留可展开 JSON 模板", () => {
+  const view = createView();
+  const html = view.renderMessageRow({
+    id: "debug-1",
+    kind: "debug",
+    metadata: {
+      rawEvents: [{ type: "tool", payload: { id: "tool-1" } }],
+      logs: ["工具调用"],
+    },
+  });
+
+  assert.match(html, /runtime-message-debug-placeholder/);
+  assert.match(html, /template data-debug-json/);
+  assert.match(html, /tool-1/);
+});
+
 test("runtimeSessionMessageListView: 对账保留已有行节点并只移除过期行", () => {
   const oldStable = fakeNode("stable", rowSignature({ id: "stable", kind: "assistant", content: "不变" }));
   const oldChanged = fakeNode("changed", "old-signature");

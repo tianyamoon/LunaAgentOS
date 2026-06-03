@@ -109,11 +109,25 @@ function projectTurnRows(turn, { latestTurnId, forceLive }) {
 
 function projectLiveTurnRows(turn) {
   const rows = projectLiveTimeline(turn).map((item) => timelineItemRow(turn, item));
+  rows.push(...projectLiveRuntimeLogRows(turn, rows));
   const debug = debugMetadataForTurn(turn);
   if (debug) {
     rows.push(baseTurnRow(turn, "debug", "debug", { metadata: debug }));
   }
   return rows;
+}
+
+function projectLiveRuntimeLogRows(turn, existingRows) {
+  const represented = new Set(existingRows.map((row) => compactText(row.content, 140)));
+  return list(turn?.logs)
+    .map((log, index) => ({ log: compactText(log, 180), index }))
+    .filter((entry) => entry.log && !represented.has(compactText(entry.log, 140)))
+    .slice(-8)
+    .map((entry) => baseTurnRow(turn, "runtime", `log:${entry.index}`, {
+      status: turn.status || "running",
+      content: entry.log,
+      metadata: { source: "turn.logs" },
+    }));
 }
 
 function projectCompletedTraceRows(turn) {

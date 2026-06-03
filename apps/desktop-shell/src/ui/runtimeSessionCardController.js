@@ -38,6 +38,7 @@ export function createRuntimeSessionCardController({
   const pendingCardRenders = new Set();
   const delegatedCards = new WeakSet();
   const delegatedBodies = new WeakSet();
+  const delegatedActionRoots = new WeakSet();
   const lastScrollTargetRows = new Map();
   const virtualListRegistry = new Map();
   const virtualListCache = new Map();
@@ -65,49 +66,41 @@ export function createRuntimeSessionCardController({
         activateWorkspaceSession(card.dataset.sessionId);
       });
     });
-    actionRoot.querySelectorAll(".session-fullscreen-btn").forEach((button) => {
-      button.addEventListener("click", () => toggleSessionFocus(button.dataset.sessionId));
-    });
-    actionRoot.querySelectorAll(".session-mini-card").forEach((button) => {
-      button.addEventListener("click", () => {
-        focusSessionInWorkspace(button.dataset.sessionId);
-        activateWorkspaceSession(button.dataset.sessionId);
-      });
-    });
-    actionRoot.querySelectorAll(".session-dismiss-btn").forEach((button) => {
-      button.addEventListener("click", () => dismissWorkspaceSession(button.dataset.sessionId));
-    });
-    actionRoot.querySelectorAll(".session-archive-btn").forEach((button) => {
-      button.addEventListener("click", () => archiveLiveSession(button.dataset.sessionId));
-    });
-    actionRoot.querySelectorAll(".session-stop-btn").forEach((button) => {
-      button.addEventListener("click", () => stopSession(button.dataset.sessionId));
-    });
-    actionRoot.querySelectorAll(".session-delete-btn").forEach((button) => {
-      button.addEventListener("click", () => requestDeleteConfirmation(button.dataset.sessionId));
-    });
-    actionRoot.querySelectorAll(".session-retry-btn").forEach((button) => {
-      button.addEventListener("click", () => restoreArchivedSession(button.dataset.sessionId));
-    });
-    actionRoot.querySelectorAll(".session-scroll-latest-btn").forEach((button) => {
-      button.addEventListener("click", () => {
-        const sessionId = button.dataset.sessionId;
+    bindDelegatedSessionActions(actionRoot);
+  }
+
+  function bindDelegatedSessionActions(actionRoot) {
+    if (!actionRoot?.addEventListener || delegatedActionRoots.has(actionRoot)) return;
+    delegatedActionRoots.add(actionRoot);
+    actionRoot.addEventListener("click", async (event) => {
+      const button = event.target.closest?.(".session-action-btn, .session-retry-btn, .session-mini-card");
+      if (!button || button.disabled) return;
+      const sessionId = button.dataset.sessionId;
+      if (!sessionId) return;
+
+      if (button.closest(".session-fullscreen-btn")) return toggleSessionFocus(sessionId);
+      if (button.closest(".session-mini-card")) {
+        focusSessionInWorkspace(sessionId);
+        return activateWorkspaceSession(sessionId);
+      }
+      if (button.closest(".session-dismiss-btn")) return dismissWorkspaceSession(sessionId);
+      if (button.closest(".session-archive-btn")) return archiveLiveSession(sessionId);
+      if (button.closest(".session-stop-btn")) return stopSession(sessionId);
+      if (button.closest(".session-delete-btn")) return requestDeleteConfirmation(sessionId);
+      if (button.closest(".session-retry-btn")) return restoreArchivedSession(sessionId);
+      if (button.closest(".session-scroll-latest-btn")) {
         const body = sessionDeck.querySelector(`.session-card[data-session-id="${sessionId}"] .session-card-body`);
-        if (!body) return;
-        ensureMessageListStickController(sessionId, body, true)?.resumeFollowing();
-      });
-    });
-    actionRoot.querySelectorAll(".session-copy-btn").forEach((button) => {
-      button.addEventListener("click", async () => {
-        const session = getSession(button.dataset.sessionId);
+        if (body) ensureMessageListStickController(sessionId, body, true)?.resumeFollowing();
+        return;
+      }
+      if (button.closest(".session-copy-btn")) {
+        const session = getSession(sessionId);
         const text = session ? sessionTranscriptText(session) : "";
         if (!text) return setAppNotice(t("session.noTranscript"), "busy");
         const copied = await copyTextToClipboard(text);
-        setAppNotice(copied ? t("session.copiedTranscript") : t("copy.selectManually"), copied ? "muted" : "error");
-      });
-    });
-    actionRoot.querySelectorAll(".session-latest-only-btn").forEach((button) => {
-      button.addEventListener("click", () => toggleSessionLatestOnly(button.dataset.sessionId));
+        return setAppNotice(copied ? t("session.copiedTranscript") : t("copy.selectManually"), copied ? "muted" : "error");
+      }
+      if (button.closest(".session-latest-only-btn")) return toggleSessionLatestOnly(sessionId);
     });
   }
 
@@ -174,23 +167,7 @@ export function createRuntimeSessionCardController({
     if (newBody) {
       const elements = messageListElements(newBody);
       if (elements.scroller && elements.contentElement) {
-        let virtualList = virtualListRegistry.get(sessionId);
-        if (!virtualList) {
-          virtualList = createRuntimeSessionVirtualList({
-            scroller: elements.scroller,
-            content: elements.contentElement,
-            estimateRowSize: 80,
-            overscan: 6,
-            getActiveRowId: () => session.activePromptRunId
-              ? projection.rows.find((r) => r.promptRunId === session.activePromptRunId && r.kind === "assistant")?.id || null
-              : null,
-          });
-          if (virtualList) {
-            const cached = virtualListCache.get(sessionId);
-            if (cached) virtualList.restoreCache(cached);
-            virtualListRegistry.set(sessionId, virtualList);
-          }
-        }
+        const virtualList = ensureSessionVirtualList(sessionId, elements);
         if (virtualList) {
           const report = virtualList.reconcile(projection.rows, {
             renderRow: (row) => runtimeSessionMessageListView.renderMessageRow(row),
@@ -204,7 +181,8 @@ export function createRuntimeSessionCardController({
       }
     }
 
-    // 动作委托已在首次绑定时设置，流式路径不需要重复绑定
+    // Header 可能被局部 patch 替换，动作通过 Card 级委托保持稳定。
+    bindSessionActions(card);
     bindMessageListDelegation(sessionId, newBody);
     // Mermaid 只处理 mutation report 中变化的 Assistant row
     renderMermaidForChangedRows(card, newBody).catch((error) => console.error(error));
@@ -219,7 +197,7 @@ export function createRuntimeSessionCardController({
       if (!body) return;
       const previousFollowing = stickyIntent.has(session.id) ? stickyIntent.get(session.id) : true;
       const projection = projectRuntimeSessionMessageList(session, { latestOnly: isSessionLatestOnly(session) });
-      runtimeSessionMessageListView.syncMessageList(body, projection);
+      syncVirtualMessageList(session, body, projection);
       bindMessageListDelegation(session.id, body);
       syncMessageListScroll(session.id, body, projection, previousFollowing);
       ids.push(session.id);
@@ -227,7 +205,57 @@ export function createRuntimeSessionCardController({
     sessionStickRegistry.sweep(ids);
   }
 
+  function syncVirtualMessageList(session, body, projection) {
+    const elements = messageListElements(body);
+    if (!elements.scroller || !elements.contentElement) {
+      runtimeSessionMessageListView.syncMessageList(body, projection);
+      return;
+    }
+    const virtualList = ensureSessionVirtualList(session.id, elements);
+    if (!virtualList) return;
+    const report = virtualList.reconcile(projection.rows, {
+      renderRow: (row) => runtimeSessionMessageListView.renderMessageRow(row),
+      renderRowBody: (row) => runtimeSessionMessageListView.renderMessageRowBody(row),
+    });
+    elements.contentElement.dataset.lastMutationReport = JSON.stringify(report);
+  }
+
   // MessageList 事件只绑定在稳定 body 上，局部更新不会重复监听。
+  function ensureSessionVirtualList(sessionId, elements) {
+    let virtualList = virtualListRegistry.get(sessionId);
+    if (virtualList && (
+      virtualList.getScroller?.() !== elements.scroller ||
+      virtualList.getContentElement?.() !== elements.contentElement
+    )) {
+      // 工作区全量重绘会替换 DOM，旧虚拟列表必须释放后重新绑定新 scroller。
+      virtualListCache.set(sessionId, virtualList.snapshotCache());
+      virtualList.dispose();
+      virtualListRegistry.delete(sessionId);
+      virtualList = null;
+    }
+    if (virtualList) return virtualList;
+    virtualList = createRuntimeSessionVirtualList({
+      scroller: elements.scroller,
+      content: elements.contentElement,
+      estimateRowSize: 80,
+      overscan: 6,
+      getActiveRowId: () => activePromptRows(sessionId).find((row) => row.kind === "assistant")?.id || null,
+      getPinnedRowIds: () => activePromptRows(sessionId).map((row) => row.id),
+    });
+    if (!virtualList) return null;
+    const cached = virtualListCache.get(sessionId);
+    if (cached) virtualList.restoreCache(cached);
+    virtualListRegistry.set(sessionId, virtualList);
+    return virtualList;
+  }
+
+  function activePromptRows(sessionId) {
+    const latestSession = getSession(sessionId);
+    if (!latestSession?.activePromptRunId) return [];
+    const latestProjection = projectRuntimeSessionMessageList(latestSession, { latestOnly: isSessionLatestOnly(latestSession) });
+    return latestProjection.rows.filter((row) => row.promptRunId === latestSession.activePromptRunId);
+  }
+
   function bindMessageListDelegation(sessionId, body) {
     if (!body?.addEventListener || delegatedBodies.has(body)) return;
     delegatedBodies.add(body);
@@ -246,8 +274,24 @@ export function createRuntimeSessionCardController({
     });
     body.addEventListener("toggle", (event) => {
       const detail = event.target.closest?.(".terminal-detail[data-detail-key]");
-      if (detail) setFlowDetailOpen(detail.dataset.detailKey, detail.open);
+      if (!detail) return;
+      setFlowDetailOpen(detail.dataset.detailKey, detail.open);
+      if (detail.classList?.contains("runtime-message-debug") && detail.open) {
+        revealDebugJson(detail);
+        scheduleSessionCardRender(sessionId);
+      }
     }, true);
+  }
+
+  function revealDebugJson(detail) {
+    const placeholder = detail.querySelector?.(".runtime-message-debug-placeholder");
+    const template = detail.querySelector?.("template[data-debug-json]");
+    if (!placeholder || !template) return;
+    const pre = document.createElement("pre");
+    pre.className = "terminal-pre";
+    pre.textContent = template.content?.textContent || "";
+    placeholder.parentNode?.replaceChild(pre, placeholder);
+    template.remove();
   }
 
   function messageListElements(body) {

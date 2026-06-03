@@ -140,6 +140,24 @@ test("runtimeSessionMessageListProjection: latest-only 只保留当前消息段"
   assert.equal(result.rows.some((row) => row.turnId === "t2"), true);
 });
 
+test("runtimeSessionMessageListProjection: 运行中日志会作为可见 Runtime 过程行", () => {
+  const result = projectRuntimeSessionMessageList({
+    activeTurnId: "t1",
+    activePromptRunId: "run-1",
+    turns: [{
+      id: "t1",
+      task: "看过程",
+      status: "running",
+      promptRunId: "run-1",
+      logs: ["正在读取配置", "工具调用 completed"],
+      timelineItems: [],
+    }],
+  });
+
+  const runtimeRows = result.rows.filter((row) => row.kind === "runtime");
+  assert.deepEqual(runtimeRows.map((row) => row.content), ["正在读取配置", "工具调用 completed"]);
+});
+
 function item(type, content, overrides = {}) {
   return {
     id: overrides.id || `${type}-${content}`,

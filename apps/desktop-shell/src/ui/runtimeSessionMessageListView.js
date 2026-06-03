@@ -114,7 +114,9 @@ export function createRuntimeSessionMessageListView({
     return `
       <details class="terminal-detail runtime-message-debug" data-detail-key="${escapeHtml(detailKey)}"${open ? " open" : ""}>
         <summary>${escapeHtml(t("turn.timeline.debug"))}<span class="debug-summary">${escapeHtml(summary)}</span></summary>
-        <pre class="terminal-pre">${escapeHtml(stringifyDebug(row.metadata))}</pre>
+        ${open
+          ? `<pre class="terminal-pre">${escapeHtml(stringifyDebug(row.metadata))}</pre>`
+          : `<div class="terminal-pre runtime-message-debug-placeholder">${escapeHtml(summary || t("turn.timeline.debug"))}</div><template data-debug-json>${escapeHtml(stringifyDebug(row.metadata))}</template>`}
       </details>
     `;
   }
