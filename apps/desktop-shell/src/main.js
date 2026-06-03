@@ -62,6 +62,7 @@ import {
   isTargetSendable,
 } from "./state/targetActivation.js";
 import { getAvailabilityStore } from "./state/availabilityStore.js";
+import { createAppPreferences } from "./state/appPreferences.js";
 import {
   acpCommandsForProvider as acpCommandsForProviderRaw,
 } from "./runtime/acpCommands.js";
@@ -195,12 +196,6 @@ const runtimeStateClasses = {
 
 const executingSessionStates = new Set([0, 2, 3, 4]);
 
-const LEGACY_TARGET_AGENT_KEY = "lunaagentos.currentTargetAgentId";
-const CURRENT_TARGET_AGENT_KEY = "lunaagentos.currentTargetId";
-const CURRENT_SESSION_KEY = "lunaagentos.currentSessionId";
-const FONT_SCALE_KEY = "lunaagentos.fontScale";
-const THEME_KEY = "lunaagentos.theme";
-const PROVIDER_COLLAPSE_KEY = "lunaagentos.providerCollapsedIds";
 const HISTORY_SCHEMA_VERSION = 5;
 const STREAM_CARD_RENDER_INTERVAL_MS = 100;
 const PROVIDER_AVAILABILITY_STATES = {
@@ -231,19 +226,6 @@ function runtimeStateLabel(runtimeState) {
   return runtimeStateKeys[runtimeState] ? t(runtimeStateKeys[runtimeState]) : runtimeStateLabels[runtimeState] || runtimeState;
 }
 
-function readCollapsedProviderIds() {
-  try {
-    const stored = JSON.parse(localStorage.getItem(PROVIDER_COLLAPSE_KEY) || "[]");
-    return Array.isArray(stored) ? stored.filter(Boolean) : [];
-  } catch (_) {
-    return [];
-  }
-}
-
-function saveCollapsedProviderIds() {
-  localStorage.setItem(PROVIDER_COLLAPSE_KEY, JSON.stringify([...collapsedProviderIds]));
-}
-
 const agentList = document.getElementById("agentList");
 const providerManagerBtn = document.getElementById("providerManagerBtn");
 const workspaceStatus = document.getElementById("workspaceStatus");
@@ -269,9 +251,13 @@ const themeBtn = document.getElementById("themeBtn");
 const languageBtn = document.getElementById("languageBtn");
 const confirmDialog = document.getElementById("confirmDialog");
 
-localStorage.removeItem(CURRENT_SESSION_KEY);
+const appPreferences = createAppPreferences({
+  defaultThemeId: DEFAULT_THEME_ID,
+});
 
-let currentTargetAgentId = localStorage.getItem(CURRENT_TARGET_AGENT_KEY) || localStorage.getItem(LEGACY_TARGET_AGENT_KEY) || null;
+appPreferences.clearCurrentSessionId();
+
+let currentTargetAgentId = appPreferences.getCurrentTargetId();
 const providersStore = createProvidersStore();
 const sessionsStore = createSessionsStore();
 const sessionRuntimeStateModel = createSessionRuntimeState({ sessionsStore });
@@ -340,13 +326,13 @@ let runtimeSessionCardController = null;
 let historyView = null;
 let workspaceView = null;
 let sendAsNewSession = false;
-let fontScaleId = localStorage.getItem(FONT_SCALE_KEY) || "default";
-let themeId = localStorage.getItem(THEME_KEY) || DEFAULT_THEME_ID;
+let fontScaleId = appPreferences.getFontScaleId();
+let themeId = appPreferences.getThemeId();
 const sessionListSectionOpenState = {
   active: true,
   archive: true,
 };
-const collapsedProviderIds = new Set(readCollapsedProviderIds());
+const collapsedProviderIds = new Set(appPreferences.getCollapsedProviderIds());
 let scheduledWorkspaceRenderOptions = null;
 let scheduledWorkspaceRenderFrame = 0;
 let scheduledWorkspaceRenderTimer = 0;
@@ -776,17 +762,12 @@ function scheduleWorkspaceRender(options = {}, delayMs = 0) {
 
 function saveCurrentTargetAgent(agentId) {
   currentTargetAgentId = agentId;
-  if (agentId) {
-    localStorage.setItem(CURRENT_TARGET_AGENT_KEY, agentId);
-  } else {
-    localStorage.removeItem(CURRENT_TARGET_AGENT_KEY);
-  }
-  localStorage.removeItem(LEGACY_TARGET_AGENT_KEY);
+  appPreferences.setCurrentTargetId(agentId);
 }
 
 function saveCurrentSession(sessionId) {
   sessionsStore.setCurrentSessionId(sessionId || null);
-  localStorage.removeItem(CURRENT_SESSION_KEY);
+  appPreferences.clearCurrentSessionId();
 }
 
 function toggleProviderCollapsed(providerId) {
@@ -796,7 +777,7 @@ function toggleProviderCollapsed(providerId) {
   } else {
     collapsedProviderIds.add(providerId);
   }
-  saveCollapsedProviderIds();
+  appPreferences.setCollapsedProviderIds([...collapsedProviderIds]);
   renderProviders();
 }
 
@@ -810,7 +791,7 @@ function markSessionInactive(sessionId) {
 
 function clearCurrentSessionIf(sessionId) {
   sessionsStore.clearCurrentSessionIf(sessionId);
-  localStorage.removeItem(CURRENT_SESSION_KEY);
+  appPreferences.clearCurrentSessionId();
 }
 
 function currentSession() {
@@ -851,7 +832,7 @@ function cycleFontScale() {
   const index = FONT_SCALE_OPTIONS.findIndex((item) => item.id === fontScaleId);
   const next = FONT_SCALE_OPTIONS[(index + 1) % FONT_SCALE_OPTIONS.length];
   fontScaleId = next.id;
-  localStorage.setItem(FONT_SCALE_KEY, fontScaleId);
+  appPreferences.setFontScaleId(fontScaleId);
   applyFontScale();
 }
 
@@ -882,7 +863,7 @@ function applyTheme() {
 
 function cycleTheme() {
   themeId = nextThemeId(themeId);
-  localStorage.setItem(THEME_KEY, themeId);
+  appPreferences.setThemeId(themeId);
   applyTheme();
 }
 
