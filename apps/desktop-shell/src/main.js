@@ -113,6 +113,11 @@ import { createSessionsStore } from "./state/sessionsStore.js";
 import { createWorkspaceViewStore } from "./state/workspaceViewStore.js";
 import { createRuntimeConfigState } from "./state/runtimeConfigState.js";
 import {
+  countRestorableActiveHistoryItems as countRestorableActiveHistoryItemsValue,
+  projectWorkspaceEmptyCopy,
+  projectWorkspaceStatus,
+} from "./state/workspaceStatusProjection.js";
+import {
   ensureRestoredAgentEntry,
   projectWorkspaceSessionFromArchived,
 } from "./state/sessionRestoreProjection.js";
@@ -851,54 +856,48 @@ function createTurn(session, task, options = {}) {
 
 function updateWorkspaceEmptyCopy() {
   const restorableCount = countRestorableActiveHistoryItems();
+  const copy = projectWorkspaceEmptyCopy({ restorableCount });
   const titleEl = workspaceEmpty.querySelector("strong");
   const textEl = workspaceEmpty.querySelector("p");
   if (!titleEl || !textEl) return;
-  if (restorableCount > 0) {
-    titleEl.textContent = t("workspace.emptyRestoreTitle");
-    textEl.textContent = t("workspace.emptyRestoreText");
-    titleEl.dataset.i18n = "workspace.emptyRestoreTitle";
-    textEl.dataset.i18n = "workspace.emptyRestoreText";
-  } else {
-    titleEl.textContent = t("workspace.emptyTitle");
-    textEl.textContent = t("workspace.emptyText");
-    titleEl.dataset.i18n = "workspace.emptyTitle";
-    textEl.dataset.i18n = "workspace.emptyText";
-  }
+  titleEl.textContent = t(copy.titleKey);
+  textEl.textContent = t(copy.textKey);
+  titleEl.dataset.i18n = copy.titleKey;
+  textEl.dataset.i18n = copy.textKey;
 }
 
 function countRestorableActiveHistoryItems() {
-  const liveIds = new Set(sessionsSnapshot().map((session) => session.id));
-  return archivedSessionsFromHistory()
-    .filter((item) => !liveIds.has(item.id))
-    .filter((item) => item.record_state === RECORD_STATE.active && item.access_mode !== ACCESS_MODE.read_only)
-    .length;
+  return countRestorableActiveHistoryItemsValue({
+    sessions: sessionsSnapshot(),
+    archivedSessions: archivedSessionsFromHistory(),
+  });
 }
 
 function renderWorkspaceStatus() {
   const agent = currentTargetAgent();
   const provider = currentTargetProvider();
   const countedSessions = sessionsSnapshot();
-  const liveCount = countedSessions.filter((session) => sessionRecordState(session) === RECORD_STATE.active).length;
-  if (!agent || !provider) {
-    workspaceStatus.textContent = t("composer.placeholderNoTarget");
+  const statusView = projectWorkspaceStatus({
+    agent,
+    provider,
+    sessions: countedSessions,
+    currentSession: currentSession(),
+    latestActiveSession: agent ? latestActiveSessionForAgent(agent.id) : null,
+    availability: provider ? providerAvailability(provider.id) : null,
+    sessionRecordState,
+    targetDisplayName,
+  });
+  if (!statusView.hasTarget) {
+    workspaceStatus.textContent = t(statusView.placeholderKey);
     return;
   }
-  const statusSession = currentSession()
-    || latestActiveSessionForAgent(agent.id)
-    || countedSessions
-      .filter((session) => session.agentId === agent.id)
-      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0]
-    || null;
-  const statusState = statusSession?.state ?? agent.state ?? 1;
-  const availability = providerAvailability(provider.id);
-  const availabilityLabel = providerAvailabilityLabel(availability.summary, t);
+  const availabilityLabel = providerAvailabilityLabel(statusView.availabilitySummary, t);
   workspaceStatus.innerHTML = `
-    <strong class="workspace-status-target">${escapeHtml(targetDisplayName(agent))}</strong>
+    <strong class="workspace-status-target">${escapeHtml(statusView.targetLabel)}</strong>
     <span class="workspace-status-separator">·</span>
-    <span class="state-pill workspace-state-pill ${stateClasses[statusState] || "state-idle"}">${escapeHtml(stateDisplayLabel(statusState, t))}</span>
+    <span class="state-pill workspace-state-pill ${stateClasses[statusView.statusState] || "state-idle"}">${escapeHtml(stateDisplayLabel(statusView.statusState, t))}</span>
     <span class="workspace-runtime-count">${escapeHtml(availabilityLabel)}</span>
-    ${liveCount > 0 ? `<span class="workspace-runtime-count">ACP × ${liveCount}</span>` : ""}
+    ${statusView.liveCount > 0 ? `<span class="workspace-runtime-count">ACP × ${statusView.liveCount}</span>` : ""}
   `;
 }
 
