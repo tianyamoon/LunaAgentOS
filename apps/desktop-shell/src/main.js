@@ -84,6 +84,7 @@ import {
   registerUserThemes,
   themeLabel,
 } from "./themes/index.js";
+import { createUserThemeCatalog } from "./themes/userThemeCatalog.js";
 import {
   archivedSessionsFromHistory as archivedSessionsFromHistoryRaw,
 } from "./history/entries.js";
@@ -307,6 +308,7 @@ const acpRuntimeClient = createAcpRuntimeClient({
   translate: t,
 });
 const runtimeAdapterCatalog = createRuntimeAdapterCatalog({ invoke });
+const userThemeCatalog = createUserThemeCatalog({ invoke, registerUserThemes });
 // History Repository 统一承接磁盘 IO 与快照管理，Shell 只注入运行时相关投影。
 const historyRepository = createHistoryRepository({
   invoke,
@@ -884,22 +886,9 @@ function cycleTheme() {
   applyTheme();
 }
 
-// Pull user-supplied themes from ~/.lunaagentos/themes/*.json via the
-// Tauri backend, merge them into the registry, and re-apply the active
-// theme so a persisted user-theme id picks up its real values instead
-// of falling back to the default. Failures are non-fatal: the built-in
-// theme set continues to work.
 async function loadUserThemes() {
-  if (typeof invoke !== "function") return;
-  try {
-    const userThemes = await invoke("load_user_themes");
-    if (Array.isArray(userThemes) && userThemes.length) {
-      registerUserThemes(userThemes);
-      applyTheme();
-    }
-  } catch (error) {
-    console.warn("load_user_themes failed", error);
-  }
+  const result = await userThemeCatalog.loadUserThemes();
+  if (result.registeredCount > 0) applyTheme();
 }
 
 function updateSendModeLabel() {
