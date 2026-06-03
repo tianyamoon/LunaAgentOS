@@ -24,6 +24,7 @@ import { createComposerController } from "./ui/composerController.js";
 import { createAgentFleetView } from "./ui/agentFleetView.js";
 import { createAgentManagementView } from "./ui/agentManagementView.js";
 import { createConfirmDialogController } from "./ui/confirmDialogController.js";
+import { createRenderScheduler } from "./ui/renderScheduler.js";
 import { createRuntimeSessionCardView } from "./ui/runtimeSessionCardView.js";
 import { createRuntimeSessionCardController } from "./ui/runtimeSessionCardController.js";
 import { projectRuntimeSessionMessageList } from "./ui/runtimeSessionMessageListProjection.js";
@@ -334,12 +335,12 @@ const sessionListSectionOpenState = {
   archive: true,
 };
 const collapsedProviderIds = new Set(appPreferences.getCollapsedProviderIds());
-let scheduledWorkspaceRenderOptions = null;
-let scheduledWorkspaceRenderFrame = 0;
-let scheduledWorkspaceRenderTimer = 0;
 const confirmDialogController = createConfirmDialogController({
   element: confirmDialog,
   translate: t,
+});
+const workspaceRenderScheduler = createRenderScheduler({
+  render: (options) => renderWorkspace(options),
 });
 
 function allAgents() {
@@ -712,30 +713,7 @@ function updatePromptPlaceholder() {
 }
 
 function scheduleWorkspaceRender(options = {}, delayMs = 0) {
-  scheduledWorkspaceRenderOptions = {
-    ...(scheduledWorkspaceRenderOptions || {}),
-    ...options,
-  };
-  if (scheduledWorkspaceRenderFrame || scheduledWorkspaceRenderTimer) return;
-  const requestRender = () => {
-    scheduledWorkspaceRenderTimer = 0;
-    scheduledWorkspaceRenderFrame = requestAnimationFrame(() => {
-      const nextOptions = scheduledWorkspaceRenderOptions || {};
-      scheduledWorkspaceRenderFrame = 0;
-      scheduledWorkspaceRenderOptions = null;
-      renderWorkspace(nextOptions);
-    });
-  };
-  if (delayMs > 0) {
-    scheduledWorkspaceRenderTimer = window.setTimeout(requestRender, delayMs);
-    return;
-  }
-  scheduledWorkspaceRenderFrame = requestAnimationFrame(() => {
-    const nextOptions = scheduledWorkspaceRenderOptions || {};
-    scheduledWorkspaceRenderFrame = 0;
-    scheduledWorkspaceRenderOptions = null;
-    renderWorkspace(nextOptions);
-  });
+  workspaceRenderScheduler.schedule(options, delayMs);
 }
 
 function saveCurrentTargetAgent(agentId) {
@@ -1502,9 +1480,9 @@ sessionLifecycleController = createSessionLifecycleController({
   markSessionInactive,
   clearCurrentSessionIf,
   clearScheduledWorkspaceFocus: (sessionId) => {
-    if (scheduledWorkspaceRenderOptions?.focusSessionId === sessionId) {
-      scheduledWorkspaceRenderOptions = { ...scheduledWorkspaceRenderOptions, focusSessionId: null };
-    }
+    workspaceRenderScheduler.updatePendingOptions((options) => (
+      options.focusSessionId === sessionId ? { ...options, focusSessionId: null } : options
+    ));
   },
   clearQueuedSubmissions: (session, reason) => sessionPromptQueueController?.clear(session, reason),
   renderProviders,
