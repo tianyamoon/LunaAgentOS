@@ -1,6 +1,5 @@
 // Session Restore Projection Module。
-// 把归档 Session 投影为可进入工作区的 Runtime Session，不理解任何具体 Adapter。
-
+// 负责把归档 Session 投影为可进入工作区的 Runtime Session；这里不理解任何具体 Adapter。
 import { readLegacyHermesSnapshot, matchAgentEntry } from "../providers/agentEntrySnapshot.js";
 import { LIFECYCLE } from "./sessionLifecycle.js";
 import {
@@ -10,7 +9,7 @@ import {
   createRuntimeBinding,
 } from "./sessionStatus.js";
 
-// 只复制目标对象中尚未存在的字段，让当前实时探测结果优先于历史 metadata。
+// 只复制目标对象尚未存在的字段，让当前实时探测结果优先于历史 metadata。
 function assignMissing(target, source = {}) {
   Object.entries(source).forEach(([key, value]) => {
     if (target[key] == null && value != null) target[key] = value;
@@ -37,6 +36,47 @@ export function restoreAgentEntryFromArchived(archived, entries = []) {
     ...metadata,
     ...liveEntry,
   };
+}
+
+export function ensureRestoredAgentEntry(agentEntry, {
+  providers = [],
+  providerById,
+  agentById,
+  appendProviderAgent,
+  translate,
+} = {}) {
+  const t = typeof translate === "function" ? translate : (key) => key;
+  const provider = providerById?.(agentEntry.providerId) || providers[0] || { id: agentEntry.providerId };
+  let agent = agentById?.(agentEntry.id);
+  if (!agent) {
+    agent = {
+      ...agentEntry,
+      id: agentEntry.id,
+      providerId: provider.id,
+      name: agentEntry.name?.split(" / ").at(-1) || t("session.historyAgentName"),
+      subtitle: t("session.historyAgentSubtitle"),
+      note: t("session.historyAgentNote"),
+      state: 5,
+      isArchivedAgent: true,
+    };
+    appendProviderAgent?.(provider.id, agent);
+  }
+  return assignMissing(agent, agentEntry);
+}
+
+export function projectWorkspaceSessionFromArchived(archived, {
+  existing = null,
+  agentEntries = [],
+  ensureAgentEntry,
+  ...projectionOptions
+} = {}) {
+  const restoredAgentEntry = restoreAgentEntryFromArchived(archived, agentEntries);
+  const restoredAgent = ensureAgentEntry?.(restoredAgentEntry) || restoredAgentEntry;
+  return projectSessionFromArchived(archived, {
+    existing,
+    agentEntry: restoredAgent,
+    ...projectionOptions,
+  });
 }
 
 // 合并归档数据、当前 Agent Entry 和 Runtime 默认值，生成工作区 Session。

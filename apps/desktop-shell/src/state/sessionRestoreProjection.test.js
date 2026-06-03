@@ -1,7 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  ensureRestoredAgentEntry,
   projectSessionFromArchived,
+  projectWorkspaceSessionFromArchived,
   restoreAgentEntryFromArchived,
 } from "./sessionRestoreProjection.js";
 
@@ -94,4 +96,45 @@ test("sessionRestoreProjection: existing session is merged in place without over
   assert.equal(restored, existing);
   assert.equal(restored.runtimeLabel, "Live");
   assert.equal(restored.profileName, "default");
+});
+
+test("sessionRestoreProjection: synthesized archived agent is registered through injected seam", () => {
+  const appended = [];
+  const agent = ensureRestoredAgentEntry(
+    { id: "archived-agent", providerId: "demo", name: "Demo / archived", runtimeLabel: "WSL" },
+    {
+      providers: [{ id: "demo" }],
+      providerById: (id) => ({ id }),
+      agentById: () => null,
+      appendProviderAgent: (providerId, entry) => appended.push({ providerId, entry }),
+      translate: (key) => `t:${key}`,
+    },
+  );
+
+  assert.equal(agent.id, "archived-agent");
+  assert.equal(agent.name, "archived");
+  assert.equal(agent.isArchivedAgent, true);
+  assert.equal(appended.length, 1);
+  assert.equal(appended[0].providerId, "demo");
+});
+
+test("sessionRestoreProjection: projectWorkspaceSessionFromArchived resolves entry before projecting session", () => {
+  const restored = projectWorkspaceSessionFromArchived(makeArchived({
+    agentEntrySnapshot: {
+      providerId: "demo",
+      targetId: "demo-main",
+      targetName: "Demo main",
+      runtimeInstanceId: "demo-wsl",
+      launch: { runtimeHost: "wsl" },
+      metadata: { profileName: "main" },
+    },
+  }), projectionOptions({
+    agentEntries: [],
+    ensureAgentEntry: (entry) => ({ ...entry, runtimeLabel: "Restored runtime" }),
+  }));
+
+  assert.equal(restored.runtimeInstanceId, "demo-wsl");
+  assert.equal(restored.runtimeLabel, "Restored runtime");
+  assert.equal(restored.profileName, "main");
+  assert.equal(restored.inWorkspace, true);
 });

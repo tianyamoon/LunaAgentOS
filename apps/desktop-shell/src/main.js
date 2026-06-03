@@ -113,8 +113,8 @@ import { createSessionsStore } from "./state/sessionsStore.js";
 import { createWorkspaceViewStore } from "./state/workspaceViewStore.js";
 import { createRuntimeConfigState } from "./state/runtimeConfigState.js";
 import {
-  projectSessionFromArchived,
-  restoreAgentEntryFromArchived,
+  ensureRestoredAgentEntry,
+  projectWorkspaceSessionFromArchived,
 } from "./state/sessionRestoreProjection.js";
 import { createWorkspaceSessionController } from "./controllers/workspaceSessionController.js";
 import { createSessionRestoreController } from "./controllers/sessionRestoreController.js";
@@ -1437,35 +1437,17 @@ function renderHistory(options = {}) {
   historyView?.renderHistory(options);
 }
 
-function ensureArchivedAgent(agentEntry) {
-  const provider = providerById(agentEntry.providerId) || providersSnapshot()[0];
-  let agent = agentById(agentEntry.id);
-  if (!agent) {
-    agent = {
-      ...agentEntry,
-      id: agentEntry.id,
-      providerId: provider.id,
-      name: agentEntry.name?.split(" / ").at(-1) || t("session.historyAgentName"),
-      subtitle: t("session.historyAgentSubtitle"),
-      note: t("session.historyAgentNote"),
-      state: 5,
-      isArchivedAgent: true,
-    };
-    providersStore.appendProviderAgent(provider.id, agent);
-  }
-  // 仅回填缺失字段，避免旧归档覆盖当前实时探测结果。
-  Object.entries(agentEntry).forEach(([key, value]) => {
-    if (agent[key] == null && value != null) agent[key] = value;
-  });
-  return agent;
-}
-
 function workspaceSessionFromArchived(archived, existing = null) {
-  const agentEntries = [...runtimeTargets(), ...providersSnapshot().flatMap((provider) => provider.agents || [])];
-  const restoredAgent = ensureArchivedAgent(restoreAgentEntryFromArchived(archived, agentEntries));
-  return projectSessionFromArchived(archived, {
+  return projectWorkspaceSessionFromArchived(archived, {
     existing,
-    agentEntry: restoredAgent,
+    agentEntries: [...runtimeTargets(), ...providersSnapshot().flatMap((provider) => provider.agents || [])],
+    ensureAgentEntry: (agentEntry) => ensureRestoredAgentEntry(agentEntry, {
+      providers: providersSnapshot(),
+      providerById,
+      agentById,
+      appendProviderAgent: (providerId, agent) => providersStore.appendProviderAgent(providerId, agent),
+      translate: t,
+    }),
     runtimeInstances: runtimeInstancesSnapshot(),
     runtimeDefaultsForProvider,
     runtimeHostForInstance,
