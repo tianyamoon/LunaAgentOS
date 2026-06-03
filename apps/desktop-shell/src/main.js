@@ -44,6 +44,9 @@ import {
   sessionCardStats,
   turnResponseText,
 } from "./ui/sessionCardView.js";
+import {
+  sessionTranscriptText as sessionTranscriptTextValue,
+} from "./ui/sessionTranscript.js";
 import { createHistoryView } from "./ui/historyView.js";
 import { createWorkspaceView } from "./ui/workspaceView.js";
 import { renderAssistantResponse as renderAssistantResponseView } from "./ui/assistantResponseView.js";
@@ -926,19 +929,10 @@ function renderAssistantResponse(text, phase = "final") {
 }
 
 function sessionTranscriptText(session) {
-  return session.turns.map((turn, index) => turnTranscriptText(turn, index)).join("\n\n---\n\n");
-}
-
-function turnTranscriptText(turn, index) {
-  const parts = [
-    `# ${t("turn.transcriptTitle", { index: index + 1 })}`,
-    `user:\n${turn.task}`,
-  ];
-  if (turn.thoughts.length) parts.push(`${t("turn.thoughtStreamLabel")}:\n${turn.thoughts.join("\n\n")}`);
-  const response = turnResponseText(turn);
-  if (response) parts.push(`assistant:\n${response}`);
-  if (turn.logs.length) parts.push(`${t("turn.runtimeStreamLabel")}:\n${turn.logs.join("\n")}`);
-  return parts.join("\n\n");
+  return sessionTranscriptTextValue(session, {
+    translate: t,
+    turnResponseText,
+  });
 }
 
 function renderSessionActionIcon(name) {
