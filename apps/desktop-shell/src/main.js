@@ -27,6 +27,10 @@ import {
   compactNoticeText as compactNoticeTextValue,
   createAppNoticeController,
 } from "./ui/appNoticeController.js";
+import {
+  formatBackendError as formatBackendErrorValue,
+  formatTime as formatTimeValue,
+} from "./ui/appFormatters.js";
 import { createConfirmDialogController } from "./ui/confirmDialogController.js";
 import { createRenderScheduler } from "./ui/renderScheduler.js";
 import { createRuntimeSessionCardView } from "./ui/runtimeSessionCardView.js";
@@ -535,14 +539,7 @@ function canSendToProvider(providerId) {
 }
 
 function formatTime(value) {
-  return new Date(value).toLocaleTimeString("zh-CN", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function formatSessionStatus(session) {
-  return stateName(session.state);
+  return formatTimeValue(value, "zh-CN");
 }
 
 function isArchivedSessionListItem(item) {
@@ -558,12 +555,7 @@ function isSessionExecuting(session) {
 }
 
 function formatBackendError(error) {
-  const raw = String(error);
-  const match = raw.match(/^\[([A-Z_]+)\]\s*(.*)$/);
-  if (!match) return raw;
-  const [, code, message] = match;
-  const label = t(`backend.${code}`);
-  return `${label === `backend.${code}` ? code : label}: ${message}`;
+  return formatBackendErrorValue(error, t);
 }
 
 function compactNoticeText(value, maxLength = 180) {
