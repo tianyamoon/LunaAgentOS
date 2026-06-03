@@ -122,6 +122,7 @@ import { createSessionLifecycleController } from "./controllers/sessionLifecycle
 import { createSessionExecutionController } from "./controllers/sessionExecutionController.js";
 import { createSessionLaunchController } from "./controllers/sessionLaunchController.js";
 import { createSessionPromptQueueController } from "./controllers/sessionPromptQueueController.js";
+import { createRuntimeProbeController } from "./controllers/runtimeProbeController.js";
 import {
   availableRuntimeInstancesForProvider as availableRuntimeInstancesForProviderRaw,
   providerRuntimeLabel as providerRuntimeLabelRaw,
@@ -266,6 +267,7 @@ let runtimeSessionCardView = null;
 let runtimeSessionCardController = null;
 let historyView = null;
 let workspaceView = null;
+let runtimeProbeController = null;
 let sendAsNewSession = false;
 let fontScaleId = appPreferences.getFontScaleId();
 let themeId = appPreferences.getThemeId();
@@ -769,44 +771,12 @@ function openAvailabilityModal() {
 }
 
 async function refreshRuntimeProbe() {
-  try {
-    const result = await runtimeAdapterCatalog.probeRuntime();
-    const adapters = result.adapters || [];
-    setAdapterIconRegistry(result.iconEntries || {});
-    providersStore.batch(() => {
-      providersStore.syncAdapterProviders(adapters);
-      providersStore.patchRuntimeAvailability(
-        Object.fromEntries((result?.providers || []).map((item) => [item.providerId, item])),
-      );
-      providersStore.replaceRuntimeInstances(Array.isArray(result?.instances) ? result.instances : []);
-      const probedInstances = runtimeInstancesSnapshot();
-      providersStore.pruneRuntimeTargetsByInstanceIds(
-        probedInstances.filter((instance) => instance.available).map((instance) => instance.id),
-      );
-    });
-    ensureCurrentTargetAgentExists();
-    renderProviders();
-    renderWorkspace();
-    renderHistory();
-    renderWorkspaceStatus();
-    const probedInstances = runtimeInstancesSnapshot();
-    getAvailabilityStore().refresh(providersSnapshot(), probedInstances, currentTargetAgent(), providersStore.getRuntimeAvailabilitySnapshot());
-    [...new Set(probedInstances.filter((instance) => instance.available).map((instance) => instance.providerId))]
-      .forEach((providerId) => {
-        loadRuntimeSlashCommandsForProvider(providerId);
-      });
-    return result.raw;
-  } catch (error) {
-    console.error(error);
-    setAppNotice(t("runtime.probeFailed", { error: formatBackendError(error) }), "error");
-    return null;
-  }
+  return runtimeProbeController?.refreshRuntimeProbe() || null;
 }
 
 // 连接弹窗重查时统一刷新探测结果和该 Provider 的目标列表。
 async function refreshProviderConnections(providerId) {
-  await refreshRuntimeProbe();
-  await loadRuntimeTargetsForProvider(providerId);
+  return runtimeProbeController?.refreshProviderConnections(providerId);
 }
 
 function latestActiveSessionForAgent(agentId) {
@@ -861,62 +831,12 @@ function renderProviders() {
   agentFleetView?.renderProviders();
 }
 
-function applyRuntimeTargetsForInstance(providerId, runtimeInstanceId, targets) {
-  providersStore.batch(() => {
-    providersStore.setRuntimeTargetsForInstance(runtimeInstanceId, targets);
-    const count = providersStore.totalRuntimeTargetCount();
-    const provider = providerById(providerId);
-    if (provider?.loadedTargetsNoteKey && count > 0) {
-      providersStore.setProviderNote(providerId, {
-        note: null,
-        noteKey: provider.loadedTargetsNoteKey,
-        noteParams: { count },
-      });
-    }
-  });
-}
-
 async function loadRuntimeSlashCommandsForProvider(providerId, runtimeInstanceIds = null) {
-  const instances = (runtimeInstanceIds || availableRuntimeInstancesForProvider(providerId).map((instance) => instance.id))
-    .map(runtimeInstanceById)
-    .filter(Boolean)
-    .filter((instance) => instance.available);
-  if (!instances.length) return;
-  try {
-    const commands = await runtimeAdapterCatalog.loadSlashCommands({
-      providerId,
-      runtimeInstances: instances,
-    });
-    providersStore.setSlashCommandsForProvider(providerId, commands);
-    composerController?.refreshCommands();
-  } catch (error) {
-    console.error(error);
-  }
+  return runtimeProbeController?.loadRuntimeSlashCommandsForProvider(providerId, runtimeInstanceIds);
 }
 
 async function loadRuntimeTargetsForProvider(providerId, runtimeInstanceIds = null) {
-  const instances = (runtimeInstanceIds || availableRuntimeInstancesForProvider(providerId).map((instance) => instance.id))
-    .map(runtimeInstanceById)
-    .filter(Boolean)
-    .filter((instance) => instance.available);
-  if (!instances.length) return;
-  try {
-    const { targetsByInstanceId, loadedCount } = await runtimeAdapterCatalog.loadTargets({
-      providerId,
-      runtimeInstances: instances,
-    });
-    Object.entries(targetsByInstanceId).forEach(([runtimeInstanceId, targets]) => {
-      applyRuntimeTargetsForInstance(providerId, runtimeInstanceId, targets);
-    });
-    ensureCurrentTargetAgentExists();
-    renderProviders();
-    renderWorkspace();
-    const emptyNoticeKey = providerById(providerId)?.emptyTargetsNoticeKey;
-    if (!loadedCount && emptyNoticeKey) setAppNotice(t(emptyNoticeKey));
-  } catch (error) {
-    console.error(error);
-    setAppNotice(t("provider.runtimeTargetLoadFailed", { error: formatBackendError(error) }), "error");
-  }
+  return runtimeProbeController?.loadRuntimeTargetsForProvider(providerId, runtimeInstanceIds);
 }
 
 // Agent Brief 与 Composer 共用同一条 Session 创建路径。
@@ -1567,6 +1487,29 @@ composerController = createComposerController({
   setAppNotice,
   t,
   escapeHtml,
+});
+
+// Runtime Probe Controller 接管 Adapter 探测、动态 targets 与 slash commands 刷新。
+runtimeProbeController = createRuntimeProbeController({
+  runtimeAdapterCatalog,
+  providersStore,
+  setAdapterIconRegistry,
+  getProvidersSnapshot: providersSnapshot,
+  getRuntimeInstancesSnapshot: runtimeInstancesSnapshot,
+  getCurrentTargetAgent: currentTargetAgent,
+  getAvailabilityStore,
+  providerById,
+  availableRuntimeInstancesForProvider,
+  runtimeInstanceById,
+  ensureCurrentTargetAgentExists,
+  renderProviders,
+  renderWorkspace,
+  renderHistory,
+  renderWorkspaceStatus,
+  refreshComposerCommands: () => composerController?.refreshCommands(),
+  setAppNotice,
+  formatBackendError,
+  t,
 });
 
 // Session Launch Controller 接管发送校验、Session 创建与附件 prompt 装配。
