@@ -30,6 +30,13 @@ import { createRuntimeSessionCardController } from "./ui/runtimeSessionCardContr
 import { projectRuntimeSessionMessageList } from "./ui/runtimeSessionMessageListProjection.js";
 import { createRuntimeSessionMessageListView } from "./ui/runtimeSessionMessageListView.js";
 import {
+  providerAvailabilityLabel,
+  providerAvailabilityState,
+  stateClasses,
+  stateDisplayLabel,
+  stateName,
+} from "./ui/runtimeStatePresentation.js";
+import {
   sessionCardStats,
   turnResponseText,
 } from "./ui/sessionCardView.js";
@@ -131,102 +138,13 @@ import { FALLBACK_SESSIONS } from "./fixtures/fallbackSessions.js";
 const { invoke } = window.__TAURI__.core;
 const listenRuntimeEvent = window.__TAURI__?.event?.listen?.bind(window.__TAURI__.event);
 
-const stateNames = {
-  0: "INIT",
-  1: "IDLE",
-  2: "THINK",
-  3: "TOOLING",
-  4: "RESP",
-  5: "DONE",
-  6: "STOPPED",
-  9: "ERROR",
-};
-
-const stateDisplayNames = {
-  0: "Starting",
-  1: "Ready",
-  2: "Thinking",
-  3: "Using tools",
-  4: "Responding",
-  5: "Done",
-  6: "Stopped",
-  9: "Error",
-};
-
-const stateDisplayKeys = {
-  0: "state.init",
-  1: "state.idle",
-  2: "state.think",
-  3: "state.tooling",
-  4: "state.response",
-  5: "state.done",
-  6: "state.stopped",
-  9: "state.error",
-};
-
-const stateClasses = {
-  0: "state-init",
-  1: "state-idle",
-  2: "state-think",
-  3: "state-tooling",
-  4: "state-resp",
-  5: "state-done",
-  6: "state-stopped",
-  9: "state-error",
-};
-
-const runtimeStateLabels = {
-  live: "Live",
-  archived: "Read-only",
-  restoring: "Reconnecting",
-  resume_failed: "Reconnect failed",
-};
-
-const runtimeStateKeys = {
-  live: "runtime.live",
-  archived: "runtime.archived",
-  restoring: "runtime.restoring",
-  resume_failed: "runtime.resumeFailed",
-};
-
-const runtimeStateClasses = {
-  live: "runtime-live",
-  archived: "runtime-archived",
-  restoring: "runtime-restoring",
-  resume_failed: "runtime-failed",
-};
-
-const executingSessionStates = new Set([0, 2, 3, 4]);
-
 const HISTORY_SCHEMA_VERSION = 5;
 const STREAM_CARD_RENDER_INTERVAL_MS = 100;
-const PROVIDER_AVAILABILITY_STATES = {
-  probing: { state: 0, key: "provider.probing" },
-  available: { state: 1, key: "provider.available" },
-  partial: { state: 2, key: "provider.partial" },
-  not_connected: { state: 9, key: "provider.notConnected" },
-  not_configured: { state: 9, key: "provider.not_configured" },
-  unavailable: { state: 9, key: "provider.unavailable" },
-  planned: { state: 6, key: "provider.planned" },
-};
 const FONT_SCALE_OPTIONS = [
   { id: "compact", labelKey: "font.compact", scale: 0.92 },
   { id: "default", labelKey: "font.default", scale: 1 },
   { id: "comfortable", labelKey: "font.comfortable", scale: 1.08 },
 ];
-
-function providerAvailabilityLabel(summary) {
-  const key = PROVIDER_AVAILABILITY_STATES[summary]?.key;
-  return key ? t(key) : summary;
-}
-
-function stateDisplayLabel(state) {
-  return stateDisplayKeys[state] ? t(stateDisplayKeys[state]) : stateDisplayNames[state] || "UNKNOWN";
-}
-
-function runtimeStateLabel(runtimeState) {
-  return runtimeStateKeys[runtimeState] ? t(runtimeStateKeys[runtimeState]) : runtimeStateLabels[runtimeState] || runtimeState;
-}
 
 const agentList = document.getElementById("agentList");
 const providerManagerBtn = document.getElementById("providerManagerBtn");
@@ -306,7 +224,7 @@ const historyRepository = createHistoryRepository({
     agentEntrySnapshot: snapshotRuntimeSession(session),
     schemaVersion: HISTORY_SCHEMA_VERSION,
     runtimeState: sessionRuntimeState(session),
-    getStateName: (state) => stateNames[state],
+    getStateName: stateName,
   }),
   projectArchivedSessions: (entries) => archivedSessionsFromHistoryRaw(entries, {
     normalizeSession: normalizeWorkspaceSession,
@@ -586,7 +504,7 @@ function providerState(provider) {
   }
   const availability = providersStore.getRuntimeAvailabilityFor(provider.id);
   if (availability) {
-    return PROVIDER_AVAILABILITY_STATES[availability.summary]?.state ?? 1;
+    return providerAvailabilityState(availability.summary) ?? 1;
   }
   const states = provider.agents.map((agent) => agent.state);
   return states.includes(3)
@@ -638,7 +556,7 @@ function formatTime(value) {
 }
 
 function formatSessionStatus(session) {
-  return stateNames[session.state] || "UNKNOWN";
+  return stateName(session.state);
 }
 
 function isArchivedSessionListItem(item) {
@@ -1112,11 +1030,11 @@ function renderWorkspaceStatus() {
     || null;
   const statusState = statusSession?.state ?? agent.state ?? 1;
   const availability = providerAvailability(provider.id);
-  const availabilityLabel = providerAvailabilityLabel(availability.summary);
+  const availabilityLabel = providerAvailabilityLabel(availability.summary, t);
   workspaceStatus.innerHTML = `
     <strong class="workspace-status-target">${escapeHtml(targetDisplayName(agent))}</strong>
     <span class="workspace-status-separator">·</span>
-    <span class="state-pill workspace-state-pill ${stateClasses[statusState] || "state-idle"}">${escapeHtml(stateDisplayLabel(statusState))}</span>
+    <span class="state-pill workspace-state-pill ${stateClasses[statusState] || "state-idle"}">${escapeHtml(stateDisplayLabel(statusState, t))}</span>
     <span class="workspace-runtime-count">${escapeHtml(availabilityLabel)}</span>
     ${liveCount > 0 ? `<span class="workspace-runtime-count">ACP × ${liveCount}</span>` : ""}
   `;
@@ -1341,7 +1259,7 @@ agentManagementView = createAgentManagementView({
   targetsForProvider,
   providerAvailability,
   providerAvailabilityLabel,
-  providerAvailabilityState: (summary) => PROVIDER_AVAILABILITY_STATES[summary]?.state,
+  providerAvailabilityState,
   runtimeConnectionNote,
   targetDisplayName,
   displayAgentName,
