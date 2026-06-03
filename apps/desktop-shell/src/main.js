@@ -91,6 +91,7 @@ import { snapshotRuntimeSession } from "./providers/agentEntrySnapshot.js";
 import { createProvidersStore } from "./state/providersStore.js";
 import { createSessionsStore } from "./state/sessionsStore.js";
 import { createWorkspaceViewStore } from "./state/workspaceViewStore.js";
+import { createRuntimeConfigState } from "./state/runtimeConfigState.js";
 import {
   projectSessionFromArchived,
   restoreAgentEntryFromArchived,
@@ -112,9 +113,6 @@ import {
 } from "./providers/runtimeView.js";
 import { providerSupportsLaunch } from "./providers/providerCatalog.js";
 import {
-  agentBriefTargetKey,
-  briefRecordForTarget,
-  explicitBriefText,
   fallbackBriefKeyForTarget,
   providerStatusForFleet,
   targetStatusForFleet,
@@ -319,6 +317,7 @@ const historyRepository = createHistoryRepository({
     normalizeSession: normalizeWorkspaceSession,
   }),
 });
+const runtimeConfigState = createRuntimeConfigState({ invoke });
 const workspaceViewStore = createWorkspaceViewStore();
 let workspaceSessionController = null;
 let sessionRestoreController = null;
@@ -336,8 +335,6 @@ let workspaceView = null;
 let sendAsNewSession = false;
 let fontScaleId = localStorage.getItem(FONT_SCALE_KEY) || "default";
 let themeId = localStorage.getItem(THEME_KEY) || DEFAULT_THEME_ID;
-let runtimeConfigSnapshot = null;
-let agentBriefs = {};
 const sessionListSectionOpenState = {
   active: true,
   archive: true,
@@ -533,69 +530,39 @@ function displayAgentNote(agent) {
   return agent?.noteKey ? t(agent.noteKey) : agent?.note || "";
 }
 
-function normalizedAgentBriefs(value) {
-  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
-}
-
 async function loadRuntimeConfigState() {
-  const config = await invoke("load_runtime_config");
-  runtimeConfigSnapshot = config || {};
-  agentBriefs = normalizedAgentBriefs(runtimeConfigSnapshot.agentBriefs);
-  return runtimeConfigSnapshot;
+  return runtimeConfigState.load();
 }
 
 async function ensureRuntimeConfigState() {
-  if (runtimeConfigSnapshot) return runtimeConfigSnapshot;
-  return loadRuntimeConfigState();
+  return runtimeConfigState.ensure();
 }
 
 async function saveAgentBriefRecords(nextBriefs) {
-  const current = await invoke("load_runtime_config");
-  const config = {
-    ...(current || {}),
-    agentBriefs: normalizedAgentBriefs(nextBriefs),
-  };
-  const saved = await invoke("save_runtime_config", { config });
-  runtimeConfigSnapshot = saved || config;
-  agentBriefs = normalizedAgentBriefs(runtimeConfigSnapshot.agentBriefs);
-  return agentBriefs;
+  return runtimeConfigState.saveAgentBriefRecords(nextBriefs);
 }
 
 function cloneAgentBriefs() {
-  return JSON.parse(JSON.stringify(normalizedAgentBriefs(agentBriefs)));
+  return runtimeConfigState.getAgentBriefsSnapshot();
 }
 
 function targetBriefRecord(target, language = getLanguage()) {
-  return briefRecordForTarget(agentBriefs, target, language);
+  return runtimeConfigState.targetBriefRecord(target, language);
 }
 
 function targetBriefText(target) {
-  const record = targetBriefRecord(target);
-  if (record?.text) return record.text;
-  const explicit = explicitBriefText(target);
-  if (explicit) return explicit;
-  return t(fallbackBriefKeyForTarget(target));
+  return runtimeConfigState.targetBriefText(target, {
+    language: getLanguage(),
+    translate: t,
+  });
 }
 
 function targetBriefInputValue(target, language) {
-  return targetBriefRecord(target, language)?.text || "";
+  return runtimeConfigState.targetBriefInputValue(target, language);
 }
 
 function writeBriefValue(nextBriefs, target, language, value, source = "manual") {
-  const key = agentBriefTargetKey(target);
-  if (!key) return;
-  if (!nextBriefs[key] || typeof nextBriefs[key] !== "object") nextBriefs[key] = {};
-  const text = String(value || "").trim();
-  if (!text) {
-    delete nextBriefs[key][language];
-    if (!Object.keys(nextBriefs[key]).length) delete nextBriefs[key];
-    return;
-  }
-  nextBriefs[key][language] = {
-    text,
-    source,
-    updatedAt: new Date().toISOString(),
-  };
+  runtimeConfigState.writeBriefValue(nextBriefs, target, language, value, source);
 }
 
 function displayProviderNote(provider) {
