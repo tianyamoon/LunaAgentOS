@@ -127,10 +127,22 @@ import {
   providerRuntimeLabel as providerRuntimeLabelRaw,
   runtimeInstanceById as runtimeInstanceByIdRaw,
   runtimeInstancesForProvider as runtimeInstancesForProviderRaw,
-  runtimeTargets as runtimeTargetsRaw,
-  sortTargetsForAgentList,
   targetsForRuntimeInstance as targetsForRuntimeInstanceRaw,
 } from "./providers/runtimeView.js";
+import {
+  canSendToProviderRuntime,
+  chooseCurrentTargetAgentId,
+  compactTargetSubtitle as compactTargetSubtitleValue,
+  findAgentEntry,
+  findProviderForAgent,
+  projectAllAgentEntries,
+  projectProviderAvailability,
+  projectProviderState,
+  projectRuntimeTargets,
+  projectTargetsForProvider,
+  providerMetaLabel as providerMetaLabelValue,
+  providerRuntimeMiniLabel as providerRuntimeMiniLabelValue,
+} from "./providers/providerRuntimeProjection.js";
 import { providerSupportsLaunch } from "./providers/providerCatalog.js";
 import {
   fallbackBriefKeyForTarget,
@@ -272,8 +284,11 @@ const workspaceRenderScheduler = createRenderScheduler({
 });
 
 function allAgents() {
-  const dynamicTargets = runtimeTargets();
-  return runtimeInstancesSnapshot().length ? dynamicTargets : providersSnapshot().flatMap((provider) => provider.agents);
+  return projectAllAgentEntries({
+    providers: providersSnapshot(),
+    runtimeInstances: runtimeInstancesSnapshot(),
+    runtimeTargets: runtimeTargets(),
+  });
 }
 
 function providersSnapshot() {
@@ -359,7 +374,7 @@ function targetsForRuntimeInstance(instance) {
 }
 
 function runtimeTargets() {
-  return runtimeTargetsRaw({
+  return projectRuntimeTargets({
     providers: providersSnapshot(),
     runtimeInstances: runtimeInstancesSnapshot(),
     runtimeTargetsByInstance: providersStore.getRuntimeTargetsByInstanceSnapshot(),
@@ -379,69 +394,49 @@ function archivedSessionsFromHistory() {
 }
 
 function targetsForProvider(providerId) {
-  const provider = providerById(providerId);
-  if (!providerSupportsLaunch(provider)) return [];
-  const instances = runtimeInstancesForProvider(providerId);
-  if (!instances.length) {
-    return provider.agents || [];
-  }
-  return sortTargetsForAgentList(instances.flatMap(targetsForRuntimeInstance));
+  return projectTargetsForProvider(providerId, {
+    providers: providersSnapshot(),
+    runtimeInstances: runtimeInstancesSnapshot(),
+    runtimeTargetsByInstance: providersStore.getRuntimeTargetsByInstanceSnapshot(),
+  });
 }
 
 function compactTargetSubtitle(target) {
-  if (!target) return "";
-  const parts = [];
-  if (target.gateway === "running") parts.push(t("availability.gatewayRunning"));
-  else if (target.gateway) parts.push(t("availability.gatewayStopped"));
-  else if (target.model) parts.push(target.model);
-  return parts.filter(Boolean).join(" · ");
+  return compactTargetSubtitleValue(target, { translate: t });
 }
 
 function providerMetaLabel(provider, targets, instances) {
-  if (targets.length) {
-    return t(provider.targetCountKey || "provider.targetCount", { count: targets.length });
-  }
-  if (instances.length) {
-    return t("provider.instanceCount", { count: instances.length });
-  }
-  return t("provider.targetCount", { count: 0 });
+  return providerMetaLabelValue(provider, targets, instances, { translate: t });
 }
 
 function providerRuntimeMiniLabel(instances) {
-  const labels = [...new Set(instances.map((instance) => instance.runtimeLabel).filter(Boolean))];
-  return labels.join(" / ");
+  return providerRuntimeMiniLabelValue(instances);
 }
 
 function ensureCurrentTargetAgentExists() {
-  const currentTarget = agentById(currentTargetAgentId);
-  if (currentTarget && isTargetSelectable(currentTarget)) return;
-  const fallbackAgent = allAgents().find(isTargetSendable);
-  if (fallbackAgent) {
-    saveCurrentTargetAgent(fallbackAgent.id);
-    return;
-  }
-  const activatableAgent = allAgents().find(isTargetActivatable);
-  if (activatableAgent) {
-    saveCurrentTargetAgent(activatableAgent.id);
-  } else {
-    saveCurrentTargetAgent(null);
-  }
+  const nextTargetAgentId = chooseCurrentTargetAgentId(currentTargetAgentId, {
+    agents: allAgents(),
+    isSelectable: isTargetSelectable,
+    isSendable: isTargetSendable,
+    isActivatable: isTargetActivatable,
+  });
+  if (nextTargetAgentId !== currentTargetAgentId) saveCurrentTargetAgent(nextTargetAgentId);
 }
 
 function agentById(id) {
-  if (!id) return null;
-  const runtimeTarget = runtimeTargets().find((agent) => agent.id === id);
-  if (runtimeTarget) return runtimeTarget;
-  const staticAgent = providersSnapshot().flatMap((provider) => provider.agents).find((agent) => agent.id === id);
-  if (!staticAgent) return null;
-  const managedByRuntimeProbe = runtimeInstancesForProvider(staticAgent.providerId).length > 0;
-  if (managedByRuntimeProbe && !staticAgent.isArchivedAgent) return null;
-  return staticAgent;
+  return findAgentEntry(id, {
+    providers: providersSnapshot(),
+    runtimeInstances: runtimeInstancesSnapshot(),
+    runtimeTargets: runtimeTargets(),
+  });
 }
 
 function providerForAgent(agentId) {
-  const agent = agentById(agentId);
-  return agent ? providerById(agent.providerId) : null;
+  return findProviderForAgent(agentId, {
+    providers: providersSnapshot(),
+    runtimeInstances: runtimeInstancesSnapshot(),
+    runtimeTargets: runtimeTargets(),
+  });
 }
 
 function currentTargetAgent() {
@@ -505,57 +500,28 @@ function acpCommandsForProvider(providerId) {
 }
 
 function providerState(provider) {
-  const instances = runtimeInstancesForProvider(provider.id);
-  if (instances.length) {
-    const availableCount = instances.filter((instance) => instance.available).length;
-    if (availableCount === instances.length) return 1;
-    if (availableCount > 0) return 2;
-    return 9;
-  }
-  const availability = providersStore.getRuntimeAvailabilityFor(provider.id);
-  if (availability) {
-    return providerAvailabilityState(availability.summary) ?? 1;
-  }
-  const states = provider.agents.map((agent) => agent.state);
-  return states.includes(3)
-    ? 3
-    : states.includes(2)
-      ? 2
-      : states.includes(4)
-        ? 4
-        : states.includes(5)
-          ? 5
-          : states.includes(9)
-            ? 9
-            : states[0] ?? 1;
+  return projectProviderState(provider, {
+    runtimeInstances: runtimeInstancesSnapshot(),
+    runtimeAvailability: providersStore.getRuntimeAvailabilityFor(provider.id),
+    availabilityState: providerAvailabilityState,
+  });
 }
 
 function providerAvailability(providerId) {
-  const instances = runtimeInstancesForProvider(providerId);
-  if (instances.length) {
-    const availableCount = instances.filter((instance) => instance.available).length;
-    const summary = availableCount === instances.length
-      ? "available"
-      : availableCount > 0
-        ? "partial"
-        : "not_connected";
-    return {
-      summary,
-      configured: instances.some((instance) => instance.configured),
-      available: availableCount > 0,
-      command: `${availableCount}/${instances.length}`,
-      detail: "",
-    };
-  }
-  return providersStore.getRuntimeAvailabilityFor(providerId) || { summary: "available", configured: true, available: true, command: "" };
+  return projectProviderAvailability(providerId, {
+    runtimeInstances: runtimeInstancesSnapshot(),
+    runtimeAvailability: providersStore.getRuntimeAvailabilityFor(providerId),
+  });
 }
 
 function canSendToProvider(providerId) {
-  if (!providerSupportsLaunch(providerById(providerId))) return false;
-  if (runtimeInstancesForProvider(providerId).length) {
-    return runtimeTargets().some((target) => target.providerId === providerId && canTargetStartSession(target));
-  }
-  return providerAvailability(providerId).available;
+  return canSendToProviderRuntime(providerId, {
+    provider: providerById(providerId),
+    runtimeInstances: runtimeInstancesSnapshot(),
+    runtimeTargets: runtimeTargets(),
+    availability: providerAvailability(providerId),
+    canStartSession: canTargetStartSession,
+  });
 }
 
 function formatTime(value) {
