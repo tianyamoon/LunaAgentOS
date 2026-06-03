@@ -136,6 +136,7 @@ import { createSessionExecutionController } from "./controllers/sessionExecution
 import { createSessionLaunchController } from "./controllers/sessionLaunchController.js";
 import { createSessionPromptQueueController } from "./controllers/sessionPromptQueueController.js";
 import { createRuntimeProbeController } from "./controllers/runtimeProbeController.js";
+import { createAgentBriefController } from "./controllers/agentBriefController.js";
 import {
   availableRuntimeInstancesForProvider as availableRuntimeInstancesForProviderRaw,
   providerRuntimeLabel as providerRuntimeLabelRaw,
@@ -302,6 +303,7 @@ let sessionLifecycleController = null;
 let sessionExecutionController = null;
 let sessionLaunchController = null;
 let sessionPromptQueueController = null;
+let agentBriefController = null;
 let composerController = null;
 let agentFleetView = null;
 let agentManagementView = null;
@@ -713,36 +715,11 @@ function updateSendModeLabel() {
 }
 
 async function fetchAgentBriefForTarget(target) {
-  if (!target || !isTargetSendable(target)) throw new Error(t("agentBrief.targetUnavailable"));
-  const commands = acpCommandsForProvider(target.providerId);
-  if (!commands?.prompt) throw new Error(t("agentBrief.autoUnsupported"));
-  const prompt = buildAgentBriefPrompt();
-  const session = createSessionForAgent(target, prompt);
-  if (!session) throw new Error(t("agentBrief.autoUnsupported"));
-  saveCurrentTargetAgent(target.id);
-  saveCurrentSession(session.id);
-  sessionsStore.unmarkStopped(session.id);
-  const turn = createTurn(session, prompt);
-  closeConfirmDialog();
-  renderProviders();
-  renderWorkspace({ scrollSessionId: session.id });
-  renderHistory({ scrollSessionId: session.id });
-  await startAcpSession(session, turn);
-  const response = turn.finalResponse || turn.outputs.join("\n");
-  return parseAgentBriefResponse(response, { translate: t });
+  return agentBriefController?.fetchAgentBriefForTarget(target);
 }
 
 async function refreshAgentBriefForTarget(target, { quiet = false } = {}) {
-  if (!target) return null;
-  if (!quiet) setAppNotice(t("agentBrief.fetching", { target: targetDisplayName(target) }), "busy");
-  const result = await fetchAgentBriefForTarget(target);
-  const next = cloneAgentBriefs();
-  writeBriefValue(next, target, "zh-CN", result["zh-CN"], "agent-session");
-  writeBriefValue(next, target, "en-US", result["en-US"], "agent-session");
-  await saveAgentBriefRecords(next);
-  renderProviders();
-  if (!quiet) setAppNotice(t("agentBrief.fetched", { target: targetDisplayName(target) }));
-  return result;
+  return agentBriefController?.refreshAgentBriefForTarget(target, { quiet }) || null;
 }
 
 // Shell 只保留弹窗命令入口，具体 HTML 和表单绑定由 Agent 管理视图负责。
@@ -1520,6 +1497,30 @@ sessionLaunchController = createSessionLaunchController({
   acpCommandsForProvider,
   startAcpSession,
   runFallbackSession,
+  setAppNotice,
+  t,
+});
+
+// Agent Brief Controller 用一次隐藏 Session 自动生成职责简报，Shell 只提供运行入口。
+agentBriefController = createAgentBriefController({
+  isTargetSendable,
+  acpCommandsForProvider,
+  buildAgentBriefPrompt,
+  createSessionForAgent,
+  saveCurrentTargetAgent,
+  saveCurrentSession,
+  unmarkStopped: (sessionId) => sessionsStore.unmarkStopped(sessionId),
+  createTurn,
+  closeConfirmDialog,
+  renderProviders,
+  renderWorkspace,
+  renderHistory,
+  startAcpSession,
+  parseAgentBriefResponse,
+  cloneAgentBriefs,
+  writeBriefValue,
+  saveAgentBriefRecords,
+  targetDisplayName,
   setAppNotice,
   t,
 });
