@@ -23,6 +23,7 @@ import {
 import { createComposerController } from "./ui/composerController.js";
 import { createAgentFleetView } from "./ui/agentFleetView.js";
 import { createAgentManagementView } from "./ui/agentManagementView.js";
+import { createConfirmDialogController } from "./ui/confirmDialogController.js";
 import { createRuntimeSessionCardView } from "./ui/runtimeSessionCardView.js";
 import { createRuntimeSessionCardController } from "./ui/runtimeSessionCardController.js";
 import { projectRuntimeSessionMessageList } from "./ui/runtimeSessionMessageListProjection.js";
@@ -336,7 +337,10 @@ const collapsedProviderIds = new Set(appPreferences.getCollapsedProviderIds());
 let scheduledWorkspaceRenderOptions = null;
 let scheduledWorkspaceRenderFrame = 0;
 let scheduledWorkspaceRenderTimer = 0;
-let pendingConfirmAction = null;
+const confirmDialogController = createConfirmDialogController({
+  element: confirmDialog,
+  translate: t,
+});
 
 function allAgents() {
   const dynamicTargets = runtimeTargets();
@@ -692,37 +696,11 @@ function toggleLanguage() {
 }
 
 function closeConfirmDialog() {
-  pendingConfirmAction = null;
-  if (!confirmDialog) return;
-  confirmDialog.hidden = true;
-  confirmDialog.innerHTML = "";
+  confirmDialogController.close();
 }
 
-function openConfirmDialog({ title, message, confirmLabel = t("common.delete"), onConfirm }) {
-  if (!confirmDialog) return;
-  pendingConfirmAction = onConfirm;
-  confirmDialog.hidden = false;
-  confirmDialog.innerHTML = `
-    <div class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirmDialogTitle">
-      <div class="confirm-dialog-header">
-        <span class="confirm-dialog-icon" aria-hidden="true">!</span>
-        <h3 id="confirmDialogTitle">${escapeHtml(title)}</h3>
-        <button type="button" class="confirm-dialog-close" aria-label="${t("common.close")}">×</button>
-      </div>
-      <p class="confirm-dialog-message">${escapeHtml(message)}</p>
-      <div class="confirm-dialog-actions">
-        <button type="button" class="mini-btn confirm-dialog-cancel">${t("common.cancel")}</button>
-        <button type="button" class="mini-btn confirm-dialog-confirm">${escapeHtml(confirmLabel)}</button>
-      </div>
-    </div>
-  `;
-  confirmDialog.querySelector(".confirm-dialog-close")?.addEventListener("click", closeConfirmDialog);
-  confirmDialog.querySelector(".confirm-dialog-cancel")?.addEventListener("click", closeConfirmDialog);
-  confirmDialog.querySelector(".confirm-dialog-confirm")?.addEventListener("click", async () => {
-    const action = pendingConfirmAction;
-    closeConfirmDialog();
-    if (action) await action();
-  });
+function openConfirmDialog(options) {
+  confirmDialogController.open(options);
 }
 
 function updateActionLabels() {
