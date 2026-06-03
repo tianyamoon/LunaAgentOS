@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   compareActiveSessionListItems,
   compareArchivedSessionListItems,
+  projectSessionListItems,
 } from "./sessionListItems.js";
 
 function item(id, overrides = {}) {
@@ -80,4 +81,60 @@ test("compareArchivedSessionListItems sorts archived history by createdAt and ig
     [older, newer].sort(compareArchivedSessionListItems).map((entry) => entry.id),
     ["newer", "older"],
   );
+});
+
+test("projectSessionListItems merges live sessions and archived history without duplicating live ids", () => {
+  const liveSession = {
+    id: "live-1",
+    createdAt: "2026-06-01T12:00:00.000Z",
+    task: "继续分析",
+    turns: [{
+      id: "turn-1",
+      createdAt: "2026-06-01T12:01:00.000Z",
+      finalResponse: "完成摘要",
+      outputs: [],
+      logs: [],
+    }],
+    inWorkspace: false,
+  };
+  const archivedOnly = {
+    id: "archived-1",
+    createdAt: "2026-05-30T12:00:00.000Z",
+    updatedAt: "2026-05-30T12:10:00.000Z",
+    providerName: "Hermes",
+  };
+  const duplicateArchived = {
+    id: "live-1",
+    createdAt: "2026-05-01T00:00:00.000Z",
+    providerName: "Old",
+  };
+
+  const items = projectSessionListItems({
+    sessions: [liveSession],
+    archivedSessions: [archivedOnly, duplicateArchived],
+    normalizeSession: (session) => ({
+      ...session,
+      providerId: "hermes",
+      providerName: "Hermes",
+      agentName: "default",
+      agentId: "agent-default",
+      targetId: "target-default",
+    }),
+    sessionRuntimeState: () => "live",
+    createRuntimeBinding: () => ({ state: "none" }),
+    translate: (key) => key,
+    constants: {
+      RECORD_STATE: { archived: "archived" },
+      ACCESS_MODE: { read_only: "read_only" },
+    },
+  });
+
+  assert.equal(items.length, 2);
+  assert.deepEqual(items.map((entry) => entry.id), ["live-1", "archived-1"]);
+  assert.equal(items[0].isInWorkspace, false);
+  assert.equal(items[0].isRuntimeAttached, true);
+  assert.equal(items[0].summary, "完成摘要");
+  assert.equal(items[1].record_state, "archived");
+  assert.equal(items[1].access_mode, "read_only");
+  assert.equal(items[1].isRuntimeAttached, false);
 });

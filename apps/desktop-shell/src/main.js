@@ -56,6 +56,7 @@ import { createSessionTurnState } from "./state/sessionTurnState.js";
 import {
   compareActiveSessionListItems,
   compareArchivedSessionListItems,
+  projectSessionListItems,
 } from "./state/sessionListItems.js";
 import {
   ACCESS_MODE,
@@ -1420,53 +1421,16 @@ function syncSessionStickControllers(visibleSessions, stickyIntent) {
 }
 
 function sessionListItems() {
-  const sourceSessions = sessionsSnapshot();
-  const liveItems = sourceSessions.map((session) => {
-    ensureSessionStatusShape(session);
-    const identitySession = normalizeWorkspaceSession(session);
-    const lastTurn = session.turns.at(-1);
-    const inWorkspace = session.inWorkspace !== false;
-    return {
-      id: session.id,
-      date: session.createdAt.slice(0, 10),
-      createdAt: session.createdAt,
-      updatedAt: lastTurn?.createdAt || session.createdAt,
-      providerId: identitySession.providerId,
-      providerName: identitySession.providerName,
-      agentName: identitySession.agentName,
-      title: session.task || t("history.newSession"),
-      summary: lastTurn?.finalResponse || lastTurn?.outputs.at(-1) || lastTurn?.logs.at(-1) || t("session.current"),
-      turnCount: session.turns.length,
-      runtimeState: sessionRuntimeState(session),
-      record_state: session.record_state,
-      access_mode: session.access_mode,
-      runtime_binding: session.runtime_binding,
-      turns: session.turns,
-      activeTurnId: session.activeTurnId || null,
-      agentId: identitySession.agentId,
-      runtimeInstanceId: identitySession.runtimeInstanceId || null,
-      targetId: identitySession.targetId || identitySession.agentId,
-      acpSessionId: session.acpSessionId || null,
-      // Display flag: only sessions actually shown in the workspace get the "in workspace" pill.
-      // A dismissed-but-still-live session keeps its runtimeState (live/restoring/...) so the
-      // history list reflects the real runtime status; the runtime keeps running in the background.
-      isInWorkspace: inWorkspace,
-      isRuntimeAttached: true,
-    };
+  return projectSessionListItems({
+    sessions: sessionsSnapshot(),
+    archivedSessions: archivedSessionsFromHistory(),
+    normalizeSession: normalizeWorkspaceSession,
+    ensureSessionStatusShape,
+    sessionRuntimeState,
+    createRuntimeBinding,
+    translate: t,
+    constants: { RECORD_STATE, ACCESS_MODE },
   });
-  const liveIds = new Set(liveItems.map((item) => item.id));
-  const historyItems = archivedSessionsFromHistory()
-    .filter((item) => !liveIds.has(item.id))
-    .map((item) => ({
-      ...item,
-      runtimeState: item.runtimeState || "archived",
-      record_state: item.record_state || RECORD_STATE.archived,
-      access_mode: item.access_mode || ACCESS_MODE.read_only,
-      runtime_binding: item.runtime_binding || createRuntimeBinding(),
-      isInWorkspace: false,
-      isRuntimeAttached: false,
-    }));
-  return [...liveItems, ...historyItems];
 }
 
 function renderHistory(options = {}) {
