@@ -23,6 +23,10 @@ import {
 import { createComposerController } from "./ui/composerController.js";
 import { createAgentFleetView } from "./ui/agentFleetView.js";
 import { createAgentManagementView } from "./ui/agentManagementView.js";
+import {
+  compactNoticeText as compactNoticeTextValue,
+  createAppNoticeController,
+} from "./ui/appNoticeController.js";
 import { createConfirmDialogController } from "./ui/confirmDialogController.js";
 import { createRenderScheduler } from "./ui/renderScheduler.js";
 import { createRuntimeSessionCardView } from "./ui/runtimeSessionCardView.js";
@@ -261,6 +265,7 @@ const confirmDialogController = createConfirmDialogController({
   element: confirmDialog,
   translate: t,
 });
+const appNoticeController = createAppNoticeController({ element: appNotice });
 const workspaceRenderScheduler = createRenderScheduler({
   render: (options) => renderWorkspace(options),
 });
@@ -585,15 +590,11 @@ function formatBackendError(error) {
 }
 
 function compactNoticeText(value, maxLength = 180) {
-  const text = String(value || "").replace(/\s+/g, " ").trim();
-  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+  return compactNoticeTextValue(value, maxLength);
 }
 
 function setAppNotice(message, tone = "muted") {
-  if (!appNotice) return;
-  appNotice.textContent = message;
-  appNotice.classList.toggle("is-busy", tone === "busy");
-  appNotice.classList.toggle("is-error", tone === "error");
+  appNoticeController.set(message, tone);
 }
 
 function applyStaticTranslations() {
