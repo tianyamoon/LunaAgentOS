@@ -273,14 +273,27 @@ export function createRuntimeSessionCardController({
       });
     });
     body.addEventListener("toggle", (event) => {
-      const detail = event.target.closest?.(".terminal-detail[data-detail-key]");
+      const detail = event.target.closest?.("details");
       if (!detail) return;
-      setFlowDetailOpen(detail.dataset.detailKey, detail.open);
+      if (detail.matches?.(".terminal-detail[data-detail-key]")) {
+        setFlowDetailOpen(detail.dataset.detailKey, detail.open);
+      }
       if (detail.classList?.contains("runtime-message-debug") && detail.open) {
         revealDebugJson(detail);
         scheduleSessionCardRender(sessionId);
       }
+      measureExpandedMessageRow(sessionId, detail);
     }, true);
+  }
+
+  function measureExpandedMessageRow(sessionId, detail) {
+    const row = detail.closest?.("[data-message-id]");
+    const rowId = row?.dataset?.messageId;
+    const virtualList = rowId ? virtualListRegistry.get(sessionId) : null;
+    if (!rowId || !virtualList) return;
+    // details 展开会改变动态行高；下一帧重新测量，避免后续行仍停在旧 offset 上造成遮挡。
+    virtualList.measureChangedRows([rowId]);
+    requestFrame(() => virtualList.measureChangedRows([rowId]));
   }
 
   function revealDebugJson(detail) {

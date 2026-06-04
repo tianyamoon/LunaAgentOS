@@ -220,11 +220,12 @@ fn history_entry_turn_id(entry: &HistoryEntry) -> Option<String> {
 
 /// 提取 Session 身份，兼容只有 ACP session ID 的旧记录。
 fn history_entry_session_key(entry: &HistoryEntry) -> Option<String> {
-    entry
-        .session_id
-        .as_ref()
-        .or(entry.acp_session_id.as_ref())
-        .map(ToString::to_string)
+    entry.session_id.as_ref().map(ToString::to_string)
+}
+
+/// 旧记录缺失 Luna session_id 时，只能回退到 entry.id，避免把共享 ACP runtime 的记录误合并。
+fn history_entry_match_key(entry: &HistoryEntry) -> String {
+    history_entry_session_key(entry).unwrap_or_else(|| entry.id.clone())
 }
 
 /// 升级 schema 并按 Session + Turn 去重，保留最后写入的副本。
@@ -240,7 +241,7 @@ fn compact_entries(entries: Vec<HistoryEntry>) -> (Vec<HistoryEntry>, usize, usi
         }
         let key = format!(
             "{}:{}",
-            history_entry_session_key(&entry).unwrap_or_else(|| entry.id.clone()),
+            history_entry_match_key(&entry),
             history_entry_turn_id(&entry).unwrap_or_else(|| entry.id.clone())
         );
         if seen.insert(key) {
@@ -258,7 +259,7 @@ fn retain_not_session(entries: Vec<HistoryEntry>, session_id: &str) -> (Vec<Hist
     let retained = entries
         .into_iter()
         .filter(|entry| {
-            history_entry_session_key(entry).unwrap_or_else(|| entry.id.clone()) != session_id
+            history_entry_match_key(entry) != session_id
         })
         .collect::<Vec<_>>();
     let removed_count = original_len.saturating_sub(retained.len());
@@ -273,7 +274,7 @@ fn archive_session_entries(
     let mut retained = Vec::new();
     let mut moved = Vec::new();
     for mut entry in entries {
-        if history_entry_session_key(&entry).unwrap_or_else(|| entry.id.clone()) == session_id {
+        if history_entry_match_key(&entry) == session_id {
             entry.runtime_state = Some("archived".to_string());
             entry.record_state = Some("archived".to_string());
             entry.access_mode = Some("read_only".to_string());
@@ -288,9 +289,9 @@ fn archive_session_entries(
 /// 按 Session + Turn 覆盖已有记录，否则追加新记录。
 fn upsert_entry(entries: &mut Vec<HistoryEntry>, saved: HistoryEntry) {
     let saved_turn_id = history_entry_turn_id(&saved);
-    let saved_session_key = history_entry_session_key(&saved);
+    let saved_session_key = history_entry_match_key(&saved);
     if let Some(index) = entries.iter().position(|item| {
-        history_entry_session_key(item) == saved_session_key
+        history_entry_match_key(item) == saved_session_key
             && saved_turn_id.is_some()
             && history_entry_turn_id(item) == saved_turn_id
     }) {
@@ -538,6 +539,24 @@ mod tests {
     }
 
     #[test]
+    fn compact_entries_preserves_legacy_acp_only_entries() {
+        let mut first = entry("legacy-a", "turn-1", 4);
+        let mut second = entry("legacy-b", "turn-1", 4);
+        first.session_id = None;
+        second.session_id = None;
+        first.acp_session_id = Some("shared-runtime".to_string());
+        second.acp_session_id = Some("shared-runtime".to_string());
+
+        let (items, removed, upgraded) = compact_entries(vec![first, second]);
+
+        assert_eq!(items.len(), 2);
+        assert_eq!(removed, 0);
+        assert_eq!(upgraded, 2);
+        assert_eq!(items[0].id, "legacy-a");
+        assert_eq!(items[1].id, "legacy-b");
+    }
+
+    #[test]
     fn retain_not_session_deletes_only_matching_entries() {
         let first = entry("one", "turn-1", HISTORY_SCHEMA_VERSION);
         let mut second = entry("two", "turn-2", HISTORY_SCHEMA_VERSION);
@@ -545,6 +564,22 @@ mod tests {
         let (items, removed) = retain_not_session(vec![first, second], "session-1");
         assert_eq!(removed, 1);
         assert_eq!(items[0].session_id.as_deref(), Some("session-2"));
+    }
+
+    #[test]
+    fn retain_not_session_does_not_delete_legacy_siblings_by_acp_id() {
+        let mut first = entry("legacy-a", "turn-1", HISTORY_SCHEMA_VERSION);
+        let mut second = entry("legacy-b", "turn-2", HISTORY_SCHEMA_VERSION);
+        first.session_id = None;
+        second.session_id = None;
+        first.acp_session_id = Some("shared-runtime".to_string());
+        second.acp_session_id = Some("shared-runtime".to_string());
+
+        let (items, removed) = retain_not_session(vec![first, second], "legacy-a");
+
+        assert_eq!(removed, 1);
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].id, "legacy-b");
     }
 
     #[test]

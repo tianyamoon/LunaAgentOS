@@ -7,11 +7,11 @@ import {
   projectHistoryTurnIntegrity,
 } from "./entries.js";
 
-test("historySessionKey prefers camelCase sessionId, then session_id, then acp ids, then id", () => {
+test("historySessionKey prefers Luna sessionId and never groups by ACP runtime id", () => {
   assert.equal(historySessionKey({ sessionId: "a", id: "z" }), "a");
   assert.equal(historySessionKey({ session_id: "b", id: "z" }), "b");
-  assert.equal(historySessionKey({ acpSessionId: "c", id: "z" }), "c");
-  assert.equal(historySessionKey({ acp_session_id: "d", id: "z" }), "d");
+  assert.equal(historySessionKey({ acpSessionId: "c", id: "z" }), "z");
+  assert.equal(historySessionKey({ acp_session_id: "d", id: "z" }), "z");
   assert.equal(historySessionKey({ id: "z" }), "z");
   assert.equal(historySessionKey(null), null);
   assert.equal(historySessionKey({}), null);
@@ -127,6 +127,16 @@ test("archivedSessionsFromHistory carries hermesProfile from the first entry tha
   ];
   const [session] = archivedSessionsFromHistory(entries);
   assert.deepEqual(session.hermesProfile, { profileName: "ai" });
+});
+
+test("archivedSessionsFromHistory keeps legacy ACP-only entries separate", () => {
+  const entries = [
+    { id: "legacy-a", acpSessionId: "shared-runtime", task: "first", summary: "a", createdAt: "2026-05-01T10:00:00Z" },
+    { id: "legacy-b", acpSessionId: "shared-runtime", task: "second", summary: "b", createdAt: "2026-05-01T11:00:00Z" },
+  ];
+  const sessions = archivedSessionsFromHistory(entries);
+  assert.deepEqual(sessions.map((session) => session.id), ["legacy-b", "legacy-a"]);
+  assert.deepEqual(sessions.map((session) => session.acpSessionId), ["shared-runtime", "shared-runtime"]);
 });
 
 test("archivedSessionsFromHistory carries agentEntrySnapshot from the first entry that has it", () => {

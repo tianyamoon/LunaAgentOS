@@ -4,7 +4,7 @@
 // 从新旧字段中提取稳定的 Session 标识。
 export function historySessionKey(entry) {
   if (!entry) return null;
-  return entry.sessionId || entry.session_id || entry.acpSessionId || entry.acp_session_id || entry.id || null;
+  return entry.sessionId || entry.session_id || entry.id || null;
 }
 
 // 使用 Session 与 Turn 标识构造条目去重键。

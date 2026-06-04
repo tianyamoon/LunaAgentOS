@@ -1756,6 +1756,15 @@ button:disabled {
   overflow: auto;
 }
 
+.runtime-message-event > .terminal-pre,
+.runtime-message-debug > .terminal-pre,
+.runtime-message-worked-for .runtime-message-trace {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
 .runtime-message-event-tool-group ul,
 .runtime-message-trace {
   margin: 7px 0 0 20px;

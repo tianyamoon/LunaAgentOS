@@ -11,6 +11,7 @@ function fakeScroller() {
   return {
     scrollTop: 0,
     offsetWidth: 800,
+    clientWidth: 800,
     offsetHeight: 400,
     scrollHeight: 2000,
     clientHeight: 400,
@@ -24,7 +25,7 @@ function fakeScroller() {
       },
     },
     getBoundingClientRect() {
-      return { width: 800, height: 400 };
+      return { width: this.clientWidth || this.offsetWidth || 800, height: 400 };
     },
     scrollTo({ top }) {
       this.scrollTop = top;
@@ -78,7 +79,7 @@ function fakeRow(id, signature = id, height = 80) {
     parent: null,
     offsetHeight: height,
     getBoundingClientRect() {
-      return { width: 800, height };
+      return { width: 800, height: this.offsetHeight };
     },
     setAttribute(name, value) {
       if (name === "data-index") this.dataset.index = String(value);
@@ -122,6 +123,82 @@ test("runtimeSessionVirtualList: 创建虚拟列表返回 reconcile/scrollToRow/
   assert.equal(typeof list.snapshotCache, "function");
   assert.equal(typeof list.restoreCache, "function");
 
+  list.dispose();
+});
+
+test("runtimeSessionVirtualList: details 展开导致行高变化后重新定位后续行", () => {
+  const scroller = fakeScroller();
+  const content = fakeContent();
+  const frames = [];
+  const list = createRuntimeSessionVirtualList({
+    scroller,
+    content,
+    requestFrame: (cb) => { frames.push(cb); return frames.length; },
+    cancelFrame: () => {},
+  });
+
+  list.reconcile(rows(3), {
+    renderRow: (row) => `<div data-message-id="${row.id}" data-message-signature="${row.id}"></div>`,
+    createRowElement: (html) => {
+      const id = html.match(/data-message-id="([^"]+)"/)?.[1] || "missing";
+      return fakeRow(id, id, 80);
+    },
+  });
+  frames.splice(0).forEach((cb) => cb());
+
+  const row0 = content.children.find((child) => child.dataset.messageId === "row-0");
+  const row1 = content.children.find((child) => child.dataset.messageId === "row-1");
+  const before = Number(row1.style.transform.match(/translateY\(([-\d.]+)/)?.[1] || 0);
+
+  row0.offsetHeight = 180;
+  list.measureChangedRows(["row-0"]);
+  frames.splice(0).forEach((cb) => cb());
+  const after = Number(row1.style.transform.match(/translateY\(([-\d.]+)/)?.[1] || 0);
+
+  assert.ok(after > before);
+  assert.equal(after, 188);
+  list.dispose();
+});
+
+test("runtimeSessionVirtualList: 容器变窄后稳定行也会重新测量高度", () => {
+  const scroller = fakeScroller();
+  const content = fakeContent();
+  const frames = [];
+  const heights = new Map([
+    ["row-0", 80],
+    ["row-1", 80],
+  ]);
+  const list = createRuntimeSessionVirtualList({
+    scroller,
+    content,
+    requestFrame: (cb) => { frames.push(cb); return frames.length; },
+    cancelFrame: () => {},
+  });
+
+  list.reconcile(rows(2), {
+    renderRow: (row) => `<div data-message-id="${row.id}" data-message-signature="${row.id}"></div>`,
+    createRowElement: (html) => {
+      const id = html.match(/data-message-id="([^"]+)"/)?.[1] || "missing";
+      return fakeRow(id, id, heights.get(id) || 80);
+    },
+  });
+  frames.splice(0).forEach((cb) => cb());
+
+  const row0 = content.children.find((child) => child.dataset.messageId === "row-0");
+  const row1 = content.children.find((child) => child.dataset.messageId === "row-1");
+  const before = Number(row1.style.transform.match(/translateY\(([-\d.]+)/)?.[1] || 0);
+
+  row0.offsetHeight = 180;
+  scroller.clientWidth = 360;
+  list.reconcile(rows(2), {
+    renderRow: (row) => `<div data-message-id="${row.id}" data-message-signature="${row.id}"></div>`,
+    createRowElement: (html) => fakeRow(html.match(/data-message-id="([^"]+)"/)?.[1] || "missing"),
+  });
+  frames.splice(0).forEach((cb) => cb());
+  const after = Number(row1.style.transform.match(/translateY\(([-\d.]+)/)?.[1] || 0);
+
+  assert.ok(after > before);
+  assert.equal(after, 188);
   list.dispose();
 });
 

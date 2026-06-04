@@ -28,6 +28,7 @@ export function createRuntimeSessionVirtualList({
   let measureFrameId = 0;
   let pendingMeasureIds = new Set();
   let cleanupVirtualizer = null;
+  let measuredWidth = 0;
 
   prepareContentElement(content);
 
@@ -62,6 +63,7 @@ export function createRuntimeSessionVirtualList({
     rowIndexById = new Map(rows.map((row, index) => [row.id, index]));
     adoptExistingRowNodes();
     dropRemovedRows(report);
+    const widthChanged = invalidateMeasurementsIfWidthChanged();
     updateVirtualizerOptions();
 
     const virtualItems = virtualizer.getVirtualItems();
@@ -80,8 +82,22 @@ export function createRuntimeSessionVirtualList({
 
     unmountRowsOutsideWindow(mountedIds);
     reconcileMountedOrder(orderedNodes, report);
-    scheduleMeasure([...report.addedIds, ...report.changedIds]);
+    scheduleMeasure(widthChanged ? [...mountedIds] : [...report.addedIds, ...report.changedIds]);
     return report;
+  }
+
+  function invalidateMeasurementsIfWidthChanged() {
+    const nextWidth = currentScrollerWidth(scroller);
+    if (!nextWidth) return false;
+    if (!measuredWidth) {
+      measuredWidth = nextWidth;
+      return false;
+    }
+    if (Math.abs(nextWidth - measuredWidth) < 1) return false;
+    // 多卡片 grid 会让同一条消息从宽列切到窄列；旧行高缓存会造成行重叠，宽度变化时必须重测。
+    measuredWidth = nextWidth;
+    rowHeights.clear();
+    return true;
   }
 
   function updateVirtualizerOptions() {
@@ -318,6 +334,12 @@ function estimatedOffsetForIndex(index, rows, rowHeights, estimateRowSize) {
     offset += 8;
   }
   return offset;
+}
+
+function currentScrollerWidth(scroller) {
+  if (!scroller) return 0;
+  const rectWidth = scroller.getBoundingClientRect?.().width || 0;
+  return scroller.clientWidth || scroller.offsetWidth || rectWidth || 0;
 }
 
 function prepareContentElement(content) {
