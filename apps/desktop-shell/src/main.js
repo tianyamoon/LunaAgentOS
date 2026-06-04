@@ -54,6 +54,7 @@ import {
 } from "./ui/sessionTranscript.js";
 import { createHistoryView } from "./ui/historyView.js";
 import { createWorkspaceView } from "./ui/workspaceView.js";
+import { createWorkspaceStatusView } from "./ui/workspaceStatusView.js";
 import { renderAssistantResponse as renderAssistantResponseView } from "./ui/assistantResponseView.js";
 import { renderProviderIcon, setAdapterIconRegistry } from "./ui/providerIcon.js";
 import {
@@ -123,7 +124,6 @@ import { createRuntimeConfigState } from "./state/runtimeConfigState.js";
 import {
   countRestorableActiveHistoryItems as countRestorableActiveHistoryItemsValue,
   projectWorkspaceEmptyCopy,
-  projectWorkspaceStatus,
 } from "./state/workspaceStatusProjection.js";
 import {
   ensureRestoredAgentEntry,
@@ -311,6 +311,7 @@ let runtimeSessionCardView = null;
 let runtimeSessionCardController = null;
 let historyView = null;
 let workspaceView = null;
+let workspaceStatusView = null;
 let runtimeProbeController = null;
 let sendAsNewSession = false;
 const sessionListSectionOpenState = {
@@ -834,31 +835,7 @@ function countRestorableActiveHistoryItems() {
 }
 
 function renderWorkspaceStatus() {
-  const agent = currentTargetAgent();
-  const provider = currentTargetProvider();
-  const countedSessions = sessionsSnapshot();
-  const statusView = projectWorkspaceStatus({
-    agent,
-    provider,
-    sessions: countedSessions,
-    currentSession: currentSession(),
-    latestActiveSession: agent ? latestActiveSessionForAgent(agent.id) : null,
-    availability: provider ? providerAvailability(provider.id) : null,
-    sessionRecordState,
-    targetDisplayName,
-  });
-  if (!statusView.hasTarget) {
-    workspaceStatus.textContent = t(statusView.placeholderKey);
-    return;
-  }
-  const availabilityLabel = providerAvailabilityLabel(statusView.availabilitySummary, t);
-  workspaceStatus.innerHTML = `
-    <strong class="workspace-status-target">${escapeHtml(statusView.targetLabel)}</strong>
-    <span class="workspace-status-separator">·</span>
-    <span class="state-pill workspace-state-pill ${stateClasses[statusView.statusState] || "state-idle"}">${escapeHtml(stateDisplayLabel(statusView.statusState, t))}</span>
-    <span class="workspace-runtime-count">${escapeHtml(availabilityLabel)}</span>
-    ${statusView.liveCount > 0 ? `<span class="workspace-runtime-count">ACP × ${statusView.liveCount}</span>` : ""}
-  `;
+  workspaceStatusView?.renderWorkspaceStatus();
 }
 
 
@@ -1172,6 +1149,23 @@ historyView = createHistoryView({
 });
 // Repository 快照变化时刷新右侧列表，包含加载态切换与后台写入结果。
 historyRepository.subscribe(() => renderHistory());
+
+workspaceStatusView = createWorkspaceStatusView({
+  element: workspaceStatus,
+  getCurrentTargetAgent: currentTargetAgent,
+  getCurrentTargetProvider: currentTargetProvider,
+  getSessionsSnapshot: sessionsSnapshot,
+  getCurrentSession: currentSession,
+  getLatestActiveSessionForAgent: latestActiveSessionForAgent,
+  getProviderAvailability: providerAvailability,
+  sessionRecordState,
+  targetDisplayName,
+  providerAvailabilityLabel,
+  stateClasses,
+  stateDisplayLabel,
+  t,
+  escapeHtml,
+});
 
 workspaceView = createWorkspaceView({
   sessionDeck,
