@@ -19,7 +19,9 @@ fn history_schema_version() -> u32 {
 
 /// 新写入不得低于当前 schema，避免旧前端把新数据降级。
 fn schema_version_for_write(requested: Option<u32>) -> u32 {
-    requested.unwrap_or(HISTORY_SCHEMA_VERSION).max(HISTORY_SCHEMA_VERSION)
+    requested
+        .unwrap_or(HISTORY_SCHEMA_VERSION)
+        .max(HISTORY_SCHEMA_VERSION)
 }
 
 /// 单个 Turn 的本地持久化记录。
@@ -141,6 +143,58 @@ fn history_bucket_dir(app: &AppHandle, bucket: &str) -> Result<PathBuf, String> 
     Ok(directory)
 }
 
+/// 返回 History 写盘前的安全备份目录，避免删除、归档或压缩把旧文件不可逆清空。
+fn history_safety_backup_dir(app: &AppHandle, operation: &str) -> Result<PathBuf, String> {
+    let directory = history_dir(app)?.join("_safety_backups").join(operation);
+    fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
+    Ok(directory)
+}
+
+/// 判断旧文件内容是否值得保留副本，避免空历史文件制造噪声。
+fn should_backup_history_payload(raw: &[u8]) -> bool {
+    let trimmed = String::from_utf8_lossy(raw).trim().to_string();
+    !trimmed.is_empty() && trimmed != "[]"
+}
+
+/// 写入 history JSON 前保存旧文件副本；空文件和空数组不备份，减少无意义噪声。
+fn backup_history_file_before_write(
+    app: &AppHandle,
+    path: &PathBuf,
+    operation: &str,
+) -> Result<(), String> {
+    if !path.exists() {
+        return Ok(());
+    }
+    let raw = fs::read(path).map_err(|error| error.to_string())?;
+    if !should_backup_history_payload(&raw) {
+        return Ok(());
+    }
+    let bucket = path
+        .parent()
+        .and_then(|parent| parent.file_name())
+        .and_then(|name| name.to_str())
+        .unwrap_or("history");
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("history.json");
+    let timestamp = Local::now().to_rfc3339().replace([':', '+'], "-");
+    let backup_path = history_safety_backup_dir(app, operation)?
+        .join(format!("{timestamp}-{bucket}-{file_name}"));
+    fs::write(backup_path, raw).map_err(|error| error.to_string())
+}
+
+/// 所有 History 覆盖写入都走这里，集中保留写盘前副本。
+fn write_history_file(
+    app: &AppHandle,
+    path: &PathBuf,
+    json: String,
+    operation: &str,
+) -> Result<(), String> {
+    backup_history_file_before_write(app, path, operation)?;
+    fs::write(path, json).map_err(|error| error.to_string())
+}
+
 /// 返回当天分桶文件路径、日期和写入时间。
 fn history_file_for_today(
     app: &AppHandle,
@@ -161,7 +215,7 @@ fn history_file_for_date(app: &AppHandle, bucket: &str, date: &str) -> Result<Pa
     Ok(history_bucket_dir(app, bucket)?.join(format!("{date}.json")))
 }
 
-/// 从 JSON 文本解析历史记录，空文件视为没有记录。
+/// 从 JSON 文本解析历史记录；空文件视为没有记录。
 fn deserialize_history_entries(raw: &str) -> Result<Vec<HistoryEntry>, String> {
     if raw.trim().is_empty() {
         return Ok(Vec::new());
@@ -258,9 +312,7 @@ fn retain_not_session(entries: Vec<HistoryEntry>, session_id: &str) -> (Vec<Hist
     let original_len = entries.len();
     let retained = entries
         .into_iter()
-        .filter(|entry| {
-            history_entry_match_key(entry) != session_id
-        })
+        .filter(|entry| history_entry_match_key(entry) != session_id)
         .collect::<Vec<_>>();
     let removed_count = original_len.saturating_sub(retained.len());
     (retained, removed_count)
@@ -331,7 +383,7 @@ pub(crate) fn compact_history_entries(app: AppHandle) -> Result<HistoryCompactRe
         if removed_for_file > 0 || upgraded_for_file > 0 {
             let json =
                 serde_json::to_string_pretty(&compacted).map_err(|error| error.to_string())?;
-            fs::write(path, json).map_err(|error| error.to_string())?;
+            write_history_file(&app, &path, json, "compact")?;
         }
     }
     Ok(HistoryCompactResult {
@@ -363,7 +415,7 @@ pub(crate) fn delete_history_session_entries(
             removed_count += removed_for_file;
             let json =
                 serde_json::to_string_pretty(&retained).map_err(|error| error.to_string())?;
-            fs::write(path, json).map_err(|error| error.to_string())?;
+            write_history_file(&app, &path, json, "delete")?;
         }
     }
     Ok(HistoryDeleteResult {
@@ -401,7 +453,7 @@ pub(crate) fn archive_history_session_entries(
         }
         moved_count += moved.len();
         let json = serde_json::to_string_pretty(&retained).map_err(|error| error.to_string())?;
-        fs::write(&path, json).map_err(|error| error.to_string())?;
+        write_history_file(&app, &path, json, "archive-live")?;
         for entry in moved {
             let archive_path = history_file_for_date(&app, "archive", &entry.date)?;
             let mut archive_entries = load_history_file(&archive_path)?;
@@ -409,7 +461,7 @@ pub(crate) fn archive_history_session_entries(
             archive_entries.sort_by(|left, right| right.created_at.cmp(&left.created_at));
             let json = serde_json::to_string_pretty(&archive_entries)
                 .map_err(|error| error.to_string())?;
-            fs::write(archive_path, json).map_err(|error| error.to_string())?;
+            write_history_file(&app, &archive_path, json, "archive-target")?;
         }
     }
     Ok(HistoryDeleteResult {
@@ -463,7 +515,7 @@ pub(crate) fn append_history_entry(
     };
     upsert_entry(&mut entries, saved.clone());
     let json = serde_json::to_string_pretty(&entries).map_err(|error| error.to_string())?;
-    fs::write(path, json).map_err(|error| error.to_string())?;
+    write_history_file(&app, &path, json, "append")?;
     Ok(saved)
 }
 
@@ -516,6 +568,15 @@ mod tests {
         assert_eq!(schema_version_for_write(None), HISTORY_SCHEMA_VERSION);
         assert_eq!(schema_version_for_write(Some(4)), HISTORY_SCHEMA_VERSION);
         assert_eq!(schema_version_for_write(Some(6)), 6);
+    }
+
+    #[test]
+    fn should_backup_history_payload_skips_empty_history_files() {
+        assert!(!should_backup_history_payload(b""));
+        assert!(!should_backup_history_payload(b"   []   "));
+        assert!(should_backup_history_payload(
+            br#"[{"id":"history-entry"}]"#
+        ));
     }
 
     #[test]
