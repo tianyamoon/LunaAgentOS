@@ -9,8 +9,7 @@ function cloneAttachments(attachments = []) {
 export function createSessionPromptQueueController({
   createSessionTurn,
   dispatchPromptRun,
-  renderWorkspace,
-  renderHistory,
+  shellSurface,
   setAppNotice,
   t,
   now = () => Date.now(),
@@ -35,8 +34,7 @@ export function createSessionPromptQueueController({
   }
 
   function refreshViews() {
-    renderWorkspace();
-    renderHistory();
+    shellSurface.refresh({ workspace: true, history: true });
   }
 
   // 真正开始执行时才创建 Turn，使一个用户输入严格对应一个 Runtime Prompt Run。

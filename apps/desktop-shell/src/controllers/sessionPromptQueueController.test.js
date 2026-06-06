@@ -1,11 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createSessionPromptQueueController } from "./sessionPromptQueueController.js";
+import { createShellSurface } from "../ui/shellSurface.js";
 
 // 创建队列测试夹具，记录 Turn 创建和 Runtime 派发顺序。
 function makeHarness() {
   const calls = [];
   let turnSeq = 0;
+  const shellSurface = createShellSurface({
+    renderWorkspace: () => calls.push("workspace"),
+    renderHistory: () => calls.push("history"),
+  });
   const controller = createSessionPromptQueueController({
     createSessionTurn: (session, task, options) => {
       turnSeq += 1;
@@ -14,8 +19,7 @@ function makeHarness() {
       return turn;
     },
     dispatchPromptRun: (_session, turn) => calls.push(`dispatch:${turn.id}`),
-    renderWorkspace: () => calls.push("workspace"),
-    renderHistory: () => calls.push("history"),
+    shellSurface,
     setAppNotice: (message, tone) => calls.push(`notice:${tone}:${message}`),
     t: (key, values = {}) => `${key}:${values.count || ""}`,
     now: () => 100,

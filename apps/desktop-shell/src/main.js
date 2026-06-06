@@ -1377,8 +1377,7 @@ sessionPromptQueueController = createSessionPromptQueueController({
       void runFallbackSession(session, turn);
     }
   },
-  renderWorkspace,
-  renderHistory,
+  shellSurface,
   setAppNotice,
   t,
 });

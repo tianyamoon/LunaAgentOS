@@ -38,6 +38,7 @@ if (/workspaceStatus\.(?:innerHTML|textContent)|workspaceEmpty\.querySelector|pr
 for (const path of [
   "src/controllers/currentTargetController.js",
   "src/controllers/workspaceSessionController.js",
+  "src/controllers/sessionPromptQueueController.js",
 ]) {
   const source = read(path);
   if (/\b(?:renderProviders|renderWorkspaceStatus|renderWorkspace|renderHistory|updateActionLabels|focusComposerInput)\b/.test(source)) {
