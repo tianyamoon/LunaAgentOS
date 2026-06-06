@@ -67,6 +67,8 @@ import { createSessionTurnState } from "./state/sessionTurnState.js";
 import {
   compareActiveSessionListItems,
   compareArchivedSessionListItems,
+  isActiveSessionListItem,
+  isArchivedSessionListItem,
   projectSessionListItems,
 } from "./state/sessionListItems.js";
 import {
@@ -573,14 +575,6 @@ function canSendToProvider(providerId) {
 
 function formatTime(value) {
   return formatTimeValue(value, "zh-CN");
-}
-
-function isArchivedSessionListItem(item) {
-  return item?.record_state === RECORD_STATE.archived || item?.access_mode === ACCESS_MODE.read_only;
-}
-
-function isActiveSessionListItem(item) {
-  return !isArchivedSessionListItem(item);
 }
 
 function isSessionExecuting(session) {

@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   compareActiveSessionListItems,
   compareArchivedSessionListItems,
+  isActiveSessionListItem,
+  isArchivedSessionListItem,
   projectSessionListItems,
 } from "./sessionListItems.js";
 
@@ -134,7 +136,23 @@ test("projectSessionListItems merges live sessions and archived history without 
   assert.equal(items[0].isInWorkspace, false);
   assert.equal(items[0].isRuntimeAttached, true);
   assert.equal(items[0].summary, "完成摘要");
-  assert.equal(items[1].record_state, "archived");
+  assert.equal(items[1].record_state, "active");
   assert.equal(items[1].access_mode, "read_only");
   assert.equal(items[1].isRuntimeAttached, false);
+});
+
+test("session list sectioning treats read-only as access mode, not archive state", () => {
+  const readOnlyActive = item("readonly-active", {
+    record_state: "active",
+    access_mode: "read_only",
+  });
+  const archivedInteractive = item("archived-interactive", {
+    record_state: "archived",
+    access_mode: "interactive",
+  });
+
+  assert.equal(isActiveSessionListItem(readOnlyActive), true);
+  assert.equal(isArchivedSessionListItem(readOnlyActive), false);
+  assert.equal(isActiveSessionListItem(archivedInteractive), false);
+  assert.equal(isArchivedSessionListItem(archivedInteractive), true);
 });

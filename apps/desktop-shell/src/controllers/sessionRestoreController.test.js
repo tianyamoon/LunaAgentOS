@@ -35,7 +35,11 @@ function makeHarness({ archivedOverrides = {}, runtime = {} } = {}) {
     sessionRuntimeState: (session) => session.lifecycle,
     setSessionRecordState: (session, state) => { session.record_state = state; },
     setSessionAccessMode: (session, mode) => { session.access_mode = mode; },
-    setSessionLifecycle: (session, lifecycle) => { session.lifecycle = lifecycle; },
+    setSessionLifecycle: (session, lifecycle) => {
+      session.lifecycle = lifecycle;
+      if (lifecycle === "archived") session.record_state = "archived";
+      if (["live", "restoring", "resume_failed", "stopped"].includes(lifecycle)) session.record_state = "active";
+    },
     setRuntimeBinding: (session, patch) => { session.runtime_binding = { ...(session.runtime_binding || {}), ...patch }; },
     clearRuntimeBindingError: (session) => { session.runtime_binding = { state: "connected" }; },
     markSessionInactive: (id) => { restored.inactive = id; },
@@ -107,6 +111,34 @@ test("sessionRestoreController: missing ACP id opens read-only without runtime c
   assert.equal(restored.lifecycle, "archived");
   assert.equal(restored.access_mode, "read_only");
   assert.equal(notices.at(-1).message, "restore.readOnlyMissingSession");
+});
+
+test("sessionRestoreController: opening an active read-only transcript does not archive it", () => {
+  const { controller, restored } = makeHarness({
+    archivedOverrides: { record_state: "active", access_mode: "read_only" },
+  });
+  controller.openArchivedTranscript("s1");
+  assert.equal(restored.record_state, "active");
+  assert.equal(restored.access_mode, "read_only");
+});
+
+test("sessionRestoreController: missing ACP id keeps source record_state active", async () => {
+  const { controller, restored } = makeHarness({
+    archivedOverrides: { acpSessionId: null, record_state: "active" },
+  });
+  await controller.restoreArchivedSession("s1");
+  assert.equal(restored.lifecycle, "archived");
+  assert.equal(restored.record_state, "active");
+  assert.equal(restored.access_mode, "read_only");
+});
+
+test("sessionRestoreController: explicit archived source remains archived when opened read-only", () => {
+  const { controller, restored } = makeHarness({
+    archivedOverrides: { record_state: "archived", access_mode: "read_only" },
+  });
+  controller.openArchivedTranscript("s1");
+  assert.equal(restored.record_state, "archived");
+  assert.equal(restored.access_mode, "read_only");
 });
 
 test("sessionRestoreController: switched focus preserves deck scroll after async restore", async () => {

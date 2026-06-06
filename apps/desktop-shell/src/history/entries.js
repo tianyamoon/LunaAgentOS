@@ -73,7 +73,8 @@ export function archivedSessionsFromHistory(entries, { normalizeSession } = {}) 
         turnCount: 1,
         turns: [turn],
         runtimeState: entry.runtimeState || entry.runtime_state || "archived",
-        record_state: entry.record_state || "archived",
+        // 归档只来自显式 record_state；旧历史缺失字段时保留为活跃历史。
+        record_state: entry.record_state || "active",
         access_mode: entry.access_mode || "read_only",
         runtime_binding: entry.runtime_binding || null,
         agentEntrySnapshot,

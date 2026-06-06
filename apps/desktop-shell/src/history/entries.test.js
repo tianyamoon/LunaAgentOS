@@ -81,6 +81,21 @@ test("archivedSessionsFromHistory tolerates snake_case keys and provides default
   assert.deepEqual(session.runtime_binding, { state: "failed", stage: "resume" });
 });
 
+test("archivedSessionsFromHistory does not archive entries without explicit record_state", () => {
+  const entries = [
+    {
+      sessionId: "active-history",
+      id: "t1",
+      task: "active by default",
+      summary: "ok",
+      createdAt: "2026-05-03T00:00:00Z",
+    },
+  ];
+  const [session] = archivedSessionsFromHistory(entries);
+  assert.equal(session.record_state, "active");
+  assert.equal(session.access_mode, "read_only");
+});
+
 test("archivedSessionsFromHistory synthesizes a turn when entry.turn is absent", () => {
   const entries = [
     { sessionId: "s1", id: "t1", task: "no turn", summary: "auto", createdAt: "2026-05-01T00:00:00Z" },

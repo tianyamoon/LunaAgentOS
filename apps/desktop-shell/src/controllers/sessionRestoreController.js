@@ -49,6 +49,11 @@ export function createSessionRestoreController({
     return getArchivedSessions().find((item) => item.id === sessionId) || null;
   }
 
+  // 归档状态只表示用户手动分组；恢复/只读打开不能擅自改成 archived。
+  function preserveSourceRecordState(restored, archived) {
+    setSessionRecordState(restored, archived?.record_state || restored?.record_state || RECORD_STATE.active);
+  }
+
   // 把恢复中的 Session 置于工作区，并同步目标与视图。
   function presentRestoredSession(restored, existing = null) {
     if (!existing) upsertSession(restored);
@@ -91,7 +96,7 @@ export function createSessionRestoreController({
       return existing;
     }
     const restored = workspaceSessionFromArchived(archived, existing);
-    setSessionRecordState(restored, RECORD_STATE.archived);
+    preserveSourceRecordState(restored, archived);
     setSessionAccessMode(restored, ACCESS_MODE.read_only);
     if (!existing) upsertSession(restored);
     markSessionInactive(restored.id);
@@ -165,7 +170,7 @@ export function createSessionRestoreController({
     }
     const restored = workspaceSessionFromArchived(archived, existing);
     clearResumeValidation(restored);
-    setSessionRecordState(restored, RECORD_STATE.archived);
+    preserveSourceRecordState(restored, archived);
     setSessionAccessMode(restored, ACCESS_MODE.interactive);
     if (restored.acpSessionId) {
       setSessionLifecycle(restored, LIFECYCLE.restoring);
@@ -175,6 +180,7 @@ export function createSessionRestoreController({
     presentRestoredSession(restored, existing);
     if (!restored.acpSessionId) {
       setSessionLifecycle(restored, LIFECYCLE.archived);
+      preserveSourceRecordState(restored, archived);
       setSessionAccessMode(restored, ACCESS_MODE.read_only);
       markSessionInactive(restored.id);
       shellSurface.refresh({ workspace: true, history: true });
@@ -185,6 +191,7 @@ export function createSessionRestoreController({
     setAppNotice(t("restore.starting"), "busy");
     if (!acpRuntimeClient.canHandle(restored.providerId)) {
       setSessionLifecycle(restored, LIFECYCLE.archived);
+      preserveSourceRecordState(restored, archived);
       markSessionInactive(restored.id);
       renderRestoreUpdate();
       setAppNotice(t("restore.unsupportedProvider"));

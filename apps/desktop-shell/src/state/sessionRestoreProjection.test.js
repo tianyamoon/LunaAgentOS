@@ -78,6 +78,12 @@ test("sessionRestoreProjection: missing runtime uses provider defaults", () => {
   assert.equal(restored.inWorkspace, true);
 });
 
+test("sessionRestoreProjection: missing record_state stays active instead of archived", () => {
+  const restored = projectSessionFromArchived(makeArchived(), projectionOptions());
+  assert.equal(restored.record_state, "active");
+  assert.equal(restored.access_mode, "read_only");
+});
+
 test("sessionRestoreProjection: runtime instance fills host before provider defaults", () => {
   const restored = projectSessionFromArchived(makeArchived({ runtimeInstanceId: "demo-wsl" }), projectionOptions({
     runtimeInstances: [{ id: "demo-wsl", runtimeLabel: "WSL", host: "wsl", command: "demo", commandKind: "shell" }],

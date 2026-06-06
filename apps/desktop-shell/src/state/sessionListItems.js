@@ -63,13 +63,24 @@ export function projectSessionListItems({
     .map((item) => ({
       ...item,
       runtimeState: item.runtimeState || "archived",
-      record_state: item.record_state || recordState.archived,
+      // 归档是用户动作；历史记录缺失字段时不能自动推入归档区。
+      record_state: item.record_state || recordState.active || "active",
       access_mode: item.access_mode || accessMode.read_only,
       runtime_binding: item.runtime_binding || fallbackRuntimeBinding(createRuntimeBinding),
       isInWorkspace: false,
       isRuntimeAttached: false,
     }));
   return [...liveItems, ...historyItems];
+}
+
+export function isArchivedSessionListItem(item, constants = {}) {
+  const archivedState = constants?.RECORD_STATE?.archived || "archived";
+  // 只按手动记录状态分组；read_only 只是访问模式，不等于归档。
+  return item?.record_state === archivedState;
+}
+
+export function isActiveSessionListItem(item, constants = {}) {
+  return !isArchivedSessionListItem(item, constants);
 }
 
 export function compareActiveSessionListItems(left, right) {

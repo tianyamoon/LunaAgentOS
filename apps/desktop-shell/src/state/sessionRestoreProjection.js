@@ -108,7 +108,8 @@ export function projectSessionFromArchived(archived, {
     acpSessionId: archived.acpSessionId,
     lifecycle: LIFECYCLE.archived,
     runtimeState: LIFECYCLE.archived,
-    record_state: archived.record_state || RECORD_STATE.archived,
+    // 归档是用户手动分组；恢复投影缺字段时保持活跃历史。
+    record_state: archived.record_state || RECORD_STATE.active,
     access_mode: archived.access_mode || ACCESS_MODE.read_only,
     runtime_binding: archived.runtime_binding || createRuntimeBinding({ state: RUNTIME_BINDING_STATE.idle }),
     agentEntrySnapshot: archived.agentEntrySnapshot || null,
