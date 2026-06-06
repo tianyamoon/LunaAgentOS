@@ -1200,9 +1200,7 @@ sessionLifecycleController = createSessionLifecycleController({
     ));
   },
   clearQueuedSubmissions: (session, reason) => sessionPromptQueueController?.clear(session, reason),
-  renderProviders,
-  renderWorkspace,
-  renderHistory,
+  shellSurface,
   openConfirmDialog,
   formatBackendError,
   setAppNotice,

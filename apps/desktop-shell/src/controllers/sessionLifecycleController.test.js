@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createShellSurface } from "../ui/shellSurface.js";
 import { createSessionLifecycleController } from "./sessionLifecycleController.js";
 
 // 创建生命周期控制器的最小可观察依赖。
@@ -8,6 +9,11 @@ function makeHarness({ sessionOverrides = {}, archived = null, shutdownError = n
   const notices = [];
   const calls = [];
   let currentSessionId = "s1";
+  const shellSurface = createShellSurface({
+    renderProviders: () => calls.push("surface:providers"),
+    renderWorkspace: () => calls.push("surface:workspace"),
+    renderHistory: () => calls.push("surface:history"),
+  });
   const historyRepository = {
     archiveSession: async (id) => { calls.push(`archive:${id}`); },
     deleteSession: async (id) => { calls.push(`delete:${id}`); return { removedCount: 1 }; },
@@ -41,9 +47,7 @@ function makeHarness({ sessionOverrides = {}, archived = null, shutdownError = n
     clearCurrentSessionIf: (id) => { if (currentSessionId === id) currentSessionId = null; },
     clearScheduledWorkspaceFocus: (id) => calls.push(`focus-clear:${id}`),
     clearQueuedSubmissions: (_session, reason) => calls.push(`queue-clear:${reason}`),
-    renderProviders: () => {},
-    renderWorkspace: () => {},
-    renderHistory: () => {},
+    shellSurface,
     openConfirmDialog: (options) => { calls.push(options); },
     formatBackendError: (error) => error.message,
     setAppNotice: (message, kind) => notices.push({ message, kind }),

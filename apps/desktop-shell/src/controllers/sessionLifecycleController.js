@@ -22,9 +22,7 @@ export function createSessionLifecycleController({
   clearCurrentSessionIf,
   clearScheduledWorkspaceFocus,
   clearQueuedSubmissions = () => 0,
-  renderProviders,
-  renderWorkspace,
-  renderHistory,
+  shellSurface,
   openConfirmDialog,
   formatBackendError,
   setAppNotice,
@@ -68,8 +66,7 @@ export function createSessionLifecycleController({
       logger.error(error);
     }
     removeSessionFromWorkspace(session.id);
-    renderWorkspace();
-    renderHistory();
+    shellSurface.refresh({ workspace: true, history: true });
     setAppNotice(t("session.archivedNotice", { agent: session.agentName }));
     return session;
   }
@@ -97,9 +94,7 @@ export function createSessionLifecycleController({
     } catch (error) {
       logger.error(error);
     }
-    renderProviders();
-    renderWorkspace();
-    renderHistory();
+    shellSurface.refresh({ providers: true, workspace: true, history: true });
     setAppNotice(t("session.stoppedNotice", { agent: session.agentName }));
     return session;
   }
@@ -112,8 +107,7 @@ export function createSessionLifecycleController({
     setWorkspaceVisibility(session.id, false);
     if (getCurrentSessionId() === sessionId) clearCurrentSessionIf(sessionId);
     clearScheduledWorkspaceFocus(sessionId);
-    renderWorkspace();
-    renderHistory();
+    shellSurface.refresh({ workspace: true, history: true });
     setAppNotice(wasArchived
       ? t("session.dismissedArchived", { agent: session.agentName })
       : t("session.dismissedActive", { agent: session.agentName }));
@@ -137,8 +131,7 @@ export function createSessionLifecycleController({
       if (session && runtimeState === LIFECYCLE.live) await shutdownQuietly(session);
       removeSessionFromWorkspace(sessionId);
       const result = await historyRepository.deleteSession(sessionId);
-      renderWorkspace();
-      renderHistory();
+      shellSurface.refresh({ workspace: true, history: true });
       const skipped = result?.skippedFiles ? t("session.deleteSkippedFiles", { count: result.skippedFiles }) : "";
       setAppNotice(t("session.deleted", { count: result?.removedCount || 0, skipped }));
       return result;
