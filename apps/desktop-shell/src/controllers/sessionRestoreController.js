@@ -32,10 +32,7 @@ export function createSessionRestoreController({
   saveCurrentTargetAgent,
   saveCurrentSession,
   activateWorkspaceSession,
-  renderProviders,
-  renderWorkspace,
-  renderHistory,
-  focusComposerInput,
+  shellSurface,
   acpRuntimeClient,
   appendRuntimeLog,
   markPromptError,
@@ -58,10 +55,14 @@ export function createSessionRestoreController({
     unmarkStopped(restored.id);
     saveCurrentTargetAgent(restored.agentId);
     saveCurrentSession(restored.id);
-    renderProviders();
-    renderWorkspace({ focusSessionId: restored.id });
-    renderHistory({ scrollSessionId: restored.id });
-    focusComposerInput();
+    shellSurface.refresh({
+      providers: true,
+      workspace: true,
+      workspaceOptions: { focusSessionId: restored.id },
+      history: true,
+      historyOptions: { scrollSessionId: restored.id },
+      focusComposer: true,
+    });
   }
 
   // 在用户切换其他 Session 后保留当前 deck 滚动位置，避免异步恢复抢走焦点。
@@ -69,8 +70,12 @@ export function createSessionRestoreController({
     const restoreIntentId = ++restoreIntentSeq;
     return () => {
       const focused = restoreIntentId === restoreIntentSeq && getCurrentSessionId() === restored.id;
-      renderWorkspace(focused ? {} : { preserveDeckScroll: true });
-      renderHistory(focused ? { scrollSessionId: restored.id } : {});
+      shellSurface.refresh({
+        workspace: true,
+        workspaceOptions: focused ? {} : { preserveDeckScroll: true },
+        history: true,
+        historyOptions: focused ? { scrollSessionId: restored.id } : {},
+      });
     };
   }
 
@@ -92,13 +97,17 @@ export function createSessionRestoreController({
     markSessionInactive(restored.id);
     saveCurrentTargetAgent(restored.agentId);
     saveCurrentSession(restored.id);
-    renderProviders();
-    renderWorkspace({ focusSessionId: restored.id });
-    renderHistory({ scrollSessionId: restored.id });
+    shellSurface.refresh({
+      providers: true,
+      workspace: true,
+      workspaceOptions: { focusSessionId: restored.id },
+      history: true,
+      historyOptions: { scrollSessionId: restored.id },
+    });
     setAppNotice(restored.acpSessionId
       ? t("archive.openedRestorable")
       : t("archive.openedReadOnly"));
-    focusComposerInput();
+    shellSurface.focusComposer();
     return restored;
   }
 
@@ -168,13 +177,11 @@ export function createSessionRestoreController({
       setSessionLifecycle(restored, LIFECYCLE.archived);
       setSessionAccessMode(restored, ACCESS_MODE.read_only);
       markSessionInactive(restored.id);
-      renderWorkspace();
-      renderHistory();
+      shellSurface.refresh({ workspace: true, history: true });
       setAppNotice(t("restore.readOnlyMissingSession"));
       return restored;
     }
-    renderWorkspace();
-    renderHistory();
+    shellSurface.refresh({ workspace: true, history: true });
     setAppNotice(t("restore.starting"), "busy");
     if (!acpRuntimeClient.canHandle(restored.providerId)) {
       setSessionLifecycle(restored, LIFECYCLE.archived);
@@ -218,8 +225,7 @@ export function createSessionRestoreController({
       error_suggestion: t("restore.firstTurnFailedSuggestion"),
     });
     markSessionInactive(session.id);
-    renderWorkspace();
-    renderHistory();
+    shellSurface.refresh({ workspace: true, history: true });
     setAppNotice(t("restore.firstTurnFailedNotice", { error: compactNoticeText(message) }), "error");
   }
 

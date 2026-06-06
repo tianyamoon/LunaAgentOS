@@ -40,6 +40,7 @@ for (const path of [
   "src/controllers/workspaceSessionController.js",
   "src/controllers/sessionPromptQueueController.js",
   "src/controllers/sessionLaunchController.js",
+  "src/controllers/sessionRestoreController.js",
 ]) {
   const source = read(path);
   if (/\b(?:renderProviders|renderWorkspaceStatus|renderWorkspace|renderHistory|updateActionLabels|focusComposerInput)\b/.test(source)) {

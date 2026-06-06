@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createShellSurface } from "../ui/shellSurface.js";
 import { createSessionRestoreController } from "./sessionRestoreController.js";
 
 // 创建可观察状态变化的控制器依赖。
@@ -12,6 +13,12 @@ function makeHarness({ archivedOverrides = {}, runtime = {} } = {}) {
   const logs = [];
   let currentSessionId = null;
   const restored = { ...archived, lifecycle: "archived" };
+  const shellSurface = createShellSurface({
+    renderProviders: () => {},
+    renderWorkspace: (options = {}) => workspaceRenders.push(options),
+    renderHistory: (options = {}) => historyRenders.push(options),
+    focusComposerInput: () => {},
+  });
   const acpRuntimeClient = {
     canHandle: () => true,
     load: async () => {},
@@ -38,10 +45,7 @@ function makeHarness({ archivedOverrides = {}, runtime = {} } = {}) {
     saveCurrentTargetAgent: () => {},
     saveCurrentSession: (id) => { currentSessionId = id; },
     activateWorkspaceSession: (id) => { currentSessionId = id; },
-    renderProviders: () => {},
-    renderWorkspace: (options = {}) => workspaceRenders.push(options),
-    renderHistory: (options = {}) => historyRenders.push(options),
-    focusComposerInput: () => {},
+    shellSurface,
     acpRuntimeClient,
     appendRuntimeLog: (_session, log) => logs.push(log),
     markPromptError: (_session, turn, message) => { turn.error = message; },
