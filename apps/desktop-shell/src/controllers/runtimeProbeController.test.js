@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createShellSurface } from "../ui/shellSurface.js";
 import { createRuntimeProbeController } from "./runtimeProbeController.js";
 
 function createProvidersStore() {
@@ -46,6 +47,12 @@ function createProvidersStore() {
 function createController(overrides = {}) {
   const providersStore = overrides.providersStore || createProvidersStore();
   const calls = [];
+  const shellSurface = createShellSurface({
+    renderProviders: () => calls.push(["providers"]),
+    renderWorkspace: () => calls.push(["workspace"]),
+    renderHistory: () => calls.push(["history"]),
+    renderWorkspaceStatus: () => calls.push(["workspaceStatus"]),
+  });
   const controller = createRuntimeProbeController({
     runtimeAdapterCatalog: {
       probeRuntime: async () => ({
@@ -73,10 +80,7 @@ function createController(overrides = {}) {
       providersStore.instances.filter((instance) => instance.providerId === providerId && instance.available),
     runtimeInstanceById: (id) => providersStore.instances.find((instance) => instance.id === id) || null,
     ensureCurrentTargetAgentExists: () => calls.push(["ensureTarget"]),
-    renderProviders: () => calls.push(["providers"]),
-    renderWorkspace: () => calls.push(["workspace"]),
-    renderHistory: () => calls.push(["history"]),
-    renderWorkspaceStatus: () => calls.push(["workspaceStatus"]),
+    shellSurface,
     refreshComposerCommands: () => calls.push(["composer"]),
     setAppNotice: (text, tone) => calls.push(["notice", text, tone]),
     formatBackendError: (error) => String(error.message || error),

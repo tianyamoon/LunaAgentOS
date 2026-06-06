@@ -10,10 +10,7 @@ export function createRuntimeProbeController({
   availableRuntimeInstancesForProvider,
   runtimeInstanceById,
   ensureCurrentTargetAgentExists,
-  renderProviders,
-  renderWorkspace,
-  renderHistory,
-  renderWorkspaceStatus,
+  shellSurface,
   refreshComposerCommands,
   setAppNotice,
   formatBackendError,
@@ -69,8 +66,7 @@ export function createRuntimeProbeController({
         applyRuntimeTargetsForInstance(providerId, runtimeInstanceId, targets);
       });
       ensureCurrentTargetAgentExists();
-      renderProviders();
-      renderWorkspace();
+      shellSurface.refresh({ providers: true, workspace: true });
       const emptyNoticeKey = providerById(providerId)?.emptyTargetsNoticeKey;
       if (!loadedCount && emptyNoticeKey) setAppNotice(t(emptyNoticeKey));
     } catch (error) {
@@ -96,10 +92,12 @@ export function createRuntimeProbeController({
         );
       });
       ensureCurrentTargetAgentExists();
-      renderProviders();
-      renderWorkspace();
-      renderHistory();
-      renderWorkspaceStatus();
+      shellSurface.refresh({
+        providers: true,
+        workspace: true,
+        history: true,
+        workspaceStatus: true,
+      });
       const probedInstances = getRuntimeInstancesSnapshot();
       getAvailabilityStore().refresh(
         getProvidersSnapshot(),
