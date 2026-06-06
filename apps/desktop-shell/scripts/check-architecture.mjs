@@ -26,7 +26,12 @@ function walk(relativeDir) {
 // main.js 只允许继续收缩；阈值按当前阶段设置，后续拆分时应继续降低。
 const mainSource = read("src/main.js");
 const mainLines = mainSource.split(/\r?\n/).length;
-if (mainLines > 2200) fail(`src/main.js 行数回升到 ${mainLines}，超过阶段阈值 2200`);
+if (mainLines > 1700) fail(`src/main.js 行数回升到 ${mainLines}，超过阶段阈值 1700`);
+
+// 工作区状态条和空态文案必须留在 View seam 后，不能回到 main.js 里拼 DOM。
+if (/workspaceStatus\.(?:innerHTML|textContent)|workspaceEmpty\.querySelector|projectWorkspace(?:Status|EmptyCopy)/.test(mainSource)) {
+  fail("src/main.js 重新包含工作区状态/空态 DOM 实现，应放在 workspaceStatusView 或 workspaceEmptyView");
+}
 
 // Shell 编排层不得重新认识具体 Adapter 名称。
 if (/\b(?:hermes|claude|trae)\b/i.test(mainSource)) {
