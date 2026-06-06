@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createWorkspaceViewStore, WORKSPACE_VIEW_MODE } from "../state/workspaceViewStore.js";
 import { createSessionsStore } from "../state/sessionsStore.js";
+import { createShellSurface } from "../ui/shellSurface.js";
 import { createWorkspaceSessionController } from "./workspaceSessionController.js";
 
 function makeHarness(overrides = {}) {
@@ -13,6 +14,13 @@ function makeHarness(overrides = {}) {
   ];
   sessionsStore.replaceSessions(sessions);
   const calls = [];
+  const shellSurface = createShellSurface({
+    updateActionLabels: () => calls.push(["labels"]),
+    renderProviders: () => calls.push(["providers"]),
+    renderWorkspace: (options = {}) => calls.push(["workspace", options]),
+    renderHistory: (options = {}) => calls.push(["history", options]),
+    focusComposerInput: () => calls.push(["focusComposer"]),
+  });
   const controller = createWorkspaceSessionController({
     getSession: (id) => sessionsStore.getSession(id),
     workspaceViewStore,
@@ -20,13 +28,9 @@ function makeHarness(overrides = {}) {
     saveCurrentSession: (id) => sessionsStore.setCurrentSessionId(id),
     canSendToSession: (session) => session.sendable !== false,
     markSessionActive: (id) => calls.push(["active", id]),
-    updateActionLabels: () => calls.push(["labels"]),
-    renderProviders: () => calls.push(["providers"]),
-    renderWorkspace: (options = {}) => calls.push(["workspace", options]),
-    renderHistory: (options = {}) => calls.push(["history", options]),
+    shellSurface,
     sessionRuntimeState: (session) => session.runtimeState,
     setAppNotice: (message) => calls.push(["notice", message]),
-    focusComposerInput: () => calls.push(["focusComposer"]),
     t: (key, params = {}) => `${key}${params.task ? `:${params.task}` : ""}`,
   });
   return { calls, controller, sessionsStore, workspaceViewStore };

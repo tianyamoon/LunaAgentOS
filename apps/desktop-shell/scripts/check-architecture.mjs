@@ -34,6 +34,17 @@ if (/workspaceStatus\.(?:innerHTML|textContent)|workspaceEmpty\.querySelector|pr
 }
 
 // Shell 编排层不得重新认识具体 Adapter 名称。
+// 目标切换与工作区激活控制器必须通过 Shell Surface 表达刷新意图，不能重新接收散装 View callback。
+for (const path of [
+  "src/controllers/currentTargetController.js",
+  "src/controllers/workspaceSessionController.js",
+]) {
+  const source = read(path);
+  if (/\b(?:renderProviders|renderWorkspaceStatus|renderWorkspace|renderHistory|updateActionLabels|focusComposerInput)\b/.test(source)) {
+    fail(`${path} 重新依赖散装 View callback，应通过 shellSurface 刷新`);
+  }
+}
+
 if (/\b(?:hermes|claude|trae)\b/i.test(mainSource)) {
   fail("src/main.js 出现具体 Adapter 名称，应改为 manifest、Provider 元数据或 Adapter seam");
 }

@@ -9,22 +9,16 @@ export function createCurrentTargetController({
   getCurrentSession,
   saveCurrentSession,
   setSendAsNewSession,
-  updateActionLabels,
-  renderProviders,
-  renderWorkspaceStatus,
-  renderWorkspace,
-  renderHistory,
+  shellSurface,
   setAppNotice,
   targetDisplayName,
-  focusComposerInput,
   t,
 }) {
   function setCurrentTargetAgent(agentId) {
     const target = agentById(agentId);
     if (!isTargetSelectable(target)) {
       setAppNotice(targetSendBlockNotice(target), "error");
-      renderProviders();
-      updateActionLabels();
+      shellSurface.refresh({ providers: true, actions: true });
       return false;
     }
 
@@ -39,15 +33,17 @@ export function createCurrentTargetController({
       setSendAsNewSession(true);
     }
 
-    updateActionLabels();
+    shellSurface.refreshActions();
     if (agent && provider) {
-      renderWorkspaceStatus();
+      shellSurface.refreshWorkspaceStatus();
       setAppNotice(t("target.switched", { target: targetDisplayName(agent) }));
     }
-    renderProviders();
-    renderWorkspace();
-    renderHistory();
-    focusComposerInput();
+    shellSurface.refresh({
+      providers: true,
+      workspace: true,
+      history: true,
+      focusComposer: true,
+    });
     return true;
   }
 

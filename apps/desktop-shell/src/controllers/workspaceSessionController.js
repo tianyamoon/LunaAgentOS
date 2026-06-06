@@ -5,19 +5,15 @@ export function createWorkspaceSessionController({
   saveCurrentSession,
   canSendToSession,
   markSessionActive,
-  updateActionLabels,
-  renderProviders,
-  renderWorkspace,
-  renderHistory,
+  shellSurface,
   sessionRuntimeState,
   setAppNotice,
-  focusComposerInput,
   t,
 }) {
   function focusSessionInWorkspace(sessionId) {
     const changed = workspaceViewStore.focusSession(sessionId);
     if (!changed) return false;
-    renderWorkspace();
+    shellSurface.refreshWorkspace();
     return true;
   }
 
@@ -25,13 +21,13 @@ export function createWorkspaceSessionController({
     const session = getSession(sessionId);
     if (!session) return false;
     const changed = workspaceViewStore.toggleFocus(sessionId);
-    if (changed) renderWorkspace();
+    if (changed) shellSurface.refreshWorkspace();
     return changed;
   }
 
   function exitFullscreenSessions() {
     if (!workspaceViewStore.exitFocus()) return false;
-    renderWorkspace();
+    shellSurface.refreshWorkspace();
     setAppNotice(t("session.exitFullscreenNotice"));
     return true;
   }
@@ -43,17 +39,21 @@ export function createWorkspaceSessionController({
     saveCurrentSession(session.id);
     workspaceViewStore.activateSession(session.id);
     if (canSendToSession(session)) markSessionActive(session.id);
-    updateActionLabels();
-    renderProviders();
-    renderWorkspace({ focusSessionId: options.focusWorkspace ? session.id : null });
-    renderHistory({ scrollSessionId: session.id });
+    shellSurface.refresh({
+      actions: true,
+      providers: true,
+      workspace: true,
+      workspaceOptions: { focusSessionId: options.focusWorkspace ? session.id : null },
+      history: true,
+      historyOptions: { scrollSessionId: session.id },
+    });
     const runtimeState = sessionRuntimeState(session);
     setAppNotice(canSendToSession(session)
       ? t("session.activated", { task: session.task })
       : runtimeState === "restoring"
         ? t("session.restoringFocused")
         : t("session.readOnlySwitchBlocked"));
-    focusComposerInput();
+    shellSurface.focusComposer();
     return true;
   }
 

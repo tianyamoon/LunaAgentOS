@@ -56,6 +56,7 @@ import { createHistoryView } from "./ui/historyView.js";
 import { createWorkspaceView } from "./ui/workspaceView.js";
 import { createWorkspaceEmptyView } from "./ui/workspaceEmptyView.js";
 import { createWorkspaceStatusView } from "./ui/workspaceStatusView.js";
+import { createShellSurface } from "./ui/shellSurface.js";
 import { renderAssistantResponse as renderAssistantResponseView } from "./ui/assistantResponseView.js";
 import { renderProviderIcon, setAdapterIconRegistry } from "./ui/providerIcon.js";
 import {
@@ -313,6 +314,7 @@ let workspaceView = null;
 let workspaceEmptyView = null;
 let workspaceStatusView = null;
 let runtimeProbeController = null;
+let shellSurface = null;
 let sendAsNewSession = false;
 const sessionListSectionOpenState = {
   active: true,
@@ -1063,6 +1065,16 @@ agentFleetView = createAgentFleetView({
   escapeHtml,
 });
 
+shellSurface = createShellSurface({
+  renderProviders,
+  renderWorkspace,
+  renderHistory,
+  renderWorkspaceStatus,
+  renderWorkspaceEmptyCopy,
+  updateActionLabels,
+  focusComposerInput,
+});
+
 workspaceSessionController = createWorkspaceSessionController({
   getSession: (sessionId) => sessionsStore.getSession(sessionId),
   workspaceViewStore,
@@ -1070,13 +1082,9 @@ workspaceSessionController = createWorkspaceSessionController({
   saveCurrentSession,
   canSendToSession,
   markSessionActive,
-  updateActionLabels,
-  renderProviders,
-  renderWorkspace,
-  renderHistory,
+  shellSurface,
   sessionRuntimeState,
   setAppNotice,
-  focusComposerInput,
   t,
 });
 
@@ -1118,14 +1126,9 @@ currentTargetController = createCurrentTargetController({
   getCurrentSession: currentSession,
   saveCurrentSession,
   setSendAsNewSession: (value) => { sendAsNewSession = value; },
-  updateActionLabels,
-  renderProviders,
-  renderWorkspaceStatus,
-  renderWorkspace,
-  renderHistory,
+  shellSurface,
   setAppNotice,
   targetDisplayName,
-  focusComposerInput,
   t,
 });
 // Repository 快照变化时刷新右侧列表，包含加载态切换与后台写入结果。
@@ -1407,13 +1410,11 @@ composerController = createComposerController({
     if (currentSession()) {
       saveCurrentSession(null);
       sendAsNewSession = true;
-      renderWorkspace();
-      renderHistory();
+      shellSurface.refresh({ workspace: true, history: true });
     } else {
       sendAsNewSession = !sendAsNewSession;
     }
-    updateActionLabels();
-    focusComposerInput();
+    shellSurface.refresh({ actions: true, focusComposer: true });
   },
   exitFullscreenSessions,
   setAppNotice,

@@ -2,11 +2,20 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { createCurrentTargetController } from "./currentTargetController.js";
+import { createShellSurface } from "../ui/shellSurface.js";
 
 function createController(overrides = {}) {
   const calls = [];
   let currentSession = overrides.currentSession ?? { id: "s1", agentId: "old-agent" };
   let sendAsNewSession = false;
+  const shellSurface = createShellSurface({
+    updateActionLabels: () => calls.push(["actions"]),
+    renderProviders: () => calls.push(["providers"]),
+    renderWorkspaceStatus: () => calls.push(["workspace-status"]),
+    renderWorkspace: () => calls.push(["workspace"]),
+    renderHistory: () => calls.push(["history"]),
+    focusComposerInput: () => calls.push(["focus"]),
+  });
   const controller = createCurrentTargetController({
     agentById: (id) => ({ id, name: `Agent ${id}` }),
     isTargetSelectable: () => true,
@@ -23,14 +32,9 @@ function createController(overrides = {}) {
       calls.push(["send-new", value]);
       sendAsNewSession = value;
     },
-    updateActionLabels: () => calls.push(["actions"]),
-    renderProviders: () => calls.push(["providers"]),
-    renderWorkspaceStatus: () => calls.push(["workspace-status"]),
-    renderWorkspace: () => calls.push(["workspace"]),
-    renderHistory: () => calls.push(["history"]),
+    shellSurface,
     setAppNotice: (message, tone) => calls.push(["notice", message, tone]),
     targetDisplayName: (agent) => agent.name,
-    focusComposerInput: () => calls.push(["focus"]),
     t: (key, params = {}) => `${key}:${params.target || ""}`,
     ...overrides,
   });
@@ -69,8 +73,8 @@ test("currentTargetController: 不可选择目标只提示并刷新 Fleet 与动
 
   assert.deepEqual(calls, [
     ["notice", "blocked", "error"],
-    ["providers"],
     ["actions"],
+    ["providers"],
   ]);
 });
 
