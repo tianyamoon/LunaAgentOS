@@ -1775,9 +1775,95 @@ button:disabled {
 }
 
 .runtime-message-worked-for {
+  margin-top: 2px;
+  border: 1px solid rgba(var(--done-rgb), 0.16);
+  border-radius: 10px;
+  background: rgba(var(--done-rgb), 0.06);
   color: var(--label-warm);
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 700;
+}
+
+.runtime-message-worked-for summary {
+  min-height: 26px;
+}
+
+.runtime-message-worked-for .cb-check {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 999px;
+  background: var(--done);
+  color: #fff;
+  font-size: 0.58rem;
+  font-weight: 800;
+}
+
+.runtime-message-worked-for .cb-check::before {
+  content: "";
+  width: 7px;
+  height: 4px;
+  border-bottom: 2px solid currentColor;
+  border-left: 2px solid currentColor;
+  transform: rotate(-45deg) translate(1px, -1px);
+}
+
+.runtime-completion-title {
+  color: var(--done);
+}
+
+.runtime-completion-stats {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runtime-completion-toggle {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  opacity: 0.72;
+}
+
+.runtime-message-worked-for[open] .runtime-completion-toggle-open,
+.runtime-message-worked-for:not([open]) .runtime-completion-toggle-close {
+  display: none;
+}
+
+.runtime-message-worked-for .runtime-message-trace {
+  display: grid;
+  gap: 5px;
+  margin: 6px 0 0;
+  padding-top: 6px;
+  border-top: 1px solid rgba(var(--surface-raised-rgb), 0.58);
+}
+
+.runtime-message-trace-section {
+  display: grid;
+  gap: 5px;
+}
+
+.runtime-message-trace-row {
+  border-radius: 8px;
+  background: rgba(var(--surface-rgb), 0.36);
+}
+
+.runtime-message-trace-row .runtime-message-thinking,
+.runtime-message-trace-row .runtime-message-event,
+.runtime-message-trace-row .runtime-message-assistant,
+.runtime-message-trace-debug .runtime-message-debug {
+  padding: 5px 7px;
+}
+
+.runtime-message-trace-debug {
+  opacity: 0.78;
 }
 
 .runtime-message-legacy-note,
@@ -3495,40 +3581,6 @@ button:disabled {
   color: var(--muted);
   margin-left: 8px;
   opacity: 0.5;
-}
-
-/* Completion Bar — 完成后绿色顶部条 */
-.runtime-completion-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 16px;
-  background: rgba(var(--done-rgb), 0.08);
-  border-bottom: 1px solid rgba(var(--done-rgb), 0.15);
-  font-size: 0.74rem;
-  color: var(--done);
-  flex-shrink: 0;
-}
-
-.runtime-completion-bar .cb-check {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--done);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.6rem;
-  font-weight: 700;
-  flex-shrink: 0;
-}
-
-.runtime-completion-bar .cb-stats {
-  display: flex;
-  gap: 12px;
-  opacity: 0.75;
-  font-weight: 400;
 }
 
 /* ===== Timeline 视觉分层 END ===== */

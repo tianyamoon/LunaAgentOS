@@ -8,10 +8,8 @@ export function createRuntimeSessionMessageListView({
   escapeHtml,
 }) {
   function renderMessageListShell(projection) {
-    const completionBar = renderCompletionBar(projection);
     return `
       <div class="runtime-message-list">
-        ${completionBar}
         <div class="runtime-message-list-scroller" data-runtime-message-scroller>
           <div class="runtime-message-list-content" data-runtime-message-content>
             ${projection.rows.map(renderMessageRow).join("")}
@@ -41,25 +39,6 @@ export function createRuntimeSessionMessageListView({
     if (row.kind === "queue") return renderQueueRow(row);
     if (row.kind === "legacy_warning") return renderLegacyWarningRow();
     return renderCompactEventRow(row);
-  }
-
-  function renderCompletionBar(projection) {
-    // completion bar only shown when latest turn is completed
-    const latestRow = projection.rows.find((row) => row.kind === "worked_for");
-    if (!latestRow) return "";
-    const summary = latestRow.metadata?.summary || {};
-    if (!summary.durationMs && !summary.toolCount) return "";
-    return `
-      <div class="runtime-completion-bar">
-        <span class="cb-check">✓</span>
-        <span>${escapeHtml(t("turn.timeline.completionTitle"))}</span>
-        <span class="cb-stats">
-          ${summary.durationMs ? `<span>${escapeHtml(t("turn.timeline.duration", { duration: formatRuntimeMessageDuration(summary.durationMs) }))}</span>` : ""}
-          ${summary.toolCount ? `<span>${escapeHtml(t("turn.timeline.toolCount", { count: summary.toolCount }))}</span>` : ""}
-          ${summary.fileChangeCount ? `<span>${escapeHtml(t("turn.timeline.fileCount", { count: summary.fileChangeCount }))}</span>` : ""}
-        </span>
-      </div>
-    `;
   }
 
   function renderUserRow(row) {
@@ -122,14 +101,30 @@ export function createRuntimeSessionMessageListView({
   }
 
   function renderWorkedForRow(row) {
-    // worked_for 现在只作为顶部摘要条，trace 行已经内联渲染
+    const detailKey = `${row.id}:message-worked-for`;
+    const open = isOpenForKey(detailKey, false);
+    const traceRows = Array.isArray(row.metadata?.rows) ? row.metadata.rows : [];
+    const debug = row.metadata?.debug || null;
     return `
-      <div class="runtime-message-worked-for">
-        <span>${escapeHtml(workedForLabel(row.metadata?.summary || {}))}</span>
-      </div>
+      <details class="terminal-detail runtime-message-worked-for" data-detail-key="${escapeHtml(detailKey)}"${open ? " open" : ""}>
+        <summary>
+          <span class="cb-check" aria-hidden="true"></span>
+          <span class="runtime-completion-title">${escapeHtml(t("turn.timeline.completionTitle"))}</span>
+          <span class="runtime-completion-stats">${completionStatsLabel(row.metadata?.summary || {}, traceRows, debug)}</span>
+          <span class="runtime-completion-toggle runtime-completion-toggle-open">${escapeHtml(t("turn.timeline.expandHint"))}</span>
+          <span class="runtime-completion-toggle runtime-completion-toggle-close">${escapeHtml(t("turn.timeline.collapseHint"))}</span>
+        </summary>
+        <div class="runtime-message-trace">
+          ${traceRows.length ? `<div class="runtime-message-trace-section">${traceRows.map(renderTraceRow).join("")}</div>` : ""}
+          ${debug ? `<div class="runtime-message-trace-section runtime-message-trace-debug">${renderDebugRow({ id: `${row.id}:debug`, kind: "debug", metadata: debug })}</div>` : ""}
+        </div>
+      </details>
     `;
   }
 
+  function renderTraceRow(row) {
+    return `<div class="runtime-message-trace-row runtime-message-trace-row-${escapeHtml(row.kind)}">${renderMessageRowBody(row)}</div>`;
+  }
   function renderDebugRow(row) {
     const detailKey = `${row.id}:message-debug`;
     const open = isOpenForKey(detailKey, false);
@@ -173,6 +168,22 @@ export function createRuntimeSessionMessageListView({
       tools: summary.toolCount ? t("turn.timeline.toolCount", { count: summary.toolCount }) : "",
       files: summary.fileChangeCount ? t("turn.timeline.fileCount", { count: summary.fileChangeCount }) : "",
     });
+  }
+
+  function completionStatsLabel(summary, traceRows, debug) {
+    const parts = [];
+    if (summary.durationMs) parts.push(t("turn.timeline.duration", { duration: formatRuntimeMessageDuration(summary.durationMs) }));
+    const thinkingCount = traceRows.filter((row) => row.kind === "thinking").length;
+    const runtimeCount = traceRows.filter((row) => row.kind === "runtime").length;
+    const responseCount = traceRows.filter((row) => row.kind === "assistant").length;
+    if (thinkingCount) parts.push(t("turn.timeline.thinkingCount", { count: thinkingCount }));
+    if (summary.toolCount) parts.push(t("turn.timeline.toolCount", { count: summary.toolCount }));
+    if (runtimeCount) parts.push(t("turn.timeline.runtimeCount", { count: runtimeCount }));
+    if (responseCount) parts.push(t("turn.timeline.responseCount", { count: responseCount }));
+    if (summary.fileChangeCount) parts.push(t("turn.timeline.fileCount", { count: summary.fileChangeCount }));
+    const debugCount = debugEventCount(debug);
+    if (debugCount) parts.push(t("turn.timeline.debugCount", { count: debugCount }));
+    return escapeHtml(parts.join(""));
   }
 
   // 已有壳只对账消息行；首次进入时才创建 scroller，保证拖动中的 scrollbar 不会失效。
@@ -316,6 +327,7 @@ export function rowSignature(row) {
     meta.summary ? JSON.stringify(meta.summary) : "",
     items,
     traceRows,
+    meta.debug ? JSON.stringify(meta.debug) : "",
     meta.attachmentCount ?? "",
   ].join("|");
 }
@@ -352,6 +364,13 @@ function debugSummary(metadata) {
   if (rawEvents.length) parts.push(`${rawEvents.length} events`);
   if (logs.length) parts.push(`${logs.length} logs`);
   return parts.length ? ` (${parts.join(", ")})` : "";
+}
+
+function debugEventCount(metadata) {
+  if (!metadata) return 0;
+  const rawEvents = Array.isArray(metadata.rawEvents) ? metadata.rawEvents.length : 0;
+  const logs = Array.isArray(metadata.logs) ? metadata.logs.length : 0;
+  return rawEvents + logs;
 }
 
 function statusClass(row) {

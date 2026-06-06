@@ -83,6 +83,7 @@ function projectTurnRows(turn, { latestTurnId, forceLive }) {
   const rows = [];
   const turnId = turn?.id;
   if (!turnId) return rows;
+  const isLive = forceLive || RUNNING_TURN_STATUSES.has(turn.status);
   if (turn.meta?.historyIntegrity === "legacy_unverified") {
     rows.push(baseTurnRow(turn, "legacy_warning", "legacy-warning", {
       content: "",
@@ -97,16 +98,33 @@ function projectTurnRows(turn, { latestTurnId, forceLive }) {
     },
   }));
 
-  // 统一路径：始终渲染完整 timeline（live 和 completed 不分支）
-  rows.push(...projectUnifiedTurnRows(turn));
-
-  const debug = debugMetadataForTurn(turn);
-  if (debug) {
-    rows.push(baseTurnRow(turn, "debug", "debug", { metadata: debug }));
-  }
+  rows.push(...(isLive ? projectLiveTurnRows(turn) : projectCompletedTurnRows(turn)));
   return rows;
 }
 
+function projectCompletedTurnRows(turn) {
+  const rows = [];
+  const traceRows = projectCompletedTraceRows(turn);
+  const debug = debugMetadataForTurn(turn);
+  const finalResponse = finalResponseForTurn(turn);
+  if (finalResponse) {
+    rows.push(baseTurnRow(turn, "assistant", "assistant", {
+      content: finalResponse,
+      metadata: { final: true },
+    }));
+  }
+  if (traceRows.length || debug) {
+    rows.push(baseTurnRow(turn, "worked_for", "worked-for", {
+      status: turn.status || "completed",
+      metadata: {
+        summary: projectCompletedTimelineSummary(turn),
+        rows: traceRows,
+        debug,
+      },
+    }));
+  }
+  return rows;
+}
 function projectUnifiedTurnRows(turn) {
   const rows = [];
   const isLive = RUNNING_TURN_STATUSES.has(turn.status);
@@ -133,10 +151,6 @@ function projectUnifiedTurnRows(turn) {
 function projectLiveTurnRows(turn) {
   const rows = projectLiveTimeline(turn).map((item) => timelineItemRow(turn, item, { turnCompleted: false }));
   rows.push(...projectLiveRuntimeLogRows(turn, rows));
-  const debug = debugMetadataForTurn(turn);
-  if (debug) {
-    rows.push(baseTurnRow(turn, "debug", "debug", { metadata: debug }));
-  }
   return rows;
 }
 
@@ -154,12 +168,20 @@ function projectLiveRuntimeLogRows(turn, existingRows) {
 }
 
 function projectCompletedTraceRows(turn) {
-  const finalResponse = responseText(turn).trim();
+  const finalResponse = finalResponseForTurn(turn);
   const items = projectLiveTimeline(turn);
   const lastAssistantIndex = items.findLastIndex((item) => item.type === "assistant");
   return items
     .filter((item, index) => !(index === lastAssistantIndex && text(item.content).trim() === finalResponse))
     .map((item) => timelineItemRow(turn, item, { turnCompleted: true }));
+}
+
+function finalResponseForTurn(turn) {
+  const explicit = responseText(turn).trim();
+  if (explicit) return explicit;
+  const items = projectLiveTimeline(turn);
+  const lastAssistant = items.findLast((item) => item.type === "assistant");
+  return text(lastAssistant?.content).trim();
 }
 
 function timelineItemRow(turn, item, options = {}) {

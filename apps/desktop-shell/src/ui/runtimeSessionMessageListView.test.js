@@ -25,7 +25,7 @@ test("runtimeSessionMessageListView: 渲染稳定 MessageList 外壳与浮动按
   assert.match(html, /data-phase="final"/);
 });
 
-test("runtimeSessionMessageListView: Worked 行使用独立用时格式化并收起过程", () => {
+test("runtimeSessionMessageListView: worked row folds completed trace and debug into one details", () => {
   const view = createView();
   const html = view.renderMessageRow({
     id: "t1:worked",
@@ -33,16 +33,22 @@ test("runtimeSessionMessageListView: Worked 行使用独立用时格式化并收
     status: "completed",
     metadata: {
       summary: { durationMs: 65_000, toolCount: 2, fileChangeCount: 1 },
-      rows: [{ id: "t1:trace:thinking", kind: "thinking", content: "分析", status: "completed" }],
+      rows: [{ id: "t1:trace:thinking", kind: "thinking", content: "analyze", status: "completed" }],
+      debug: { rawEvents: [{ type: "tool", payload: { id: "tool-1" } }], logs: ["log line"] },
     },
   });
 
-  assert.match(html, /Worked for 1m 5s · 2 tools · 1 files/);
-  assert.doesNotMatch(html, /runtime-message-trace/);
+  assert.match(html, /runtime-message-worked-for/);
+  assert.match(html, /Task completed/);
+  assert.match(html, /Duration 1m 5s/);
+  assert.match(html, /Expand/);
+  assert.match(html, /Collapse trace/);
+  assert.match(html, /runtime-message-trace-row-thinking/);
+  assert.match(html, /runtime-message-debug-placeholder/);
   assert.equal(formatRuntimeMessageDuration(5_000), "5s");
 });
 
-test("runtimeSessionMessageListView: completed timeline renders completion bar and expand hint", () => {
+test("runtimeSessionMessageListView: completed timeline does not render a separate completion bar", () => {
   const view = createView();
   const html = view.renderMessageListShell({
     rows: [
@@ -50,22 +56,19 @@ test("runtimeSessionMessageListView: completed timeline renders completion bar a
         id: "t1:worked",
         kind: "worked_for",
         status: "completed",
-        metadata: { summary: { durationMs: 8_000, toolCount: 1, fileChangeCount: 0 } },
-      },
-      {
-        id: "t1:tool",
-        kind: "tool",
-        content: "read_file",
-        status: "completed",
-        metadata: { turnCompleted: true },
+        metadata: {
+          summary: { durationMs: 8_000, toolCount: 1, fileChangeCount: 0 },
+          rows: [{ id: "t1:tool", kind: "tool", content: "read_file", status: "completed", metadata: { turnCompleted: true } }],
+        },
       },
     ],
   });
 
-  assert.match(html, /runtime-completion-bar/);
+  assert.doesNotMatch(html, /runtime-completion-bar/);
+  assert.match(html, /runtime-message-worked-for/);
   assert.match(html, /Task completed/);
   assert.match(html, /Duration 8s/);
-  assert.match(html, /data-expand-hint="Expand"/);
+  assert.match(html, /runtime-message-trace-row-tool/);
 });
 
 test("runtimeSessionMessageListView: Debug 折叠态保留可展开 JSON 模板", () => {
@@ -186,6 +189,11 @@ function createView() {
         "turn.timeline.completionTitle": "Task completed",
         "turn.timeline.duration": "Duration {duration}",
         "turn.timeline.expandHint": "Expand",
+        "turn.timeline.collapseHint": "Collapse trace",
+        "turn.timeline.thinkingCount": " | {count} thoughts",
+        "turn.timeline.runtimeCount": " | {count} runtime",
+        "turn.timeline.responseCount": " | {count} replies",
+        "turn.timeline.debugCount": " | {count} diagnostics",
         "turn.timeline.toolCount": " · {count} tools",
         "turn.timeline.fileCount": " · {count} files",
       };

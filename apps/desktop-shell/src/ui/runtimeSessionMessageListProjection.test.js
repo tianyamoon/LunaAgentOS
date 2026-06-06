@@ -49,32 +49,34 @@ test("runtimeSessionMessageListProjection: 完成态最终回答为主体并生�
   const result = projectRuntimeSessionMessageList({
     turns: [{
       id: "t1",
-      task: "总结",
+      task: "summarize",
       status: "completed",
-      finalResponse: "完成总结",
+      finalResponse: "done summary",
       timelineStartedAt: "2026-06-01T00:00:00.000Z",
       timelineCompletedAt: "2026-06-01T00:00:05.000Z",
       timelineItems: [
-        item("thinking", "分析"),
+        item("thinking", "analyze"),
         item("tool", "Read", { id: "read-1" }),
-        item("assistant", "完成总结"),
+        item("assistant", "done summary"),
       ],
     }],
   });
 
-  assert.deepEqual(result.rows.map((row) => row.kind), ["user", "worked_for", "thinking", "tool", "assistant"]);
-  assert.equal(result.rows[1].metadata.summary.durationMs, 5000);
-  assert.deepEqual(result.rows.slice(2).map((row) => row.metadata.turnCompleted), [true, true, true]);
-  assert.equal(result.rows.at(-1).content, "完成总结");
+  assert.deepEqual(result.rows.map((row) => row.kind), ["user", "assistant", "worked_for"]);
+  assert.equal(result.rows[1].content, "done summary");
+  assert.equal(result.rows[1].metadata.final, true);
+  assert.equal(result.rows[2].metadata.summary.durationMs, 5000);
+  assert.deepEqual(result.rows[2].metadata.rows.map((row) => row.kind), ["thinking", "tool"]);
+  assert.deepEqual(result.rows[2].metadata.rows.map((row) => row.metadata.turnCompleted), [true, true]);
 });
 
-test("runtimeSessionMessageListProjection: Debug 行收纳 rawEvents 与日志", () => {
+test("runtimeSessionMessageListProjection: debug metadata is folded under completed summary", () => {
   const result = projectRuntimeSessionMessageList({
     turns: [{
       id: "t1",
-      task: "失败任务",
+      task: "failed task",
       status: "failed",
-      logs: ["工具失败"],
+      logs: ["tool failed"],
       timelineItems: [
         item("tool", "Terminal", {
           id: "tool-1",
@@ -85,9 +87,10 @@ test("runtimeSessionMessageListProjection: Debug 行收纳 rawEvents 与日志",
     }],
   });
 
-  const debugRow = result.rows.find((row) => row.kind === "debug");
-  assert.equal(debugRow.metadata.rawEvents.length, 1);
-  assert.deepEqual(debugRow.metadata.logs, ["工具失败"]);
+  assert.deepEqual(result.rows.map((row) => row.kind), ["user", "worked_for"]);
+  const debug = result.rows.at(-1).metadata.debug;
+  assert.equal(debug.rawEvents.length, 1);
+  assert.deepEqual(debug.logs, ["tool failed"]);
 });
 
 test("runtimeSessionMessageListProjection: 旧历史与队列使用独立消息行", () => {
