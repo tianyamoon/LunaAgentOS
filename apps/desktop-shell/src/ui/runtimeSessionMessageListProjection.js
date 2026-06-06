@@ -158,13 +158,28 @@ function projectLiveRuntimeLogRows(turn, existingRows) {
   const represented = new Set(existingRows.map((row) => compactText(row.content, 140)));
   return list(turn?.logs)
     .map((log, index) => ({ log: compactText(log, 180), index }))
-    .filter((entry) => entry.log && !represented.has(compactText(entry.log, 140)))
+    .filter((entry) => entry.log && isVisibleRuntimeLog(entry.log) && !represented.has(compactText(entry.log, 140)))
     .slice(-8)
     .map((entry) => baseTurnRow(turn, "runtime", `log:${entry.index}`, {
       status: turn.status || "running",
       content: entry.log,
       metadata: { source: "turn.logs" },
     }));
+}
+
+function isVisibleRuntimeLog(log) {
+  const value = compactText(log, 180).toLowerCase();
+  if (!value) return false;
+  if (/(error|failed|failure|timeout|denied|blocked|permission|confirm|approval|错误|失败|超时|拒绝|阻塞|权限|确认|等待确认)/.test(value)) {
+    return true;
+  }
+  if (/(message.*(entered|queued).*session|消息已进入当前会话|等待运行时返回内容)/.test(value)) {
+    return false;
+  }
+  if (/^(tool|工具|工具调用).*(done|complete|completed|success|ok|完成|成功)$/.test(value)) {
+    return false;
+  }
+  return true;
 }
 
 function projectCompletedTraceRows(turn) {

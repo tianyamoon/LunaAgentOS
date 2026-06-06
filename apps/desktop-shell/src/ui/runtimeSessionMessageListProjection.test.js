@@ -143,22 +143,40 @@ test("runtimeSessionMessageListProjection: latest-only 只保留当前消息段"
   assert.equal(result.rows.some((row) => row.turnId === "t2"), true);
 });
 
-test("runtimeSessionMessageListProjection: 运行中日志会作为可见 Runtime 过程行", () => {
+test("runtimeSessionMessageListProjection: running runtime logs hide low-value acknowledgements", () => {
   const result = projectRuntimeSessionMessageList({
     activeTurnId: "t1",
     activePromptRunId: "run-1",
     turns: [{
       id: "t1",
-      task: "看过程",
+      task: "show progress",
       status: "running",
       promptRunId: "run-1",
-      logs: ["正在读取配置", "工具调用 completed"],
+      logs: ["Reading config", "tool call completed", "Message entered current session, waiting for runtime response."],
       timelineItems: [],
     }],
   });
 
   const runtimeRows = result.rows.filter((row) => row.kind === "runtime");
-  assert.deepEqual(runtimeRows.map((row) => row.content), ["正在读取配置", "工具调用 completed"]);
+  assert.deepEqual(runtimeRows.map((row) => row.content), ["Reading config"]);
+});
+
+test("runtimeSessionMessageListProjection: running runtime logs keep blocking or error signals visible", () => {
+  const result = projectRuntimeSessionMessageList({
+    activeTurnId: "t1",
+    activePromptRunId: "run-1",
+    turns: [{
+      id: "t1",
+      task: "check runtime",
+      status: "running",
+      promptRunId: "run-1",
+      logs: ["tool call completed", "Permission denied", "Message entered current session, waiting for runtime response."],
+      timelineItems: [],
+    }],
+  });
+
+  const runtimeRows = result.rows.filter((row) => row.kind === "runtime");
+  assert.deepEqual(runtimeRows.map((row) => row.content), ["Permission denied"]);
 });
 
 test("runtimeSessionMessageListProjection: reconnecting session without turns renders a visible runtime row", () => {
