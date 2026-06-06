@@ -20,11 +20,8 @@ export function createSessionExecutionController({
   saveTurnToHistory,
   rollbackFirstTurnPromptFailure,
   refreshRuntimeTargets,
-  renderProviders,
-  renderWorkspace,
-  renderHistory,
+  shellSurface,
   scheduleSessionCardRender,
-  updateActionLabels,
   formatBackendError,
   setAppNotice,
   t,
@@ -62,7 +59,7 @@ export function createSessionExecutionController({
     const turn = sessionTurnState.updateTurnFromEvents(sessionId, turnId, promptRunId, events);
     if (!turn) return null;
     scheduleSessionCardRender(sessionId);
-    renderHistory();
+    shellSurface.refreshHistory();
     return turn;
   }
 
@@ -91,7 +88,7 @@ export function createSessionExecutionController({
     if (!session || !turn) return null;
     sessionTurnState.markPromptError(session, turn, message);
     scheduleSessionCardRender(sessionId);
-    renderHistory();
+    shellSurface.refreshHistory();
     setAppNotice(t("runtime.failed", { agent: session.agentName, message }), "error");
     return turn;
   }
@@ -110,7 +107,7 @@ export function createSessionExecutionController({
   // 记录执行数量变化，集中刷新相关按钮。
   function changeRunningCount(delta) {
     runningSessions = Math.max(0, runningSessions + delta);
-    updateActionLabels();
+    shellSurface.refreshActions();
   }
 
   // 执行 fallback 事件序列，供没有 ACP 能力的入口使用。
@@ -121,7 +118,7 @@ export function createSessionExecutionController({
     const promptRunId = createPromptRunId(session, turn);
     sessionTurnState.beginPromptRun(session, turn, promptRunId);
     prependStartupNoticeIfNeeded(session, turn);
-    renderWorkspace();
+    shellSurface.refreshWorkspace();
     setAppNotice(t("runtime.sentNotice", { agent: session.agentName }), "busy");
     sessionRuntimeState.setRuntimeBinding(session, { state: RUNTIME_BINDING_STATE.connected, stage: RUNTIME_BINDING_STAGE.prompt });
     let shouldPumpQueue = false;
@@ -156,7 +153,7 @@ export function createSessionExecutionController({
     const promptRunId = createPromptRunId(session, turn);
     sessionTurnState.beginPromptRun(session, turn, promptRunId);
     prependStartupNoticeIfNeeded(session, turn);
-    renderWorkspace();
+    shellSurface.refreshWorkspace();
     setAppNotice(t("runtime.sentNotice", { agent: session.agentName }), "busy");
     sessionRuntimeState.setRuntimeBinding(session, { state: RUNTIME_BINDING_STATE.connected, stage: RUNTIME_BINDING_STAGE.prompt });
     let shouldPumpQueue = false;
@@ -178,7 +175,7 @@ export function createSessionExecutionController({
       sessionRuntimeState.clearRuntimeBindingError(session);
       const agent = getAgent(session.agentId);
       if (agent) agent.state = session.state;
-      renderProviders();
+      shellSurface.refreshProviders();
       await saveTurnToHistory(session, saved);
       if (getAdapterCapabilities(session.providerId)?.refreshTargetsAfterPrompt) {
         await refreshRuntimeTargets(session.providerId, session.runtimeInstanceId ? [session.runtimeInstanceId] : null);

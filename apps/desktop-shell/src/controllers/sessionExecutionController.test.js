@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createShellSurface } from "../ui/shellSurface.js";
 import { createSessionExecutionController } from "./sessionExecutionController.js";
 
 // 创建可观察执行副作用的控制器。
@@ -8,6 +9,12 @@ function makeHarness({ prompt, capabilities = {}, fallbackSessions = {}, tombsto
   const turn = { id: "t1", task: "task", logs: [], outputs: [], finalResponse: "", status: "running" };
   session.turns.push(turn);
   const calls = [];
+  const shellSurface = createShellSurface({
+    updateActionLabels: () => calls.push("labels"),
+    renderProviders: () => calls.push("providers"),
+    renderWorkspace: () => calls.push("workspace"),
+    renderHistory: () => calls.push("history"),
+  });
   const controller = createSessionExecutionController({
     getSession: () => session,
     getAgent: () => ({}),
@@ -51,11 +58,8 @@ function makeHarness({ prompt, capabilities = {}, fallbackSessions = {}, tombsto
     saveTurnToHistory: async () => calls.push("save"),
     rollbackFirstTurnPromptFailure: (_session, _turn, message) => calls.push(`rollback:${message}`),
     refreshRuntimeTargets: async () => calls.push("refresh"),
-    renderProviders: () => {},
-    renderWorkspace: () => calls.push("workspace"),
-    renderHistory: () => calls.push("history"),
+    shellSurface,
     scheduleSessionCardRender: () => calls.push("schedule"),
-    updateActionLabels: () => {},
     formatBackendError: (error) => error.message,
     setAppNotice: () => {},
     t: (key) => key,

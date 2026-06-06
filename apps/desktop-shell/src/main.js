@@ -1342,11 +1342,8 @@ sessionExecutionController = createSessionExecutionController({
     sessionRestoreController?.rollbackFirstTurnPromptFailure(session, turn, message)
   ),
   refreshRuntimeTargets: loadRuntimeTargetsForProvider,
-  renderProviders,
-  renderWorkspace,
-  renderHistory,
+  shellSurface,
   scheduleSessionCardRender,
-  updateActionLabels,
   formatBackendError,
   setAppNotice,
   t,
