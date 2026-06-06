@@ -161,6 +161,43 @@ test("runtimeSessionMessageListProjection: running runtime logs hide low-value a
   assert.deepEqual(runtimeRows.map((row) => row.content), ["Reading config"]);
 });
 
+test("runtimeSessionMessageListProjection: waiting acknowledgement stays visible while no process row exists", () => {
+  const result = projectRuntimeSessionMessageList({
+    activeTurnId: "t1",
+    activePromptRunId: "run-1",
+    turns: [{
+      id: "t1",
+      task: "wait for feedback",
+      status: "running",
+      promptRunId: "run-1",
+      logs: ["tool call completed", "Message entered current session, waiting for runtime response."],
+      timelineItems: [],
+    }],
+  });
+
+  const runtimeRows = result.rows.filter((row) => row.kind === "runtime");
+  assert.deepEqual(runtimeRows.map((row) => row.content), ["Message entered current session, waiting for runtime response."]);
+});
+
+test("runtimeSessionMessageListProjection: waiting acknowledgement hides after thinking starts", () => {
+  const result = projectRuntimeSessionMessageList({
+    activeTurnId: "t1",
+    activePromptRunId: "run-1",
+    turns: [{
+      id: "t1",
+      task: "think",
+      status: "running",
+      promptRunId: "run-1",
+      logs: ["Message entered current session, waiting for runtime response."],
+      timelineItems: [item("thinking", "Analyzing request", { status: "running" })],
+    }],
+  });
+
+  const runtimeRows = result.rows.filter((row) => row.kind === "runtime");
+  assert.deepEqual(runtimeRows.map((row) => row.content), []);
+  assert.equal(result.rows.some((row) => row.kind === "thinking"), true);
+});
+
 test("runtimeSessionMessageListProjection: running runtime logs keep blocking or error signals visible", () => {
   const result = projectRuntimeSessionMessageList({
     activeTurnId: "t1",

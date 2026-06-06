@@ -156,9 +156,14 @@ function projectLiveTurnRows(turn) {
 
 function projectLiveRuntimeLogRows(turn, existingRows) {
   const represented = new Set(existingRows.map((row) => compactText(row.content, 140)));
-  return list(turn?.logs)
+  const entries = list(turn?.logs)
     .map((log, index) => ({ log: compactText(log, 180), index }))
-    .filter((entry) => entry.log && isVisibleRuntimeLog(entry.log) && !represented.has(compactText(entry.log, 140)))
+    .filter((entry) => entry.log && !represented.has(compactText(entry.log, 140)));
+  const visibleEntries = entries.filter((entry) => isVisibleRuntimeLog(entry.log));
+  const waitingEntry = !existingRows.length && !visibleEntries.length
+    ? entries.find((entry) => isWaitingForRuntimeLog(entry.log))
+    : null;
+  return [...visibleEntries, ...(waitingEntry ? [waitingEntry] : [])]
     .slice(-8)
     .map((entry) => baseTurnRow(turn, "runtime", `log:${entry.index}`, {
       status: turn.status || "running",
@@ -180,6 +185,11 @@ function isVisibleRuntimeLog(log) {
     return false;
   }
   return true;
+}
+
+function isWaitingForRuntimeLog(log) {
+  const value = compactText(log, 180).toLowerCase();
+  return /(message.*(entered|queued).*session.*runtime response|\u6d88\u606f.*\u4f1a\u8bdd.*\u7b49\u5f85.*\u8fd4\u56de)/.test(value);
 }
 
 function projectCompletedTraceRows(turn) {
