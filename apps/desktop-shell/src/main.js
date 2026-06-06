@@ -54,6 +54,7 @@ import {
 } from "./ui/sessionTranscript.js";
 import { createHistoryView } from "./ui/historyView.js";
 import { createWorkspaceView } from "./ui/workspaceView.js";
+import { createWorkspaceEmptyView } from "./ui/workspaceEmptyView.js";
 import { createWorkspaceStatusView } from "./ui/workspaceStatusView.js";
 import { renderAssistantResponse as renderAssistantResponseView } from "./ui/assistantResponseView.js";
 import { renderProviderIcon, setAdapterIconRegistry } from "./ui/providerIcon.js";
@@ -121,10 +122,6 @@ import { createProvidersStore } from "./state/providersStore.js";
 import { createSessionsStore } from "./state/sessionsStore.js";
 import { createWorkspaceViewStore } from "./state/workspaceViewStore.js";
 import { createRuntimeConfigState } from "./state/runtimeConfigState.js";
-import {
-  countRestorableActiveHistoryItems as countRestorableActiveHistoryItemsValue,
-  projectWorkspaceEmptyCopy,
-} from "./state/workspaceStatusProjection.js";
 import {
   ensureRestoredAgentEntry,
   projectWorkspaceSessionFromArchived,
@@ -311,6 +308,7 @@ let runtimeSessionCardView = null;
 let runtimeSessionCardController = null;
 let historyView = null;
 let workspaceView = null;
+let workspaceEmptyView = null;
 let workspaceStatusView = null;
 let runtimeProbeController = null;
 let sendAsNewSession = false;
@@ -815,23 +813,8 @@ function createTurn(session, task, options = {}) {
   return sessionLaunchController?.createTurn(session, task, options) || null;
 }
 
-function updateWorkspaceEmptyCopy() {
-  const restorableCount = countRestorableActiveHistoryItems();
-  const copy = projectWorkspaceEmptyCopy({ restorableCount });
-  const titleEl = workspaceEmpty.querySelector("strong");
-  const textEl = workspaceEmpty.querySelector("p");
-  if (!titleEl || !textEl) return;
-  titleEl.textContent = t(copy.titleKey);
-  textEl.textContent = t(copy.textKey);
-  titleEl.dataset.i18n = copy.titleKey;
-  textEl.dataset.i18n = copy.textKey;
-}
-
-function countRestorableActiveHistoryItems() {
-  return countRestorableActiveHistoryItemsValue({
-    sessions: sessionsSnapshot(),
-    archivedSessions: archivedSessionsFromHistory(),
-  });
+function renderWorkspaceEmptyCopy() {
+  workspaceEmptyView?.renderWorkspaceEmptyCopy();
 }
 
 function renderWorkspaceStatus() {
@@ -1167,6 +1150,13 @@ workspaceStatusView = createWorkspaceStatusView({
   escapeHtml,
 });
 
+workspaceEmptyView = createWorkspaceEmptyView({
+  element: workspaceEmpty,
+  getSessionsSnapshot: sessionsSnapshot,
+  getArchivedSessions: archivedSessionsFromHistory,
+  t,
+});
+
 workspaceView = createWorkspaceView({
   sessionDeck,
   workspaceEmpty,
@@ -1174,7 +1164,7 @@ workspaceView = createWorkspaceView({
   workspaceViewStore,
   updatePromptPlaceholder,
   renderWorkspaceStatus,
-  updateWorkspaceEmptyCopy,
+  renderWorkspaceEmptyCopy,
   renderSessionCard,
   renderSessionMiniCard,
   bindSessionActions,

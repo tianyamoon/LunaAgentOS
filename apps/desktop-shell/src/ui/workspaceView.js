@@ -5,7 +5,7 @@ export function createWorkspaceView({
   workspaceViewStore,
   updatePromptPlaceholder,
   renderWorkspaceStatus,
-  updateWorkspaceEmptyCopy,
+  renderWorkspaceEmptyCopy,
   renderSessionCard,
   renderSessionMiniCard,
   bindSessionActions,
@@ -28,7 +28,7 @@ export function createWorkspaceView({
     updatePromptPlaceholder();
     renderWorkspaceStatus();
     workspaceEmpty.style.display = visibleSessions.length ? "none" : "flex";
-    if (!visibleSessions.length) updateWorkspaceEmptyCopy();
+    if (!visibleSessions.length) renderWorkspaceEmptyCopy();
     sessionDeck.classList.toggle("is-single-session", visibleSessions.length === 1);
     sessionDeck.classList.toggle("is-two-sessions", visibleSessions.length === 2);
     sessionDeck.classList.toggle("is-many-sessions", visibleSessions.length > 2);
