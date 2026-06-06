@@ -44,6 +44,7 @@ for (const path of [
   "src/controllers/sessionLifecycleController.js",
   "src/controllers/sessionExecutionController.js",
   "src/controllers/runtimeProbeController.js",
+  "src/controllers/agentBriefController.js",
 ]) {
   const source = read(path);
   if (/\b(?:renderProviders|renderWorkspaceStatus|renderWorkspace|renderHistory|updateActionLabels|focusComposerInput)\b/.test(source)) {

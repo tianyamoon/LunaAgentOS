@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { createShellSurface } from "../ui/shellSurface.js";
 import { createAgentBriefController } from "./agentBriefController.js";
 
 function makeHarness(overrides = {}) {
@@ -9,6 +10,11 @@ function makeHarness(overrides = {}) {
   const session = { id: "session-a" };
   const briefs = {};
   const target = { id: "agent-a", providerId: "provider-a", name: "Agent A" };
+  const shellSurface = createShellSurface({
+    renderProviders: () => calls.push(["providers"]),
+    renderWorkspace: (options) => calls.push(["workspace", options]),
+    renderHistory: (options) => calls.push(["history", options]),
+  });
   const controller = createAgentBriefController({
     isTargetSendable: () => true,
     acpCommandsForProvider: () => ({ prompt: "runtime_acp_adapter_prompt" }),
@@ -19,9 +25,7 @@ function makeHarness(overrides = {}) {
     unmarkStopped: (id) => calls.push(["unstop", id]),
     createTurn: () => turn,
     closeConfirmDialog: () => calls.push(["close"]),
-    renderProviders: () => calls.push(["providers"]),
-    renderWorkspace: (options) => calls.push(["workspace", options]),
-    renderHistory: (options) => calls.push(["history", options]),
+    shellSurface,
     startAcpSession: async () => calls.push(["acp"]),
     parseAgentBriefResponse: () => ({ "zh-CN": "中文职责", "en-US": "English brief" }),
     cloneAgentBriefs: () => briefs,

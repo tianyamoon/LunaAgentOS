@@ -8,9 +8,7 @@ export function createAgentBriefController({
   unmarkStopped,
   createTurn,
   closeConfirmDialog,
-  renderProviders,
-  renderWorkspace,
-  renderHistory,
+  shellSurface,
   startAcpSession,
   parseAgentBriefResponse,
   cloneAgentBriefs,
@@ -33,9 +31,13 @@ export function createAgentBriefController({
     unmarkStopped(session.id);
     const turn = createTurn(session, prompt);
     closeConfirmDialog();
-    renderProviders();
-    renderWorkspace({ scrollSessionId: session.id });
-    renderHistory({ scrollSessionId: session.id });
+    shellSurface.refresh({
+      providers: true,
+      workspace: true,
+      workspaceOptions: { scrollSessionId: session.id },
+      history: true,
+      historyOptions: { scrollSessionId: session.id },
+    });
     await startAcpSession(session, turn);
     const response = turn.finalResponse || turn.outputs.join("\n");
     return parseAgentBriefResponse(response, { translate: t });
@@ -49,7 +51,7 @@ export function createAgentBriefController({
     writeBriefValue(next, target, "zh-CN", result["zh-CN"], "agent-session");
     writeBriefValue(next, target, "en-US", result["en-US"], "agent-session");
     await saveAgentBriefRecords(next);
-    renderProviders();
+    shellSurface.refreshProviders();
     if (!quiet) setAppNotice(t("agentBrief.fetched", { target: targetDisplayName(target) }));
     return result;
   }
