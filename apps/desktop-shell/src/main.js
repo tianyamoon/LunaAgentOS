@@ -132,6 +132,7 @@ import { createSessionLifecycleController } from "./controllers/sessionLifecycle
 import { createSessionExecutionController } from "./controllers/sessionExecutionController.js";
 import { createSessionLaunchController } from "./controllers/sessionLaunchController.js";
 import { createSessionPromptQueueController } from "./controllers/sessionPromptQueueController.js";
+import { createCurrentTargetController } from "./controllers/currentTargetController.js";
 import { createRuntimeProbeController } from "./controllers/runtimeProbeController.js";
 import { createAgentBriefController } from "./controllers/agentBriefController.js";
 import {
@@ -300,6 +301,7 @@ let sessionLifecycleController = null;
 let sessionExecutionController = null;
 let sessionLaunchController = null;
 let sessionPromptQueueController = null;
+let currentTargetController = null;
 let agentBriefController = null;
 let composerController = null;
 let agentFleetView = null;
@@ -750,32 +752,7 @@ function latestActiveSessionForAgent(agentId) {
 }
 
 function setCurrentTargetAgent(agentId) {
-  const target = agentById(agentId);
-  if (!isTargetSelectable(target)) {
-    setAppNotice(targetSendBlockNotice(target), "error");
-    renderProviders();
-    updateActionLabels();
-    return;
-  }
-  const previousSession = currentSession();
-  saveCurrentTargetAgent(agentId);
-  const agent = currentTargetAgent();
-  const provider = currentTargetProvider();
-  if (previousSession && previousSession.agentId !== agentId) {
-    saveCurrentSession(null);
-    sendAsNewSession = true;
-  } else if (!currentSession()) {
-    sendAsNewSession = true;
-  }
-  updateActionLabels();
-  if (agent && provider) {
-    renderWorkspaceStatus();
-    setAppNotice(t("target.switched", { target: targetDisplayName(agent) }));
-  }
-  renderProviders();
-  renderWorkspace();
-  renderHistory();
-  focusComposerInput();
+  return currentTargetController?.setCurrentTargetAgent(agentId) || false;
 }
 
 function runtimeConnectionNote(provider, instances) {
@@ -1129,6 +1106,27 @@ historyView = createHistoryView({
   restoreArchivedSession,
   activateWorkspaceSession,
   openArchivedTranscript,
+});
+
+currentTargetController = createCurrentTargetController({
+  agentById,
+  isTargetSelectable,
+  targetSendBlockNotice,
+  saveCurrentTargetAgent,
+  getCurrentTargetAgent: currentTargetAgent,
+  getCurrentTargetProvider: currentTargetProvider,
+  getCurrentSession: currentSession,
+  saveCurrentSession,
+  setSendAsNewSession: (value) => { sendAsNewSession = value; },
+  updateActionLabels,
+  renderProviders,
+  renderWorkspaceStatus,
+  renderWorkspace,
+  renderHistory,
+  setAppNotice,
+  targetDisplayName,
+  focusComposerInput,
+  t,
 });
 // Repository 快照变化时刷新右侧列表，包含加载态切换与后台写入结果。
 historyRepository.subscribe(() => renderHistory());
