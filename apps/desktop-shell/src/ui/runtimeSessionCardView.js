@@ -71,7 +71,10 @@ export function createRuntimeSessionCardView({
     const profileMeta = [identitySession.profileName, identitySession.profileModel].filter(Boolean).join(" · ");
     const stats = sessionCardStats(session, t);
     const latestOnly = isSessionLatestOnly(session);
-    const messageList = projectRuntimeSessionMessageList(session, { latestOnly });
+    const messageList = projectRuntimeSessionMessageList(session, {
+      latestOnly,
+      reconnectingRuntimeText: (stage) => t("restore.reconnectingRuntimeRow", { stage }),
+    });
     const managementTitleSuffix = isRestoring ? t("action.restoringSuffix") : "";
     const canArchiveCard = session.record_state !== RECORD_STATE.archived && session.access_mode !== ACCESS_MODE.read_only;
     const latestOnlyLabel = latestOnly ? t("action.showAllMessages") : t("action.latestMessages");

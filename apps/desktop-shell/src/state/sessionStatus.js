@@ -182,6 +182,10 @@ export function resolveSessionCardStatusView(session, options = {}) {
     return buildStatusView(status, translate, { error: runtimeErrorView(runtimeBinding, translate) });
   }
 
+  if (runtimeBinding.state === RUNTIME_BINDING_STATE.reconnecting) {
+    return buildStatusView(CARD_STATUS.running, translate, { secondary });
+  }
+
   if (!turn || turnStatus === TURN_STATUS.created || turnStatus === TURN_STATUS.cancelled) {
     return buildStatusView(CARD_STATUS.waiting_input, translate, { secondary });
   }

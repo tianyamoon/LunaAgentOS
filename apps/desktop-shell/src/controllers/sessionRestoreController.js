@@ -158,6 +158,10 @@ export function createSessionRestoreController({
     clearResumeValidation(restored);
     setSessionRecordState(restored, RECORD_STATE.archived);
     setSessionAccessMode(restored, ACCESS_MODE.interactive);
+    if (restored.acpSessionId) {
+      setSessionLifecycle(restored, LIFECYCLE.restoring);
+      setRuntimeBinding(restored, { state: RUNTIME_BINDING_STATE.reconnecting, stage: RUNTIME_BINDING_STAGE.load });
+    }
     const renderRestoreUpdate = createRenderRestoreUpdate(restored);
     presentRestoredSession(restored, existing);
     if (!restored.acpSessionId) {
@@ -169,8 +173,6 @@ export function createSessionRestoreController({
       setAppNotice(t("restore.readOnlyMissingSession"));
       return restored;
     }
-    setSessionLifecycle(restored, LIFECYCLE.restoring);
-    setRuntimeBinding(restored, { state: RUNTIME_BINDING_STATE.reconnecting, stage: RUNTIME_BINDING_STAGE.load });
     renderWorkspace();
     renderHistory();
     setAppNotice(t("restore.starting"), "busy");

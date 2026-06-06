@@ -45,14 +45,37 @@ export function projectRuntimeSessionMessageList(session, options = {}) {
     latestTurnId: latestTurn?.id || null,
     forceLive: Boolean(session?.activePromptRunId && turn.id === activeTurnId),
   }));
+  const runtimeRows = !rows.length && session?.runtime_binding?.state === "reconnecting"
+    ? [projectSessionRuntimeRow(session, options)]
+    : [];
   return {
     rows: [
       ...rows,
+      ...runtimeRows,
       ...list(session?.queuedSubmissions).map(projectQueueRow),
     ],
     latestTurnId: latestTurn?.id || null,
     activePromptRunId: session?.activePromptRunId || null,
-    scrollTargetRowId: latestTurn ? rowId(latestTurn, "user") : null,
+    scrollTargetRowId: latestTurn ? rowId(latestTurn, "user") : runtimeRows[0]?.id || null,
+  };
+}
+
+function projectSessionRuntimeRow(session, options = {}) {
+  const stage = session.runtime_binding?.stage || "runtime";
+  const content = typeof options.reconnectingRuntimeText === "function"
+    ? options.reconnectingRuntimeText(stage)
+    : `Restoring ${stage} runtime. The session will become interactive when the connection is ready.`;
+  return {
+    id: `${session.id}:runtime:${stage}`,
+    kind: "runtime",
+    turnId: null,
+    promptRunId: null,
+    status: "running",
+    content,
+    metadata: {
+      source: "runtime_binding",
+      stage,
+    },
   };
 }
 

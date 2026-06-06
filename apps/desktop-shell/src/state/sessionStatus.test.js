@@ -115,6 +115,18 @@ test("resolveSessionCardStatusView: runtime resume failure is blocked with error
   assert.equal(view.error.detail, "stdout closed");
 });
 
+test("resolveSessionCardStatusView: reconnecting runtime is visible as running before a turn exists", () => {
+  const view = resolveSessionCardStatusView(session({
+    runtime_binding: createRuntimeBinding({
+      state: RUNTIME_BINDING_STATE.reconnecting,
+      stage: RUNTIME_BINDING_STAGE.load,
+    }),
+    turns: [],
+  }), { translate });
+  assert.equal(view.status, CARD_STATUS.running);
+  assert.equal(view.tone, "busy");
+});
+
 test("resolveSessionCardStatusView: runtime exit mid-session is blocked, not failed", () => {
   const view = resolveSessionCardStatusView(session({
     runtime_binding: createRuntimeBinding({

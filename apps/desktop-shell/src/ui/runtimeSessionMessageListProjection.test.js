@@ -158,6 +158,23 @@ test("runtimeSessionMessageListProjection: 运行中日志会作为可见 Runtim
   assert.deepEqual(runtimeRows.map((row) => row.content), ["正在读取配置", "工具调用 completed"]);
 });
 
+test("runtimeSessionMessageListProjection: reconnecting session without turns renders a visible runtime row", () => {
+  const result = projectRuntimeSessionMessageList({
+    id: "s-restore",
+    turns: [],
+    runtime_binding: {
+      state: "reconnecting",
+      stage: "load",
+    },
+  });
+
+  assert.equal(result.rows.length, 1);
+  assert.equal(result.rows[0].kind, "runtime");
+  assert.equal(result.rows[0].status, "running");
+  assert.equal(result.rows[0].metadata.stage, "load");
+  assert.equal(result.scrollTargetRowId, "s-restore:runtime:load");
+});
+
 function item(type, content, overrides = {}) {
   return {
     id: overrides.id || `${type}-${content}`,
