@@ -38,8 +38,34 @@ test("runtimeSessionMessageListView: Worked 行使用独立用时格式化并收
   });
 
   assert.match(html, /Worked for 1m 5s · 2 tools · 1 files/);
-  assert.match(html, /runtime-message-trace/);
+  assert.doesNotMatch(html, /runtime-message-trace/);
   assert.equal(formatRuntimeMessageDuration(5_000), "5s");
+});
+
+test("runtimeSessionMessageListView: completed timeline renders completion bar and expand hint", () => {
+  const view = createView();
+  const html = view.renderMessageListShell({
+    rows: [
+      {
+        id: "t1:worked",
+        kind: "worked_for",
+        status: "completed",
+        metadata: { summary: { durationMs: 8_000, toolCount: 1, fileChangeCount: 0 } },
+      },
+      {
+        id: "t1:tool",
+        kind: "tool",
+        content: "read_file",
+        status: "completed",
+        metadata: { turnCompleted: true },
+      },
+    ],
+  });
+
+  assert.match(html, /runtime-completion-bar/);
+  assert.match(html, /Task completed/);
+  assert.match(html, /Duration 8s/);
+  assert.match(html, /data-expand-hint="Expand"/);
 });
 
 test("runtimeSessionMessageListView: Debug 折叠态保留可展开 JSON 模板", () => {
@@ -157,6 +183,9 @@ function createView() {
         "turn.timeline.assistant": "Assistant",
         "turn.timeline.thinking": "Thinking",
         "turn.timeline.workedFor": "Worked for {duration}{tools}{files}",
+        "turn.timeline.completionTitle": "Task completed",
+        "turn.timeline.duration": "Duration {duration}",
+        "turn.timeline.expandHint": "Expand",
         "turn.timeline.toolCount": " · {count} tools",
         "turn.timeline.fileCount": " · {count} files",
       };

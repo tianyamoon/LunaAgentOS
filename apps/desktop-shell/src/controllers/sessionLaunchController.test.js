@@ -12,6 +12,8 @@ function makeHarness({
   commands = { prompt: "runtime_prompt" },
   currentSession = null,
   composingNew = false,
+  currentSessionActive = true,
+  blockReason = "",
 } = {}) {
   const sessions = [];
   const calls = [];
@@ -55,14 +57,14 @@ function makeHarness({
     providerAvailabilityLabel: (summary) => summary,
     getCurrentSession: () => activeSession,
     isComposingNewSession: () => composingNew || !activeSession,
-    currentSessionSendBlockReason: () => "",
+    currentSessionSendBlockReason: () => blockReason,
     normalizeWorkspaceSession: (session) => session,
     upsertSession: (session) => {
       sessions.unshift(session);
       activeSession = session;
     },
     markSessionActive: (sessionId) => calls.push(`active:${sessionId}`),
-    isSessionActive: () => true,
+    isSessionActive: () => currentSessionActive,
     saveCurrentSession: (sessionId) => calls.push(`current:${sessionId}`),
     unmarkStopped: (sessionId) => calls.push(`unstopped:${sessionId}`),
     createSessionTurn: (session, task, options) => {
@@ -123,6 +125,26 @@ test("sessionLaunchController: 复用同目标的活跃 Session", () => {
   assert.equal(sessions.length, 0);
   assert.equal(result.session, currentSession);
   assert.equal(calls.includes("current:session-old"), true);
+});
+
+test("sessionLaunchController: inactive read-only transcript sends as new session", () => {
+  const currentSession = {
+    id: "history-readonly",
+    agentId: "agent-1",
+    access_mode: "read_only",
+    turns: [],
+  };
+  const { calls, controller, sessions } = makeHarness({
+    currentSession,
+    currentSessionActive: false,
+    blockReason: "should-not-block",
+  });
+  const result = controller.startSessionFromPrompt();
+
+  assert.equal(sessions.length, 1);
+  assert.notEqual(result.session, currentSession);
+  assert.equal(result.session.task, "检查项目");
+  assert.equal(calls.some((item) => item === "notice:error:should-not-block"), false);
 });
 
 test("sessionLaunchController: 不可用 Agent Entry 会在创建前阻止发送", () => {

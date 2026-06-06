@@ -10,9 +10,13 @@
   --accent: #d96c3a;
   --accent-soft: rgba(217, 108, 58, 0.1);
   --thinking: #b26b00;
+  --thinking-rgb: 178, 107, 0;
   --tooling: #9653d6;
+  --tooling-rgb: 150, 83, 214;
   --done: #217a4c;
+  --done-rgb: 33, 122, 76;
   --error: #c03a3a;
+  --error-rgb: 192, 58, 58;
   --shadow: 0 18px 55px rgba(73, 49, 25, 0.08);
   --radius: 24px;
   --scrollbar-thumb: rgba(99, 82, 63, 0.14);
@@ -3406,6 +3410,128 @@ button:disabled {
     justify-self: end;
   }
 }
+
+/* ===== Timeline 视觉分层 — 彩色左边框 + 活跃光晕 ===== */
+.runtime-message-row-thinking {
+  border-left: 3px solid var(--thinking);
+  background: rgba(var(--thinking-rgb), 0.08);
+}
+
+.runtime-message-event-tool,
+.runtime-message-event .runtime-message-status-tool {
+  border-left: 3px solid var(--tooling);
+  background: rgba(var(--tooling-rgb), 0.08);
+}
+
+.runtime-message-event-permission,
+.runtime-message-event .runtime-message-status-permission {
+  border-left: 3px solid var(--thinking);
+  background: rgba(var(--thinking-rgb), 0.1);
+}
+
+.runtime-message-event-error,
+.runtime-message-event .runtime-message-status-error:not(.runtime-message-status-failed) {
+  border-left: 3px solid var(--error);
+  background: rgba(var(--error-rgb), 0.08);
+}
+
+/* 活跃项呼吸增强 */
+.runtime-message-event.is-active {
+  animation: timeline-live-pulse 1.4s infinite ease-in-out;
+}
+
+@keyframes timeline-live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+.runtime-message-event.is-active .turn-event-dot {
+  animation: timeline-dot-pulse 1.4s infinite ease-in-out;
+}
+
+@keyframes timeline-dot-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 2px rgba(var(--surface-raised-rgb), 1); }
+  50% { opacity: 0.4; box-shadow: 0 0 0 5px rgba(217, 119, 6, 0.18); }
+}
+
+/* 活跃 thinking 行 — 加粗左边框 + 光晕 */
+.runtime-message-row-thinking.is-active {
+  border-left-width: 4px;
+  background: rgba(var(--thinking-rgb), 0.18);
+  box-shadow: -2px 0 12px rgba(var(--thinking-rgb), 0.35);
+}
+
+/* 活跃 tool 行 — 加粗左边框 + 光晕 */
+.runtime-message-event-tool.is-active {
+  border-left-width: 4px;
+  background: rgba(var(--tooling-rgb), 0.18);
+  box-shadow: -2px 0 12px rgba(var(--tooling-rgb), 0.35);
+}
+
+/* 活跃 permission 行 */
+.runtime-message-event-permission.is-active {
+  border-left-width: 4px;
+  background: rgba(var(--thinking-rgb), 0.18);
+  box-shadow: -2px 0 12px rgba(var(--thinking-rgb), 0.35);
+}
+
+/* 运行中的 Session Card 外发光 */
+.session-card.is-waiting {
+  box-shadow: 0 14px 34px rgba(178, 107, 0, 0.08);
+}
+
+/* 完成后折叠行的视觉提示 */
+.runtime-message-event.is-completed summary {
+  opacity: 0.65;
+}
+
+.runtime-message-event.is-completed summary:hover {
+  opacity: 1;
+}
+
+.runtime-message-event.is-completed:not([open]) summary::after {
+  content: attr(data-expand-hint, "展开");
+  font-size: 0.6rem;
+  color: var(--muted);
+  margin-left: 8px;
+  opacity: 0.5;
+}
+
+/* Completion Bar — 完成后绿色顶部条 */
+.runtime-completion-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  background: rgba(var(--done-rgb), 0.08);
+  border-bottom: 1px solid rgba(var(--done-rgb), 0.15);
+  font-size: 0.74rem;
+  color: var(--done);
+  flex-shrink: 0;
+}
+
+.runtime-completion-bar .cb-check {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--done);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.runtime-completion-bar .cb-stats {
+  display: flex;
+  gap: 12px;
+  opacity: 0.75;
+  font-weight: 400;
+}
+
+/* ===== Timeline 视觉分层 END ===== */
 
 @keyframes liveBreath {
   0%, 100% {

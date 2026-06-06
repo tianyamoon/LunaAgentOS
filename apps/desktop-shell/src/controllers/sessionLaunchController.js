@@ -143,7 +143,9 @@ export function createSessionLaunchController({
     }
 
     const selectedSession = getCurrentSession();
-    const composingNewSession = forceNewSession || isComposingNewSession();
+    const selectedSessionActive = selectedSession ? isSessionActive(selectedSession.id) : false;
+    // 只读 transcript 会保留为当前查看对象，但发送时应自然开启新会话。
+    const composingNewSession = forceNewSession || isComposingNewSession() || (selectedSession && !selectedSessionActive);
     const blockReason = !composingNewSession ? currentSessionSendBlockReason(selectedSession, agent) : "";
     if (blockReason) {
       setAppNotice(blockReason, "error");

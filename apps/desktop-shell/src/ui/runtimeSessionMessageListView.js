@@ -8,8 +8,10 @@ export function createRuntimeSessionMessageListView({
   escapeHtml,
 }) {
   function renderMessageListShell(projection) {
+    const completionBar = renderCompletionBar(projection);
     return `
       <div class="runtime-message-list">
+        ${completionBar}
         <div class="runtime-message-list-scroller" data-runtime-message-scroller>
           <div class="runtime-message-list-content" data-runtime-message-content>
             ${projection.rows.map(renderMessageRow).join("")}
@@ -24,7 +26,9 @@ export function createRuntimeSessionMessageListView({
 
   function renderMessageRow(row) {
     const signature = rowSignature(row);
-    return `<div class="runtime-message-row runtime-message-row-${escapeHtml(row.kind)}" data-message-id="${escapeHtml(row.id)}" data-message-kind="${escapeHtml(row.kind)}" data-message-signature="${escapeHtml(signature)}">${renderMessageRowBody(row)}</div>`;
+    const activeClass = row.status === "running" ? "is-active" : "";
+    const completedClass = row.metadata?.turnCompleted ? "is-completed" : "";
+    return `<div class="runtime-message-row runtime-message-row-${escapeHtml(row.kind)} ${escapeHtml(activeClass)} ${escapeHtml(completedClass)}" data-message-id="${escapeHtml(row.id)}" data-message-kind="${escapeHtml(row.kind)}" data-message-signature="${escapeHtml(signature)}">${renderMessageRowBody(row)}</div>`;
   }
 
   function renderMessageRowBody(row) {
@@ -37,6 +41,25 @@ export function createRuntimeSessionMessageListView({
     if (row.kind === "queue") return renderQueueRow(row);
     if (row.kind === "legacy_warning") return renderLegacyWarningRow();
     return renderCompactEventRow(row);
+  }
+
+  function renderCompletionBar(projection) {
+    // completion bar only shown when latest turn is completed
+    const latestRow = projection.rows.find((row) => row.kind === "worked_for");
+    if (!latestRow) return "";
+    const summary = latestRow.metadata?.summary || {};
+    if (!summary.durationMs && !summary.toolCount) return "";
+    return `
+      <div class="runtime-completion-bar">
+        <span class="cb-check">✓</span>
+        <span>${escapeHtml(t("turn.timeline.completionTitle"))}</span>
+        <span class="cb-stats">
+          ${summary.durationMs ? `<span>${escapeHtml(t("turn.timeline.duration", { duration: formatRuntimeMessageDuration(summary.durationMs) }))}</span>` : ""}
+          ${summary.toolCount ? `<span>${escapeHtml(t("turn.timeline.toolCount", { count: summary.toolCount }))}</span>` : ""}
+          ${summary.fileChangeCount ? `<span>${escapeHtml(t("turn.timeline.fileCount", { count: summary.fileChangeCount }))}</span>` : ""}
+        </span>
+      </div>
+    `;
   }
 
   function renderUserRow(row) {
@@ -58,8 +81,11 @@ export function createRuntimeSessionMessageListView({
   }
 
   function renderThinkingRow(row) {
+    const completed = row.metadata?.turnCompleted ? "is-completed" : "";
+    const active = row.status === "running" ? "is-active" : "";
+    const open = row.status === "running" ? " open" : "";
     return `
-      <section class="runtime-message-thinking ${statusClass(row)}">
+      <section class="runtime-message-thinking ${statusClass(row)} ${escapeHtml(completed)} ${escapeHtml(active)}">
         ${renderEventHeading(row, t("turn.timeline.thinking"))}
         <div class="runtime-message-event-content">${escapeHtml(row.content || t("turn.timeline.thinking"))}</div>
       </section>
@@ -69,9 +95,12 @@ export function createRuntimeSessionMessageListView({
   function renderCompactEventRow(row) {
     const detailKey = `${row.id}:message`;
     const open = isOpenForKey(detailKey, row.kind === "error" || row.status === "failed");
+    const activeClass = row.status === "running" ? "is-active" : "";
+    const completedClass = row.metadata?.turnCompleted ? "is-completed" : "";
+    const expandHint = row.metadata?.turnCompleted ? ` data-expand-hint="${escapeHtml(t("turn.timeline.expandHint"))}"` : "";
     return `
-      <details class="terminal-detail runtime-message-event runtime-message-event-${escapeHtml(row.kind)} ${statusClass(row)}" data-detail-key="${escapeHtml(detailKey)}"${open ? " open" : ""}>
-        <summary>${renderEventHeading(row)}<span class="turn-event-arrow" aria-hidden="true"></span></summary>
+      <details class="terminal-detail runtime-message-event runtime-message-event-${escapeHtml(row.kind)} ${statusClass(row)} ${escapeHtml(activeClass)} ${escapeHtml(completedClass)}" data-detail-key="${escapeHtml(detailKey)}"${open ? " open" : ""}>
+        <summary${expandHint}>${renderEventHeading(row)}<span class="turn-event-arrow" aria-hidden="true"></span></summary>
         ${row.content ? `<pre class="terminal-pre">${escapeHtml(row.content)}</pre>` : ""}
       </details>
     `;
@@ -81,28 +110,23 @@ export function createRuntimeSessionMessageListView({
     const detailKey = `${row.id}:message-group`;
     const tools = Array.isArray(row.metadata?.items) ? row.metadata.items : [];
     const open = isOpenForKey(detailKey, row.status === "running");
+    const activeClass = row.status === "running" ? "is-active" : "";
+    const completedClass = row.metadata?.turnCompleted ? "is-completed" : "";
+    const expandHint = row.metadata?.turnCompleted ? ` data-expand-hint="${escapeHtml(t("turn.timeline.expandHint"))}"` : "";
     return `
-      <details class="terminal-detail runtime-message-event runtime-message-event-tool-group ${statusClass(row)}" data-detail-key="${escapeHtml(detailKey)}"${open ? " open" : ""}>
-        <summary>${renderEventHeading(row, t("turn.timeline.exploreTools", { count: tools.length }))}<span class="turn-event-arrow" aria-hidden="true"></span></summary>
+      <details class="terminal-detail runtime-message-event runtime-message-event-tool-group ${statusClass(row)} ${escapeHtml(activeClass)} ${escapeHtml(completedClass)}" data-detail-key="${escapeHtml(detailKey)}"${open ? " open" : ""}>
+        <summary${expandHint}>${renderEventHeading(row, t("turn.timeline.exploreTools", { count: tools.length }))}<span class="turn-event-arrow" aria-hidden="true"></span></summary>
         <ul>${tools.map((tool) => `<li>${escapeHtml(tool.content || t("turn.timeline.emptyEvent"))}</li>`).join("")}</ul>
       </details>
     `;
   }
 
   function renderWorkedForRow(row) {
-    const summary = row.metadata?.summary || {};
-    const detailKey = `${row.id}:message-trace`;
-    const open = isOpenForKey(detailKey, row.status === "failed");
-    const traceRows = Array.isArray(row.metadata?.rows) ? row.metadata.rows : [];
+    // worked_for 现在只作为顶部摘要条，trace 行已经内联渲染
     return `
-      <details class="terminal-detail runtime-message-worked-for" data-detail-key="${escapeHtml(detailKey)}"${open ? " open" : ""}>
-        <summary>
-          <span>${escapeHtml(workedForLabel(summary))}</span>
-          <span class="turn-event-arrow" aria-hidden="true"></span>
-        </summary>
-        ${summary.legacyApproximation ? `<p class="runtime-message-legacy-note">${escapeHtml(t("turn.timeline.legacyApproximation"))}</p>` : ""}
-        <div class="runtime-message-trace">${traceRows.map(renderMessageRow).join("")}</div>
-      </details>
+      <div class="runtime-message-worked-for">
+        <span>${escapeHtml(workedForLabel(row.metadata?.summary || {}))}</span>
+      </div>
     `;
   }
 

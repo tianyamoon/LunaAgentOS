@@ -97,23 +97,28 @@ function projectTurnRows(turn, { latestTurnId, forceLive }) {
     },
   }));
 
-  const isLive = forceLive || RUNNING_TURN_STATUSES.has(turn.status);
-  if (isLive) {
-    rows.push(...projectLiveTurnRows(turn));
-    return rows;
-  }
+  // 统一路径：始终渲染完整 timeline（live 和 completed 不分支）
+  rows.push(...projectUnifiedTurnRows(turn));
 
-  const finalResponse = responseText(turn);
-  if (finalResponse) {
-    rows.push(baseTurnRow(turn, "assistant", "assistant-final", {
-      content: finalResponse,
-      status: turn.status || "completed",
-      metadata: { final: true },
-    }));
+  const debug = debugMetadataForTurn(turn);
+  if (debug) {
+    rows.push(baseTurnRow(turn, "debug", "debug", { metadata: debug }));
   }
-  const traceRows = projectCompletedTraceRows(turn);
-  if (traceRows.length) {
-    rows.push(baseTurnRow(turn, "worked_for", "worked-for", {
+  return rows;
+}
+
+function projectUnifiedTurnRows(turn) {
+  const rows = [];
+  const isLive = RUNNING_TURN_STATUSES.has(turn.status);
+  const hasNativeTimeline = Array.isArray(turn.timelineItems) && turn.timelineItems.length > 0;
+  const timelineRows = projectLiveTimeline(turn).map((item) => timelineItemRow(turn, item, { turnCompleted: !isLive }));
+  rows.push(...timelineRows);
+  rows.push(...projectLiveRuntimeLogRows(turn, timelineRows));
+
+  // 完成后在顶部放 worked_for 摘要
+  if (!isLive && hasNativeTimeline && timelineRows.length) {
+    const traceRows = projectLiveTimeline(turn).map((item) => timelineItemRow(turn, item, { turnCompleted: true }));
+    rows.unshift(baseTurnRow(turn, "worked_for", "worked-for", {
       status: turn.status || "completed",
       metadata: {
         summary: projectCompletedTimelineSummary(turn),
@@ -121,17 +126,12 @@ function projectTurnRows(turn, { latestTurnId, forceLive }) {
       },
     }));
   }
-  const debug = debugMetadataForTurn(turn);
-  if (debug) {
-    rows.push(baseTurnRow(turn, "debug", "debug", {
-      metadata: debug,
-    }));
-  }
+
   return rows;
 }
 
 function projectLiveTurnRows(turn) {
-  const rows = projectLiveTimeline(turn).map((item) => timelineItemRow(turn, item));
+  const rows = projectLiveTimeline(turn).map((item) => timelineItemRow(turn, item, { turnCompleted: false }));
   rows.push(...projectLiveRuntimeLogRows(turn, rows));
   const debug = debugMetadataForTurn(turn);
   if (debug) {
@@ -159,24 +159,25 @@ function projectCompletedTraceRows(turn) {
   const lastAssistantIndex = items.findLastIndex((item) => item.type === "assistant");
   return items
     .filter((item, index) => !(index === lastAssistantIndex && text(item.content).trim() === finalResponse))
-    .map((item) => timelineItemRow(turn, item));
+    .map((item) => timelineItemRow(turn, item, { turnCompleted: true }));
 }
 
-function timelineItemRow(turn, item) {
+function timelineItemRow(turn, item, options = {}) {
   if (item.type === "tool_group") {
     return baseTurnRow(turn, "tool_group", `timeline:${item.id}`, {
       status: item.status || "completed",
       content: item.content || "",
       metadata: {
         ...item.metadata,
-        items: list(item.items).map((tool) => timelineItemRow(turn, tool)),
+        items: list(item.items).map((tool) => timelineItemRow(turn, tool, options)),
+        turnCompleted: options.turnCompleted || false,
       },
     });
   }
   return baseTurnRow(turn, rowKindForTimelineType(item.type), `timeline:${item.id}`, {
     status: item.status || "completed",
     content: item.content || "",
-    metadata: item.metadata || {},
+    metadata: { ...item.metadata, turnCompleted: options.turnCompleted || false },
   });
 }
 

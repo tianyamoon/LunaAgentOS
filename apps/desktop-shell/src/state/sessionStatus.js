@@ -1,3 +1,5 @@
+import { timelineItemsForTurn } from "../ui/turnTimelineProjection.js";
+
 export const RECORD_STATE = Object.freeze({
   active: "active",
   archived: "archived",
@@ -190,15 +192,27 @@ export function resolveSessionCardStatusView(session, options = {}) {
     return buildStatusView(CARD_STATUS.waiting_input, translate, { secondary });
   }
 
-  if (turnStatus === TURN_STATUS.running) return buildStatusView(CARD_STATUS.running, translate);
-  if (turnStatus === TURN_STATUS.waiting_confirmation) return buildStatusView(CARD_STATUS.waiting_confirmation, translate);
-  if (turnStatus === TURN_STATUS.completed) return buildStatusView(CARD_STATUS.completed, translate);
-  if (turnStatus === TURN_STATUS.failed) return buildStatusView(CARD_STATUS.failed, translate);
+  if (turnStatus === TURN_STATUS.running) {
+    const activity = resolveActivityDescription(turn, translate);
+    return buildStatusView(CARD_STATUS.running, translate, { activity });
+  }
+  if (turnStatus === TURN_STATUS.waiting_confirmation) {
+    const activity = resolveActivityDescription(turn, translate);
+    return buildStatusView(CARD_STATUS.waiting_confirmation, translate, { activity });
+  }
+  if (turnStatus === TURN_STATUS.completed) {
+    const summary = projectCompletedTimelineSummary(turn);
+    return buildStatusView(CARD_STATUS.completed, translate, { summary });
+  }
+  if (turnStatus === TURN_STATUS.failed) {
+    const activity = resolveActivityDescription(turn, translate);
+    return buildStatusView(CARD_STATUS.failed, translate, { activity });
+  }
 
   return buildStatusView(CARD_STATUS.waiting_input, translate, { secondary });
 }
 
-function buildStatusView(status, translate, { secondary = null, error = null } = {}) {
+function buildStatusView(status, translate, { secondary = null, error = null, activity = null, summary = null } = {}) {
   const meta = CARD_STATUS_META[status] || CARD_STATUS_META.waiting_input;
   return {
     status,
@@ -208,6 +222,8 @@ function buildStatusView(status, translate, { secondary = null, error = null } =
     icon: meta.icon,
     secondary_status: secondaryStatusView(secondary, translate),
     error,
+    activity,
+    summary,
   };
 }
 
@@ -246,4 +262,52 @@ function translateOrFallback(translate, key) {
 
 function defaultTranslate(key) {
   return DEFAULT_ZH[key] || key;
+}
+
+// 从当前 turn 的 timeline 提取活动描述，用于状态 chip
+function resolveActivityDescription(turn, translate) {
+  const items = timelineItemsForTurn(turn);
+  if (!items || !items.length) return null;
+
+  // 优先找 running 状态的事件
+  const activeItem = items.find((item) => item.status === "running") || items.at(-1);
+  if (!activeItem) return null;
+
+  if (activeItem.type === "thinking") {
+    const title = (activeItem.content || "").split("\n")[0]?.slice(0, 40);
+    return { kind: "thinking", text: title || translate("turn.timeline.thinking") };
+  }
+  if (activeItem.type === "tool") {
+    return { kind: "tool", text: (activeItem.content || "").slice(0, 40) || translate("turn.timeline.kind.tool") };
+  }
+  if (activeItem.type === "permission") {
+    return { kind: "permission", text: (activeItem.content || "").slice(0, 40) };
+  }
+  if (activeItem.type === "error") {
+    return { kind: "error", text: (activeItem.content || "").slice(0, 40) };
+  }
+  if (activeItem.type === "tool_group") {
+    const toolItems = Array.isArray(activeItem.items) ? activeItem.items : [];
+    const lastTool = toolItems.at(-1);
+    if (lastTool) {
+      return { kind: "tool", text: (lastTool.content || "").slice(0, 40) || translate("turn.timeline.kind.tool") };
+    }
+  }
+  return null;
+}
+
+// 完成摘要（从 turnTimelineProjection 借用，避免循环依赖）
+function projectCompletedTimelineSummary(turn) {
+  const items = timelineItemsForTurn(turn);
+  const start = turn?.timelineStartedAt || turn?.createdAt;
+  const end = turn?.timelineCompletedAt;
+  const startMs = Date.parse(start || "");
+  const endMs = Date.parse(end || "");
+  const durationMs = Number.isFinite(startMs) && Number.isFinite(endMs) ? Math.max(0, endMs - startMs) : 0;
+  return {
+    durationMs,
+    toolCount: items.filter((item) => item.type === "tool").length,
+    fileChangeCount: items.filter((item) => item.type === "file_change").length,
+    legacyApproximation: items.some((item) => item.metadata?.legacyApproximation),
+  };
 }

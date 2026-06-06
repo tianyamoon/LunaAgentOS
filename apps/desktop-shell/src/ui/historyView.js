@@ -1,3 +1,8 @@
+export function shouldRestoreActiveHistoryItem(existing, canSendToSession) {
+  // 活跃历史可能已经以只读 transcript 打开；再次点击应尝试恢复 runtime。
+  return Boolean(existing) && typeof canSendToSession === "function" && !canSendToSession(existing);
+}
+
 export function createHistoryView({
   historyList,
   sessionListSectionOpenState,
@@ -99,7 +104,7 @@ export function createHistoryView({
       item.addEventListener("click", () => {
         const sessionId = item.dataset.sessionId;
         const existing = getSession(sessionId);
-        if (!existing) {
+        if (!existing || shouldRestoreActiveHistoryItem(existing, canSendToSession)) {
           restoreArchivedSession(sessionId);
           return;
         }

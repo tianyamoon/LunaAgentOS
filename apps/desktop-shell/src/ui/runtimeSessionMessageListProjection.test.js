@@ -62,10 +62,10 @@ test("runtimeSessionMessageListProjection: 完成态最终回答为主体并生�
     }],
   });
 
-  assert.deepEqual(result.rows.map((row) => row.kind), ["user", "assistant", "worked_for"]);
-  assert.equal(result.rows[1].content, "完成总结");
-  assert.equal(result.rows[2].metadata.summary.durationMs, 5000);
-  assert.deepEqual(result.rows[2].metadata.rows.map((row) => row.kind), ["thinking", "tool"]);
+  assert.deepEqual(result.rows.map((row) => row.kind), ["user", "worked_for", "thinking", "tool", "assistant"]);
+  assert.equal(result.rows[1].metadata.summary.durationMs, 5000);
+  assert.deepEqual(result.rows.slice(2).map((row) => row.metadata.turnCompleted), [true, true, true]);
+  assert.equal(result.rows.at(-1).content, "完成总结");
 });
 
 test("runtimeSessionMessageListProjection: Debug 行收纳 rawEvents 与日志", () => {

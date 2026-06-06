@@ -660,7 +660,8 @@ function currentSession() {
 }
 
 function isComposingNewSession() {
-  return sendAsNewSession || !currentSession();
+  const session = currentSession();
+  return sendAsNewSession || !session || !sessionsStore.isSessionActive(session.id);
 }
 
 function currentComposerTargetLabel() {

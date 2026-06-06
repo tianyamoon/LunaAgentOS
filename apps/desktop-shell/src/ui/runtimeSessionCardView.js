@@ -38,11 +38,31 @@ export function createRuntimeSessionCardView({
     const secondary = statusView.secondary_status?.label
       ? `<span class="session-status-secondary">${escapeHtml(statusView.secondary_status.label)}</span>`
       : "";
+    const activityText = renderActivityText(statusView.activity);
+    const summaryText = renderSummaryText(statusView.summary);
     return `<span class="runtime-pill session-card-status-pill session-status-${escapeHtml(statusView.tone)} session-status-${escapeHtml(statusView.status)}" aria-label="${escapeHtml(t("session.statusAria", { state: statusView.label }))}" title="${escapeHtml(statusView.detail)}">
       ${renderSessionStatusIcon(statusView.icon)}
-      <span>${escapeHtml(statusView.label)}</span>
+      <span>${escapeHtml(statusView.label)}${activityText}${summaryText}</span>
       ${secondary}
     </span>`;
+  }
+
+  function renderActivityText(activity) {
+    if (!activity) return "";
+    if (activity.kind === "thinking") return ` · ${escapeHtml(t("session.activity.thinking"))}`;
+    if (activity.kind === "tool") return ` · ${escapeHtml(t("session.activity.tool", { tool: activity.text }))}`;
+    if (activity.kind === "permission") return ` · ${escapeHtml(t("session.activity.permission", { detail: activity.text }))}`;
+    if (activity.kind === "error") return ` · ${escapeHtml(activity.text)}`;
+    return ` · ${escapeHtml(activity.text)}`;
+  }
+
+  function renderSummaryText(summary) {
+    if (!summary || !summary.toolCount) return "";
+    const parts = [];
+    if (summary.toolCount) parts.push(t("session.summary.tools", { count: summary.toolCount }));
+    if (summary.fileChangeCount) parts.push(t("session.summary.files", { count: summary.fileChangeCount }));
+    if (summary.durationMs) parts.push(formatRuntimeMessageDuration(summary.durationMs));
+    return parts.length ? ` · ${escapeHtml(parts.join(" · "))}` : "";
   }
 
   // 错误块只在状态投影提供错误时出现，避免普通会话被调试信息淹没。
