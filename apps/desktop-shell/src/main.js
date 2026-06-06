@@ -1447,7 +1447,6 @@ runtimeProbeController = createRuntimeProbeController({
 // Session Launch Controller 接管发送校验、Session 创建与附件 prompt 装配。
 sessionLaunchController = createSessionLaunchController({
   getPromptValue: () => promptBox.value,
-  focusPrompt: () => promptBox.focus(),
   clearPrompt: () => { promptBox.value = ""; },
   getComposerAttachments: () => composerController.getAttachments(),
   clearComposerAttachments: () => composerController.clearAttachments(),
@@ -1471,10 +1470,8 @@ sessionLaunchController = createSessionLaunchController({
   unmarkStopped: (sessionId) => sessionsStore.unmarkStopped(sessionId),
   createSessionTurn,
   sessionPromptQueue: sessionPromptQueueController,
-  renderWorkspace,
-  renderHistory,
+  shellSurface,
   setSendAsNewSession: (value) => { sendAsNewSession = value; },
-  updateActionLabels,
   isTargetActivatable,
   acpCommandsForProvider,
   startAcpSession,

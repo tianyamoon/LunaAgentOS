@@ -12,7 +12,6 @@ import {
 // 创建发送入口控制器。Shell 仅注入环境能力，控制器不理解具体 Adapter。
 export function createSessionLaunchController({
   getPromptValue,
-  focusPrompt,
   clearPrompt,
   getComposerAttachments,
   clearComposerAttachments,
@@ -36,10 +35,8 @@ export function createSessionLaunchController({
   unmarkStopped,
   createSessionTurn,
   sessionPromptQueue,
-  renderWorkspace,
-  renderHistory,
+  shellSurface,
   setSendAsNewSession,
-  updateActionLabels,
   isTargetActivatable,
   acpCommandsForProvider,
   startAcpSession,
@@ -87,15 +84,14 @@ export function createSessionLaunchController({
     Object.assign(session, normalizeWorkspaceSession(session));
     upsertSession(session);
     markSessionActive(session.id);
-    renderWorkspace();
-    renderHistory();
+    shellSurface.refresh({ workspace: true, history: true });
     return session;
   }
 
   // 创建 Turn 后立即刷新工作区，使用户先看到已接收任务的反馈。
   function createTurn(session, task, options = {}) {
     const turn = createSessionTurn(session, task, options);
-    renderWorkspace();
+    shellSurface.refreshWorkspace();
     return turn;
   }
 
@@ -124,7 +120,7 @@ export function createSessionLaunchController({
   function startSessionFromPrompt(forceNewSession = false) {
     const task = getPromptValue().trim();
     if (!task) {
-      focusPrompt();
+      shellSurface.focusComposer();
       return null;
     }
 
@@ -136,7 +132,7 @@ export function createSessionLaunchController({
     }
     if (!canTargetStartSession(agent)) {
       setAppNotice(targetSendBlockNotice(agent), "error");
-      focusPrompt();
+      shellSurface.focusComposer();
       return null;
     }
     if (!canSendToProvider(provider.id)) {
@@ -151,7 +147,7 @@ export function createSessionLaunchController({
     const blockReason = !composingNewSession ? currentSessionSendBlockReason(selectedSession, agent) : "";
     if (blockReason) {
       setAppNotice(blockReason, "error");
-      focusPrompt();
+      shellSurface.focusComposer();
       return null;
     }
 
@@ -171,7 +167,7 @@ export function createSessionLaunchController({
     clearPrompt();
     clearComposerAttachments();
     setSendAsNewSession(false);
-    updateActionLabels();
+    shellSurface.refreshActions();
     if (isTargetActivatable(agent)) {
       setAppNotice(t("runtime.activatingTarget", { target: targetDisplayName(agent) }), "busy");
     }

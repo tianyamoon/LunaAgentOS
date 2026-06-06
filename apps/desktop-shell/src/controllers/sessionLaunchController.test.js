@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createShellSurface } from "../ui/shellSurface.js";
 import { createSessionLaunchController } from "./sessionLaunchController.js";
 
 // 创建可观察发送行为的控制器夹具，覆盖 Launch Controller 的稳定接口。
@@ -19,6 +20,12 @@ function makeHarness({
   let composerAttachments = attachments;
   const agent = { id: "agent-1", providerId: "demo", name: "Demo Agent", runtimeHost: "win" };
   const provider = { id: "demo", name: "Demo" };
+  const shellSurface = createShellSurface({
+    focusComposerInput: () => calls.push("focus"),
+    renderWorkspace: () => calls.push("workspace"),
+    renderHistory: () => calls.push("history"),
+    updateActionLabels: () => calls.push("labels"),
+  });
   const sessionPromptQueue = {
     submit: (session, task, options) => {
       if (session.activePromptRunId) {
@@ -34,7 +41,6 @@ function makeHarness({
   };
   const controller = createSessionLaunchController({
     getPromptValue: () => promptValue,
-    focusPrompt: () => calls.push("focus"),
     clearPrompt: () => { promptValue = ""; },
     getComposerAttachments: () => composerAttachments,
     clearComposerAttachments: () => { composerAttachments = []; },
@@ -65,10 +71,8 @@ function makeHarness({
       return turn;
     },
     sessionPromptQueue,
-    renderWorkspace: () => calls.push("workspace"),
-    renderHistory: () => calls.push("history"),
+    shellSurface,
     setSendAsNewSession: (value) => calls.push(`new:${value}`),
-    updateActionLabels: () => calls.push("labels"),
     isTargetActivatable: () => false,
     acpCommandsForProvider: () => commands,
     startAcpSession: (_session, turn) => calls.push(`acp:${turn.id}`),
