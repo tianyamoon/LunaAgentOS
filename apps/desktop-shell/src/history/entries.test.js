@@ -4,6 +4,7 @@ import {
   archivedSessionsFromHistory,
   historySessionKey,
   historyTurnKey,
+  isDeletedHistoryEntry,
   projectHistoryTurnIntegrity,
 } from "./entries.js";
 
@@ -79,6 +80,31 @@ test("archivedSessionsFromHistory tolerates snake_case keys and provides default
   assert.equal(session.record_state, "archived");
   assert.equal(session.access_mode, "read_only");
   assert.deepEqual(session.runtime_binding, { state: "failed", stage: "resume" });
+});
+
+test("archivedSessionsFromHistory hides deleted tombstones without dropping normal history", () => {
+  const sessions = archivedSessionsFromHistory([
+    {
+      sessionId: "deleted-session",
+      id: "deleted-turn",
+      task: "deleted task",
+      summary: "kept on disk",
+      createdAt: "2026-05-01T10:00:00Z",
+      record_state: "deleted",
+    },
+    {
+      sessionId: "active-session",
+      id: "active-turn",
+      task: "active task",
+      summary: "visible",
+      createdAt: "2026-05-01T11:00:00Z",
+      record_state: "active",
+    },
+  ]);
+
+  assert.deepEqual(sessions.map((session) => session.id), ["active-session"]);
+  assert.equal(isDeletedHistoryEntry({ recordState: "deleted" }), true);
+  assert.equal(isDeletedHistoryEntry({ record_state: "active" }), false);
 });
 
 test("archivedSessionsFromHistory does not archive entries without explicit record_state", () => {

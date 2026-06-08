@@ -31,7 +31,7 @@ export function createHistoryRepository({
         notice: formatCompactHistoryNotice(compactResult),
       };
     } catch (error) {
-      entries = [];
+      // 加载失败时保留上一次可用快照，避免桌面端历史列表瞬间清空。
       throw error;
     } finally {
       loading = false;

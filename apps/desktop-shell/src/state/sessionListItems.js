@@ -10,6 +10,18 @@ function fallbackRuntimeBinding(createRuntimeBinding) {
   return typeof createRuntimeBinding === "function" ? createRuntimeBinding() : null;
 }
 
+function normalizeDetachedHistoryTurn(turn) {
+  if (!turn) return turn;
+  const hasFinalContent = Boolean(turn.finalResponse || turn.outputs?.length || turn.logs?.length);
+  if (!["running", "waiting_confirmation"].includes(turn.status)) return turn;
+  // 离线历史条目没有正在执行的 runtime；旧快照里的 running 只能代表上次写盘时仍在跑。
+  return {
+    ...turn,
+    status: hasFinalContent ? "completed" : "created",
+    state: hasFinalContent ? 5 : turn.state,
+  };
+}
+
 export function projectSessionListItems({
   sessions = [],
   archivedSessions = [],
@@ -60,16 +72,22 @@ export function projectSessionListItems({
   const liveIds = new Set(liveItems.map((item) => item.id));
   const historyItems = archivedSessions
     .filter((item) => !liveIds.has(item.id))
-    .map((item) => ({
-      ...item,
-      runtimeState: item.runtimeState || "archived",
-      // 归档是用户动作；历史记录缺失字段时不能自动推入归档区。
-      record_state: item.record_state || recordState.active || "active",
-      access_mode: item.access_mode || accessMode.read_only,
-      runtime_binding: item.runtime_binding || fallbackRuntimeBinding(createRuntimeBinding),
-      isInWorkspace: false,
-      isRuntimeAttached: false,
-    }));
+    .map((item) => {
+      const turns = Array.isArray(item.turns) ? item.turns.map(normalizeDetachedHistoryTurn) : [];
+      return {
+        ...item,
+        runtimeState: item.runtimeState || "archived",
+        // 归档是用户动作；历史记录缺失字段时不能自动推入归档区。
+        record_state: item.record_state || recordState.active || "active",
+        // 只有真正挂在内存 runtime 上的 session 才能交互；磁盘历史在列表里一律按只读状态展示。
+        access_mode: accessMode.read_only || "read_only",
+        runtime_binding: item.runtime_binding || fallbackRuntimeBinding(createRuntimeBinding),
+        turns,
+        activeTurnId: item.activeTurnId || turns.at(-1)?.id || null,
+        isInWorkspace: false,
+        isRuntimeAttached: false,
+      };
+    });
   return [...liveItems, ...historyItems];
 }
 

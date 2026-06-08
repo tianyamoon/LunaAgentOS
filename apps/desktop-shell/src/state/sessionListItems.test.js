@@ -141,6 +141,37 @@ test("projectSessionListItems merges live sessions and archived history without 
   assert.equal(items[1].isRuntimeAttached, false);
 });
 
+test("projectSessionListItems shows detached active history as read-only instead of running", () => {
+  const [item] = projectSessionListItems({
+    sessions: [],
+    archivedSessions: [{
+      id: "history-running",
+      createdAt: "2026-06-08T00:00:00.000Z",
+      updatedAt: "2026-06-08T00:00:00.000Z",
+      record_state: "active",
+      access_mode: "interactive",
+      turns: [{
+        id: "turn-1",
+        status: "running",
+        state: 2,
+        finalResponse: "saved answer",
+        outputs: [],
+        logs: [],
+      }],
+    }],
+    createRuntimeBinding: () => ({ state: "idle" }),
+    constants: {
+      RECORD_STATE: { active: "active", archived: "archived" },
+      ACCESS_MODE: { read_only: "read_only" },
+    },
+  });
+
+  assert.equal(item.record_state, "active");
+  assert.equal(item.access_mode, "read_only");
+  assert.equal(item.isRuntimeAttached, false);
+  assert.equal(item.turns[0].status, "completed");
+});
+
 test("session list sectioning treats read-only as access mode, not archive state", () => {
   const readOnlyActive = item("readonly-active", {
     record_state: "active",

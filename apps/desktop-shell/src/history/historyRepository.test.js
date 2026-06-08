@@ -36,7 +36,7 @@ test("historyRepository: load compacts, loads and exposes an isolated snapshot",
   assert.equal(repository.isLoading(), false);
 });
 
-test("historyRepository: failed load clears stale snapshot and loading state", async () => {
+test("historyRepository: failed load keeps last usable snapshot and loading state", async () => {
   let shouldFail = false;
   const { repository } = makeRepository({
     responses: {
@@ -50,7 +50,7 @@ test("historyRepository: failed load clears stale snapshot and loading state", a
   await repository.load();
   shouldFail = true;
   await assert.rejects(repository.load(), /boom/);
-  assert.deepEqual(repository.getEntriesSnapshot(), []);
+  assert.deepEqual(repository.getEntriesSnapshot(), [{ sessionId: "s1" }]);
   assert.equal(repository.isLoading(), false);
 });
 
@@ -85,7 +85,7 @@ test("historyRepository: archiveSession reloads backend entries", async () => {
   assert.equal(repository.getEntriesSnapshot()[0].record_state, "archived");
 });
 
-test("historyRepository: deleteSession removes matching entries and returns backend result", async () => {
+test("historyRepository: deleteSession hides matching entries from memory and returns backend result", async () => {
   const { repository } = makeRepository({
     responses: {
       compact_history_entries: {},

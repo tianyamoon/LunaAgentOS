@@ -14,6 +14,11 @@ export function historyTurnKey(entry) {
   return `${sessionKey}:${turnId}`;
 }
 
+export function isDeletedHistoryEntry(entry) {
+  // 后端删除现在写入墓碑，列表投影隐藏它，但磁盘仍保留正文用于恢复和审计。
+  return (entry?.record_state || entry?.recordState || entry?.runtime_state || entry?.runtimeState) === "deleted";
+}
+
 // 旧历史没有 Prompt Run 写入租约，只能保守标记，不能根据正文相似度猜测修复归属。
 export function projectHistoryTurnIntegrity(turn) {
   if (!turn) return turn;
@@ -31,7 +36,7 @@ export function projectHistoryTurnIntegrity(turn) {
 export function archivedSessionsFromHistory(entries, { normalizeSession } = {}) {
   const list = Array.isArray(entries) ? entries : [];
   const bySession = new Map();
-  list.forEach((entry) => {
+  list.filter((entry) => !isDeletedHistoryEntry(entry)).forEach((entry) => {
     const key = historySessionKey(entry);
     const createdAt = entry.createdAt || entry.created_at;
     if (!key || !createdAt) return;

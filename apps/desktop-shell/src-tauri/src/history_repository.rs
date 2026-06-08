@@ -308,14 +308,25 @@ fn compact_entries(entries: Vec<HistoryEntry>) -> (Vec<HistoryEntry>, usize, usi
 }
 
 /// 删除指定 Session 的全部 History Entry。
-fn retain_not_session(entries: Vec<HistoryEntry>, session_id: &str) -> (Vec<HistoryEntry>, usize) {
-    let original_len = entries.len();
-    let retained = entries
+fn mark_session_deleted_entries(
+    entries: Vec<HistoryEntry>,
+    session_id: &str,
+) -> (Vec<HistoryEntry>, usize) {
+    let mut marked_count = 0;
+    let marked = entries
         .into_iter()
-        .filter(|entry| history_entry_match_key(entry) != session_id)
+        .map(|mut entry| {
+            // 删除只做可审计墓碑标记，不物理移除历史正文，避免误触发时把 JSON 写成空数组。
+            if history_entry_match_key(&entry) == session_id {
+                entry.runtime_state = Some("deleted".to_string());
+                entry.record_state = Some("deleted".to_string());
+                entry.access_mode = Some("read_only".to_string());
+                marked_count += 1;
+            }
+            entry
+        })
         .collect::<Vec<_>>();
-    let removed_count = original_len.saturating_sub(retained.len());
-    (retained, removed_count)
+    (marked, marked_count)
 }
 
 /// 把指定 Session 的记录标记为只读归档，并与剩余 live 记录分离。
@@ -410,12 +421,12 @@ pub(crate) fn delete_history_session_entries(
             skipped_files += 1;
             continue;
         };
-        let (retained, removed_for_file) = retain_not_session(entries, &session_id);
+        let (retained, removed_for_file) = mark_session_deleted_entries(entries, &session_id);
         if removed_for_file > 0 {
             removed_count += removed_for_file;
             let json =
                 serde_json::to_string_pretty(&retained).map_err(|error| error.to_string())?;
-            write_history_file(&app, &path, json, "delete")?;
+            write_history_file(&app, &path, json, "delete-mark")?;
         }
     }
     Ok(HistoryDeleteResult {
@@ -618,17 +629,23 @@ mod tests {
     }
 
     #[test]
-    fn retain_not_session_deletes_only_matching_entries() {
+    fn mark_session_deleted_entries_keeps_payload_and_marks_only_matching_entries() {
         let first = entry("one", "turn-1", HISTORY_SCHEMA_VERSION);
         let mut second = entry("two", "turn-2", HISTORY_SCHEMA_VERSION);
         second.session_id = Some("session-2".to_string());
-        let (items, removed) = retain_not_session(vec![first, second], "session-1");
+        let (items, removed) = mark_session_deleted_entries(vec![first, second], "session-1");
         assert_eq!(removed, 1);
-        assert_eq!(items[0].session_id.as_deref(), Some("session-2"));
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].session_id.as_deref(), Some("session-1"));
+        assert_eq!(items[0].runtime_state.as_deref(), Some("deleted"));
+        assert_eq!(items[0].record_state.as_deref(), Some("deleted"));
+        assert_eq!(items[0].access_mode.as_deref(), Some("read_only"));
+        assert_eq!(items[1].session_id.as_deref(), Some("session-2"));
+        assert_ne!(items[1].record_state.as_deref(), Some("deleted"));
     }
 
     #[test]
-    fn retain_not_session_does_not_delete_legacy_siblings_by_acp_id() {
+    fn mark_session_deleted_entries_does_not_mark_legacy_siblings_by_acp_id() {
         let mut first = entry("legacy-a", "turn-1", HISTORY_SCHEMA_VERSION);
         let mut second = entry("legacy-b", "turn-2", HISTORY_SCHEMA_VERSION);
         first.session_id = None;
@@ -636,11 +653,14 @@ mod tests {
         first.acp_session_id = Some("shared-runtime".to_string());
         second.acp_session_id = Some("shared-runtime".to_string());
 
-        let (items, removed) = retain_not_session(vec![first, second], "legacy-a");
+        let (items, removed) = mark_session_deleted_entries(vec![first, second], "legacy-a");
 
         assert_eq!(removed, 1);
-        assert_eq!(items.len(), 1);
-        assert_eq!(items[0].id, "legacy-b");
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].id, "legacy-a");
+        assert_eq!(items[0].record_state.as_deref(), Some("deleted"));
+        assert_eq!(items[1].id, "legacy-b");
+        assert_ne!(items[1].record_state.as_deref(), Some("deleted"));
     }
 
     #[test]
