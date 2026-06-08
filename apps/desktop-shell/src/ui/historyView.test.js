@@ -40,7 +40,27 @@ test("historyView: 没有 live session 时状态源回退到历史 item", () => 
   assert.equal(resolveHistoryItemStatusSource(historyItem, () => null), historyItem);
 });
 
-test("historyView: read-only history with stale running turn uses muted history signal", () => {
+test("historyView: read-only history with saved answer keeps completed status", () => {
+  const projected = projectHistoryListItemState({
+    id: "s1",
+    record_state: RECORD_STATE.active,
+    access_mode: ACCESS_MODE.read_only,
+    turns: [{ id: "t1", status: TURN_STATUS.running, finalResponse: "done" }],
+  }, {
+    getSession: () => null,
+    ensureSessionStatusShape: () => {},
+    resolveSessionListPresentationState,
+    canSendToSession: () => false,
+    translate: (key) => key,
+  });
+
+  assert.equal(projected.statusView.status, CARD_STATUS.completed);
+  assert.equal(projected.signalClass, "signal-archive");
+  assert.equal(projected.isSendable, false);
+  assert.equal(projected.listStateClass, "is-active-history");
+});
+
+test("historyView: read-only history without saved answer does not appear running", () => {
   const projected = projectHistoryListItemState({
     id: "s1",
     record_state: RECORD_STATE.active,

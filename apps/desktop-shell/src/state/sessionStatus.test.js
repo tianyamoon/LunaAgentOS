@@ -94,11 +94,22 @@ test("resolveSessionCardStatusView: archived preserves latest outcome as seconda
   assert.deepEqual(view.secondary_status, { status: TURN_STATUS.completed, label: "上次已完成" });
 });
 
-test("resolveSessionCardStatusView: read-only history wins over turn status", () => {
+test("resolveSessionCardStatusView: read-only history with saved result shows execution outcome", () => {
+  const view = resolveSessionCardStatusView(session({
+    access_mode: ACCESS_MODE.read_only,
+    turns: [{ id: "t", status: TURN_STATUS.running, finalResponse: "done" }],
+  }), { translate });
+  assert.equal(view.status, CARD_STATUS.completed);
+  assert.equal(view.label, "已完成");
+  assert.equal(view.secondary_status, null);
+});
+
+test("resolveSessionCardStatusView: read-only history without saved result stays history record", () => {
   const view = resolveSessionCardStatusView(session({
     access_mode: ACCESS_MODE.read_only,
     turns: [{ id: "t", status: TURN_STATUS.running }],
   }), { translate });
+
   assert.equal(view.status, CARD_STATUS.readonly_history);
   assert.equal(view.label, "只读历史");
   assert.equal(view.secondary_status, null);
@@ -115,17 +126,17 @@ test("resolveSessionCardStatusView: manual archive wins over read-only access", 
   assert.equal(view.secondary_status.status, TURN_STATUS.completed);
 });
 
-test("resolveSessionCanonicalState: read-only history is not live even when old turn says running", () => {
+test("resolveSessionCanonicalState: read-only history keeps completed outcome but is not live", () => {
   const view = resolveSessionCanonicalState(session({
     access_mode: ACCESS_MODE.read_only,
-    turns: [{ id: "t", status: TURN_STATUS.running }],
+    turns: [{ id: "t", status: TURN_STATUS.running, finalResponse: "done" }],
   }), {
     translate,
     canSendToSession: () => false,
   });
 
   assert.equal(view.kind, SESSION_STATUS_KIND.readonly_history);
-  assert.equal(view.statusView.status, CARD_STATUS.readonly_history);
+  assert.equal(view.statusView.status, CARD_STATUS.completed);
   assert.equal(view.listSignal, SESSION_LIST_SIGNAL.readonly_history);
   assert.equal(view.canSend, false);
   assert.equal(view.isRuntimeAttached, false);
@@ -176,7 +187,21 @@ test("resolveSessionListPresentationState: live completed session keeps active s
   assert.equal(view.listStateClass, "is-active-history");
 });
 
-test("resolveSessionListPresentationState: read-only history ignores stale running signal", () => {
+test("resolveSessionListPresentationState: read-only history keeps saved execution outcome", () => {
+  const view = resolveSessionListPresentationState(session({
+    access_mode: ACCESS_MODE.read_only,
+    turns: [{ id: "t", status: TURN_STATUS.running, finalResponse: "done" }],
+  }), {
+    translate,
+    canSendToSession: () => false,
+  });
+
+  assert.equal(view.statusView.status, CARD_STATUS.completed);
+  assert.equal(view.signalClass, "signal-archive");
+  assert.equal(view.isSendable, false);
+});
+
+test("resolveSessionListPresentationState: read-only history without saved result is not running", () => {
   const view = resolveSessionListPresentationState(session({
     access_mode: ACCESS_MODE.read_only,
     turns: [{ id: "t", status: TURN_STATUS.running }],
@@ -203,16 +228,16 @@ test("resolveSessionListPresentationState: failed session exposes failed signal"
   assert.equal(view.isFailedOrBlocked, true);
 });
 
-test("resolveSessionCardControlState: read-only history disables live actions", () => {
+test("resolveSessionCardControlState: read-only completed history disables live actions", () => {
   const controls = resolveSessionCardControlState(session({
     access_mode: ACCESS_MODE.read_only,
-    turns: [{ id: "t", status: TURN_STATUS.running }],
+    turns: [{ id: "t", status: TURN_STATUS.running, finalResponse: "done" }],
   }), {
     translate,
     canSendToSession: () => false,
   });
 
-  assert.equal(controls.statusView.status, CARD_STATUS.readonly_history);
+  assert.equal(controls.statusView.status, CARD_STATUS.completed);
   assert.equal(controls.isWaiting, false);
   assert.equal(controls.canStop, false);
   assert.equal(controls.canArchive, false);

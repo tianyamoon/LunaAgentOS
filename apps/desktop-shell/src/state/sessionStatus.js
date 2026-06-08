@@ -141,6 +141,25 @@ export function latestTurnOutcome(session) {
   return Object.values(TURN_STATUS).includes(status) ? status : TURN_STATUS.created;
 }
 
+function resolveVisibleTurnStatus(turn, { readOnly = false } = {}) {
+  const status = turn?.status || TURN_STATUS.created;
+  if (!readOnly) return status;
+  if (status === TURN_STATUS.completed || status === TURN_STATUS.failed) return status;
+  if (hasReadableTurnResult(turn)) return TURN_STATUS.completed;
+  if (status === TURN_STATUS.waiting_confirmation || status === TURN_STATUS.running) return TURN_STATUS.created;
+  return status;
+}
+
+function hasReadableTurnResult(turn) {
+  if (!turn) return false;
+  if (String(turn.finalResponse || "").trim()) return true;
+  if (Array.isArray(turn.outputs) && turn.outputs.some((output) => String(output || "").trim())) return true;
+  if (Array.isArray(turn.timelineItems)) {
+    return turn.timelineItems.some((item) => item?.type === "assistant" && String(item.content || "").trim());
+  }
+  return false;
+}
+
 export function isRunningTurnStatus(status) {
   return status === TURN_STATUS.running || status === TURN_STATUS.waiting_confirmation;
 }
@@ -184,7 +203,7 @@ export function resolveSessionCardStatusView(session, options = {}) {
   const accessMode = session?.access_mode || ACCESS_MODE.interactive;
   const runtimeBinding = session?.runtime_binding || createRuntimeBinding();
   const turn = activeOrLatestTurn(session);
-  const turnStatus = turn?.status || TURN_STATUS.created;
+  const turnStatus = resolveVisibleTurnStatus(turn, { readOnly: accessMode === ACCESS_MODE.read_only });
   const secondary = latestTurnOutcome(session);
 
   if (recordState === RECORD_STATE.archived) {
@@ -192,14 +211,14 @@ export function resolveSessionCardStatusView(session, options = {}) {
     return buildStatusView(CARD_STATUS.archived, translate, { secondary });
   }
 
-  if (accessMode === ACCESS_MODE.read_only) {
-    // 只读历史不是 live runtime，不展示旧快照里的“上次运行中”等执行态。
-    return buildStatusView(CARD_STATUS.readonly_history, translate);
-  }
-
   if (runtimeBinding.state === RUNTIME_BINDING_STATE.failed) {
     const status = BLOCKING_RUNTIME_STAGES.has(runtimeBinding.stage) ? CARD_STATUS.blocked : CARD_STATUS.failed;
     return buildStatusView(status, translate, { error: runtimeErrorView(runtimeBinding, translate) });
+  }
+
+  if (accessMode === ACCESS_MODE.read_only && (!turn || turnStatus === TURN_STATUS.created || turnStatus === TURN_STATUS.cancelled)) {
+    // 只读是访问模式；没有可证明的执行结果时才展示为历史记录。
+    return buildStatusView(CARD_STATUS.readonly_history, translate);
   }
 
   if (runtimeBinding.state === RUNTIME_BINDING_STATE.reconnecting) {

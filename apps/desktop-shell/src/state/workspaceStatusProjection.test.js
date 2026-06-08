@@ -133,3 +133,22 @@ test("workspaceStatusProjection: 顶部状态使用 canonical 只读状态，忽
   assert.equal(view.sessionStatusView.status, "readonly_history");
   assert.equal(view.liveCount, 0);
 });
+
+test("workspaceStatusProjection: 只读历史保留已完成执行结果但不计入 live runtime", () => {
+  const view = projectWorkspaceStatus({
+    agent: { id: "agent-a", name: "Hermes", state: 1 },
+    provider: { id: "hermes" },
+    currentSession: {
+      id: "history",
+      agentId: "agent-a",
+      record_state: RECORD_STATE.active,
+      access_mode: ACCESS_MODE.read_only,
+      turns: [{ id: "t1", status: "running", finalResponse: "done" }],
+    },
+    availability: { summary: "available" },
+    targetDisplayName: (agent) => agent.name,
+  });
+
+  assert.equal(view.sessionStatusView.status, "completed");
+  assert.equal(view.liveCount, 0);
+});
