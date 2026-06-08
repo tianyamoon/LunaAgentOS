@@ -39,29 +39,32 @@ function createView(overrides = {}) {
   return { element, view };
 }
 
-test("workspaceStatusView: 渲染目标、状态、可用性和活跃 ACP 数量", () => {
+test("workspaceStatusView: 渲染目标、canonical 状态、可用性和活跃 ACP 数量", () => {
   const { element, view } = createView();
 
   view.renderWorkspaceStatus();
 
   assert.match(element.innerHTML, /workspace-status-target/);
   assert.match(element.innerHTML, /Hermes/);
-  assert.match(element.innerHTML, /state-think/);
-  assert.match(element.innerHTML, /state:2/);
+  assert.match(element.innerHTML, /session-status-neutral/);
+  assert.match(element.innerHTML, /t:sessionStatus.waitingInput/);
   assert.match(element.innerHTML, /availability:available/);
   assert.match(element.innerHTML, /ACP × 1/);
 });
 
-test("workspaceStatusView: uses unified session card status when available", () => {
+test("workspaceStatusView: uses unified canonical status when available", () => {
   const { element, view } = createView({
-    resolveSessionCardStatusView: () => ({ status: "completed", label: "已完成", tone: "success" }),
+    resolveSessionCanonicalState: () => ({
+      statusView: { status: "completed", label: "completed", tone: "success" },
+      isRuntimeAttached: true,
+    }),
   });
 
   view.renderWorkspaceStatus();
 
   assert.match(element.innerHTML, /session-status-success/);
   assert.match(element.innerHTML, /session-status-completed/);
-  assert.match(element.innerHTML, /已完成/);
+  assert.match(element.innerHTML, /completed/);
   assert.doesNotMatch(element.innerHTML, /state:2/);
 });
 

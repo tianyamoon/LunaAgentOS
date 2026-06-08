@@ -80,6 +80,7 @@ import {
   isRunningTurnStatus,
   resolveSessionCardControlState,
   resolveSessionCardStatusView,
+  resolveSessionCanonicalState,
   resolveSessionListPresentationState,
 } from "./state/sessionStatus.js";
 import {
@@ -1141,6 +1142,9 @@ workspaceStatusView = createWorkspaceStatusView({
   stateClasses,
   stateDisplayLabel,
   resolveSessionCardStatusView,
+  resolveSessionCanonicalState,
+  canSendToSession,
+  canRestoreSession,
   t,
   escapeHtml,
 });

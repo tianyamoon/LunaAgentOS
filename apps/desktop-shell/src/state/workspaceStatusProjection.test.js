@@ -64,14 +64,11 @@ test("workspaceStatusProjection: 产出顶部状态条所需最小视图数据",
     targetDisplayName: (agent) => `目标:${agent.name}`,
   });
 
-  assert.deepEqual(view, {
-    hasTarget: true,
-    targetLabel: "目标:Hermes",
-    statusState: 3,
-    sessionStatusView: null,
-    availabilitySummary: "available",
-    liveCount: 1,
-  });
+  assert.equal(view.hasTarget, true);
+  assert.equal(view.targetLabel, "目标:Hermes");
+  assert.equal(view.statusState, 3);
+  assert.equal(view.availabilitySummary, "available");
+  assert.equal(view.liveCount, 1);
 });
 
 test("workspaceStatusProjection: 缺少目标时返回占位 key", () => {
@@ -81,7 +78,7 @@ test("workspaceStatusProjection: 缺少目标时返回占位 key", () => {
   });
 });
 
-test("workspaceStatusProjection: workspace status can consume unified session card status view", () => {
+test("workspaceStatusProjection: workspace status can consume unified canonical state", () => {
   const view = projectWorkspaceStatus({
     agent: { id: "agent-a", name: "Hermes", state: 2 },
     provider: { id: "hermes" },
@@ -92,11 +89,14 @@ test("workspaceStatusProjection: workspace status can consume unified session ca
       turns: [{ id: "t1", status: "completed", finalResponse: "done" }],
     },
     availability: { summary: "available" },
-    resolveSessionStatusView: () => ({ status: "completed", label: "已完成", tone: "success" }),
+    resolveSessionCanonicalState: () => ({
+      statusView: { status: "completed", label: "completed", tone: "success" },
+      isRuntimeAttached: true,
+    }),
     targetDisplayName: (agent) => agent.name,
   });
 
-  assert.deepEqual(view.sessionStatusView, { status: "completed", label: "已完成", tone: "success" });
+  assert.deepEqual(view.sessionStatusView, { status: "completed", label: "completed", tone: "success" });
   assert.equal(view.statusState, 2);
 });
 
@@ -113,4 +113,23 @@ test("workspaceStatusProjection: read-only history in workspace snapshot is not 
   });
 
   assert.equal(view.liveCount, 1);
+});
+
+test("workspaceStatusProjection: 顶部状态使用 canonical 只读状态，忽略历史快照里的旧运行态", () => {
+  const view = projectWorkspaceStatus({
+    agent: { id: "agent-a", name: "Hermes", state: 1 },
+    provider: { id: "hermes" },
+    currentSession: {
+      id: "history",
+      agentId: "agent-a",
+      record_state: RECORD_STATE.active,
+      access_mode: ACCESS_MODE.read_only,
+      turns: [{ id: "t1", status: "running" }],
+    },
+    availability: { summary: "available" },
+    targetDisplayName: (agent) => agent.name,
+  });
+
+  assert.equal(view.sessionStatusView.status, "readonly_history");
+  assert.equal(view.liveCount, 0);
 });

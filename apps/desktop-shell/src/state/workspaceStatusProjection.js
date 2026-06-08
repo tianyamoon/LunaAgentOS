@@ -1,17 +1,60 @@
 import {
   ACCESS_MODE,
   RECORD_STATE,
+  resolveSessionCanonicalState as defaultResolveSessionCanonicalState,
 } from "./sessionStatus.js";
-
-function activeRecordStateOf(session, sessionRecordState) {
-  return sessionRecordState ? sessionRecordState(session) : (session?.record_state || RECORD_STATE.active);
-}
 
 function createdAtDesc(left, right) {
   return String(right?.createdAt || "").localeCompare(String(left?.createdAt || ""));
 }
 
-// 工作区空态只关心右侧是否还有可恢复的活跃历史，不直接碰 DOM。
+function fallbackCanonicalState(session, {
+  sessionRecordState = null,
+  resolveSessionStatusView = null,
+  translate = null,
+} = {}) {
+  const recordState = sessionRecordState
+    ? sessionRecordState(session)
+    : (session?.record_state || RECORD_STATE.active);
+  const accessMode = session?.access_mode || ACCESS_MODE.interactive;
+  const isArchived = recordState === RECORD_STATE.archived;
+  const isDeleted = recordState === RECORD_STATE.deleted;
+  const isReadOnly = accessMode === ACCESS_MODE.read_only;
+
+  return {
+    recordState,
+    accessMode,
+    statusView: typeof resolveSessionStatusView === "function"
+      ? resolveSessionStatusView(session, { translate })
+      : null,
+    isRuntimeAttached: recordState === RECORD_STATE.active && !isArchived && !isDeleted && !isReadOnly,
+  };
+}
+
+function canonicalStateForSession(session, {
+  resolveSessionCanonicalState = defaultResolveSessionCanonicalState,
+  canSendToSession = null,
+  canRestoreSession = null,
+  sessionRecordState = null,
+  resolveSessionStatusView = null,
+  translate = null,
+} = {}) {
+  if (typeof resolveSessionCanonicalState === "function") {
+    return resolveSessionCanonicalState(session, {
+      translate,
+      canSendToSession,
+      canRestoreSession,
+    });
+  }
+
+  return fallbackCanonicalState(session, {
+    sessionRecordState,
+    resolveSessionStatusView,
+    translate,
+  });
+}
+
+// 工作区空态只关心右侧是否还有可恢复的活跃历史，不直接触碰 DOM。
 export function countRestorableActiveHistoryItems({ sessions = [], archivedSessions = [] } = {}) {
   const liveIds = new Set(sessions.map((session) => session.id));
   return archivedSessions
@@ -46,7 +89,7 @@ export function pickWorkspaceStatusSession({
     .sort(createdAtDesc)[0] || null;
 }
 
-// 顶部状态条的领域投影集中在这里，main.js 只负责渲染结果。
+// 顶部状态条只消费 canonical session 状态，避免与卡片、右侧列表各自推断。
 export function projectWorkspaceStatus({
   agent = null,
   provider = null,
@@ -56,6 +99,9 @@ export function projectWorkspaceStatus({
   availability = null,
   sessionRecordState = null,
   resolveSessionStatusView = null,
+  resolveSessionCanonicalState = defaultResolveSessionCanonicalState,
+  canSendToSession = null,
+  canRestoreSession = null,
   translate = null,
   targetDisplayName = (target) => target?.name || target?.id || "",
 } = {}) {
@@ -66,9 +112,16 @@ export function projectWorkspaceStatus({
     };
   }
 
+  const canonicalOptions = {
+    resolveSessionCanonicalState,
+    canSendToSession,
+    canRestoreSession,
+    sessionRecordState,
+    resolveSessionStatusView,
+    translate,
+  };
   const liveCount = sessions
-    .filter((session) => activeRecordStateOf(session, sessionRecordState) === RECORD_STATE.active)
-    .filter((session) => session?.access_mode !== ACCESS_MODE.read_only)
+    .filter((session) => canonicalStateForSession(session, canonicalOptions).isRuntimeAttached)
     .length;
   const statusSession = pickWorkspaceStatusSession({
     currentSession,
@@ -76,15 +129,15 @@ export function projectWorkspaceStatus({
     sessions,
     agentId: agent.id,
   });
-  const sessionStatusView = statusSession && typeof resolveSessionStatusView === "function"
-    ? resolveSessionStatusView(statusSession, { translate })
+  const statusCanonical = statusSession
+    ? canonicalStateForSession(statusSession, canonicalOptions)
     : null;
 
   return {
     hasTarget: true,
     targetLabel: targetDisplayName(agent),
     statusState: statusSession?.state ?? agent.state ?? 1,
-    sessionStatusView,
+    sessionStatusView: statusCanonical?.statusView || null,
     availabilitySummary: availability?.summary || "unknown",
     liveCount,
   };

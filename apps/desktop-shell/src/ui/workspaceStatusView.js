@@ -1,6 +1,6 @@
 import { projectWorkspaceStatus } from "../state/workspaceStatusProjection.js";
 
-// 顶部工作区状态条只消费领域投影，不在 main.js 或 DOM 层重新推断会话状态。
+// 顶部工作区状态条只消费领域投影，不在 DOM 层重新解释会话状态。
 export function createWorkspaceStatusView({
   element,
   getCurrentTargetAgent,
@@ -15,6 +15,9 @@ export function createWorkspaceStatusView({
   stateClasses,
   stateDisplayLabel,
   resolveSessionCardStatusView,
+  resolveSessionCanonicalState,
+  canSendToSession,
+  canRestoreSession,
   t,
   escapeHtml,
 }) {
@@ -30,6 +33,9 @@ export function createWorkspaceStatusView({
       availability: provider ? getProviderAvailability(provider.id) : null,
       sessionRecordState,
       resolveSessionStatusView: resolveSessionCardStatusView,
+      resolveSessionCanonicalState,
+      canSendToSession,
+      canRestoreSession,
       translate: t,
       targetDisplayName,
     });
