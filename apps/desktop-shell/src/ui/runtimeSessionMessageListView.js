@@ -24,9 +24,7 @@ export function createRuntimeSessionMessageListView({
 
   function renderMessageRow(row) {
     const signature = rowSignature(row);
-    const activeClass = row.status === "running" ? "is-active" : "";
-    const completedClass = row.metadata?.turnCompleted ? "is-completed" : "";
-    return `<div class="runtime-message-row runtime-message-row-${escapeHtml(row.kind)} ${escapeHtml(activeClass)} ${escapeHtml(completedClass)}" data-message-id="${escapeHtml(row.id)}" data-message-kind="${escapeHtml(row.kind)}" data-message-signature="${escapeHtml(signature)}">${renderMessageRowBody(row)}</div>`;
+    return `<div class="${escapeHtml(messageRowClass(row))}" data-message-id="${escapeHtml(row.id)}" data-message-kind="${escapeHtml(row.kind)}" data-message-signature="${escapeHtml(signature)}">${renderMessageRowBody(row)}</div>`;
   }
 
   function renderMessageRowBody(row) {
@@ -105,11 +103,12 @@ export function createRuntimeSessionMessageListView({
     const open = isOpenForKey(detailKey, false);
     const traceRows = Array.isArray(row.metadata?.rows) ? row.metadata.rows : [];
     const debug = row.metadata?.debug || null;
+    const status = row.status || "completed";
     return `
-      <details class="terminal-detail runtime-message-worked-for" data-detail-key="${escapeHtml(detailKey)}"${open ? " open" : ""}>
+      <details class="terminal-detail runtime-message-worked-for runtime-message-worked-for-${escapeHtml(status)}" data-detail-key="${escapeHtml(detailKey)}"${open ? " open" : ""}>
         <summary>
           <span class="cb-check" aria-hidden="true"></span>
-          <span class="runtime-completion-title">${escapeHtml(t("turn.timeline.completionTitle"))}</span>
+          <span class="runtime-completion-title">${escapeHtml(workedForTitle(status))}</span>
           <span class="runtime-completion-stats">${completionStatsLabel(row.metadata?.summary || {}, traceRows, debug)}</span>
           <span class="runtime-completion-toggle runtime-completion-toggle-open">${escapeHtml(t("turn.timeline.expandHint"))}</span>
           <span class="runtime-completion-toggle runtime-completion-toggle-close">${escapeHtml(t("turn.timeline.collapseHint"))}</span>
@@ -120,6 +119,12 @@ export function createRuntimeSessionMessageListView({
         </div>
       </details>
     `;
+  }
+
+  function workedForTitle(status) {
+    if (status === "failed") return t("turn.timeline.failedTitle");
+    if (status === "cancelled" || status === "canceled" || status === "stopped") return t("turn.timeline.cancelledTitle");
+    return t("turn.timeline.completionTitle");
   }
 
   function renderTraceRow(row) {
@@ -250,7 +255,7 @@ export function reconcileMessageList(contentElement, rows, {
       node = createRowElement(renderMessageRow(row));
       report.addedIds.push(row.id);
     } else if (node.dataset.messageSignature !== signature) {
-      node.className = `runtime-message-row runtime-message-row-${row.kind}`;
+      node.className = messageRowClass(row);
       node.dataset.messageKind = row.kind;
       node.dataset.messageSignature = signature;
       node.innerHTML = renderMessageRowBody(row);
@@ -364,6 +369,17 @@ function debugSummary(metadata) {
   if (rawEvents.length) parts.push(`${rawEvents.length} events`);
   if (logs.length) parts.push(`${logs.length} logs`);
   return parts.length ? ` (${parts.join(", ")})` : "";
+}
+
+export function messageRowClass(row) {
+  const classes = [
+    "runtime-message-row",
+    `runtime-message-row-${row.kind || "event"}`,
+  ];
+  if (row.status) classes.push(`runtime-message-status-${row.status}`);
+  if (row.status === "running") classes.push("is-active");
+  if (row.metadata?.turnCompleted) classes.push("is-completed");
+  return classes.join(" ");
 }
 
 function debugEventCount(metadata) {

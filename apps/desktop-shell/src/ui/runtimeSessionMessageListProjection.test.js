@@ -93,6 +93,28 @@ test("runtimeSessionMessageListProjection: debug metadata is folded under comple
   assert.deepEqual(debug.logs, ["tool failed"]);
 });
 
+test("runtimeSessionMessageListProjection: completed turn folds even when prompt run id is stale", () => {
+  const result = projectRuntimeSessionMessageList({
+    activeTurnId: "t1",
+    activePromptRunId: "run-stale",
+    turns: [{
+      id: "t1",
+      task: "done task",
+      status: "completed",
+      promptRunId: "run-stale",
+      finalResponse: "final answer",
+      timelineItems: [
+        item("thinking", "analysis"),
+        item("tool", "Read", { id: "read-1" }),
+        item("assistant", "final answer"),
+      ],
+    }],
+  });
+
+  assert.deepEqual(result.rows.map((row) => row.kind), ["user", "assistant", "worked_for"]);
+  assert.deepEqual(result.rows.at(-1).metadata.rows.map((row) => row.kind), ["thinking", "tool"]);
+});
+
 test("runtimeSessionMessageListProjection: 旧历史与队列使用独立消息行", () => {
   const result = projectRuntimeSessionMessageList({
     turns: [{
@@ -196,6 +218,23 @@ test("runtimeSessionMessageListProjection: waiting acknowledgement hides after t
   const runtimeRows = result.rows.filter((row) => row.kind === "runtime");
   assert.deepEqual(runtimeRows.map((row) => row.content), []);
   assert.equal(result.rows.some((row) => row.kind === "thinking"), true);
+});
+
+test("runtimeSessionMessageListProjection: 只读历史不展示运行中的等待日志", () => {
+  const result = projectRuntimeSessionMessageList({
+    access_mode: "read_only",
+    activeTurnId: "t1",
+    turns: [{
+      id: "t1",
+      task: "旧历史",
+      status: "running",
+      logs: ["Message entered current session, waiting for runtime response."],
+      timelineItems: [],
+    }],
+  });
+
+  assert.equal(result.rows.some((row) => row.kind === "runtime"), false);
+  assert.deepEqual(result.rows.map((row) => row.kind), ["user", "worked_for"]);
 });
 
 test("runtimeSessionMessageListProjection: running runtime logs keep blocking or error signals visible", () => {

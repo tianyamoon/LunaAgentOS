@@ -8,6 +8,7 @@ import {
   observeElementOffset,
   observeElementRect,
 } from "@tanstack/virtual-core";
+import { messageRowClass } from "./runtimeSessionMessageListView.js";
 
 export function createRuntimeSessionVirtualList({
   scroller,
@@ -154,12 +155,12 @@ export function createRuntimeSessionVirtualList({
   function createNode(row, { renderRow, createRowElement }) {
     if (renderRow) return createRowElement(renderRow(row));
     const node = document.createElement("div");
-    node.className = `runtime-message-row runtime-message-row-${row.kind || "event"}`;
+    node.className = messageRowClass(row);
     return node;
   }
 
   function updateNodeBody(node, row, { renderRowBody }) {
-    node.className = `runtime-message-row runtime-message-row-${row.kind || "event"}`;
+    node.className = messageRowClass(row);
     if (renderRowBody) node.innerHTML = renderRowBody(row);
   }
 

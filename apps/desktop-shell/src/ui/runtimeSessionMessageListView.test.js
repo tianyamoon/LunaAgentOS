@@ -5,6 +5,7 @@ import {
   createMergedReconciler,
   createRuntimeSessionMessageListView,
   formatRuntimeMessageDuration,
+  messageRowClass,
   reconcileMessageList,
   rowSignature,
 } from "./runtimeSessionMessageListView.js";
@@ -69,6 +70,40 @@ test("runtimeSessionMessageListView: completed timeline does not render a separa
   assert.match(html, /Task completed/);
   assert.match(html, /Duration 8s/);
   assert.match(html, /runtime-message-trace-row-tool/);
+});
+
+test("runtimeSessionMessageListView: failed worked row does not claim completion", () => {
+  const view = createView();
+  const html = view.renderMessageRow({
+    id: "t1:worked",
+    kind: "worked_for",
+    status: "failed",
+    metadata: {
+      summary: { durationMs: 3_000, toolCount: 0, fileChangeCount: 0 },
+      rows: [{ id: "t1:error", kind: "error", content: "runtime exited", status: "failed" }],
+      debug: { rawEvents: [{ type: "error" }], logs: ["runtime exited"] },
+    },
+  });
+
+  assert.match(html, /Task failed/);
+  assert.doesNotMatch(html, /Task completed/);
+  assert.match(html, /runtime-message-worked-for-failed/);
+});
+
+test("runtimeSessionMessageListView: cancelled worked row uses cancelled title", () => {
+  const view = createView();
+  const html = view.renderMessageRow({
+    id: "t1:worked",
+    kind: "worked_for",
+    status: "cancelled",
+    metadata: {
+      summary: { durationMs: 1_000, toolCount: 0, fileChangeCount: 0 },
+      rows: [],
+    },
+  });
+
+  assert.match(html, /Task cancelled/);
+  assert.doesNotMatch(html, /Task completed/);
 });
 
 test("runtimeSessionMessageListView: Debug 折叠态保留可展开 JSON 模板", () => {
@@ -144,7 +179,7 @@ test("runtimeSessionMessageListView: active row 变化时只更新该行内容",
 
   reconcileMessageList(content, [
     { id: "stable", kind: "assistant", content: "历史" },
-    { id: "active", kind: "assistant", content: "最新 delta" },
+    { id: "active", kind: "assistant", content: "最新 delta", status: "running" },
   ], {
     renderMessageRow: (row) => row.id,
     renderMessageRowBody: (row) => `body:${row.content}`,
@@ -153,7 +188,16 @@ test("runtimeSessionMessageListView: active row 变化时只更新该行内容",
 
   assert.equal(stable.innerHTML, "");
   assert.equal(active.innerHTML, "body:最新 delta");
+  assert.match(active.className, /runtime-message-status-running/);
+  assert.match(active.className, /is-active/);
   assert.deepEqual(content.operations, []);
+});
+
+test("runtimeSessionMessageListView: running row class is shared by render and reconcile", () => {
+  const row = { id: "active", kind: "tool", content: "fetching", status: "running", metadata: {} };
+  const view = createView();
+  assert.match(view.renderMessageRow(row), /runtime-message-status-running/);
+  assert.match(messageRowClass(row), /is-active/);
 });
 
 test("runtimeSessionMessageListView: 换序时只移动真实错位的行", () => {
@@ -187,6 +231,8 @@ function createView() {
         "turn.timeline.thinking": "Thinking",
         "turn.timeline.workedFor": "Worked for {duration}{tools}{files}",
         "turn.timeline.completionTitle": "Task completed",
+        "turn.timeline.failedTitle": "Task failed",
+        "turn.timeline.cancelledTitle": "Task cancelled",
         "turn.timeline.duration": "Duration {duration}",
         "turn.timeline.expandHint": "Expand",
         "turn.timeline.collapseHint": "Collapse trace",

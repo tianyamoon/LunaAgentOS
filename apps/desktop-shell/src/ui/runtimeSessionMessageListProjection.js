@@ -8,6 +8,7 @@ import {
 } from "./turnTimelineProjection.js";
 
 const RUNNING_TURN_STATUSES = new Set(["running", "waiting_confirmation"]);
+const TERMINAL_TURN_STATUSES = new Set(["completed", "failed", "cancelled", "canceled", "stopped"]);
 
 function list(value) {
   return Array.isArray(value) ? value : [];
@@ -44,6 +45,7 @@ export function projectRuntimeSessionMessageList(session, options = {}) {
   const rows = visibleTurns.flatMap((turn) => projectTurnRows(turn, {
     latestTurnId: latestTurn?.id || null,
     forceLive: Boolean(session?.activePromptRunId && turn.id === activeTurnId),
+    readOnly: session?.access_mode === "read_only",
   }));
   const runtimeRows = !rows.length && session?.runtime_binding?.state === "reconnecting"
     ? [projectSessionRuntimeRow(session, options)]
@@ -79,11 +81,12 @@ function projectSessionRuntimeRow(session, options = {}) {
   };
 }
 
-function projectTurnRows(turn, { latestTurnId, forceLive }) {
+function projectTurnRows(turn, { latestTurnId, forceLive, readOnly = false }) {
   const rows = [];
   const turnId = turn?.id;
   if (!turnId) return rows;
-  const isLive = forceLive || RUNNING_TURN_STATUSES.has(turn.status);
+  // 只读 transcript 没有可执行 runtime；即便旧快照残留 running，也按历史内容投影。
+  const isLive = !readOnly && (RUNNING_TURN_STATUSES.has(turn.status) || (forceLive && !TERMINAL_TURN_STATUSES.has(turn.status)));
   if (turn.meta?.historyIntegrity === "legacy_unverified") {
     rows.push(baseTurnRow(turn, "legacy_warning", "legacy-warning", {
       content: "",

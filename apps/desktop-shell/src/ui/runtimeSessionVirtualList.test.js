@@ -399,3 +399,32 @@ test("runtimeSessionVirtualList: 测量动态高度后重新定位已挂载行",
   assert.equal(after, 40);
   list.dispose();
 });
+
+test("runtimeSessionVirtualList: running row keeps active classes after body update", () => {
+  const scroller = fakeScroller();
+  const content = fakeContent();
+  const active = fakeRow("row-0", "stale");
+  content.append(active);
+  const list = createRuntimeSessionVirtualList({
+    scroller,
+    content,
+    requestFrame: (cb) => { cb(); return 1; },
+    cancelFrame: () => {},
+  });
+
+  list.reconcile([{
+    id: "row-0",
+    kind: "tool",
+    content: "fetching",
+    status: "running",
+    metadata: {},
+  }], {
+    renderRow: (row) => `<div data-message-id="${row.id}" data-message-signature="${row.id}"></div>`,
+    renderRowBody: (row) => `fresh:${row.content}`,
+    createRowElement: (html) => fakeRow(html.match(/data-message-id="([^"]+)"/)?.[1] || "missing"),
+  });
+
+  assert.match(active.className, /runtime-message-status-running/);
+  assert.match(active.className, /is-active/);
+  list.dispose();
+});

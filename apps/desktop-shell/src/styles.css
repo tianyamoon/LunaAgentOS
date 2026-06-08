@@ -1815,6 +1815,27 @@ button:disabled {
   color: var(--done);
 }
 
+.runtime-message-worked-for-failed {
+  border-color: rgba(var(--danger-rgb), 0.28);
+  background: rgba(var(--danger-rgb), 0.08);
+}
+
+.runtime-message-worked-for-failed .cb-check {
+  background: var(--danger);
+}
+
+.runtime-message-worked-for-failed .cb-check::before {
+  width: auto;
+  height: auto;
+  border: 0;
+  content: "!";
+  transform: none;
+}
+
+.runtime-message-worked-for-failed .runtime-completion-title {
+  color: var(--danger);
+}
+
 .runtime-completion-stats {
   min-width: 0;
   overflow: hidden;

@@ -1,3 +1,5 @@
+import { formatRuntimeMessageDuration } from "./runtimeSessionMessageListView.js";
+
 // Runtime Session Card 视图集中生成主卡片和底部 mini card。
 // 状态、工作区焦点和 Turn 渲染均通过稳定接口注入，视图不直接修改 Store。
 export function createRuntimeSessionCardView({
