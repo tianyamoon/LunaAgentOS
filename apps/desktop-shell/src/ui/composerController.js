@@ -454,12 +454,14 @@ export function createComposerController({
   // 刷新 Composer 顶层状态标签。
   function updateActionLabels() {
     const composingNewSession = isComposingNewSession();
+    const explicitNewSession = getSendAsNewSession();
     sendBtn.textContent = t("composer.send");
     if (attachBtn) {
       renderAttachButton();
     }
-    newSessionToggle.classList.toggle("is-active", composingNewSession);
-    newSessionToggle.setAttribute("aria-pressed", String(composingNewSession));
+    // “另开会话”按钮只表达用户显式选择，避免只读历史的隐式状态看起来像已选中。
+    newSessionToggle.classList.toggle("is-active", explicitNewSession);
+    newSessionToggle.setAttribute("aria-pressed", String(explicitNewSession));
     composer?.classList.toggle("is-new-session-mode", composingNewSession);
     composer?.classList.toggle("is-current-session-mode", !composingNewSession);
     updateCommandHint();

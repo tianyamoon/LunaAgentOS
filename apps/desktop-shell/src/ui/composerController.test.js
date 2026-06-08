@@ -5,9 +5,22 @@ import { createComposerController } from "./composerController.js";
 // 构造足够支撑 Composer 行为测试的轻量 DOM 元素。
 function makeElement() {
   const listeners = {};
+  const classes = new Set();
+  const attributes = new Map();
   return {
     listeners,
-    classList: { add() {}, remove() {}, toggle() {} },
+    classList: {
+      add(name) { classes.add(name); },
+      remove(name) { classes.delete(name); },
+      toggle(name, force) {
+        const shouldAdd = force === undefined ? !classes.has(name) : Boolean(force);
+        if (shouldAdd) classes.add(name);
+        else classes.delete(name);
+        return shouldAdd;
+      },
+      contains(name) { return classes.has(name); },
+    },
+    attributes,
     style: {},
     value: "",
     scrollHeight: 120,
@@ -19,7 +32,8 @@ function makeElement() {
     insertBefore() {},
     querySelector() { return null; },
     querySelectorAll() { return []; },
-    setAttribute() {},
+    getAttribute(name) { return attributes.get(name); },
+    setAttribute(name, value) { attributes.set(name, String(value)); },
     setSelectionRange() {},
     focus() {},
     click() {},
@@ -28,7 +42,7 @@ function makeElement() {
 }
 
 // 创建可观察附件与发送行为的 Composer Controller。
-function makeHarness() {
+function makeHarness(overrides = {}) {
   const promptBox = makeElement();
   const composer = makeElement();
   const composerInputShell = makeElement();
@@ -89,14 +103,17 @@ function makeHarness() {
     windowRoot: { innerHeight: 1000 },
     FileReaderClass: FileReaderStub,
     now: () => 100,
+    ...overrides,
   });
   return {
     controller,
     attachBtn,
     notices,
     promptBox,
+    sendBtn,
     sendModeBtn,
     sent,
+    newSessionToggle,
   };
 }
 
@@ -154,4 +171,19 @@ test("composerController: 超出六个附件时保留上限并显示提示", asy
 
   assert.equal(controller.getAttachments().length, 6);
   assert.equal(notices.at(-1).tone, "error");
+});
+
+test("composerController: 只读历史的隐式新会话状态不会伪装成已选择另开会话", () => {
+  const { controller, newSessionToggle, sendBtn, sent } = makeHarness({
+    isComposingNewSession: () => true,
+    getSendAsNewSession: () => false,
+  });
+
+  controller.updateActionLabels();
+  controller.bindEvents();
+  sendBtn.listeners.click();
+
+  assert.equal(newSessionToggle.classList.contains("is-active"), false);
+  assert.equal(newSessionToggle.getAttribute("aria-pressed"), "false");
+  assert.deepEqual(sent, [false]);
 });
