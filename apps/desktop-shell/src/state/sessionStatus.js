@@ -265,6 +265,49 @@ export function resolveSessionCanonicalState(session, options = {}) {
   };
 }
 
+export function resolveSessionCardControlState(session, options = {}) {
+  const translate = typeof options.translate === "function" ? options.translate : defaultTranslate;
+  const canonical = resolveSessionCanonicalState(session, {
+    translate,
+    canSendToSession: options.canSendToSession,
+    canRestoreSession: options.canRestoreSession,
+  });
+  const runtimeBinding = session?.runtime_binding || createRuntimeBinding();
+  const statusView = canonical.statusView;
+  const isWaiting = statusView.status === CARD_STATUS.running
+    || statusView.status === CARD_STATUS.waiting_confirmation;
+  const isRestoring = runtimeBinding.state === RUNTIME_BINDING_STATE.reconnecting;
+  const managementDisabled = isRestoring;
+  const isInteractiveActive = canonical.recordState === RECORD_STATE.active
+    && canonical.accessMode === ACCESS_MODE.interactive;
+
+  // 卡片按钮只消费这个投影，避免视图重新解释 record/access/runtime 三套状态。
+  return {
+    canonical,
+    statusView,
+    isWaiting,
+    isRestoring,
+    managementDisabled,
+    canStop: isWaiting && isInteractiveActive,
+    canArchive: canonical.recordState !== RECORD_STATE.archived
+      && canonical.recordState !== RECORD_STATE.deleted
+      && canonical.accessMode !== ACCESS_MODE.read_only,
+    canRestore: canonical.canRestore,
+    actionDigest: [
+      canonical.kind,
+      canonical.listSignal,
+      statusView.status,
+      statusView.tone,
+      isWaiting,
+      isRestoring,
+      managementDisabled,
+      canonical.recordState,
+      canonical.accessMode,
+      canonical.canRestore,
+    ].join("|"),
+  };
+}
+
 function resolveSessionStatusKind({ isDeleted, isArchived, isReadOnly }) {
   if (isDeleted) return SESSION_STATUS_KIND.deleted;
   if (isArchived) return SESSION_STATUS_KIND.archived;

@@ -14,6 +14,7 @@ import {
   latestTurnOutcome,
   normalizeSessionStatusShape,
   resolveSessionCanonicalState,
+  resolveSessionCardControlState,
   resolveSessionCardStatusView,
   statusFromRuntimeEvent,
   statusFromRuntimeStateCode,
@@ -158,6 +159,50 @@ test("resolveSessionCanonicalState: manual archive remains archive bucket", () =
   assert.equal(view.statusView.status, CARD_STATUS.archived);
   assert.equal(view.listSignal, SESSION_LIST_SIGNAL.archived);
   assert.equal(view.canSend, false);
+});
+
+test("resolveSessionCardControlState: read-only history disables live actions", () => {
+  const controls = resolveSessionCardControlState(session({
+    access_mode: ACCESS_MODE.read_only,
+    turns: [{ id: "t", status: TURN_STATUS.running }],
+  }), {
+    translate,
+    canSendToSession: () => false,
+  });
+
+  assert.equal(controls.statusView.status, CARD_STATUS.readonly_history);
+  assert.equal(controls.isWaiting, false);
+  assert.equal(controls.canStop, false);
+  assert.equal(controls.canArchive, false);
+});
+
+test("resolveSessionCardControlState: interactive running session exposes stop and archive", () => {
+  const controls = resolveSessionCardControlState(session({
+    turns: [{ id: "t", status: TURN_STATUS.running }],
+  }), {
+    translate,
+    canSendToSession: () => true,
+  });
+
+  assert.equal(controls.statusView.status, CARD_STATUS.running);
+  assert.equal(controls.isWaiting, true);
+  assert.equal(controls.canStop, true);
+  assert.equal(controls.canArchive, true);
+});
+
+test("resolveSessionCardControlState: archived transcript is restorable but not archivable", () => {
+  const controls = resolveSessionCardControlState(session({
+    record_state: RECORD_STATE.archived,
+    access_mode: ACCESS_MODE.read_only,
+    turns: [{ id: "t", status: TURN_STATUS.completed, finalResponse: "done" }],
+  }), {
+    translate,
+    canRestoreSession: () => true,
+  });
+
+  assert.equal(controls.statusView.status, CARD_STATUS.archived);
+  assert.equal(controls.canArchive, false);
+  assert.equal(controls.canRestore, true);
 });
 
 test("resolveSessionCardStatusView: runtime resume failure is blocked with error detail", () => {

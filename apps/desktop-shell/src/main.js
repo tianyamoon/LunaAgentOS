@@ -80,6 +80,7 @@ import {
   createRuntimeBinding,
   isRunningTurnStatus,
   resolveSessionCanonicalState,
+  resolveSessionCardControlState,
   resolveSessionCardStatusView,
 } from "./state/sessionStatus.js";
 import {
@@ -941,7 +942,7 @@ function focusComposerInput() {
 runtimeSessionCardView = createRuntimeSessionCardView({
   ensureSessionStatusShape,
   normalizeWorkspaceSession,
-  resolveSessionCardStatusView,
+  resolveSessionCardControlState,
   getCurrentSessionId: () => sessionsStore.getCurrentSessionId(),
   getFocusedSessionId: () => workspaceViewStore.getFocusedSessionId(),
   projectRuntimeSessionMessageList,
@@ -952,10 +953,6 @@ runtimeSessionCardView = createRuntimeSessionCardView({
   renderSessionIdentityTitle,
   renderSessionActionIcon,
   canRestoreSession,
-  CARD_STATUS,
-  RUNTIME_BINDING_STATE,
-  RECORD_STATE,
-  ACCESS_MODE,
   t,
   escapeHtml,
 });

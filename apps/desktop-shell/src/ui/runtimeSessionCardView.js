@@ -5,7 +5,7 @@ import { formatRuntimeMessageDuration } from "./runtimeSessionMessageListView.js
 export function createRuntimeSessionCardView({
   ensureSessionStatusShape,
   normalizeWorkspaceSession,
-  resolveSessionCardStatusView,
+  resolveSessionCardControlState,
   getCurrentSessionId,
   getFocusedSessionId,
   projectRuntimeSessionMessageList,
@@ -16,10 +16,6 @@ export function createRuntimeSessionCardView({
   renderSessionIdentityTitle,
   renderSessionActionIcon,
   canRestoreSession,
-  CARD_STATUS,
-  RUNTIME_BINDING_STATE,
-  RECORD_STATE,
-  ACCESS_MODE,
   t,
   escapeHtml,
 }) {
@@ -85,11 +81,11 @@ export function createRuntimeSessionCardView({
   function renderSessionCard(session) {
     ensureSessionStatusShape(session);
     const identitySession = normalizeWorkspaceSession(session);
-    const statusView = resolveSessionCardStatusView(session, { translate: t });
+    const controlState = resolveSessionCardControlState(session, { translate: t, canRestoreSession });
+    const statusView = controlState.statusView;
     const isActiveReceiver = getCurrentSessionId() === session.id;
-    const isWaiting = statusView.status === CARD_STATUS.running || statusView.status === CARD_STATUS.waiting_confirmation;
-    const isRestoring = session.runtime_binding?.state === RUNTIME_BINDING_STATE.reconnecting;
-    const managementDisabled = isRestoring ? "disabled" : "";
+    const isWaiting = controlState.isWaiting;
+    const managementDisabled = controlState.managementDisabled ? "disabled" : "";
     const profileMeta = [identitySession.profileName, identitySession.profileModel].filter(Boolean).join(" · ");
     const stats = sessionCardStats(session, t);
     const latestOnly = isSessionLatestOnly(session);
@@ -97,8 +93,7 @@ export function createRuntimeSessionCardView({
       latestOnly,
       reconnectingRuntimeText: (stage) => t("restore.reconnectingRuntimeRow", { stage }),
     });
-    const managementTitleSuffix = isRestoring ? t("action.restoringSuffix") : "";
-    const canArchiveCard = session.record_state !== RECORD_STATE.archived && session.access_mode !== ACCESS_MODE.read_only;
+    const managementTitleSuffix = controlState.managementDisabled ? t("action.restoringSuffix") : "";
     const latestOnlyLabel = latestOnly ? t("action.showAllMessages") : t("action.latestMessages");
     const isFocusedSession = getFocusedSessionId() === session.id;
     const fullscreenLabel = isFocusedSession ? t("action.exitFullscreen") : t("action.enterFullscreen");
@@ -113,7 +108,7 @@ export function createRuntimeSessionCardView({
               ${isActiveReceiver ? `<span class="active-receiver-banner">${t("session.current")}</span>` : ""}
             </div>
             <div class="session-card-actions" role="toolbar" aria-label="${t("session.actionsAria")}">
-              ${isWaiting && session.record_state === RECORD_STATE.active ? `<button type="button" class="mini-btn ghost-btn session-action-btn danger-btn session-stop-btn" data-session-id="${session.id}" title="${t("action.stop")}" aria-label="${t("action.stop")}">${renderSessionActionIcon("stop")}</button>` : ""}
+              ${controlState.canStop ? `<button type="button" class="mini-btn ghost-btn session-action-btn danger-btn session-stop-btn" data-session-id="${session.id}" title="${t("action.stop")}" aria-label="${t("action.stop")}">${renderSessionActionIcon("stop")}</button>` : ""}
               <div class="session-tool-group" role="group">
                 <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-copy-btn" data-session-id="${session.id}" title="${t("action.copySession")}" aria-label="${t("action.copySession")}" ${session.turns.length ? "" : "disabled"}>${renderSessionActionIcon("copy")}</button>
                 <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-latest-only-btn ${latestOnly ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${latestOnly ? "true" : "false"}" title="${latestOnlyLabel}" aria-label="${latestOnlyLabel}" ${session.turns.length > 1 ? "" : "disabled"}>${renderSessionActionIcon(latestOnly ? "all" : "latest")}</button>
@@ -122,9 +117,9 @@ export function createRuntimeSessionCardView({
               </div>
               <div class="session-management-group" role="group">
                 <button type="button" class="mini-btn ghost-btn session-action-btn session-dismiss-btn" data-session-id="${session.id}" title="${t("action.dismiss")}${managementTitleSuffix}" aria-label="${t("action.dismiss")}" ${managementDisabled}>${renderSessionActionIcon("dismiss")}</button>
-                ${canArchiveCard ? `<button type="button" class="mini-btn ghost-btn session-action-btn session-archive-btn" data-session-id="${session.id}" title="${t("action.archive")}${managementTitleSuffix}" aria-label="${t("action.archive")}" ${managementDisabled}>${renderSessionActionIcon("archive")}</button>` : ""}
+                ${controlState.canArchive ? `<button type="button" class="mini-btn ghost-btn session-action-btn session-archive-btn" data-session-id="${session.id}" title="${t("action.archive")}${managementTitleSuffix}" aria-label="${t("action.archive")}" ${managementDisabled}>${renderSessionActionIcon("archive")}</button>` : ""}
                 <button type="button" class="mini-btn ghost-btn session-action-btn danger-btn session-delete-btn" data-session-id="${session.id}" title="${t("action.delete")}${managementTitleSuffix}" aria-label="${t("action.delete")}" ${managementDisabled}>${renderSessionActionIcon("delete")}</button>
-                ${canRestoreSession(session) ? `<button type="button" class="mini-btn ghost-btn session-retry-btn" data-session-id="${session.id}">${t("session.restoreRetry")}</button>` : ""}
+                ${controlState.canRestore ? `<button type="button" class="mini-btn ghost-btn session-retry-btn" data-session-id="${session.id}">${t("session.restoreRetry")}</button>` : ""}
               </div>
             </div>
           </div>
@@ -153,9 +148,10 @@ export function createRuntimeSessionCardView({
   function renderSessionMiniCard(session) {
     ensureSessionStatusShape(session);
     const identitySession = normalizeWorkspaceSession(session);
-    const statusView = resolveSessionCardStatusView(session, { translate: t });
+    const controlState = resolveSessionCardControlState(session, { translate: t, canRestoreSession });
+    const statusView = controlState.statusView;
     const isActive = getCurrentSessionId() === session.id;
-    const isWaiting = statusView.status === CARD_STATUS.running || statusView.status === CARD_STATUS.waiting_confirmation;
+    const isWaiting = controlState.isWaiting;
     const taskPreview = (session.task || "").replace(/\s+/g, " ").trim();
     const previewText = taskPreview.length > 64 ? `${taskPreview.slice(0, 64)}\u2026` : taskPreview;
     const identityTitle = sessionIdentityTitle(identitySession);
@@ -173,18 +169,17 @@ export function createRuntimeSessionCardView({
   function buildSessionCardViewModel(session) {
     ensureSessionStatusShape(session);
     const identitySession = normalizeWorkspaceSession(session);
-    const statusView = resolveSessionCardStatusView(session, { translate: t });
+    const controlState = resolveSessionCardControlState(session, { translate: t, canRestoreSession });
+    const statusView = controlState.statusView;
     const isActiveReceiver = getCurrentSessionId() === session.id;
-    const isWaiting = statusView.status === CARD_STATUS.running || statusView.status === CARD_STATUS.waiting_confirmation;
-    const isRestoring = session.runtime_binding?.state === RUNTIME_BINDING_STATE.reconnecting;
+    const isWaiting = controlState.isWaiting;
     const profileMeta = [identitySession.profileName, identitySession.profileModel].filter(Boolean).join(" · ");
     const stats = sessionCardStats(session, t);
     const isFocusedSession = getFocusedSessionId() === session.id;
     const identityTitle = sessionIdentityTitle(identitySession);
     const identityTitleMarkup = renderSessionIdentityTitle(identitySession);
-    const canArchiveCard = session.record_state !== RECORD_STATE.archived && session.access_mode !== ACCESS_MODE.read_only;
-    const managementDisabled = isRestoring ? "disabled" : "";
-    const managementTitleSuffix = isRestoring ? t("action.restoringSuffix") : "";
+    const managementDisabled = controlState.managementDisabled ? "disabled" : "";
+    const managementTitleSuffix = controlState.managementDisabled ? t("action.restoringSuffix") : "";
     const latestOnly = isSessionLatestOnly(session);
     const latestOnlyLabel = latestOnly ? t("action.showAllMessages") : t("action.latestMessages");
     const fullscreenLabel = isFocusedSession ? t("action.exitFullscreen") : t("action.enterFullscreen");
@@ -200,7 +195,7 @@ export function createRuntimeSessionCardView({
           ${isActiveReceiver ? `<span class="active-receiver-banner">${t("session.current")}</span>` : ""}
         </div>
         <div class="session-card-actions" role="toolbar" aria-label="${t("session.actionsAria")}">
-          ${isWaiting && session.record_state === RECORD_STATE.active ? `<button type="button" class="mini-btn ghost-btn session-action-btn danger-btn session-stop-btn" data-session-id="${session.id}" title="${t("action.stop")}" aria-label="${t("action.stop")}">${renderSessionActionIcon("stop")}</button>` : ""}
+          ${controlState.canStop ? `<button type="button" class="mini-btn ghost-btn session-action-btn danger-btn session-stop-btn" data-session-id="${session.id}" title="${t("action.stop")}" aria-label="${t("action.stop")}">${renderSessionActionIcon("stop")}</button>` : ""}
           <div class="session-tool-group" role="group">
             <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-copy-btn" data-session-id="${session.id}" title="${t("action.copySession")}" aria-label="${t("action.copySession")}" ${session.turns.length ? "" : "disabled"}>${renderSessionActionIcon("copy")}</button>
             <button type="button" class="mini-btn ghost-btn session-action-btn tool-btn session-latest-only-btn ${latestOnly ? "is-on" : ""}" data-session-id="${session.id}" aria-pressed="${latestOnly ? "true" : "false"}" title="${latestOnlyLabel}" aria-label="${latestOnlyLabel}" ${session.turns.length > 1 ? "" : "disabled"}>${renderSessionActionIcon(latestOnly ? "all" : "latest")}</button>
@@ -209,9 +204,9 @@ export function createRuntimeSessionCardView({
           </div>
           <div class="session-management-group" role="group">
             <button type="button" class="mini-btn ghost-btn session-action-btn session-dismiss-btn" data-session-id="${session.id}" title="${t("action.dismiss")}${managementTitleSuffix}" aria-label="${t("action.dismiss")}" ${managementDisabled}>${renderSessionActionIcon("dismiss")}</button>
-            ${canArchiveCard ? `<button type="button" class="mini-btn ghost-btn session-action-btn session-archive-btn" data-session-id="${session.id}" title="${t("action.archive")}${managementTitleSuffix}" aria-label="${t("action.archive")}" ${managementDisabled}>${renderSessionActionIcon("archive")}</button>` : ""}
+            ${controlState.canArchive ? `<button type="button" class="mini-btn ghost-btn session-action-btn session-archive-btn" data-session-id="${session.id}" title="${t("action.archive")}${managementTitleSuffix}" aria-label="${t("action.archive")}" ${managementDisabled}>${renderSessionActionIcon("archive")}</button>` : ""}
             <button type="button" class="mini-btn ghost-btn session-action-btn danger-btn session-delete-btn" data-session-id="${session.id}" title="${t("action.delete")}${managementTitleSuffix}" aria-label="${t("action.delete")}" ${managementDisabled}>${renderSessionActionIcon("delete")}</button>
-            ${canRestoreSession(session) ? `<button type="button" class="mini-btn ghost-btn session-retry-btn" data-session-id="${session.id}">${t("session.restoreRetry")}</button>` : ""}
+            ${controlState.canRestore ? `<button type="button" class="mini-btn ghost-btn session-retry-btn" data-session-id="${session.id}">${t("session.restoreRetry")}</button>` : ""}
           </div>
         </div>
       </div>
@@ -235,8 +230,7 @@ export function createRuntimeSessionCardView({
       isActiveReceiver,
       isWaiting,
       isFocusedSession,
-      isRestoring,
-      session.record_state,
+      controlState.actionDigest,
       session.turns.length,
       stats.map((s) => s.key + s.label).join(","),
       profileMeta,
