@@ -73,15 +73,14 @@ import {
 } from "./state/sessionListItems.js";
 import {
   ACCESS_MODE,
-  CARD_STATUS,
   RECORD_STATE,
   RUNTIME_BINDING_STAGE,
   RUNTIME_BINDING_STATE,
   createRuntimeBinding,
   isRunningTurnStatus,
-  resolveSessionCanonicalState,
   resolveSessionCardControlState,
   resolveSessionCardStatusView,
+  resolveSessionListPresentationState,
 } from "./state/sessionStatus.js";
 import {
   canTargetStartSession,
@@ -1092,9 +1091,7 @@ historyView = createHistoryView({
   compareActiveSessionListItems,
   compareArchivedSessionListItems,
   ensureSessionStatusShape,
-  resolveSessionCardStatusView,
-  resolveSessionCanonicalState,
-  CARD_STATUS,
+  resolveSessionListPresentationState,
   canSendToSession,
   canRestoreSession,
   sessionsStore,

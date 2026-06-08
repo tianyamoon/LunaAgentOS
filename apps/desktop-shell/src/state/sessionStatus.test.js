@@ -16,6 +16,7 @@ import {
   resolveSessionCanonicalState,
   resolveSessionCardControlState,
   resolveSessionCardStatusView,
+  resolveSessionListPresentationState,
   statusFromRuntimeEvent,
   statusFromRuntimeStateCode,
 } from "./sessionStatus.js";
@@ -159,6 +160,47 @@ test("resolveSessionCanonicalState: manual archive remains archive bucket", () =
   assert.equal(view.statusView.status, CARD_STATUS.archived);
   assert.equal(view.listSignal, SESSION_LIST_SIGNAL.archived);
   assert.equal(view.canSend, false);
+});
+
+test("resolveSessionListPresentationState: live completed session keeps active signal", () => {
+  const view = resolveSessionListPresentationState(session({
+    turns: [{ id: "t", status: TURN_STATUS.completed, finalResponse: "done" }],
+  }), {
+    translate,
+    canSendToSession: () => true,
+  });
+
+  assert.equal(view.statusView.status, CARD_STATUS.completed);
+  assert.equal(view.signalClass, "signal-active");
+  assert.equal(view.signalLabel, "history.signal.live");
+  assert.equal(view.listStateClass, "is-active-history");
+});
+
+test("resolveSessionListPresentationState: read-only history ignores stale running signal", () => {
+  const view = resolveSessionListPresentationState(session({
+    access_mode: ACCESS_MODE.read_only,
+    turns: [{ id: "t", status: TURN_STATUS.running }],
+  }), {
+    translate,
+    canSendToSession: () => false,
+  });
+
+  assert.equal(view.statusView.status, CARD_STATUS.readonly_history);
+  assert.equal(view.signalClass, "signal-archive");
+  assert.equal(view.isSendable, false);
+});
+
+test("resolveSessionListPresentationState: failed session exposes failed signal", () => {
+  const view = resolveSessionListPresentationState(session({
+    turns: [{ id: "t", status: TURN_STATUS.failed }],
+  }), {
+    translate,
+    canSendToSession: () => false,
+  });
+
+  assert.equal(view.statusView.status, CARD_STATUS.failed);
+  assert.equal(view.signalClass, "signal-failed");
+  assert.equal(view.isFailedOrBlocked, true);
 });
 
 test("resolveSessionCardControlState: read-only history disables live actions", () => {

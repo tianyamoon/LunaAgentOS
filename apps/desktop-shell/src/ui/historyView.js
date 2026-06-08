@@ -13,44 +13,23 @@ export function resolveHistoryItemStatusSource(item, getSession) {
 export function projectHistoryListItemState(item, {
   getSession,
   ensureSessionStatusShape,
-  resolveSessionCanonicalState,
-  resolveSessionCardStatusView,
+  resolveSessionListPresentationState,
   canSendToSession,
   canRestoreSession,
-  isArchivedSessionListItem,
   translate,
 } = {}) {
   const t = typeof translate === "function" ? translate : (key) => key;
   const statusSource = resolveHistoryItemStatusSource(item, getSession);
   ensureSessionStatusShape?.(statusSource);
-  const canonical = typeof resolveSessionCanonicalState === "function"
-    ? resolveSessionCanonicalState(statusSource, { translate: t, canSendToSession, canRestoreSession })
-    : null;
-  const statusView = canonical?.statusView || resolveSessionCardStatusView(statusSource, { translate: t });
-  const isArchived = canonical?.isArchived ?? Boolean(isArchivedSessionListItem?.(item));
-  const isFailedOrBlocked = canonical?.listSignal === "failed" || statusView.status === "blocked" || statusView.status === "failed";
-  const isSendable = canonical?.canSend ?? Boolean(canSendToSession?.(statusSource));
-  let signalClass;
-  let signalLabel;
-  if (isFailedOrBlocked) {
-    signalClass = "signal-failed";
-    signalLabel = statusView.label;
-  } else if (isSendable) {
-    signalClass = "signal-active";
-    signalLabel = t("history.signal.live");
-  } else {
-    signalClass = "signal-archive";
-    signalLabel = statusView.label;
-  }
+  const presentation = resolveSessionListPresentationState(statusSource, {
+    translate: t,
+    canSendToSession,
+    canRestoreSession,
+  });
+
   return {
     statusSource,
-    statusView,
-    isArchived,
-    isFailedOrBlocked,
-    isSendable,
-    signalClass,
-    signalLabel,
-    listStateClass: isArchived ? "is-archive" : "is-active-history",
+    ...presentation,
   };
 }
 
@@ -64,8 +43,7 @@ export function createHistoryView({
   compareActiveSessionListItems,
   compareArchivedSessionListItems,
   ensureSessionStatusShape,
-  resolveSessionCardStatusView,
-  resolveSessionCanonicalState,
+  resolveSessionListPresentationState,
   canSendToSession,
   canRestoreSession,
   sessionsStore,
@@ -111,11 +89,9 @@ export function createHistoryView({
     } = projectHistoryListItemState(item, {
       getSession,
       ensureSessionStatusShape,
-      resolveSessionCanonicalState,
-      resolveSessionCardStatusView,
+      resolveSessionListPresentationState,
       canSendToSession,
       canRestoreSession,
-      isArchivedSessionListItem,
       translate: t,
     });
     const isActiveHistoryItem = sessionsStore.getCurrentSessionId() === item.id;

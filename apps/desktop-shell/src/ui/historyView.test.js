@@ -10,8 +10,7 @@ import {
   CARD_STATUS,
   RECORD_STATE,
   TURN_STATUS,
-  resolveSessionCanonicalState,
-  resolveSessionCardStatusView,
+  resolveSessionListPresentationState,
 } from "../state/sessionStatus.js";
 
 test("historyView: 已打开的只读活跃历史再次点击仍只导航回工作区", () => {
@@ -50,10 +49,8 @@ test("historyView: read-only history with stale running turn uses muted history 
   }, {
     getSession: () => null,
     ensureSessionStatusShape: () => {},
-    resolveSessionCanonicalState,
-    resolveSessionCardStatusView,
+    resolveSessionListPresentationState,
     canSendToSession: () => false,
-    isArchivedSessionListItem: () => false,
     translate: (key) => key,
   });
 
@@ -78,10 +75,8 @@ test("historyView: live session source wins over detached read-only history stat
   }, {
     getSession: () => liveSession,
     ensureSessionStatusShape: () => {},
-    resolveSessionCanonicalState,
-    resolveSessionCardStatusView,
+    resolveSessionListPresentationState,
     canSendToSession: () => true,
-    isArchivedSessionListItem: () => false,
     translate: (key) => key,
   });
 

@@ -265,6 +265,53 @@ export function resolveSessionCanonicalState(session, options = {}) {
   };
 }
 
+export function resolveSessionListPresentationState(session, options = {}) {
+  const translate = typeof options.translate === "function" ? options.translate : defaultTranslate;
+  const canonical = resolveSessionCanonicalState(session, {
+    translate,
+    canSendToSession: options.canSendToSession,
+    canRestoreSession: options.canRestoreSession,
+  });
+  const statusView = canonical.statusView;
+  const isFailedOrBlocked = canonical.listSignal === SESSION_LIST_SIGNAL.failed;
+  const isSendable = canonical.canSend;
+
+  // 右侧列表只消费这个投影，不再自行组合 record/access/runtime 与 turn 状态。
+  if (isFailedOrBlocked) {
+    return {
+      canonical,
+      statusView,
+      isFailedOrBlocked,
+      isSendable,
+      signalClass: "signal-failed",
+      signalLabel: statusView.label,
+      listStateClass: canonical.isArchived ? "is-archive" : "is-active-history",
+    };
+  }
+
+  if (isSendable) {
+    return {
+      canonical,
+      statusView,
+      isFailedOrBlocked,
+      isSendable,
+      signalClass: "signal-active",
+      signalLabel: translateOrFallback(translate, "history.signal.live"),
+      listStateClass: canonical.isArchived ? "is-archive" : "is-active-history",
+    };
+  }
+
+  return {
+    canonical,
+    statusView,
+    isFailedOrBlocked,
+    isSendable,
+    signalClass: "signal-archive",
+    signalLabel: statusView.label,
+    listStateClass: canonical.isArchived ? "is-archive" : "is-active-history",
+  };
+}
+
 export function resolveSessionCardControlState(session, options = {}) {
   const translate = typeof options.translate === "function" ? options.translate : defaultTranslate;
   const canonical = resolveSessionCanonicalState(session, {
