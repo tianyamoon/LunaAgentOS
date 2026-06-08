@@ -1076,6 +1076,7 @@ workspaceSessionController = createWorkspaceSessionController({
   workspaceViewStore,
   saveCurrentTargetAgent,
   saveCurrentSession,
+  setSendAsNewSession: (value) => { sendAsNewSession = value; },
   canSendToSession,
   markSessionActive,
   shellSurface,
@@ -1361,6 +1362,7 @@ async function startAcpSession(session, turn) {
 // 后续输入队列只负责串行化 Prompt Run；具体 Runtime 路由仍由 Shell 注入。
 sessionPromptQueueController = createSessionPromptQueueController({
   createSessionTurn,
+  persistTurnSnapshot: (session, turn) => saveTurnToHistory(session, turn),
   dispatchPromptRun: (session, turn) => {
     if (acpCommandsForProvider(session.providerId)) {
       void startAcpSession(session, turn);

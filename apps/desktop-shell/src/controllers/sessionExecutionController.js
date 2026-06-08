@@ -55,12 +55,39 @@ export function createSessionExecutionController({
   }
 
   // 批量事件只刷新对应卡片；完成态也不销毁稳定的滚动容器。
+  function refreshSessionSurfaces(sessionId) {
+    // 同一轮状态变化后，卡片、顶部状态和右侧列表必须看到同一份 Session 快照。
+    scheduleSessionCardRender(sessionId);
+    shellSurface.refreshWorkspaceStatus();
+    shellSurface.refreshHistory();
+  }
+
   function updateTurnFromEvents(sessionId, turnId, promptRunId, events) {
     const turn = sessionTurnState.updateTurnFromEvents(sessionId, turnId, promptRunId, events);
     if (!turn) return null;
-    scheduleSessionCardRender(sessionId);
-    shellSurface.refreshHistory();
+    refreshSessionSurfaces(sessionId);
     return turn;
+  }
+
+  // Prompt Run 的完成提交点：批量事件、Turn 终态、Session 状态与 activePromptRunId 必须一次性归一。
+  function completePromptRunFromEvents(sessionId, turnId, promptRunId, events) {
+    const result = sessionTurnState.completePromptRunFromEvents(sessionId, turnId, promptRunId, events);
+    if (!result) return null;
+    refreshSessionSurfaces(sessionId);
+    return result.turn;
+  }
+
+  function cleanupPromptRun(session, turn, promptRunId) {
+    if (!sessionTurnState.endPromptRun(session, turn, promptRunId)) return;
+    refreshSessionSurfaces(session.id);
+  }
+
+  function failPromptRun(session, turn, promptRunId, message) {
+    const result = sessionTurnState.failPromptRun(session, turn, promptRunId, message);
+    if (!result) return null;
+    refreshSessionSurfaces(session.id);
+    setAppNotice(t("runtime.failed", { agent: session.agentName, message }), "error");
+    return result.turn;
   }
 
   // 路由流式事件，并在出现有效输出后完成首轮健康确认。
@@ -78,6 +105,7 @@ export function createSessionExecutionController({
       clearResumeValidation(session);
     }
     scheduleSessionCardRender(session.id);
+    shellSurface.refreshWorkspaceStatus();
     return result;
   }
 
@@ -87,8 +115,7 @@ export function createSessionExecutionController({
     const turn = session?.turns?.find((item) => item.id === turnId);
     if (!session || !turn) return null;
     sessionTurnState.markPromptError(session, turn, message);
-    scheduleSessionCardRender(sessionId);
-    shellSurface.refreshHistory();
+    refreshSessionSurfaces(sessionId);
     setAppNotice(t("runtime.failed", { agent: session.agentName, message }), "error");
     return turn;
   }
@@ -110,6 +137,17 @@ export function createSessionExecutionController({
     shellSurface.refreshActions();
   }
 
+  // 历史保存失败属于持久化故障，不能反向污染已完成的 Runtime Turn。
+  async function persistTurnToHistory(session, turn) {
+    try {
+      await saveTurnToHistory(session, turn);
+      return true;
+    } catch (error) {
+      setAppNotice(t("history.saveFailed", { message: formatBackendError(error) }), "error");
+      return false;
+    }
+  }
+
   // 执行 fallback 事件序列，供没有 ACP 能力的入口使用。
   async function runFallbackSession(session, turn) {
     const fallback = fallbackSessions[session.providerId];
@@ -124,22 +162,22 @@ export function createSessionExecutionController({
     let shouldPumpQueue = false;
     try {
       if (isTombstoned(session.id)) return null;
-      const saved = updateTurnFromEvents(session.id, turn.id, promptRunId, localizedFallbackEvents(fallback.events));
+      const saved = completePromptRunFromEvents(session.id, turn.id, promptRunId, localizedFallbackEvents(fallback.events));
       if (isTombstoned(session.id)) return null;
       if (saved) {
         sessionRuntimeState.clearRuntimeBindingError(session);
-        await saveTurnToHistory(session, saved);
-        setAppNotice(t("runtime.completedSaved", { agent: session.agentName }));
+        const persisted = await persistTurnToHistory(session, saved);
+        if (persisted) setAppNotice(t("runtime.completedSaved", { agent: session.agentName }));
         shouldPumpQueue = saved.status === TURN_STATUS.completed;
       }
       return saved;
     } catch (error) {
       if (isTombstoned(session.id)) return null;
-      appendErrorToTurn(session.id, turn.id, formatBackendError(error));
-      await saveTurnToHistory(session, turn);
+      failPromptRun(session, turn, promptRunId, formatBackendError(error));
+      await persistTurnToHistory(session, turn);
       return turn;
     } finally {
-      sessionTurnState.endPromptRun(session, turn, promptRunId);
+      cleanupPromptRun(session, turn, promptRunId);
       changeRunningCount(-1);
       if (shouldPumpQueue) pumpFollowUpQueue(session);
     }
@@ -161,14 +199,14 @@ export function createSessionExecutionController({
       await requestFrame();
       const events = await acpRuntimeClient.prompt(session, turn, promptRunId);
       if (isTombstoned(session.id)) return null;
-      const saved = updateTurnFromEvents(session.id, turn.id, promptRunId, events);
+      const saved = completePromptRunFromEvents(session.id, turn.id, promptRunId, events);
       if (isTombstoned(session.id)) return null;
       if (!saved) return null;
       const failedBeforeAnyOutput = saved.status === TURN_STATUS.failed && !saved.finalResponse && !saved.outputs?.length;
       if (isResumeValidationTurn(session, turn.id) && failedBeforeAnyOutput) {
         const message = saved.logs.at(0) || saved.finalResponse || t("runtime.promptFailedTitle", { agent: session.agentName });
         rollbackFirstTurnPromptFailure(session, saved, message);
-        await saveTurnToHistory(session, saved);
+        await persistTurnToHistory(session, saved);
         return saved;
       }
       clearResumeValidation(session);
@@ -176,22 +214,26 @@ export function createSessionExecutionController({
       const agent = getAgent(session.agentId);
       if (agent) agent.state = session.state;
       shellSurface.refreshProviders();
-      await saveTurnToHistory(session, saved);
+      const persisted = await persistTurnToHistory(session, saved);
       if (getAdapterCapabilities(session.providerId)?.refreshTargetsAfterPrompt) {
         await refreshRuntimeTargets(session.providerId, session.runtimeInstanceId ? [session.runtimeInstanceId] : null);
       }
-      setAppNotice(t("runtime.completedSaved", { agent: session.agentName }));
+      if (persisted) setAppNotice(t("runtime.completedSaved", { agent: session.agentName }));
       shouldPumpQueue = saved.status === TURN_STATUS.completed;
       return saved;
     } catch (error) {
       if (isTombstoned(session.id)) return null;
       const message = formatBackendError(error);
-      if (isResumeValidationTurn(session, turn.id)) rollbackFirstTurnPromptFailure(session, turn, message);
-      else appendErrorToTurn(session.id, turn.id, message);
-      await saveTurnToHistory(session, turn);
+      if (isResumeValidationTurn(session, turn.id)) {
+        rollbackFirstTurnPromptFailure(session, turn, message);
+        cleanupPromptRun(session, turn, promptRunId);
+      } else {
+        failPromptRun(session, turn, promptRunId, message);
+      }
+      await persistTurnToHistory(session, turn);
       return turn;
     } finally {
-      sessionTurnState.endPromptRun(session, turn, promptRunId);
+      cleanupPromptRun(session, turn, promptRunId);
       changeRunningCount(-1);
       if (shouldPumpQueue) pumpFollowUpQueue(session);
     }

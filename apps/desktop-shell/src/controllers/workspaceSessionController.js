@@ -3,6 +3,7 @@ export function createWorkspaceSessionController({
   workspaceViewStore,
   saveCurrentTargetAgent,
   saveCurrentSession,
+  setSendAsNewSession = () => {},
   canSendToSession,
   markSessionActive,
   shellSurface,
@@ -37,6 +38,8 @@ export function createWorkspaceSessionController({
     if (!session) return false;
     saveCurrentTargetAgent(session.agentId);
     saveCurrentSession(session.id);
+    // 选中会话代表用户要操作当前记录，必须清掉之前残留的“另开会话”意图。
+    setSendAsNewSession(false);
     workspaceViewStore.activateSession(session.id);
     if (canSendToSession(session)) markSessionActive(session.id);
     shellSurface.refresh({

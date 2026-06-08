@@ -147,7 +147,13 @@ export function applyEventsToTurn(session, turn, events, { now = Date.now } = {}
   if (turn.status === TURN_STATUS.running && sections.finalResponse && lastState?.state === 5) {
     turn.status = TURN_STATUS.completed;
   }
+  if (turn.status === TURN_STATUS.running && sections.finalResponse) {
+    turn.status = TURN_STATUS.completed;
+  }
   if (turn.status === TURN_STATUS.completed || turn.status === TURN_STATUS.failed) {
+    if (turn.status === TURN_STATUS.completed) {
+      turn.state = 5;
+    }
     finalizeTurnTimeline(turn, { now });
   }
   if (acpSessionEvent?.payload?.sessionId) session.acpSessionId = acpSessionEvent.payload.sessionId;

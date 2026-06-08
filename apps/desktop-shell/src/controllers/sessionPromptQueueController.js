@@ -9,6 +9,7 @@ function cloneAttachments(attachments = []) {
 export function createSessionPromptQueueController({
   createSessionTurn,
   dispatchPromptRun,
+  persistTurnSnapshot = () => null,
   shellSurface,
   setAppNotice,
   t,
@@ -37,12 +38,27 @@ export function createSessionPromptQueueController({
     shellSurface.refresh({ workspace: true, history: true });
   }
 
+  // Turn 进入可见工作台时先落一份历史快照，避免桌面关闭后只剩内存态。
+  function persistAcceptedTurn(session, turn) {
+    try {
+      const result = persistTurnSnapshot(session, turn);
+      if (result && typeof result.catch === "function") {
+        result.catch((error) => {
+          setAppNotice(t("history.saveFailed", { message: error?.message || String(error) }), "error");
+        });
+      }
+    } catch (error) {
+      setAppNotice(t("history.saveFailed", { message: error?.message || String(error) }), "error");
+    }
+  }
+
   // 真正开始执行时才创建 Turn，使一个用户输入严格对应一个 Runtime Prompt Run。
   function startSubmission(session, submission) {
     const turn = createSessionTurn(session, submission.task, {
       runtimePrompt: submission.runtimePrompt,
       attachments: cloneAttachments(submission.attachments),
     });
+    persistAcceptedTurn(session, turn);
     refreshViews();
     dispatchPromptRun(session, turn);
     return { queued: false, submission, turn };

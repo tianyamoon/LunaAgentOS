@@ -144,8 +144,18 @@ export function createSessionLaunchController({
 
     const selectedSession = getCurrentSession();
     const selectedSessionActive = selectedSession ? isSessionActive(selectedSession.id) : false;
-    // 只读 transcript 会保留为当前查看对象，但发送时应自然开启新会话。
-    const composingNewSession = forceNewSession || isComposingNewSession() || (selectedSession && !selectedSessionActive);
+    const explicitNewSession = Boolean(forceNewSession || isComposingNewSession());
+    const selectedSessionReadOnly = selectedSession?.access_mode === ACCESS_MODE.read_only;
+    const selectedSessionDetached = Boolean(selectedSession && !selectedSessionActive);
+    const automaticNewFromDetached = Boolean(selectedSessionDetached && !selectedSessionReadOnly && !explicitNewSession);
+    const automaticNewFromHistory = Boolean(selectedSessionReadOnly && explicitNewSession);
+    // 只读历史不能被普通发送隐式续写；用户必须明确选择“另开会话”。
+    if (selectedSessionReadOnly && !explicitNewSession) {
+      setAppNotice(t("session.readOnlySwitchBlocked"), "error");
+      shellSurface.focusComposer();
+      return null;
+    }
+    const composingNewSession = explicitNewSession || selectedSessionDetached;
     const blockReason = !composingNewSession ? currentSessionSendBlockReason(selectedSession, agent) : "";
     if (blockReason) {
       setAppNotice(blockReason, "error");
@@ -170,7 +180,11 @@ export function createSessionLaunchController({
     clearComposerAttachments();
     setSendAsNewSession(false);
     shellSurface.refreshActions();
-    if (isTargetActivatable(agent)) {
+    if (automaticNewFromHistory) {
+      setAppNotice(t("session.startedNewFromHistory", { target: targetDisplayName(agent) }), "busy");
+    } else if (automaticNewFromDetached) {
+      setAppNotice(t("session.startedNewFromDetached", { target: targetDisplayName(agent) }), "busy");
+    } else if (isTargetActivatable(agent)) {
       setAppNotice(t("runtime.activatingTarget", { target: targetDisplayName(agent) }), "busy");
     }
     return { session, ...submission };

@@ -4,7 +4,7 @@ import { createSessionPromptQueueController } from "./sessionPromptQueueControll
 import { createShellSurface } from "../ui/shellSurface.js";
 
 // 创建队列测试夹具，记录 Turn 创建和 Runtime 派发顺序。
-function makeHarness() {
+function makeHarness({ persistTurnSnapshot } = {}) {
   const calls = [];
   let turnSeq = 0;
   const shellSurface = createShellSurface({
@@ -19,6 +19,7 @@ function makeHarness() {
       return turn;
     },
     dispatchPromptRun: (_session, turn) => calls.push(`dispatch:${turn.id}`),
+    persistTurnSnapshot: persistTurnSnapshot || ((_session, turn) => calls.push(`persist:${turn.id}`)),
     shellSurface,
     setAppNotice: (message, tone) => calls.push(`notice:${tone}:${message}`),
     t: (key, values = {}) => `${key}:${values.count || ""}`,
@@ -79,4 +80,14 @@ test("sessionPromptQueueController: clear 清空队列并记录原因", () => {
   assert.equal(controller.clear(session, "stop"), 1);
   assert.deepEqual(session.queuedSubmissions, []);
   assert.equal(session.discardedQueuedSubmissions[0].reason, "stop");
+});
+test("sessionPromptQueueController: 新 Turn 在派发 runtime 前先写入历史快照", () => {
+  const session = { id: "s1", turns: [] };
+  const { calls, controller } = makeHarness();
+  controller.submit(session, "task");
+
+  assert.deepEqual(
+    calls.filter((item) => item.startsWith("persist:") || item.startsWith("dispatch:")),
+    ["persist:turn-1", "dispatch:turn-1"],
+  );
 });

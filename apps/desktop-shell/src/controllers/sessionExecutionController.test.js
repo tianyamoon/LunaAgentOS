@@ -4,7 +4,7 @@ import { createShellSurface } from "../ui/shellSurface.js";
 import { createSessionExecutionController } from "./sessionExecutionController.js";
 
 // 创建可观察执行副作用的控制器。
-function makeHarness({ prompt, capabilities = {}, fallbackSessions = {}, tombstoned = false } = {}) {
+function makeHarness({ prompt, capabilities = {}, fallbackSessions = {}, tombstoned = false, saveError = null } = {}) {
   const session = { id: "s1", providerId: "demo", agentId: "a1", agentName: "Demo", turns: [] };
   const turn = { id: "t1", task: "task", logs: [], outputs: [], finalResponse: "", status: "running" };
   session.turns.push(turn);
@@ -14,6 +14,7 @@ function makeHarness({ prompt, capabilities = {}, fallbackSessions = {}, tombsto
     renderProviders: () => calls.push("providers"),
     renderWorkspace: () => calls.push("workspace"),
     renderHistory: () => calls.push("history"),
+    renderWorkspaceStatus: () => calls.push("workspaceStatus"),
   });
   const controller = createSessionExecutionController({
     getSession: () => session,
@@ -39,6 +40,16 @@ function makeHarness({ prompt, capabilities = {}, fallbackSessions = {}, tombsto
         turn.status = events.some((event) => event.state === 9) ? "failed" : "completed";
         return turn;
       },
+      completePromptRunFromEvents: (_sessionId, _turnId, _promptRunId, events) => {
+        const response = events.find((event) => event.type === "response");
+        turn.finalResponse = response?.payload?.content || "";
+        turn.outputs = turn.finalResponse ? [turn.finalResponse] : [];
+        turn.status = events.some((event) => event.state === 9) ? "failed" : "completed";
+        turn.state = turn.status === "completed" ? 5 : 9;
+        session.state = turn.state;
+        session.activePromptRunId = null;
+        return { session, turn };
+      },
       appendStreamEvent: (_sessionId, _turnId, _promptRunId, event) => {
         turn.status = event.type === "thought" ? "running" : turn.status;
         return { session, turn };
@@ -48,6 +59,15 @@ function makeHarness({ prompt, capabilities = {}, fallbackSessions = {}, tombsto
         turn.logs = [message, ...turn.logs];
       },
       markPromptError: (_session, _turn, message) => { turn.error = message; turn.status = "failed"; },
+      failPromptRun: (_session, _turn, promptRunId, message) => {
+        if (session.activePromptRunId !== promptRunId || turn.promptRunId !== promptRunId) return null;
+        turn.error = message;
+        turn.status = "failed";
+        turn.state = 9;
+        session.state = 9;
+        session.activePromptRunId = null;
+        return { session, turn };
+      },
     },
     sessionRuntimeState: {
       isSessionDeletedTombstone: () => tombstoned,
@@ -55,13 +75,16 @@ function makeHarness({ prompt, capabilities = {}, fallbackSessions = {}, tombsto
       setRuntimeBinding: () => {},
       clearRuntimeBindingError: () => {},
     },
-    saveTurnToHistory: async () => calls.push("save"),
+    saveTurnToHistory: async () => {
+      if (saveError) throw saveError;
+      calls.push(session.activePromptRunId ? "save:active" : "save:settled");
+    },
     rollbackFirstTurnPromptFailure: (_session, _turn, message) => calls.push(`rollback:${message}`),
     refreshRuntimeTargets: async () => calls.push("refresh"),
     shellSurface,
     scheduleSessionCardRender: () => calls.push("schedule"),
     formatBackendError: (error) => error.message,
-    setAppNotice: () => {},
+    setAppNotice: (message, tone = "info") => calls.push(`notice:${tone}:${message}`),
     t: (key) => key,
     pumpFollowUpQueue: () => calls.push("pump"),
   });
@@ -72,20 +95,30 @@ test("sessionExecutionController: ACP success saves turn", async () => {
   const { controller, session, turn, calls } = makeHarness();
   await controller.startAcpSession(session, turn);
   assert.equal(turn.finalResponse, "done");
-  assert.equal(calls.includes("save"), true);
+  assert.equal(calls.includes("save:settled"), true);
+});
+
+test("sessionExecutionController: history save failure does not fail completed ACP turn", async () => {
+  const { controller, session, turn, calls } = makeHarness({ saveError: new Error("disk full") });
+  await controller.startAcpSession(session, turn);
+
+  assert.equal(turn.status, "completed");
+  assert.equal(turn.finalResponse, "done");
+  assert.equal(calls.some((item) => item.includes("history.saveFailed")), true);
 });
 
 test("sessionExecutionController: ACP error is persisted", async () => {
   const { controller, session, turn, calls } = makeHarness({ prompt: async () => { throw new Error("boom"); } });
   await controller.startAcpSession(session, turn);
   assert.equal(turn.error, "boom");
-  assert.equal(calls.includes("save"), true);
+  assert.equal(calls.includes("save:settled"), true);
 });
 
 test("sessionExecutionController: stream event schedules card render", () => {
   const { controller, calls } = makeHarness();
   controller.appendStreamEvent("s1", "t1", "run-1", { type: "thought", payload: { content: "x" } });
   assert.equal(calls.includes("schedule"), true);
+  assert.equal(calls.includes("workspaceStatus"), true);
 });
 
 test("sessionExecutionController: final batch refresh keeps workspace container stable", () => {
@@ -95,6 +128,7 @@ test("sessionExecutionController: final batch refresh keeps workspace container 
   controller.updateTurnFromEvents("s1", "t1", "run-1", [{ type: "response", state: 5, payload: { content: "done" } }]);
   assert.equal(calls.includes("schedule"), true);
   assert.equal(calls.includes("history"), true);
+  assert.equal(calls.includes("workspaceStatus"), true);
   assert.equal(calls.includes("workspace"), false);
 });
 
@@ -103,6 +137,7 @@ test("sessionExecutionController: prompt error refresh keeps workspace container
   controller.appendErrorToTurn("s1", "t1", "boom");
   assert.equal(calls.includes("schedule"), true);
   assert.equal(calls.includes("history"), true);
+  assert.equal(calls.includes("workspaceStatus"), true);
   assert.equal(calls.includes("workspace"), false);
 });
 
@@ -127,7 +162,7 @@ test("sessionExecutionController: fallback execution localizes and saves events"
   });
   await controller.runFallbackSession(session, turn);
   assert.equal(turn.finalResponse, "fallback.done");
-  assert.equal(calls.includes("save"), true);
+  assert.equal(calls.includes("save:settled"), true);
 });
 
 test("sessionExecutionController: restored first-turn error triggers rollback", async () => {

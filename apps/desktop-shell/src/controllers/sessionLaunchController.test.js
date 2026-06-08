@@ -80,7 +80,11 @@ function makeHarness({
     startAcpSession: (_session, turn) => calls.push(`acp:${turn.id}`),
     runFallbackSession: (_session, turn) => calls.push(`fallback:${turn.id}`),
     setAppNotice: (message, kind) => calls.push(`notice:${kind}:${message}`),
-    t: (key, values = {}) => values.provider ? `${key}:${values.provider}:${values.state}` : key,
+    t: (key, values = {}) => {
+      if (values.provider) return `${key}:${values.provider}:${values.state}`;
+      if (values.target) return `${key}:${values.target}`;
+      return key;
+    },
     now: () => 100,
   });
   return {
@@ -127,7 +131,7 @@ test("sessionLaunchController: 复用同目标的活跃 Session", () => {
   assert.equal(calls.includes("current:session-old"), true);
 });
 
-test("sessionLaunchController: inactive read-only transcript sends as new session", () => {
+test("sessionLaunchController: read-only transcript blocks normal send", () => {
   const currentSession = {
     id: "history-readonly",
     agentId: "agent-1",
@@ -141,10 +145,52 @@ test("sessionLaunchController: inactive read-only transcript sends as new sessio
   });
   const result = controller.startSessionFromPrompt();
 
+  assert.equal(result, null);
+  assert.equal(sessions.length, 0);
+  assert.equal(calls.some((item) => item === "notice:error:should-not-block"), false);
+  assert.equal(calls.includes("notice:error:session.readOnlySwitchBlocked"), true);
+});
+
+test("sessionLaunchController: explicit new session can branch from read-only transcript", () => {
+  const currentSession = {
+    id: "history-readonly",
+    agentId: "agent-1",
+    access_mode: "read_only",
+    turns: [],
+  };
+  const { calls, controller, sessions } = makeHarness({
+    currentSession,
+    currentSessionActive: false,
+    blockReason: "should-not-block",
+  });
+  const result = controller.startSessionFromPrompt(true);
+
   assert.equal(sessions.length, 1);
   assert.notEqual(result.session, currentSession);
   assert.equal(result.session.task, "检查项目");
   assert.equal(calls.some((item) => item === "notice:error:should-not-block"), false);
+  assert.equal(calls.includes("notice:busy:session.startedNewFromHistory:Demo Agent"), true);
+});
+
+test("sessionLaunchController: composer new-session toggle can branch from read-only transcript", () => {
+  const currentSession = {
+    id: "history-readonly",
+    agentId: "agent-1",
+    access_mode: "read_only",
+    turns: [],
+  };
+  const { calls, controller, sessions } = makeHarness({
+    currentSession,
+    currentSessionActive: false,
+    composingNew: true,
+    blockReason: "should-not-block",
+  });
+  const result = controller.startSessionFromPrompt();
+
+  assert.equal(sessions.length, 1);
+  assert.notEqual(result.session, currentSession);
+  assert.equal(calls.includes("notice:error:session.readOnlySwitchBlocked"), false);
+  assert.equal(calls.includes("notice:busy:session.startedNewFromHistory:Demo Agent"), true);
 });
 
 test("sessionLaunchController: 不可用 Agent Entry 会在创建前阻止发送", () => {

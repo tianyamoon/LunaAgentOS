@@ -26,6 +26,7 @@ function makeHarness(overrides = {}) {
     workspaceViewStore,
     saveCurrentTargetAgent: (id) => calls.push(["target", id]),
     saveCurrentSession: (id) => sessionsStore.setCurrentSessionId(id),
+    setSendAsNewSession: (value) => calls.push(["newSession", value]),
     canSendToSession: (session) => session.sendable !== false,
     markSessionActive: (id) => calls.push(["active", id]),
     shellSurface,
@@ -41,6 +42,7 @@ test("workspaceSessionController: history activation updates current session", (
   assert.equal(controller.activateWorkspaceSession("b", { focusWorkspace: true }), true);
   assert.equal(sessionsStore.getCurrentSessionId(), "b");
   assert.equal(workspaceViewStore.getMode(), WORKSPACE_VIEW_MODE.grid);
+  assert.deepEqual(calls.find((call) => call[0] === "newSession"), ["newSession", false]);
   assert.deepEqual(calls.find((call) => call[0] === "workspace"), ["workspace", { focusSessionId: "b" }]);
 });
 

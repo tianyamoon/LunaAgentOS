@@ -126,6 +126,21 @@ test("applyEventsToTurn preserves Turn start time when final ACP batch completes
   assert.equal(turn.timelineCompletedAt, "1970-01-01T00:00:06.000Z");
 });
 
+test("applyEventsToTurn completes final batch response without explicit done state", () => {
+  const session = makeSession();
+  const turn = makeTurn();
+
+  applyEventsToTurn(session, turn, [
+    { type: "thought", state: 2, payload: { content: "checking" } },
+    { type: "tool", state: 3, payload: { title: "Read", status: "completed" } },
+    { type: "response", state: 4, payload: { content: "final answer" } },
+  ]);
+
+  assert.equal(turn.finalResponse, "final answer");
+  assert.equal(turn.status, TURN_STATUS.completed);
+  assert.equal(turn.timelineCompletedAt != null, true);
+});
+
 test("applyStreamEventToTurn appends incremental thought and response chunks", () => {
   const session = makeSession();
   const turn = makeTurn();

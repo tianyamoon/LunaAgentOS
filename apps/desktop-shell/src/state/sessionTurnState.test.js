@@ -79,6 +79,81 @@ test("sessionTurnState: aggregate and stream events update the located turn", ()
   assert.equal(turn.logs.some((item) => /Late/.test(item)), false);
 });
 
+test("sessionTurnState: completePromptRunFromEvents atomically settles turn and session", () => {
+  const { sessionsStore, sessionTurnState } = makeState();
+  const session = makeSession("complete-run");
+  sessionsStore.upsertHead(session);
+  const turn = sessionTurnState.createTurn(session, "task");
+  sessionTurnState.beginPromptRun(session, turn, "run-1");
+
+  const result = sessionTurnState.completePromptRunFromEvents(session.id, turn.id, "run-1", [
+    { type: "response", state: 4, payload: { content: "done without final state" } },
+  ]);
+
+  assert.equal(result.turn.finalResponse, "done without final state");
+  assert.equal(result.turn.status, TURN_STATUS.completed);
+  assert.equal(result.turn.state, 5);
+  assert.equal(result.session.state, 5);
+  assert.equal(result.session.activePromptRunId, null);
+  assert.equal(Boolean(result.turn.timelineCompletedAt), true);
+});
+
+test("sessionTurnState: final batch can settle a turn already completed by stream state", () => {
+  const { sessionsStore, sessionTurnState } = makeState();
+  const session = makeSession("stream-then-final");
+  sessionsStore.upsertHead(session);
+  const turn = sessionTurnState.createTurn(session, "task");
+  sessionTurnState.beginPromptRun(session, turn, "run-1");
+
+  sessionTurnState.appendStreamEvent(session.id, turn.id, "run-1", {
+    type: "response",
+    state: 5,
+    payload: { content: "stream done" },
+  });
+  assert.equal(turn.status, TURN_STATUS.completed);
+
+  const result = sessionTurnState.completePromptRunFromEvents(session.id, turn.id, "run-1", [
+    { type: "response", state: 4, payload: { content: "final done" } },
+    { type: "state", state: 5, payload: { content: "runtime complete", sessionId: "acp-final" } },
+  ]);
+
+  assert.equal(result.turn.finalResponse, "final done");
+  assert.equal(result.session.acpSessionId, "acp-final");
+  assert.equal(result.session.activePromptRunId, null);
+});
+
+test("sessionTurnState: completePromptRunFromEvents rejects mismatched prompt run", () => {
+  const { sessionsStore, sessionTurnState } = makeState();
+  const session = makeSession("complete-mismatch");
+  sessionsStore.upsertHead(session);
+  const turn = sessionTurnState.createTurn(session, "task");
+  sessionTurnState.beginPromptRun(session, turn, "run-1");
+
+  const result = sessionTurnState.completePromptRunFromEvents(session.id, turn.id, "run-other", [
+    { type: "response", state: 5, payload: { content: "wrong" } },
+  ]);
+
+  assert.equal(result, null);
+  assert.equal(turn.finalResponse, "");
+  assert.equal(session.activePromptRunId, "run-1");
+});
+
+test("sessionTurnState: failPromptRun atomically settles failed prompt run", () => {
+  const { sessionsStore, sessionTurnState } = makeState();
+  const session = makeSession("fail-run");
+  sessionsStore.upsertHead(session);
+  const turn = sessionTurnState.createTurn(session, "task");
+  sessionTurnState.beginPromptRun(session, turn, "run-1");
+
+  const result = sessionTurnState.failPromptRun(session, turn, "run-1", "boom");
+
+  assert.equal(result.turn.status, TURN_STATUS.failed);
+  assert.equal(result.turn.state, 9);
+  assert.equal(result.session.state, 9);
+  assert.equal(result.session.activePromptRunId, null);
+  assert.equal(result.turn.logs[0], "boom");
+});
+
 test("sessionTurnState: tombstones block late stream events", () => {
   const { sessionsStore, sessionRuntimeState, sessionTurnState } = makeState();
   const session = makeSession("stopped");
@@ -145,7 +220,7 @@ test("sessionTurnState: runtime logs dedupe and stopped turn gets a final respon
   sessionTurnState.appendRuntimeLog(session, "log", 3);
   sessionTurnState.appendRuntimeLog(session, "log", 3);
   assert.equal(turn.logs.filter((item) => item === "log").length, 1);
-  assert.equal(sessionsStore.getFlowDetailOpen(`${turn.id}:logs`), true);
+  assert.equal(sessionsStore.getFlowDetailOpen(`${turn.id}:logs`), false);
   sessionTurnState.markStopped(session);
   assert.equal(turn.state, 6);
   assert.equal(turn.finalResponse, "turn.stoppedResponse");

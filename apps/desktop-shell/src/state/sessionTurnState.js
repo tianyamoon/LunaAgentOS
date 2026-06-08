@@ -93,6 +93,18 @@ export function createSessionTurnState({
     );
   }
 
+  function acceptsPromptRunCompletion(session, turn, promptRunId) {
+    return Boolean(
+      session
+      && turn
+      && promptRunId
+      && session.activePromptRunId === promptRunId
+      && turn.promptRunId === promptRunId
+      // 流式 state=5 可能已经把 Turn 标为 completed；最终批量事件仍要允许同一 Prompt Run 结算落盘。
+      && [TURN_STATUS.running, TURN_STATUS.waiting_confirmation, TURN_STATUS.completed].includes(turn.status),
+    );
+  }
+
   function endPromptRun(session, turn, promptRunId) {
     if (!session || !turn || !promptRunId) return false;
     if (session.activePromptRunId !== promptRunId || turn.promptRunId !== promptRunId) return false;
@@ -100,11 +112,45 @@ export function createSessionTurnState({
     return true;
   }
 
+  function isTerminalTurn(turn) {
+    return [TURN_STATUS.completed, TURN_STATUS.failed, TURN_STATUS.cancelled].includes(turn?.status);
+  }
+
+  function normalizeReturnedPromptRun(session, turn) {
+    if (!session || !turn) return null;
+    // ACP/fallback prompt 返回后代表本次 Prompt Run 已结束；这里集中提交终态，避免 UI 和 history 从不同字段各自猜。
+    if (!isTerminalTurn(turn) && turn.status !== TURN_STATUS.waiting_confirmation) {
+      turn.status = TURN_STATUS.completed;
+    }
+    if (turn.status === TURN_STATUS.completed) turn.state = 5;
+    if (turn.status === TURN_STATUS.failed) turn.state = 9;
+    session.state = turn.state;
+    session.activeTurnId = turn.id;
+    if (isTerminalTurn(turn)) finalizeTurnTimeline(turn, { now });
+    return turn;
+  }
+
   function updateTurnFromEvents(sessionId, turnId, promptRunId, events) {
     const found = findSessionTurn(sessionId, turnId);
     if (!found || !acceptsPromptRun(found.session, found.turn, promptRunId)) return null;
     applyEventsToTurn(found.session, found.turn, events, { now });
     return found.turn;
+  }
+
+  function completePromptRunFromEvents(sessionId, turnId, promptRunId, events) {
+    const found = findSessionTurn(sessionId, turnId);
+    if (!found || !acceptsPromptRunCompletion(found.session, found.turn, promptRunId)) return null;
+    applyEventsToTurn(found.session, found.turn, events, { now });
+    normalizeReturnedPromptRun(found.session, found.turn);
+    endPromptRun(found.session, found.turn, promptRunId);
+    return { session: found.session, turn: found.turn };
+  }
+
+  function failPromptRun(session, turn, promptRunId, message) {
+    if (!acceptsPromptRun(session, turn, promptRunId)) return null;
+    markPromptError(session, turn, message);
+    endPromptRun(session, turn, promptRunId);
+    return { session, turn };
   }
 
   function appendStreamEvent(sessionId, turnId, promptRunId, event) {
@@ -152,7 +198,7 @@ export function createSessionTurnState({
       turn.status = statusFromRuntimeStateCode(state, Boolean(turn.finalResponse));
       session.state = state;
     }
-    sessionsStore.setFlowDetailOpen(`${turn.id}:logs`, true);
+    // 运行日志只写入数据，不替用户展开调试区；完成态是否展开交给视图投影决定。
     return turn;
   }
 
@@ -183,8 +229,10 @@ export function createSessionTurnState({
     appendRuntimeLog,
     appendStreamEvent,
     beginPromptRun,
+    completePromptRunFromEvents,
     createTurn,
     endPromptRun,
+    failPromptRun,
     findSessionTurn,
     markPromptError,
     markStopped,
