@@ -79,6 +79,7 @@ import {
   RUNTIME_BINDING_STATE,
   createRuntimeBinding,
   isRunningTurnStatus,
+  resolveSessionCanonicalState,
   resolveSessionCardStatusView,
 } from "./state/sessionStatus.js";
 import {
@@ -1094,8 +1095,10 @@ historyView = createHistoryView({
   compareArchivedSessionListItems,
   ensureSessionStatusShape,
   resolveSessionCardStatusView,
+  resolveSessionCanonicalState,
   CARD_STATUS,
   canSendToSession,
+  canRestoreSession,
   sessionsStore,
   t,
   escapeHtml,
@@ -1142,6 +1145,7 @@ workspaceStatusView = createWorkspaceStatusView({
   providerAvailabilityLabel,
   stateClasses,
   stateDisplayLabel,
+  resolveSessionCardStatusView,
   t,
   escapeHtml,
 });

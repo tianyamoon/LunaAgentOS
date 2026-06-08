@@ -68,6 +68,7 @@ test("workspaceStatusProjection: 产出顶部状态条所需最小视图数据",
     hasTarget: true,
     targetLabel: "目标:Hermes",
     statusState: 3,
+    sessionStatusView: null,
     availabilitySummary: "available",
     liveCount: 1,
   });
@@ -78,4 +79,38 @@ test("workspaceStatusProjection: 缺少目标时返回占位 key", () => {
     hasTarget: false,
     placeholderKey: "composer.placeholderNoTarget",
   });
+});
+
+test("workspaceStatusProjection: workspace status can consume unified session card status view", () => {
+  const view = projectWorkspaceStatus({
+    agent: { id: "agent-a", name: "Hermes", state: 2 },
+    provider: { id: "hermes" },
+    currentSession: {
+      id: "s1",
+      agentId: "agent-a",
+      state: 2,
+      turns: [{ id: "t1", status: "completed", finalResponse: "done" }],
+    },
+    availability: { summary: "available" },
+    resolveSessionStatusView: () => ({ status: "completed", label: "已完成", tone: "success" }),
+    targetDisplayName: (agent) => agent.name,
+  });
+
+  assert.deepEqual(view.sessionStatusView, { status: "completed", label: "已完成", tone: "success" });
+  assert.equal(view.statusState, 2);
+});
+
+test("workspaceStatusProjection: read-only history in workspace snapshot is not counted as live runtime", () => {
+  const view = projectWorkspaceStatus({
+    agent: { id: "agent-a", name: "Hermes", state: 1 },
+    provider: { id: "hermes" },
+    sessions: [
+      { id: "live", agentId: "agent-a", record_state: RECORD_STATE.active, access_mode: ACCESS_MODE.interactive },
+      { id: "history", agentId: "agent-a", record_state: RECORD_STATE.active, access_mode: ACCESS_MODE.read_only },
+    ],
+    availability: { summary: "available" },
+    targetDisplayName: (agent) => agent.name,
+  });
+
+  assert.equal(view.liveCount, 1);
 });

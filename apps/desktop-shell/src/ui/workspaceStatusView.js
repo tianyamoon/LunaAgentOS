@@ -1,6 +1,6 @@
 import { projectWorkspaceStatus } from "../state/workspaceStatusProjection.js";
 
-// 顶部工作区状态条只负责把领域投影写入 DOM，避免 main.js 直接拼 UI。
+// 顶部工作区状态条只消费领域投影，不在 main.js 或 DOM 层重新推断会话状态。
 export function createWorkspaceStatusView({
   element,
   getCurrentTargetAgent,
@@ -14,6 +14,7 @@ export function createWorkspaceStatusView({
   providerAvailabilityLabel,
   stateClasses,
   stateDisplayLabel,
+  resolveSessionCardStatusView,
   t,
   escapeHtml,
 }) {
@@ -28,6 +29,8 @@ export function createWorkspaceStatusView({
       latestActiveSession: agent ? getLatestActiveSessionForAgent(agent.id) : null,
       availability: provider ? getProviderAvailability(provider.id) : null,
       sessionRecordState,
+      resolveSessionStatusView: resolveSessionCardStatusView,
+      translate: t,
       targetDisplayName,
     });
 
@@ -40,10 +43,27 @@ export function createWorkspaceStatusView({
     element.innerHTML = `
       <strong class="workspace-status-target">${escapeHtml(statusView.targetLabel)}</strong>
       <span class="workspace-status-separator">·</span>
-      <span class="state-pill workspace-state-pill ${stateClasses[statusView.statusState] || "state-idle"}">${escapeHtml(stateDisplayLabel(statusView.statusState, t))}</span>
+      ${renderStatusPill(statusView)}
       <span class="workspace-runtime-count">${escapeHtml(availabilityLabel)}</span>
       ${statusView.liveCount > 0 ? `<span class="workspace-runtime-count">ACP × ${statusView.liveCount}</span>` : ""}
     `;
+  }
+
+  function renderStatusPill(statusView) {
+    const sessionStatusView = statusView.sessionStatusView;
+    if (!sessionStatusView) {
+      return `<span class="state-pill workspace-state-pill ${stateClasses[statusView.statusState] || "state-idle"}">${escapeHtml(stateDisplayLabel(statusView.statusState, t))}</span>`;
+    }
+    const status = sessionStatusView.status || "waiting_input";
+    const tone = sessionStatusView.tone || "neutral";
+    const classes = [
+      "state-pill",
+      "workspace-state-pill",
+      "runtime-pill",
+      `session-status-${tone}`,
+      `session-status-${status}`,
+    ].join(" ");
+    return `<span class="${classes}">${escapeHtml(sessionStatusView.label || "")}</span>`;
   }
 
   return { renderWorkspaceStatus };

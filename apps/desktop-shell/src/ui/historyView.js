@@ -1,6 +1,57 @@
 export function shouldRestoreActiveHistoryItem(existing, canSendToSession) {
-  // 活跃历史可能已经以只读 transcript 打开；再次点击应尝试恢复 runtime。
-  return Boolean(existing) && typeof canSendToSession === "function" && !canSendToSession(existing);
+  // 活跃区点击只负责导航回工作区；能不能发送不等于需要恢复 runtime。
+  void existing;
+  void canSendToSession;
+  return false;
+}
+
+export function resolveHistoryItemStatusSource(item, getSession) {
+  // 历史列表只负责导航；同 id 的 live session 存在时，状态必须以 live session 为准。
+  return getSession?.(item?.id) || item;
+}
+
+export function projectHistoryListItemState(item, {
+  getSession,
+  ensureSessionStatusShape,
+  resolveSessionCanonicalState,
+  resolveSessionCardStatusView,
+  canSendToSession,
+  canRestoreSession,
+  isArchivedSessionListItem,
+  translate,
+} = {}) {
+  const t = typeof translate === "function" ? translate : (key) => key;
+  const statusSource = resolveHistoryItemStatusSource(item, getSession);
+  ensureSessionStatusShape?.(statusSource);
+  const canonical = typeof resolveSessionCanonicalState === "function"
+    ? resolveSessionCanonicalState(statusSource, { translate: t, canSendToSession, canRestoreSession })
+    : null;
+  const statusView = canonical?.statusView || resolveSessionCardStatusView(statusSource, { translate: t });
+  const isArchived = canonical?.isArchived ?? Boolean(isArchivedSessionListItem?.(item));
+  const isFailedOrBlocked = canonical?.listSignal === "failed" || statusView.status === "blocked" || statusView.status === "failed";
+  const isSendable = canonical?.canSend ?? Boolean(canSendToSession?.(statusSource));
+  let signalClass;
+  let signalLabel;
+  if (isFailedOrBlocked) {
+    signalClass = "signal-failed";
+    signalLabel = statusView.label;
+  } else if (isSendable) {
+    signalClass = "signal-active";
+    signalLabel = t("history.signal.live");
+  } else {
+    signalClass = "signal-archive";
+    signalLabel = statusView.label;
+  }
+  return {
+    statusSource,
+    statusView,
+    isArchived,
+    isFailedOrBlocked,
+    isSendable,
+    signalClass,
+    signalLabel,
+    listStateClass: isArchived ? "is-archive" : "is-active-history",
+  };
 }
 
 export function createHistoryView({
@@ -14,8 +65,9 @@ export function createHistoryView({
   compareArchivedSessionListItems,
   ensureSessionStatusShape,
   resolveSessionCardStatusView,
-  CARD_STATUS,
+  resolveSessionCanonicalState,
   canSendToSession,
+  canRestoreSession,
   sessionsStore,
   t,
   escapeHtml,
@@ -51,25 +103,22 @@ export function createHistoryView({
   }
 
   function renderSessionListItem(item) {
-    ensureSessionStatusShape(item);
-    const statusView = resolveSessionCardStatusView(item, { translate: t });
+    const {
+      statusView,
+      signalClass,
+      signalLabel,
+      listStateClass,
+    } = projectHistoryListItemState(item, {
+      getSession,
+      ensureSessionStatusShape,
+      resolveSessionCanonicalState,
+      resolveSessionCardStatusView,
+      canSendToSession,
+      canRestoreSession,
+      isArchivedSessionListItem,
+      translate: t,
+    });
     const isActiveHistoryItem = sessionsStore.getCurrentSessionId() === item.id;
-    const isArchived = isArchivedSessionListItem(item);
-    const isFailedOrBlocked = statusView.status === CARD_STATUS.blocked || statusView.status === CARD_STATUS.failed;
-    const isSendable = canSendToSession(item);
-    let signalClass;
-    let signalLabel;
-    if (isFailedOrBlocked) {
-      signalClass = "signal-failed";
-      signalLabel = statusView.label;
-    } else if (isSendable) {
-      signalClass = "signal-active";
-      signalLabel = t("history.signal.live");
-    } else {
-      signalClass = "signal-archive";
-      signalLabel = statusView.label;
-    }
-    const listStateClass = isArchived ? "is-archive" : "is-active-history";
     return `
       <article class="history-item ${listStateClass} ${isActiveHistoryItem ? "is-active-session" : ""}" data-session-id="${item.id}" data-agent-id="${item.agentId || ""}" ${isActiveHistoryItem ? "aria-current=\"true\"" : ""}>
         <div class="history-item-top">

@@ -55,6 +55,8 @@ export function projectWorkspaceStatus({
   latestActiveSession = null,
   availability = null,
   sessionRecordState = null,
+  resolveSessionStatusView = null,
+  translate = null,
   targetDisplayName = (target) => target?.name || target?.id || "",
 } = {}) {
   if (!agent || !provider) {
@@ -64,18 +66,25 @@ export function projectWorkspaceStatus({
     };
   }
 
-  const liveCount = sessions.filter((session) => activeRecordStateOf(session, sessionRecordState) === RECORD_STATE.active).length;
+  const liveCount = sessions
+    .filter((session) => activeRecordStateOf(session, sessionRecordState) === RECORD_STATE.active)
+    .filter((session) => session?.access_mode !== ACCESS_MODE.read_only)
+    .length;
   const statusSession = pickWorkspaceStatusSession({
     currentSession,
     latestActiveSession,
     sessions,
     agentId: agent.id,
   });
+  const sessionStatusView = statusSession && typeof resolveSessionStatusView === "function"
+    ? resolveSessionStatusView(statusSession, { translate })
+    : null;
 
   return {
     hasTarget: true,
     targetLabel: targetDisplayName(agent),
     statusState: statusSession?.state ?? agent.state ?? 1,
+    sessionStatusView,
     availabilitySummary: availability?.summary || "unknown",
     liveCount,
   };

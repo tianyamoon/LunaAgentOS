@@ -60,6 +60,22 @@ export const CARD_STATUS_META = Object.freeze({
   readonly_history: { labelKey: "sessionStatus.readonlyHistory", detailKey: "sessionStatus.readonlyHistoryDetail", tone: "muted", icon: "lock" },
 });
 
+export const SESSION_STATUS_KIND = Object.freeze({
+  live: "live",
+  readonly_history: "readonly_history",
+  archived: "archived",
+  deleted: "deleted",
+});
+
+export const SESSION_LIST_SIGNAL = Object.freeze({
+  live: "live",
+  failed: "failed",
+  readonly_history: "readonly_history",
+  archived: "archived",
+  deleted: "deleted",
+  inactive: "inactive",
+});
+
 const BLOCKING_RUNTIME_STAGES = new Set([
   RUNTIME_BINDING_STAGE.launch,
   RUNTIME_BINDING_STAGE.initialize,
@@ -172,7 +188,8 @@ export function resolveSessionCardStatusView(session, options = {}) {
   const secondary = latestTurnOutcome(session);
 
   if (accessMode === ACCESS_MODE.read_only) {
-    return buildStatusView(CARD_STATUS.readonly_history, translate, { secondary });
+    // 只读历史不是 live runtime，不展示旧快照里的“上次运行中”等执行态。
+    return buildStatusView(CARD_STATUS.readonly_history, translate);
   }
 
   if (recordState === RECORD_STATE.archived) {
@@ -210,6 +227,73 @@ export function resolveSessionCardStatusView(session, options = {}) {
   }
 
   return buildStatusView(CARD_STATUS.waiting_input, translate, { secondary });
+}
+
+export function resolveSessionCanonicalState(session, options = {}) {
+  const translate = typeof options.translate === "function" ? options.translate : defaultTranslate;
+  const recordState = session?.record_state || RECORD_STATE.active;
+  const accessMode = session?.access_mode || ACCESS_MODE.interactive;
+  const statusView = resolveSessionCardStatusView(session, { translate });
+  const canSend = typeof options.canSendToSession === "function"
+    ? Boolean(options.canSendToSession(session))
+    : fallbackCanSendToSession(session, statusView);
+  const canRestore = typeof options.canRestoreSession === "function"
+    ? Boolean(options.canRestoreSession(session))
+    : fallbackCanRestoreSession(session);
+
+  const isDeleted = recordState === RECORD_STATE.deleted;
+  const isArchived = recordState === RECORD_STATE.archived;
+  const isReadOnly = accessMode === ACCESS_MODE.read_only;
+  const isFailure = statusView.status === CARD_STATUS.failed || statusView.status === CARD_STATUS.blocked;
+  const kind = resolveSessionStatusKind({ isDeleted, isArchived, isReadOnly });
+  const listSignal = resolveSessionListSignal({ canSend, isArchived, isDeleted, isFailure, isReadOnly });
+
+  return {
+    recordState,
+    accessMode,
+    kind,
+    listSignal,
+    statusView,
+    canSend,
+    canRestore,
+    isArchived,
+    isDeleted,
+    isReadOnly,
+    // 只有可交互且未归档/删除的会话才算挂在 runtime 上，避免历史快照污染工作区状态。
+    isRuntimeAttached: canSend || (!isReadOnly && !isArchived && !isDeleted),
+  };
+}
+
+function resolveSessionStatusKind({ isDeleted, isArchived, isReadOnly }) {
+  if (isDeleted) return SESSION_STATUS_KIND.deleted;
+  if (isArchived) return SESSION_STATUS_KIND.archived;
+  if (isReadOnly) return SESSION_STATUS_KIND.readonly_history;
+  return SESSION_STATUS_KIND.live;
+}
+
+function resolveSessionListSignal({ canSend, isArchived, isDeleted, isFailure, isReadOnly }) {
+  if (isDeleted) return SESSION_LIST_SIGNAL.deleted;
+  if (isArchived) return SESSION_LIST_SIGNAL.archived;
+  if (isFailure) return SESSION_LIST_SIGNAL.failed;
+  if (canSend) return SESSION_LIST_SIGNAL.live;
+  if (isReadOnly) return SESSION_LIST_SIGNAL.readonly_history;
+  return SESSION_LIST_SIGNAL.inactive;
+}
+
+function fallbackCanSendToSession(session, statusView) {
+  const recordState = session?.record_state || RECORD_STATE.active;
+  const accessMode = session?.access_mode || ACCESS_MODE.interactive;
+  return recordState === RECORD_STATE.active
+    && accessMode === ACCESS_MODE.interactive
+    && statusView.status !== CARD_STATUS.blocked
+    && statusView.status !== CARD_STATUS.failed
+    && statusView.status !== CARD_STATUS.archived
+    && statusView.status !== CARD_STATUS.readonly_history;
+}
+
+function fallbackCanRestoreSession(session) {
+  return Boolean(session?.acpSessionId)
+    && (session?.record_state === RECORD_STATE.archived || session?.access_mode === ACCESS_MODE.read_only);
 }
 
 function buildStatusView(status, translate, { secondary = null, error = null, activity = null, summary = null } = {}) {

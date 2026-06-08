@@ -52,6 +52,19 @@ test("workspaceStatusView: 渲染目标、状态、可用性和活跃 ACP 数量
   assert.match(element.innerHTML, /ACP × 1/);
 });
 
+test("workspaceStatusView: uses unified session card status when available", () => {
+  const { element, view } = createView({
+    resolveSessionCardStatusView: () => ({ status: "completed", label: "已完成", tone: "success" }),
+  });
+
+  view.renderWorkspaceStatus();
+
+  assert.match(element.innerHTML, /session-status-success/);
+  assert.match(element.innerHTML, /session-status-completed/);
+  assert.match(element.innerHTML, /已完成/);
+  assert.doesNotMatch(element.innerHTML, /state:2/);
+});
+
 test("workspaceStatusView: 缺少目标时只写入占位文案", () => {
   const { element, view } = createView({
     getCurrentTargetAgent: () => null,

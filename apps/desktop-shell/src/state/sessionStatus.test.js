@@ -6,11 +6,14 @@ import {
   RECORD_STATE,
   RUNTIME_BINDING_STAGE,
   RUNTIME_BINDING_STATE,
+  SESSION_LIST_SIGNAL,
+  SESSION_STATUS_KIND,
   TURN_STATUS,
   createRuntimeBinding,
   latestTurn,
   latestTurnOutcome,
   normalizeSessionStatusShape,
+  resolveSessionCanonicalState,
   resolveSessionCardStatusView,
   statusFromRuntimeEvent,
   statusFromRuntimeStateCode,
@@ -96,6 +99,53 @@ test("resolveSessionCardStatusView: read-only history wins over turn status", ()
   }), { translate });
   assert.equal(view.status, CARD_STATUS.readonly_history);
   assert.equal(view.label, "只读历史");
+  assert.equal(view.secondary_status, null);
+});
+
+test("resolveSessionCanonicalState: read-only history is not live even when old turn says running", () => {
+  const view = resolveSessionCanonicalState(session({
+    access_mode: ACCESS_MODE.read_only,
+    turns: [{ id: "t", status: TURN_STATUS.running }],
+  }), {
+    translate,
+    canSendToSession: () => false,
+  });
+
+  assert.equal(view.kind, SESSION_STATUS_KIND.readonly_history);
+  assert.equal(view.statusView.status, CARD_STATUS.readonly_history);
+  assert.equal(view.listSignal, SESSION_LIST_SIGNAL.readonly_history);
+  assert.equal(view.canSend, false);
+  assert.equal(view.isRuntimeAttached, false);
+});
+
+test("resolveSessionCanonicalState: interactive completed session stays sendable", () => {
+  const view = resolveSessionCanonicalState(session({
+    turns: [{ id: "t", status: TURN_STATUS.completed, finalResponse: "done" }],
+  }), {
+    translate,
+    canSendToSession: () => true,
+  });
+
+  assert.equal(view.kind, SESSION_STATUS_KIND.live);
+  assert.equal(view.statusView.status, CARD_STATUS.completed);
+  assert.equal(view.listSignal, SESSION_LIST_SIGNAL.live);
+  assert.equal(view.canSend, true);
+  assert.equal(view.isRuntimeAttached, true);
+});
+
+test("resolveSessionCanonicalState: manual archive remains archive bucket", () => {
+  const view = resolveSessionCanonicalState(session({
+    record_state: RECORD_STATE.archived,
+    access_mode: ACCESS_MODE.read_only,
+    turns: [{ id: "t", status: TURN_STATUS.completed, finalResponse: "done" }],
+  }), {
+    translate,
+    canSendToSession: () => false,
+  });
+
+  assert.equal(view.kind, SESSION_STATUS_KIND.archived);
+  assert.equal(view.listSignal, SESSION_LIST_SIGNAL.archived);
+  assert.equal(view.canSend, false);
 });
 
 test("resolveSessionCardStatusView: runtime resume failure is blocked with error detail", () => {
