@@ -187,13 +187,14 @@ export function resolveSessionCardStatusView(session, options = {}) {
   const turnStatus = turn?.status || TURN_STATUS.created;
   const secondary = latestTurnOutcome(session);
 
+  if (recordState === RECORD_STATE.archived) {
+    // 归档是用户动作，优先于只读访问模式，避免手动归档被显示成普通历史记录。
+    return buildStatusView(CARD_STATUS.archived, translate, { secondary });
+  }
+
   if (accessMode === ACCESS_MODE.read_only) {
     // 只读历史不是 live runtime，不展示旧快照里的“上次运行中”等执行态。
     return buildStatusView(CARD_STATUS.readonly_history, translate);
-  }
-
-  if (recordState === RECORD_STATE.archived) {
-    return buildStatusView(CARD_STATUS.archived, translate, { secondary });
   }
 
   if (runtimeBinding.state === RUNTIME_BINDING_STATE.failed) {

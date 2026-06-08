@@ -102,6 +102,17 @@ test("resolveSessionCardStatusView: read-only history wins over turn status", ()
   assert.equal(view.secondary_status, null);
 });
 
+test("resolveSessionCardStatusView: manual archive wins over read-only access", () => {
+  const view = resolveSessionCardStatusView(session({
+    record_state: RECORD_STATE.archived,
+    access_mode: ACCESS_MODE.read_only,
+    turns: [{ id: "t", status: TURN_STATUS.completed }],
+  }), { translate });
+
+  assert.equal(view.status, CARD_STATUS.archived);
+  assert.equal(view.secondary_status.status, TURN_STATUS.completed);
+});
+
 test("resolveSessionCanonicalState: read-only history is not live even when old turn says running", () => {
   const view = resolveSessionCanonicalState(session({
     access_mode: ACCESS_MODE.read_only,
@@ -144,6 +155,7 @@ test("resolveSessionCanonicalState: manual archive remains archive bucket", () =
   });
 
   assert.equal(view.kind, SESSION_STATUS_KIND.archived);
+  assert.equal(view.statusView.status, CARD_STATUS.archived);
   assert.equal(view.listSignal, SESSION_LIST_SIGNAL.archived);
   assert.equal(view.canSend, false);
 });
