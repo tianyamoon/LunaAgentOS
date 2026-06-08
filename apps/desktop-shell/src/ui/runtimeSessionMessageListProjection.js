@@ -107,6 +107,7 @@ function projectTurnRows(turn, { latestTurnId, forceLive, readOnly = false }) {
 
 function projectCompletedTurnRows(turn) {
   const rows = [];
+  const completedScope = completedDetailScope(turn);
   const traceRows = projectCompletedTraceRows(turn);
   const debug = debugMetadataForTurn(turn);
   const finalResponse = finalResponseForTurn(turn);
@@ -121,6 +122,7 @@ function projectCompletedTurnRows(turn) {
       status: turn.status || "completed",
       metadata: {
         summary: projectCompletedTimelineSummary(turn),
+        detailKey: `${completedScope}:worked-for`,
         rows: traceRows,
         debug,
       },
@@ -199,9 +201,10 @@ function projectCompletedTraceRows(turn) {
   const finalResponse = finalResponseForTurn(turn);
   const items = projectLiveTimeline(turn);
   const lastAssistantIndex = items.findLastIndex((item) => item.type === "assistant");
+  const completedScope = completedDetailScope(turn);
   return items
     .filter((item, index) => !(index === lastAssistantIndex && text(item.content).trim() === finalResponse))
-    .map((item) => timelineItemRow(turn, item, { turnCompleted: true }));
+    .map((item) => timelineItemRow(turn, item, { turnCompleted: true, completedScope }));
 }
 
 function finalResponseForTurn(turn) {
@@ -213,22 +216,38 @@ function finalResponseForTurn(turn) {
 }
 
 function timelineItemRow(turn, item, options = {}) {
+  const suffix = timelineRowSuffix(item, options);
+  const detailSuffix = item.type === "tool_group" ? "message-group" : "message";
+  // 完成态的过程折叠必须使用独立 key，避免继承运行中用户曾展开的行。
+  const detailBase = options.completedScope ? `${options.completedScope}:${suffix}` : rowId(turn, suffix);
+  const detailKey = `${detailBase}:${detailSuffix}`;
   if (item.type === "tool_group") {
-    return baseTurnRow(turn, "tool_group", `timeline:${item.id}`, {
+    return baseTurnRow(turn, "tool_group", suffix, {
       status: item.status || "completed",
       content: item.content || "",
       metadata: {
         ...item.metadata,
         items: list(item.items).map((tool) => timelineItemRow(turn, tool, options)),
+        detailKey,
         turnCompleted: options.turnCompleted || false,
       },
     });
   }
-  return baseTurnRow(turn, rowKindForTimelineType(item.type), `timeline:${item.id}`, {
+  return baseTurnRow(turn, rowKindForTimelineType(item.type), suffix, {
     status: item.status || "completed",
     content: item.content || "",
-    metadata: { ...item.metadata, turnCompleted: options.turnCompleted || false },
+    metadata: { ...item.metadata, detailKey, turnCompleted: options.turnCompleted || false },
   });
+}
+
+function timelineRowSuffix(item, options = {}) {
+  const prefix = options.turnCompleted ? "completed-timeline" : "timeline";
+  return `${prefix}:${item.id}`;
+}
+
+function completedDetailScope(turn) {
+  const completedAt = turn?.timelineCompletedAt || turn?.completedAt || turn?.updatedAt || turn?.status || "terminal";
+  return rowId(turn, `completed:${completedAt}`);
 }
 
 function rowKindForTimelineType(type) {

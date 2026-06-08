@@ -49,6 +49,53 @@ test("runtimeSessionMessageListView: worked row folds completed trace and debug 
   assert.equal(formatRuntimeMessageDuration(5_000), "5s");
 });
 
+test("runtimeSessionMessageListView: worked row uses completion scoped detail key", () => {
+  const requestedKeys = [];
+  const view = createView({
+    isOpenForKey: (key, defaultOpen) => {
+      requestedKeys.push([key, defaultOpen]);
+      return key === "t1:worked:message-worked-for";
+    },
+  });
+
+  const html = view.renderMessageRow({
+    id: "t1:worked",
+    kind: "worked_for",
+    status: "completed",
+    metadata: {
+      detailKey: "t1:completed:done:worked-for",
+      summary: { durationMs: 5_000, toolCount: 0, fileChangeCount: 0 },
+      rows: [],
+    },
+  });
+
+  assert.deepEqual(requestedKeys, [["t1:completed:done:worked-for", false]]);
+  assert.match(html, /data-detail-key="t1:completed:done:worked-for"/);
+  assert.doesNotMatch(html, /<details[^>]* open/);
+});
+
+test("runtimeSessionMessageListView: compact event row uses projected detail key", () => {
+  const requestedKeys = [];
+  const view = createView({
+    isOpenForKey: (key, defaultOpen) => {
+      requestedKeys.push([key, defaultOpen]);
+      return key === "completed-tool-key";
+    },
+  });
+
+  const html = view.renderMessageRow({
+    id: "t1:completed-timeline:tool-1",
+    kind: "tool",
+    status: "completed",
+    content: "Read file",
+    metadata: { detailKey: "completed-tool-key", turnCompleted: true },
+  });
+
+  assert.deepEqual(requestedKeys, [["completed-tool-key", false]]);
+  assert.match(html, /data-detail-key="completed-tool-key"/);
+  assert.match(html, /<details[^>]* open/);
+});
+
 test("runtimeSessionMessageListView: completed timeline does not render a separate completion bar", () => {
   const view = createView();
   const html = view.renderMessageListShell({
@@ -220,10 +267,10 @@ test("runtimeSessionMessageListView: 换序时只移动真实错位的行", () =
   assert.deepEqual(content.operations, [["insertBefore", "second", "first"]]);
 });
 
-function createView() {
+function createView(overrides = {}) {
   return createRuntimeSessionMessageListView({
     renderAssistantResponse: (content, phase) => `<article data-phase="${phase}">${content}</article>`,
-    isOpenForKey: () => false,
+    isOpenForKey: overrides.isOpenForKey || (() => false),
     t: (key, values = {}) => {
       const messages = {
         "action.scrollLatest": "Scroll to latest",

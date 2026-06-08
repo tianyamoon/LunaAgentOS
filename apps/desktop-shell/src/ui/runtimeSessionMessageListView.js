@@ -70,7 +70,7 @@ export function createRuntimeSessionMessageListView({
   }
 
   function renderCompactEventRow(row) {
-    const detailKey = `${row.id}:message`;
+    const detailKey = row.metadata?.detailKey || `${row.id}:message`;
     const open = isOpenForKey(detailKey, row.kind === "error" || row.status === "failed");
     const activeClass = row.status === "running" ? "is-active" : "";
     const completedClass = row.metadata?.turnCompleted ? "is-completed" : "";
@@ -84,7 +84,7 @@ export function createRuntimeSessionMessageListView({
   }
 
   function renderToolGroupRow(row) {
-    const detailKey = `${row.id}:message-group`;
+    const detailKey = row.metadata?.detailKey || `${row.id}:message-group`;
     const tools = Array.isArray(row.metadata?.items) ? row.metadata.items : [];
     const open = isOpenForKey(detailKey, row.status === "running");
     const activeClass = row.status === "running" ? "is-active" : "";
@@ -99,7 +99,7 @@ export function createRuntimeSessionMessageListView({
   }
 
   function renderWorkedForRow(row) {
-    const detailKey = `${row.id}:message-worked-for`;
+    const detailKey = row.metadata?.detailKey || `${row.id}:message-worked-for`;
     const open = isOpenForKey(detailKey, false);
     const traceRows = Array.isArray(row.metadata?.rows) ? row.metadata.rows : [];
     const debug = row.metadata?.debug || null;

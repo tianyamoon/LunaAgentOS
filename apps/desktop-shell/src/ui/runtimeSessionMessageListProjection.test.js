@@ -70,6 +70,34 @@ test("runtimeSessionMessageListProjection: 完成态最终回答为主体并生�
   assert.deepEqual(result.rows[2].metadata.rows.map((row) => row.metadata.turnCompleted), [true, true]);
 });
 
+test("runtimeSessionMessageListProjection: completed trace rows use completion scoped keys", () => {
+  const result = projectRuntimeSessionMessageList({
+    turns: [{
+      id: "t1",
+      task: "summarize",
+      status: "completed",
+      finalResponse: "done summary",
+      timelineStartedAt: "2026-06-01T00:00:00.000Z",
+      timelineCompletedAt: "2026-06-01T00:00:05.000Z",
+      timelineItems: [
+        item("thinking", "analyze"),
+        item("tool", "Read", { id: "read-1" }),
+        item("assistant", "done summary"),
+      ],
+    }],
+  });
+
+  const worked = result.rows.at(-1);
+  const traceRows = worked.metadata.rows;
+  assert.equal(worked.metadata.detailKey, "t1:completed:2026-06-01T00:00:05.000Z:worked-for");
+  assert.deepEqual(traceRows.map((row) => row.id), [
+    "t1:completed-timeline:thinking-analyze",
+    "t1:completed-timeline:read-1",
+  ]);
+  assert.equal(traceRows[1].metadata.detailKey, "t1:completed:2026-06-01T00:00:05.000Z:completed-timeline:read-1:message");
+  assert.equal(traceRows.some((row) => row.id === "t1:timeline:read-1"), false);
+});
+
 test("runtimeSessionMessageListProjection: debug metadata is folded under completed summary", () => {
   const result = projectRuntimeSessionMessageList({
     turns: [{
