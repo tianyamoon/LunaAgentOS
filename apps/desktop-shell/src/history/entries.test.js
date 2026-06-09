@@ -122,6 +122,26 @@ test("archivedSessionsFromHistory does not archive entries without explicit reco
   assert.equal(session.access_mode, "read_only");
 });
 
+test("archivedSessionsFromHistory keeps legacy entries without record_state visible as active read-only", () => {
+  const sessions = archivedSessionsFromHistory([{
+    id: "legacy-turn",
+    sessionId: "legacy-session",
+    createdAt: "2026-06-01T00:00:00Z",
+    providerId: "demo",
+    providerName: "Demo",
+    agentId: "agent",
+    agentName: "Agent",
+    task: "legacy task",
+    summary: "legacy answer",
+  }]);
+
+  assert.equal(sessions.length, 1);
+  assert.equal(sessions[0].id, "legacy-session");
+  assert.equal(sessions[0].record_state, "active");
+  assert.equal(sessions[0].access_mode, "read_only");
+  assert.equal(sessions[0].turns[0].finalResponse, "legacy answer");
+});
+
 test("archivedSessionsFromHistory synthesizes a turn when entry.turn is absent", () => {
   const entries = [
     { sessionId: "s1", id: "t1", task: "no turn", summary: "auto", createdAt: "2026-05-01T00:00:00Z" },

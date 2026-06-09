@@ -70,6 +70,32 @@ test("historyRepository: appendTurn builds payload and upserts returned entry", 
   assert.deepEqual(repository.getEntriesSnapshot(), [saved]);
 });
 
+test("historyRepository: appended turn remains visible after reload", async () => {
+  let stored = [];
+  const saved = {
+    sessionId: "s1",
+    record_state: "active",
+    access_mode: "read_only",
+    turn: { id: "t1", status: "completed" },
+  };
+  const { repository } = makeRepository({
+    responses: {
+      append_history_entry: () => {
+        stored = [saved];
+        return saved;
+      },
+      compact_history_entries: {},
+      load_history_entries: () => stored,
+    },
+    buildPayload: ({ session, turn }) => ({ sessionId: session.id, turn }),
+  });
+
+  await repository.appendTurn({ session: { id: "s1" }, turn: { id: "t1" } });
+  assert.deepEqual(repository.getEntriesSnapshot(), [saved]);
+  await repository.load();
+  assert.deepEqual(repository.getEntriesSnapshot(), [saved]);
+});
+
 test("historyRepository: archiveSession reloads backend entries", async () => {
   const { repository, calls } = makeRepository({
     responses: {
@@ -97,6 +123,23 @@ test("historyRepository: deleteSession hides matching entries from memory and re
   const result = await repository.deleteSession("s1");
   assert.deepEqual(result, { removedCount: 1 });
   assert.deepEqual(repository.getEntriesSnapshot(), [{ sessionId: "s2" }]);
+});
+
+test("historyRepository: deleteSession only hides the matching Luna session key", async () => {
+  const liveEntry = { sessionId: "s1", acpSessionId: "shared-runtime" };
+  const legacyEntry = { id: "legacy-entry", acpSessionId: "shared-runtime" };
+  const { repository } = makeRepository({
+    responses: {
+      compact_history_entries: {},
+      load_history_entries: [liveEntry, legacyEntry],
+      delete_history_session_entries: { removedCount: 1 },
+    },
+  });
+
+  await repository.load();
+  await repository.deleteSession("s1");
+
+  assert.deepEqual(repository.getEntriesSnapshot(), [legacyEntry]);
 });
 
 test("historyRepository: archived projection and subscriptions observe repository changes", async () => {

@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashSet;
 use std::fs;
+use std::io::Write;
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
 
@@ -192,7 +193,36 @@ fn write_history_file(
     operation: &str,
 ) -> Result<(), String> {
     backup_history_file_before_write(app, path, operation)?;
-    fs::write(path, json).map_err(|error| error.to_string())
+    atomic_write_history_file(path, json)
+}
+
+fn atomic_write_history_file(path: &PathBuf, json: String) -> Result<(), String> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| format!("history path has no parent: {}", path.display()))?;
+    fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("history.json");
+    let timestamp = Local::now().timestamp_nanos_opt().unwrap_or_default();
+    let temp_path = parent.join(format!(".{file_name}.{timestamp}.tmp"));
+    let write_result = (|| -> Result<(), String> {
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temp_path)
+            .map_err(|error| error.to_string())?;
+        file.write_all(json.as_bytes())
+            .map_err(|error| error.to_string())?;
+        file.sync_all().map_err(|error| error.to_string())?;
+        drop(file);
+        fs::rename(&temp_path, path).map_err(|error| error.to_string())
+    })();
+    if write_result.is_err() {
+        let _ = fs::remove_file(&temp_path);
+    }
+    write_result
 }
 
 /// 返回当天分桶文件路径、日期和写入时间。
@@ -591,6 +621,34 @@ mod tests {
     }
 
     #[test]
+    fn atomic_write_history_file_replaces_existing_json_and_removes_temp() {
+        let dir = std::env::temp_dir().join(format!(
+            "luna-history-test-{}",
+            Local::now().timestamp_nanos_opt().unwrap_or_default()
+        ));
+        fs::create_dir_all(&dir).expect("temp dir");
+        let path = dir.join("2026-06-01.json");
+        fs::write(&path, r#"[{"id":"old"}]"#).expect("old file");
+
+        atomic_write_history_file(&path, r#"[{"id":"new"}]"#.to_string())
+            .expect("atomic write should replace file");
+
+        let raw = fs::read_to_string(&path).expect("new file");
+        assert_eq!(raw, r#"[{"id":"new"}]"#);
+        let temp_count = fs::read_dir(&dir)
+            .expect("read dir")
+            .filter(|item| {
+                item.as_ref()
+                    .ok()
+                    .and_then(|entry| entry.file_name().to_str().map(|name| name.contains(".tmp")))
+                    .unwrap_or(false)
+            })
+            .count();
+        assert_eq!(temp_count, 0);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn schema_five_serializes_agent_entry_snapshot() {
         let mut item = entry("one", "turn-1", HISTORY_SCHEMA_VERSION);
         item.agent_entry_snapshot = Some(json!({ "agentId": "demo-main" }));
@@ -626,6 +684,21 @@ mod tests {
         assert_eq!(upgraded, 2);
         assert_eq!(items[0].id, "legacy-a");
         assert_eq!(items[1].id, "legacy-b");
+    }
+
+    #[test]
+    fn compact_entries_preserves_missing_record_state_as_normal_history() {
+        let mut legacy = entry("legacy", "turn-1", 4);
+        legacy.record_state = None;
+        legacy.access_mode = None;
+
+        let (items, removed, upgraded) = compact_entries(vec![legacy]);
+
+        assert_eq!(items.len(), 1);
+        assert_eq!(removed, 0);
+        assert_eq!(upgraded, 1);
+        assert!(items[0].record_state.is_none());
+        assert!(items[0].access_mode.is_none());
     }
 
     #[test]
