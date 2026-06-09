@@ -59,9 +59,6 @@ import { createWorkspaceStatusView } from "./ui/workspaceStatusView.js";
 import { createShellSurface } from "./ui/shellSurface.js";
 import { renderAssistantResponse as renderAssistantResponseView } from "./ui/assistantResponseView.js";
 import { renderProviderIcon, setAdapterIconRegistry } from "./ui/providerIcon.js";
-import {
-  LIFECYCLE,
-} from "./state/sessionLifecycle.js";
 import { createSessionRuntimeState } from "./state/sessionRuntimeState.js";
 import { createSessionTurnState } from "./state/sessionTurnState.js";
 import {
@@ -74,8 +71,6 @@ import {
 import {
   ACCESS_MODE,
   RECORD_STATE,
-  RUNTIME_BINDING_STAGE,
-  RUNTIME_BINDING_STATE,
   createRuntimeBinding,
   isRunningTurnStatus,
   resolveSessionCardControlState,
@@ -139,6 +134,7 @@ import { createSessionLaunchController } from "./controllers/sessionLaunchContro
 import { createSessionPromptQueueController } from "./controllers/sessionPromptQueueController.js";
 import { createCurrentTargetController } from "./controllers/currentTargetController.js";
 import { createRuntimeProbeController } from "./controllers/runtimeProbeController.js";
+import { createRuntimeAliveController } from "./controllers/runtimeAliveController.js";
 import { createAgentBriefController } from "./controllers/agentBriefController.js";
 import {
   availableRuntimeInstancesForProvider as availableRuntimeInstancesForProviderRaw,
@@ -318,6 +314,7 @@ let workspaceView = null;
 let workspaceEmptyView = null;
 let workspaceStatusView = null;
 let runtimeProbeController = null;
+let runtimeAliveController = null;
 let shellSurface = null;
 let sendAsNewSession = false;
 const sessionListSectionOpenState = {
@@ -1068,6 +1065,19 @@ shellSurface = createShellSurface({
   focusComposerInput,
 });
 
+runtimeAliveController = createRuntimeAliveController({
+  getSessionsSnapshot: sessionsSnapshot,
+  sessionRuntimeState,
+  acpRuntimeClient,
+  setSessionLifecycle,
+  setSessionAccessMode,
+  setRuntimeBinding,
+  markSessionInactive,
+  shellSurface,
+  setAppNotice,
+  t,
+});
+
 workspaceSessionController = createWorkspaceSessionController({
   getSession: (sessionId) => sessionsStore.getSession(sessionId),
   workspaceViewStore,
@@ -1560,50 +1570,4 @@ setTimeout(() => {
   });
 }, 0);
 
-async function syncRuntimeAliveStates() {
-  const sessions = sessionsSnapshot();
-  const liveSessionsExist = sessions.some(
-    (session) => sessionRuntimeState(session) === "live" && session.acpSessionId,
-  );
-  if (!liveSessionsExist) return;
-  try {
-    const providerIds = [...new Set(sessions
-      .filter((session) => sessionRuntimeState(session) === "live" && session.acpSessionId)
-      .map((session) => session.providerId))];
-    const aliveByProvider = {};
-    for (const providerId of providerIds) {
-      if (acpRuntimeClient.canHandle(providerId)) {
-        aliveByProvider[providerId] = new Set(
-          await acpRuntimeClient.aliveIds(providerId),
-        );
-      }
-    }
-    let mutated = false;
-    sessions.forEach((session) => {
-      const declaredLive = sessionRuntimeState(session) === "live";
-      const hasStartedRuntime = Boolean(session.acpSessionId);
-      const aliveIds = aliveByProvider[session.providerId];
-      if (declaredLive && hasStartedRuntime && aliveIds && !aliveIds.has(session.id)) {
-        setSessionLifecycle(session, LIFECYCLE.resume_failed);
-        setRuntimeBinding(session, {
-          state: RUNTIME_BINDING_STATE.failed,
-          stage: RUNTIME_BINDING_STAGE.runtime,
-          error_title: t("runtime.aliveExitedTitle", { agent: session.agentName || session.providerName }),
-          error_detail: t("runtime.aliveExited"),
-          error_suggestion: t("runtime.aliveExitedSuggestion"),
-        });
-        sessionsStore.markInactive(session.id);
-        mutated = true;
-      }
-    });
-    if (mutated) {
-      renderWorkspace();
-      renderHistory();
-      setAppNotice(t("runtime.aliveExited"), "error");
-    }
-  } catch (error) {
-    console.error(error);
-  }
-}
-
-setInterval(() => { void syncRuntimeAliveStates(); }, 15000);
+setInterval(() => { void runtimeAliveController.sync(); }, 15000);
