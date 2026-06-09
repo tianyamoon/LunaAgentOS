@@ -88,6 +88,9 @@ import {
 import { getAvailabilityStore } from "./state/availabilityStore.js";
 import { createAppPreferences } from "./state/appPreferences.js";
 import {
+  currentSessionSendBlockReason as currentSessionSendBlockReasonValue,
+} from "./state/sessionSendPolicy.js";
+import {
   acpCommandsForProvider as acpCommandsForProviderRaw,
 } from "./runtime/acpCommands.js";
 import { createAcpRuntimeClient } from "./runtime/acpRuntimeClient.js";
@@ -676,10 +679,11 @@ function currentComposerTargetLabel() {
 }
 
 function currentSessionSendBlockReason(session, agent) {
-  if (!session) return "";
-  if (agent && session.agentId !== agent.id) return t("composer.blockInactiveSession");
-  if (canSendToSession(session)) return "";
-  return t("composer.blockInactiveSession");
+  return currentSessionSendBlockReasonValue(session, agent, {
+    canSendToSession,
+    canRestoreSession,
+    translate: t,
+  });
 }
 
 function currentFontScaleOption() {
