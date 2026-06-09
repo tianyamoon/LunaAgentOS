@@ -82,7 +82,9 @@ function makeHarness({ prompt, capabilities = {}, fallbackSessions = {}, tombsto
     rollbackFirstTurnPromptFailure: (_session, _turn, message) => calls.push(`rollback:${message}`),
     refreshRuntimeTargets: async () => calls.push("refresh"),
     shellSurface,
-    scheduleSessionCardRender: () => calls.push("schedule"),
+    sessionSurfaceCoordinator: {
+      invalidate: (options) => calls.push(["invalidate", options]),
+    },
     formatBackendError: (error) => error.message,
     setAppNotice: (message, tone = "info") => calls.push(`notice:${tone}:${message}`),
     t: (key) => key,
@@ -117,8 +119,12 @@ test("sessionExecutionController: ACP error is persisted", async () => {
 test("sessionExecutionController: stream event schedules card render", () => {
   const { controller, calls } = makeHarness();
   controller.appendStreamEvent("s1", "t1", "run-1", { type: "thought", payload: { content: "x" } });
-  assert.equal(calls.includes("schedule"), true);
-  assert.equal(calls.includes("workspaceStatus"), true);
+  assert.equal(calls.some(([type, options]) => (
+    type === "invalidate"
+    && options.sessionId === "s1"
+    && options.deferCard === true
+    && options.history === false
+  )), true);
 });
 
 test("sessionExecutionController: final batch refresh keeps workspace container stable", () => {
@@ -126,18 +132,18 @@ test("sessionExecutionController: final batch refresh keeps workspace container 
   session.activePromptRunId = "run-1";
   turn.promptRunId = "run-1";
   controller.updateTurnFromEvents("s1", "t1", "run-1", [{ type: "response", state: 5, payload: { content: "done" } }]);
-  assert.equal(calls.includes("schedule"), true);
-  assert.equal(calls.includes("history"), true);
-  assert.equal(calls.includes("workspaceStatus"), true);
+  assert.equal(calls.some(([type, options]) => (
+    type === "invalidate" && options.sessionId === "s1"
+  )), true);
   assert.equal(calls.includes("workspace"), false);
 });
 
 test("sessionExecutionController: prompt error refresh keeps workspace container stable", () => {
   const { controller, calls } = makeHarness();
   controller.appendErrorToTurn("s1", "t1", "boom");
-  assert.equal(calls.includes("schedule"), true);
-  assert.equal(calls.includes("history"), true);
-  assert.equal(calls.includes("workspaceStatus"), true);
+  assert.equal(calls.some(([type, options]) => (
+    type === "invalidate" && options.sessionId === "s1"
+  )), true);
   assert.equal(calls.includes("workspace"), false);
 });
 

@@ -97,6 +97,34 @@ test("sessionsStore: updateSession owns object mutation and notifies once", () =
   assert.equal(notifyCount, 1);
 });
 
+test("sessionsStore: batched session mutations preserve changed session ids", () => {
+  const store = createSessionsStore();
+  const changes = [];
+  store.replaceSessions([makeSession("a"), makeSession("b")]);
+  store.subscribe((change) => {
+    changes.push(change);
+  });
+
+  store.batch(() => {
+    store.updateSession("a", (session) => {
+      session.task = "updated-a";
+      return true;
+    });
+    store.updateSession("b", (session) => {
+      session.task = "updated-b";
+      return true;
+    });
+  });
+
+  assert.deepEqual(changes, [{
+    type: "batch",
+    changes: [
+      { type: "session-updated", sessionId: "a" },
+      { type: "session-updated", sessionId: "b" },
+    ],
+  }]);
+});
+
 test("sessionsStore: currentSessionId clear on demand", () => {
   const store = createSessionsStore();
   let notifyCount = 0;

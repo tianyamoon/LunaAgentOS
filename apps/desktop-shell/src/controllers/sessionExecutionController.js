@@ -21,7 +21,7 @@ export function createSessionExecutionController({
   rollbackFirstTurnPromptFailure,
   refreshRuntimeTargets,
   shellSurface,
-  scheduleSessionCardRender,
+  sessionSurfaceCoordinator,
   formatBackendError,
   setAppNotice,
   t,
@@ -56,10 +56,7 @@ export function createSessionExecutionController({
 
   // 批量事件只刷新对应卡片；完成态也不销毁稳定的滚动容器。
   function refreshSessionSurfaces(sessionId) {
-    // 同一轮状态变化后，卡片、顶部状态和右侧列表必须看到同一份 Session 快照。
-    scheduleSessionCardRender(sessionId);
-    shellSurface.refreshWorkspaceStatus();
-    shellSurface.refreshHistory();
+    sessionSurfaceCoordinator.invalidate({ sessionId });
   }
 
   function updateTurnFromEvents(sessionId, turnId, promptRunId, events) {
@@ -104,8 +101,11 @@ export function createSessionExecutionController({
     if (isResumeValidationTurn(session, turn.id) && turn.status !== TURN_STATUS.failed && validatedByStream) {
       clearResumeValidation(session);
     }
-    scheduleSessionCardRender(session.id);
-    shellSurface.refreshWorkspaceStatus();
+    sessionSurfaceCoordinator.invalidate({
+      sessionId: session.id,
+      deferCard: true,
+      history: false,
+    });
     return result;
   }
 

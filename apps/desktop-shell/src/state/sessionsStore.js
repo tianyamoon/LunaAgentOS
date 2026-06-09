@@ -21,15 +21,17 @@ export function createSessionsStore() {
   const listeners = new Set();
   let suppressNotify = 0;
   let pendingNotify = false;
+  let pendingChanges = [];
 
-  function notify() {
+  function notify(change) {
     if (suppressNotify > 0) {
       pendingNotify = true;
+      if (change) pendingChanges.push(change);
       return;
     }
     listeners.forEach((listener) => {
       try {
-        listener();
+        listener(change);
       } catch (error) {
         console.error("sessionsStore listener threw:", error);
       }
@@ -44,7 +46,12 @@ export function createSessionsStore() {
       suppressNotify -= 1;
       if (suppressNotify === 0 && pendingNotify) {
         pendingNotify = false;
-        notify();
+        const changes = pendingChanges;
+        pendingChanges = [];
+        const change = changes.length > 1
+          ? { type: "batch", changes }
+          : changes[0];
+        notify(change);
       }
     }
   }
@@ -64,7 +71,7 @@ export function createSessionsStore() {
       if (!session || typeof mutator !== "function") return false;
       const changed = mutator(session);
       if (changed === false) return false;
-      notify();
+      notify({ type: "session-updated", sessionId: id });
       return true;
     },
     replaceSessions(next) {
@@ -217,6 +224,7 @@ export function createSessionsStore() {
       deletedSessionIds.clear();
       flowDetailOpenState.clear();
       sessionLatestOnlyState.clear();
+      pendingChanges = [];
       notify();
     },
   };

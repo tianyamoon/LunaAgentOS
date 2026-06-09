@@ -414,6 +414,7 @@ export function createRuntimeSessionCardController({
   return {
     bindSessionActions,
     sampleSessionStickyIntent,
+    refreshSessionCard: renderSessionCardInPlace,
     scheduleSessionCardRender,
     syncSessionStickControllers,
     disposeVirtualList,

@@ -130,6 +130,7 @@ import { createWorkspaceSessionController } from "./controllers/workspaceSession
 import { createSessionRestoreController } from "./controllers/sessionRestoreController.js";
 import { createSessionLifecycleController } from "./controllers/sessionLifecycleController.js";
 import { createSessionExecutionController } from "./controllers/sessionExecutionController.js";
+import { createSessionSurfaceCoordinator } from "./controllers/sessionSurfaceCoordinator.js";
 import { createSessionLaunchController } from "./controllers/sessionLaunchController.js";
 import { createSessionPromptQueueController } from "./controllers/sessionPromptQueueController.js";
 import { createCurrentTargetController } from "./controllers/currentTargetController.js";
@@ -309,6 +310,7 @@ let agentFleetView = null;
 let agentManagementView = null;
 let runtimeSessionCardView = null;
 let runtimeSessionCardController = null;
+let sessionSurfaceCoordinator = null;
 let historyView = null;
 let workspaceView = null;
 let workspaceEmptyView = null;
@@ -1065,6 +1067,14 @@ shellSurface = createShellSurface({
   focusComposerInput,
 });
 
+// Session 状态变化统一在同一帧提交到 Card、顶部状态和右侧记录列表。
+sessionSurfaceCoordinator = createSessionSurfaceCoordinator({
+  sessionsStore,
+  refreshSessionCard: (sessionId) => runtimeSessionCardController?.refreshSessionCard(sessionId),
+  scheduleSessionCardRender,
+  shellSurface,
+});
+
 runtimeAliveController = createRuntimeAliveController({
   getSessionsSnapshot: sessionsSnapshot,
   sessionRuntimeState,
@@ -1352,7 +1362,7 @@ sessionExecutionController = createSessionExecutionController({
   ),
   refreshRuntimeTargets: loadRuntimeTargetsForProvider,
   shellSurface,
-  scheduleSessionCardRender,
+  sessionSurfaceCoordinator,
   formatBackendError,
   setAppNotice,
   t,
