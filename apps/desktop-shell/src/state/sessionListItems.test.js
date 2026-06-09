@@ -252,6 +252,34 @@ test("projectSessionListItems keeps a hidden memory session authoritative while 
   assert.equal(item.isRuntimeAttached, true);
 });
 
+test("projectSessionListItems keeps dismissed active session in active section when no disk snapshot exists", () => {
+  const [dismissed] = projectSessionListItems({
+    sessions: [{
+      id: "dismissed-active",
+      createdAt: "2026-06-08T00:00:00.000Z",
+      task: "hidden but active",
+      lifecycle: "live",
+      record_state: "active",
+      access_mode: "interactive",
+      inWorkspace: false,
+      turns: [{ id: "turn-1", status: "completed", finalResponse: "done" }],
+    }],
+    archivedSessions: [],
+    normalizeSession: (session) => session,
+    sessionRuntimeState: (session) => session.lifecycle,
+    constants: {
+      RECORD_STATE: { active: "active", archived: "archived" },
+      ACCESS_MODE: { read_only: "read_only" },
+    },
+  });
+
+  assert.equal(dismissed.isInWorkspace, false);
+  assert.equal(dismissed.record_state, "active");
+  assert.equal(dismissed.access_mode, "interactive");
+  assert.equal(isActiveSessionListItem(dismissed), true);
+  assert.equal(isArchivedSessionListItem(dismissed), false);
+});
+
 test("session list sectioning treats read-only as access mode, not archive state", () => {
   const readOnlyActive = item("readonly-active", {
     record_state: "active",

@@ -79,9 +79,17 @@ test("sessionLifecycleController: shutdown failure is logged without blocking ar
 });
 
 test("sessionLifecycleController: dismiss hides session without removing it", async () => {
-  const { controller, sessions, calls } = makeHarness();
+  const { controller, sessions, calls } = makeHarness({
+    sessionOverrides: {
+      record_state: "active",
+      access_mode: "interactive",
+    },
+  });
   await controller.dismissWorkspaceSession("s1");
   assert.equal(sessions[0].inWorkspace, false);
+  assert.equal(sessions[0].lifecycle, "live");
+  assert.equal(sessions[0].record_state, "active");
+  assert.equal(sessions[0].access_mode, "interactive");
   assert.equal(calls.includes("shutdown"), false);
   assert.equal(calls.some((item) => item.startsWith("queue-clear:")), false);
 });
