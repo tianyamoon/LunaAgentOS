@@ -662,7 +662,8 @@ function currentSession() {
 
 function isComposingNewSession() {
   const session = currentSession();
-  return sendAsNewSession || !session || !sessionsStore.isSessionActive(session.id);
+  // Composer 模式只表达显式“另开会话”意图；会话失活由发送校验负责拦截。
+  return sendAsNewSession || !session;
 }
 
 function currentComposerTargetLabel() {
@@ -1469,7 +1470,6 @@ sessionLaunchController = createSessionLaunchController({
   providerAvailability,
   providerAvailabilityLabel,
   getCurrentSession: currentSession,
-  isComposingNewSession,
   currentSessionSendBlockReason,
   normalizeWorkspaceSession,
   upsertSession: (session) => sessionsStore.upsertHead(session),

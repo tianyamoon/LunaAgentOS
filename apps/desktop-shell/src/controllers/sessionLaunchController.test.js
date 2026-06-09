@@ -11,7 +11,6 @@ function makeHarness({
   canSendProvider = true,
   commands = { prompt: "runtime_prompt" },
   currentSession = null,
-  composingNew = false,
   currentSessionActive = true,
   blockReason = "",
 } = {}) {
@@ -56,7 +55,6 @@ function makeHarness({
     providerAvailability: () => ({ summary: "missing" }),
     providerAvailabilityLabel: (summary) => summary,
     getCurrentSession: () => activeSession,
-    isComposingNewSession: () => composingNew || !activeSession,
     currentSessionSendBlockReason: () => blockReason,
     normalizeWorkspaceSession: (session) => session,
     upsertSession: (session) => {
@@ -151,6 +149,25 @@ test("sessionLaunchController: read-only transcript blocks normal send", () => {
   assert.equal(calls.includes("notice:error:session.readOnlySwitchBlocked"), true);
 });
 
+test("sessionLaunchController: detached failed session cannot silently start a new session", () => {
+  const currentSession = {
+    id: "session-failed",
+    agentId: "agent-1",
+    access_mode: "interactive",
+    turns: [],
+  };
+  const { calls, controller, sessions } = makeHarness({
+    currentSession,
+    currentSessionActive: false,
+    blockReason: "session-not-sendable",
+  });
+  const result = controller.startSessionFromPrompt();
+
+  assert.equal(result, null);
+  assert.equal(sessions.length, 0);
+  assert.equal(calls.includes("notice:error:session-not-sendable"), true);
+});
+
 test("sessionLaunchController: explicit new session can branch from read-only transcript", () => {
   const currentSession = {
     id: "history-readonly",
@@ -182,10 +199,9 @@ test("sessionLaunchController: composer new-session toggle can branch from read-
   const { calls, controller, sessions } = makeHarness({
     currentSession,
     currentSessionActive: false,
-    composingNew: true,
     blockReason: "should-not-block",
   });
-  const result = controller.startSessionFromPrompt();
+  const result = controller.startSessionFromPrompt(true);
 
   assert.equal(sessions.length, 1);
   assert.notEqual(result.session, currentSession);
