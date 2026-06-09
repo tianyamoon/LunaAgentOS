@@ -90,3 +90,79 @@ test("runtimeSessionCardView: readonly history does not expose live management a
   assert.doesNotMatch(html, /session-archive-btn/);
   assert.match(html, /readonly_history/);
 });
+
+test("runtimeSessionCardView: live running session exposes waiting classes for animation", () => {
+  const session = {
+    id: "session-running",
+    task: "run task",
+    turns: [{ id: "t1", status: "running" }],
+    record_state: "active",
+    access_mode: "interactive",
+    runtime_binding: { state: "connected" },
+  };
+  const view = createView({
+    getCurrentSessionId: () => "session-running",
+    getFocusedSessionId: () => null,
+    resolveSessionCardControlState: () => ({
+      statusView: {
+        status: "running",
+        tone: "busy",
+        label: "运行中",
+        detail: "处理中",
+        icon: "spinner",
+      },
+      isWaiting: true,
+      managementDisabled: false,
+      canStop: true,
+      canArchive: true,
+      canRestore: false,
+      actionDigest: "live|running|active|interactive",
+    }),
+  });
+
+  const cardHtml = view.renderSessionCard(session);
+  const miniHtml = view.renderSessionMiniCard(session);
+  assert.match(cardHtml, /session-card[^"]*is-waiting/);
+  assert.match(cardHtml, /session-card-status-pill session-status-busy session-status-running/);
+  assert.match(cardHtml, /session-stop-btn/);
+  assert.match(miniHtml, /session-mini-card[^"]*is-waiting/);
+  assert.match(miniHtml, /session-status-running is-busy/);
+});
+
+test("runtimeSessionCardView: readonly stale running history has no waiting animation classes", () => {
+  const session = {
+    id: "session-history",
+    task: "old transcript",
+    turns: [{ id: "t1", status: "running" }],
+    record_state: "active",
+    access_mode: "read_only",
+    runtime_binding: { state: "idle" },
+  };
+  const view = createView({
+    getCurrentSessionId: () => "session-history",
+    getFocusedSessionId: () => null,
+    resolveSessionCardControlState: () => ({
+      statusView: {
+        status: "readonly_history",
+        tone: "muted",
+        label: "只读历史",
+        detail: "只能查看",
+        icon: "lock",
+      },
+      isWaiting: false,
+      managementDisabled: false,
+      canStop: false,
+      canArchive: false,
+      canRestore: false,
+      actionDigest: "readonly_history|readonly_history|active|read_only",
+    }),
+  });
+
+  const cardHtml = view.renderSessionCard(session);
+  const miniHtml = view.renderSessionMiniCard(session);
+  assert.doesNotMatch(cardHtml, /session-card[^"]*is-waiting/);
+  assert.doesNotMatch(cardHtml, /session-status-running/);
+  assert.doesNotMatch(cardHtml, /session-stop-btn/);
+  assert.doesNotMatch(miniHtml, /is-busy/);
+  assert.doesNotMatch(miniHtml, /session-status-running/);
+});
