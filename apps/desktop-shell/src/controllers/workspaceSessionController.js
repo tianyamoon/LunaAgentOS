@@ -5,6 +5,7 @@ export function createWorkspaceSessionController({
   saveCurrentSession,
   setSendAsNewSession = () => {},
   canSendToSession,
+  canRestoreSession = () => false,
   markSessionActive,
   shellSurface,
   sessionRuntimeState,
@@ -55,7 +56,9 @@ export function createWorkspaceSessionController({
       ? t("session.activated", { task: session.task })
       : runtimeState === "restoring"
         ? t("session.restoringFocused")
-        : t("session.readOnlySwitchBlocked"));
+        : canRestoreSession(session)
+          ? t("session.readOnlySwitchBlocked")
+          : t("session.readOnlyCannotRestore"));
     shellSurface.focusComposer();
     return true;
   }

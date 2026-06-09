@@ -25,6 +25,7 @@ export function createSessionLaunchController({
   providerAvailability,
   providerAvailabilityLabel,
   getCurrentSession,
+  canRestoreSession = () => false,
   currentSessionSendBlockReason,
   normalizeWorkspaceSession,
   upsertSession,
@@ -151,7 +152,12 @@ export function createSessionLaunchController({
     const explicitNewFromHistory = Boolean(selectedSessionReadOnly && explicitNewSession);
     // 只读历史不能被普通发送隐式续写；用户必须明确选择“另开会话”。
     if (selectedSessionReadOnly && !explicitNewSession) {
-      setAppNotice(t("session.readOnlySwitchBlocked"), "error");
+      setAppNotice(
+        canRestoreSession(selectedSession)
+          ? t("session.readOnlySwitchBlocked")
+          : t("session.readOnlyCannotRestore"),
+        "error",
+      );
       shellSurface.focusComposer();
       return null;
     }

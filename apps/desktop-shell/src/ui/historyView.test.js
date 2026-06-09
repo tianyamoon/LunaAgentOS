@@ -13,18 +13,35 @@ import {
   resolveSessionListPresentationState,
 } from "../state/sessionStatus.js";
 
-test("historyView: 已打开的只读活跃历史再次点击仍只导航回工作区", () => {
+test("historyView: 已打开且可恢复的只读历史再次点击会进入恢复流程", () => {
   const readOnlyExisting = { id: "s1", access_mode: "read_only" };
-  assert.equal(shouldRestoreActiveHistoryItem(readOnlyExisting, () => false), false);
+  assert.equal(
+    shouldRestoreActiveHistoryItem(readOnlyExisting, () => false, () => true),
+    true,
+  );
+});
+
+test("historyView: 不可恢复的只读记录再次点击只导航到原文", () => {
+  const readOnlyExisting = { id: "s1", access_mode: "read_only" };
+  assert.equal(
+    shouldRestoreActiveHistoryItem(readOnlyExisting, () => false, () => false),
+    false,
+  );
 });
 
 test("historyView: 可发送的现有会话点击时只需要激活", () => {
   const liveExisting = { id: "s1", access_mode: "interactive" };
-  assert.equal(shouldRestoreActiveHistoryItem(liveExisting, () => true), false);
+  assert.equal(
+    shouldRestoreActiveHistoryItem(liveExisting, () => true, () => true),
+    false,
+  );
 });
 
 test("historyView: 不存在工作区会话时由原点击路径负责恢复", () => {
-  assert.equal(shouldRestoreActiveHistoryItem(null, () => false), false);
+  assert.equal(
+    shouldRestoreActiveHistoryItem(null, () => false, () => true),
+    false,
+  );
 });
 
 test("historyView: 同 id live session 存在时状态源优先使用 live session", () => {

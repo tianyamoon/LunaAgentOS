@@ -1,10 +1,14 @@
 import { isAuthoritativeMemorySession } from "../state/sessionStatusSource.js";
 
-export function shouldRestoreActiveHistoryItem(existing, canSendToSession) {
-  // 活跃区点击只负责导航回工作区；能不能发送不等于需要恢复 runtime。
-  void existing;
-  void canSendToSession;
-  return false;
+export function shouldRestoreActiveHistoryItem(
+  existing,
+  canSendToSession,
+  canRestoreSession,
+) {
+  // 已打开的历史记录如果具备恢复身份，再次点击时应进入恢复流程。
+  return Boolean(existing)
+    && !canSendToSession(existing)
+    && canRestoreSession(existing);
 }
 
 export function resolveHistoryItemStatusSource(item, getSession, isSessionActive) {
@@ -138,7 +142,11 @@ export function createHistoryView({
       item.addEventListener("click", () => {
         const sessionId = item.dataset.sessionId;
         const existing = getSession(sessionId);
-        if (!existing || shouldRestoreActiveHistoryItem(existing, canSendToSession)) {
+        if (!existing || shouldRestoreActiveHistoryItem(
+          existing,
+          canSendToSession,
+          canRestoreSession,
+        )) {
           restoreArchivedSession(sessionId);
           return;
         }

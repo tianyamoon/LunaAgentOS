@@ -28,6 +28,7 @@ function makeHarness(overrides = {}) {
     saveCurrentSession: (id) => sessionsStore.setCurrentSessionId(id),
     setSendAsNewSession: (value) => calls.push(["newSession", value]),
     canSendToSession: (session) => session.sendable !== false,
+    canRestoreSession: (session) => session.restorable === true,
     markSessionActive: (id) => calls.push(["active", id]),
     shellSurface,
     sessionRuntimeState: (session) => session.runtimeState,
@@ -71,4 +72,23 @@ test("workspaceSessionController: fullscreen button toggles focus without mutati
   assert.equal(workspaceViewStore.getFocusedSessionId(), "a");
   controller.toggleSessionFocus("a");
   assert.equal(workspaceViewStore.getFocusedSessionId(), null);
+});
+
+test("workspaceSessionController: unrestorable history does not instruct the user to restore", () => {
+  const { controller, sessionsStore, calls } = makeHarness();
+  sessionsStore.upsertHead({
+    id: "history",
+    agentId: "agent-a",
+    task: "history",
+    runtimeState: "archived",
+    sendable: false,
+    restorable: false,
+  });
+
+  controller.activateWorkspaceSession("history");
+
+  assert.deepEqual(
+    calls.findLast((call) => call[0] === "notice"),
+    ["notice", "session.readOnlyCannotRestore"],
+  );
 });

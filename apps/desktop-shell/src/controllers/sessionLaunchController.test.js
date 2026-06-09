@@ -12,6 +12,7 @@ function makeHarness({
   commands = { prompt: "runtime_prompt" },
   currentSession = null,
   currentSessionActive = true,
+  currentSessionRestorable = false,
   blockReason = "",
 } = {}) {
   const sessions = [];
@@ -55,6 +56,7 @@ function makeHarness({
     providerAvailability: () => ({ summary: "missing" }),
     providerAvailabilityLabel: (summary) => summary,
     getCurrentSession: () => activeSession,
+    canRestoreSession: () => currentSessionRestorable,
     currentSessionSendBlockReason: () => blockReason,
     normalizeWorkspaceSession: (session) => session,
     upsertSession: (session) => {
@@ -139,6 +141,7 @@ test("sessionLaunchController: read-only transcript blocks normal send", () => {
   const { calls, controller, sessions } = makeHarness({
     currentSession,
     currentSessionActive: false,
+    currentSessionRestorable: true,
     blockReason: "should-not-block",
   });
   const result = controller.startSessionFromPrompt();
@@ -147,6 +150,41 @@ test("sessionLaunchController: read-only transcript blocks normal send", () => {
   assert.equal(sessions.length, 0);
   assert.equal(calls.some((item) => item === "notice:error:should-not-block"), false);
   assert.equal(calls.includes("notice:error:session.readOnlySwitchBlocked"), true);
+});
+
+test("sessionLaunchController: unrestorable history explains that a new session is required", () => {
+  const currentSession = {
+    id: "history-without-runtime-id",
+    agentId: "agent-1",
+    access_mode: "read_only",
+    turns: [],
+  };
+  const { calls, controller } = makeHarness({
+    currentSession,
+    currentSessionActive: false,
+    currentSessionRestorable: false,
+  });
+
+  assert.equal(controller.startSessionFromPrompt(), null);
+  assert.equal(calls.includes("notice:error:session.readOnlyCannotRestore"), true);
+});
+
+test("sessionLaunchController: restorable history points to the restore action", () => {
+  const currentSession = {
+    id: "history-with-runtime-id",
+    agentId: "agent-1",
+    access_mode: "read_only",
+    turns: [],
+  };
+  const { calls, controller } = makeHarness({
+    currentSession,
+    currentSessionActive: false,
+    currentSessionRestorable: true,
+  });
+
+  assert.equal(controller.startSessionFromPrompt(), null);
+  assert.equal(calls.includes("notice:error:session.readOnlySwitchBlocked"), true);
+  assert.equal(calls.includes("notice:error:session.readOnlyCannotRestore"), false);
 });
 
 test("sessionLaunchController: detached failed session cannot silently start a new session", () => {
@@ -178,6 +216,7 @@ test("sessionLaunchController: explicit new session can branch from read-only tr
   const { calls, controller, sessions } = makeHarness({
     currentSession,
     currentSessionActive: false,
+    currentSessionRestorable: true,
     blockReason: "should-not-block",
   });
   const result = controller.startSessionFromPrompt(true);
@@ -199,6 +238,7 @@ test("sessionLaunchController: composer new-session toggle can branch from read-
   const { calls, controller, sessions } = makeHarness({
     currentSession,
     currentSessionActive: false,
+    currentSessionRestorable: true,
     blockReason: "should-not-block",
   });
   const result = controller.startSessionFromPrompt(true);
