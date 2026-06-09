@@ -132,6 +132,19 @@ test("sessionRestoreController: missing ACP id keeps source record_state active"
   assert.equal(restored.access_mode, "read_only");
 });
 
+test("sessionRestoreController: unsupported provider falls back to read-only access", async () => {
+  const { controller, restored, notices } = makeHarness({
+    archivedOverrides: { record_state: "active", access_mode: "read_only" },
+    runtime: { canHandle: () => false },
+  });
+  await controller.restoreArchivedSession("s1");
+  assert.equal(restored.lifecycle, "archived");
+  assert.equal(restored.record_state, "active");
+  assert.equal(restored.access_mode, "read_only");
+  assert.equal(restored.inactive, "s1");
+  assert.equal(notices.at(-1).message, "restore.unsupportedProvider");
+});
+
 test("sessionRestoreController: explicit archived source remains archived when opened read-only", () => {
   const { controller, restored } = makeHarness({
     archivedOverrides: { record_state: "archived", access_mode: "read_only" },

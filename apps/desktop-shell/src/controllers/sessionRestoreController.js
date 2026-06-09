@@ -192,6 +192,7 @@ export function createSessionRestoreController({
     if (!acpRuntimeClient.canHandle(restored.providerId)) {
       setSessionLifecycle(restored, LIFECYCLE.archived);
       preserveSourceRecordState(restored, archived);
+      setSessionAccessMode(restored, ACCESS_MODE.read_only);
       markSessionInactive(restored.id);
       renderRestoreUpdate();
       setAppNotice(t("restore.unsupportedProvider"));
