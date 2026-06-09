@@ -1,3 +1,5 @@
+import { isAuthoritativeMemorySession } from "../state/sessionStatusSource.js";
+
 export function shouldRestoreActiveHistoryItem(existing, canSendToSession) {
   // 活跃区点击只负责导航回工作区；能不能发送不等于需要恢复 runtime。
   void existing;
@@ -5,9 +7,14 @@ export function shouldRestoreActiveHistoryItem(existing, canSendToSession) {
   return false;
 }
 
-export function resolveHistoryItemStatusSource(item, getSession) {
-  // 历史列表只负责导航；同 id 的 live session 存在时，状态必须以 live session 为准。
-  return getSession?.(item?.id) || item;
+export function resolveHistoryItemStatusSource(item, getSession, isSessionActive) {
+  const existing = getSession?.(item?.id);
+  return isAuthoritativeMemorySession(existing, {
+    hasPersistedHistory: Boolean(item),
+    isSessionActive,
+  })
+    ? existing
+    : item;
 }
 
 export function projectHistoryListItemState(item, {
@@ -16,10 +23,11 @@ export function projectHistoryListItemState(item, {
   resolveSessionListPresentationState,
   canSendToSession,
   canRestoreSession,
+  isSessionActive,
   translate,
 } = {}) {
   const t = typeof translate === "function" ? translate : (key) => key;
-  const statusSource = resolveHistoryItemStatusSource(item, getSession);
+  const statusSource = resolveHistoryItemStatusSource(item, getSession, isSessionActive);
   ensureSessionStatusShape?.(statusSource);
   const presentation = resolveSessionListPresentationState(statusSource, {
     translate: t,
@@ -92,6 +100,7 @@ export function createHistoryView({
       resolveSessionListPresentationState,
       canSendToSession,
       canRestoreSession,
+      isSessionActive: (sessionId) => sessionsStore.isSessionActive(sessionId),
       translate: t,
     });
     const isActiveHistoryItem = sessionsStore.getCurrentSessionId() === item.id;

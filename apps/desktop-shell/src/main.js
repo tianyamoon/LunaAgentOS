@@ -1241,6 +1241,7 @@ function sessionListItems() {
   return projectSessionListItems({
     sessions: sessionsSnapshot(),
     archivedSessions: archivedSessionsFromHistory(),
+    isSessionActive: (sessionId) => sessionsStore.isSessionActive(sessionId),
     normalizeSession: normalizeWorkspaceSession,
     ensureSessionStatusShape,
     sessionRuntimeState,

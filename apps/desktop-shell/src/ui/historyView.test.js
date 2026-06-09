@@ -104,3 +104,32 @@ test("historyView: live session source wins over detached read-only history stat
   assert.equal(projected.statusView.status, CARD_STATUS.completed);
   assert.equal(projected.signalClass, "signal-active");
 });
+
+test("historyView: inactive hidden memory shell cannot override persisted history state", () => {
+  const staleMemorySession = {
+    id: "s1",
+    inWorkspace: false,
+    record_state: RECORD_STATE.active,
+    access_mode: ACCESS_MODE.interactive,
+    turns: [{ id: "t1", status: TURN_STATUS.running }],
+  };
+  const historyItem = {
+    id: "s1",
+    record_state: RECORD_STATE.active,
+    access_mode: ACCESS_MODE.read_only,
+    turns: [{ id: "t1", status: TURN_STATUS.completed, finalResponse: "done" }],
+  };
+
+  const projected = projectHistoryListItemState(historyItem, {
+    getSession: () => staleMemorySession,
+    isSessionActive: () => false,
+    ensureSessionStatusShape: () => {},
+    resolveSessionListPresentationState,
+    canSendToSession: () => false,
+    translate: (key) => key,
+  });
+
+  assert.equal(projected.statusSource, historyItem);
+  assert.equal(projected.statusView.status, CARD_STATUS.completed);
+  assert.equal(projected.signalClass, "signal-archive");
+});

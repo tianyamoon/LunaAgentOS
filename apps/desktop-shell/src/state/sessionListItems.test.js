@@ -172,6 +172,86 @@ test("projectSessionListItems shows detached active history as read-only instead
   assert.equal(item.turns[0].status, "completed");
 });
 
+test("projectSessionListItems prefers disk history over an inactive hidden memory shell", () => {
+  const staleMemorySession = {
+    id: "same-session",
+    createdAt: "2026-06-08T00:00:00.000Z",
+    task: "旧内存状态",
+    lifecycle: "live",
+    access_mode: "interactive",
+    inWorkspace: false,
+    turns: [{
+      id: "turn-1",
+      status: "running",
+      state: 2,
+      outputs: [],
+      logs: [],
+    }],
+  };
+  const [item] = projectSessionListItems({
+    sessions: [staleMemorySession],
+    archivedSessions: [{
+      id: "same-session",
+      createdAt: "2026-06-08T00:00:00.000Z",
+      updatedAt: "2026-06-08T00:01:00.000Z",
+      title: "磁盘历史",
+      record_state: "active",
+      turns: [{
+        id: "turn-1",
+        status: "completed",
+        state: 5,
+        finalResponse: "已保存结果",
+        outputs: [],
+        logs: [],
+      }],
+    }],
+    isSessionActive: () => false,
+    normalizeSession: (session) => session,
+    sessionRuntimeState: (session) => session.lifecycle,
+    createRuntimeBinding: () => ({ state: "idle" }),
+    constants: {
+      RECORD_STATE: { active: "active", archived: "archived" },
+      ACCESS_MODE: { read_only: "read_only" },
+    },
+  });
+
+  assert.equal(item.title, "磁盘历史");
+  assert.equal(item.access_mode, "read_only");
+  assert.equal(item.isRuntimeAttached, false);
+  assert.equal(item.turns[0].status, "completed");
+});
+
+test("projectSessionListItems keeps a hidden memory session authoritative while runtime remains active", () => {
+  const [item] = projectSessionListItems({
+    sessions: [{
+      id: "live-hidden",
+      createdAt: "2026-06-08T00:00:00.000Z",
+      task: "仍在执行",
+      lifecycle: "live",
+      access_mode: "interactive",
+      inWorkspace: false,
+      turns: [{ id: "turn-1", status: "running", state: 2 }],
+    }],
+    archivedSessions: [{
+      id: "live-hidden",
+      createdAt: "2026-06-08T00:00:00.000Z",
+      updatedAt: "2026-06-08T00:01:00.000Z",
+      title: "旧磁盘快照",
+    }],
+    isSessionActive: () => true,
+    normalizeSession: (session) => session,
+    sessionRuntimeState: (session) => session.lifecycle,
+    constants: {
+      RECORD_STATE: { active: "active", archived: "archived" },
+      ACCESS_MODE: { read_only: "read_only" },
+    },
+  });
+
+  assert.equal(item.title, "仍在执行");
+  assert.equal(item.access_mode, "interactive");
+  assert.equal(item.isRuntimeAttached, true);
+});
+
 test("session list sectioning treats read-only as access mode, not archive state", () => {
   const readOnlyActive = item("readonly-active", {
     record_state: "active",
