@@ -52,6 +52,49 @@ test("sessionRuntimeState: restoring transition updates record and binding", () 
   assert.equal(session.runtime_binding.stage, RUNTIME_BINDING_STAGE.load);
 });
 
+test("sessionRuntimeState: stored lifecycle transition notifies once", () => {
+  const { runtimeState, sessionsStore } = makeRuntimeState();
+  const session = makeSession("stored", {
+    lifecycle: LIFECYCLE.archived,
+    runtimeState: LIFECYCLE.archived,
+    record_state: RECORD_STATE.archived,
+  });
+  sessionsStore.upsertHead(session);
+  let notifyCount = 0;
+  sessionsStore.subscribe(() => {
+    notifyCount += 1;
+  });
+
+  runtimeState.setSessionLifecycle(session, LIFECYCLE.restoring);
+
+  assert.equal(notifyCount, 1);
+  assert.equal(sessionsStore.getSession(session.id).lifecycle, LIFECYCLE.restoring);
+  assert.equal(
+    sessionsStore.getSession(session.id).runtime_binding.state,
+    RUNTIME_BINDING_STATE.reconnecting,
+  );
+});
+
+test("sessionRuntimeState: detached restore session remains mutable before upsert", () => {
+  const { runtimeState, sessionsStore } = makeRuntimeState();
+  const session = makeSession("detached", {
+    lifecycle: LIFECYCLE.archived,
+    runtimeState: LIFECYCLE.archived,
+    record_state: RECORD_STATE.archived,
+  });
+  let notifyCount = 0;
+  sessionsStore.subscribe(() => {
+    notifyCount += 1;
+  });
+
+  runtimeState.setSessionLifecycle(session, LIFECYCLE.restoring);
+
+  assert.equal(session.lifecycle, LIFECYCLE.restoring);
+  assert.equal(session.runtime_binding.state, RUNTIME_BINDING_STATE.reconnecting);
+  assert.equal(sessionsStore.getSession(session.id), null);
+  assert.equal(notifyCount, 0);
+});
+
 test("sessionRuntimeState: stopped and deleted transitions sync tombstones", () => {
   const { runtimeState, sessionsStore } = makeRuntimeState();
   const stopped = makeSession("stopped");

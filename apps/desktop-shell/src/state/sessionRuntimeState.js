@@ -24,6 +24,24 @@ export function createSessionRuntimeState({ sessionsStore, logger = console } = 
     return normalizeSessionStatusShape(session);
   }
 
+  function mutateSession(session, mutator) {
+    if (!session || typeof mutator !== "function") return null;
+    let result = null;
+    const applyMutation = (target) => {
+      const mutation = mutator(target) || {};
+      result = mutation.value ?? null;
+      return mutation.changed !== false;
+    };
+    const stored = session.id ? sessionsStore.getSession(session.id) : null;
+    // 恢复流程会先构造临时 Session，再放入 Store；只有同一对象才触发 Store 通知。
+    if (stored === session) {
+      sessionsStore.updateSession(session.id, applyMutation);
+    } else {
+      applyMutation(session);
+    }
+    return result;
+  }
+
   function sessionLifecycle(session) {
     if (!session) return LIFECYCLE.live;
     if (session.lifecycle) return session.lifecycle;
@@ -41,26 +59,34 @@ export function createSessionRuntimeState({ sessionsStore, logger = console } = 
 
   function setSessionRecordState(session, state) {
     if (!session) return null;
-    ensureSessionStatusShape(session);
-    session.record_state = state;
-    return state;
+    return mutateSession(session, (target) => {
+      ensureSessionStatusShape(target);
+      const changed = target.record_state !== state;
+      target.record_state = state;
+      return { changed, value: state };
+    });
   }
 
   function setSessionAccessMode(session, mode) {
     if (!session) return null;
-    ensureSessionStatusShape(session);
-    session.access_mode = mode;
-    return mode;
+    return mutateSession(session, (target) => {
+      ensureSessionStatusShape(target);
+      const changed = target.access_mode !== mode;
+      target.access_mode = mode;
+      return { changed, value: mode };
+    });
   }
 
   function setRuntimeBinding(session, patch = {}) {
     if (!session) return null;
-    ensureSessionStatusShape(session);
-    session.runtime_binding = {
-      ...createRuntimeBinding(session.runtime_binding),
-      ...patch,
-    };
-    return session.runtime_binding;
+    return mutateSession(session, (target) => {
+      ensureSessionStatusShape(target);
+      const previous = createRuntimeBinding(target.runtime_binding);
+      const next = { ...previous, ...patch };
+      const changed = Object.keys(next).some((key) => previous[key] !== next[key]);
+      target.runtime_binding = next;
+      return { changed, value: next };
+    });
   }
 
   function clearRuntimeBindingError(session, patch = {}) {
@@ -90,34 +116,40 @@ export function createSessionRuntimeState({ sessionsStore, logger = console } = 
       }
       throw error;
     }
-    session.lifecycle = next;
-    session.runtimeState = next;
-    if (next === LIFECYCLE.archived) {
-      setSessionRecordState(session, RECORD_STATE.archived);
-    } else if (next === LIFECYCLE.deleted) {
-      setSessionRecordState(session, RECORD_STATE.deleted);
-    } else if (
-      next === LIFECYCLE.live
-      || next === LIFECYCLE.restoring
-      || next === LIFECYCLE.resume_failed
-      || next === LIFECYCLE.stopped
-    ) {
-      setSessionRecordState(session, RECORD_STATE.active);
-    }
-    if (next === LIFECYCLE.restoring) {
-      setRuntimeBinding(session, {
-        state: RUNTIME_BINDING_STATE.reconnecting,
-        stage: RUNTIME_BINDING_STAGE.load,
+    sessionsStore.batch(() => {
+      mutateSession(session, (targetSession) => {
+        const changed = targetSession.lifecycle !== next || targetSession.runtimeState !== next;
+        targetSession.lifecycle = next;
+        targetSession.runtimeState = next;
+        return { changed, value: next };
       });
-    }
-    if (isStoppedLifecycle(next)) {
-      if (session.id) sessionsStore.markStopped(session.id);
-    } else if (next !== LIFECYCLE.deleted) {
-      if (session.id) sessionsStore.unmarkStopped(session.id);
-    }
-    if (isDeletedLifecycle(next) && session.id) {
-      sessionsStore.markDeleted(session.id);
-    }
+      if (next === LIFECYCLE.archived) {
+        setSessionRecordState(session, RECORD_STATE.archived);
+      } else if (next === LIFECYCLE.deleted) {
+        setSessionRecordState(session, RECORD_STATE.deleted);
+      } else if (
+        next === LIFECYCLE.live
+        || next === LIFECYCLE.restoring
+        || next === LIFECYCLE.resume_failed
+        || next === LIFECYCLE.stopped
+      ) {
+        setSessionRecordState(session, RECORD_STATE.active);
+      }
+      if (next === LIFECYCLE.restoring) {
+        setRuntimeBinding(session, {
+          state: RUNTIME_BINDING_STATE.reconnecting,
+          stage: RUNTIME_BINDING_STAGE.load,
+        });
+      }
+      if (isStoppedLifecycle(next)) {
+        if (session.id) sessionsStore.markStopped(session.id);
+      } else if (next !== LIFECYCLE.deleted) {
+        if (session.id) sessionsStore.unmarkStopped(session.id);
+      }
+      if (isDeletedLifecycle(next) && session.id) {
+        sessionsStore.markDeleted(session.id);
+      }
+    });
     return next;
   }
 

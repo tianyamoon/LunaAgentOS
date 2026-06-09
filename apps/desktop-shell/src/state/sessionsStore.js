@@ -58,6 +58,15 @@ export function createSessionsStore() {
     getSession(id) {
       return id ? sessions.find((session) => session.id === id) || null : null;
     },
+    // Session 对象字段只能通过 Store 更新；mutator 返回 false 表示没有实际变化。
+    updateSession(id, mutator) {
+      const session = id ? sessions.find((item) => item.id === id) : null;
+      if (!session || typeof mutator !== "function") return false;
+      const changed = mutator(session);
+      if (changed === false) return false;
+      notify();
+      return true;
+    },
     replaceSessions(next) {
       sessions.length = 0;
       if (Array.isArray(next)) sessions.push(...next);

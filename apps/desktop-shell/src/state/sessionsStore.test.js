@@ -69,6 +69,34 @@ test("sessionsStore: workspace visibility uses an explicit mutation interface", 
   assert.equal(store.setWorkspaceVisibility("missing", true), false);
 });
 
+test("sessionsStore: updateSession owns object mutation and notifies once", () => {
+  const store = createSessionsStore();
+  let notifyCount = 0;
+  store.subscribe(() => {
+    notifyCount += 1;
+  });
+  store.replaceSessions([makeSession("a")]);
+  notifyCount = 0;
+
+  assert.equal(
+    store.updateSession("a", (session) => {
+      session.task = "updated";
+      return true;
+    }),
+    true,
+  );
+  assert.equal(store.getSession("a").task, "updated");
+  assert.equal(notifyCount, 1);
+
+  assert.equal(
+    store.updateSession("a", () => false),
+    false,
+  );
+  assert.equal(notifyCount, 1);
+  assert.equal(store.updateSession("missing", () => true), false);
+  assert.equal(notifyCount, 1);
+});
+
 test("sessionsStore: currentSessionId clear on demand", () => {
   const store = createSessionsStore();
   let notifyCount = 0;
