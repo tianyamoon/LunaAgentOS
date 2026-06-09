@@ -4,7 +4,7 @@ use std::env;
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
-use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::sync::OnceLock;
 use std::sync::{Arc, Mutex};
@@ -62,6 +62,7 @@ struct AcpSession {
     stdin: ChildStdin,
     inbox: Receiver<Value>,
     stderr_log: Arc<Mutex<String>>,
+    stderr_done: Receiver<()>,
     next_id: i64,
     session_id: String,
 }
@@ -346,21 +347,13 @@ fn start_acp_session(
         .spawn()
         .map_err(|error| format!("启动 {} adapter 失败：{error}", runtime.display()))?;
 
-    let stderr = child.stderr.take();
-    let stderr_log = Arc::new(Mutex::new(String::new()));
-    if let Some(stderr) = stderr {
-        let stderr_log = Arc::clone(&stderr_log);
-        thread::spawn(move || {
-            let mut reader = BufReader::new(stderr);
-            let mut line = String::new();
-            while reader.read_line(&mut line).unwrap_or(0) > 0 {
-                if let Ok(mut log) = stderr_log.lock() {
-                    log.push_str(&line);
-                }
-                line.clear();
-            }
-        });
-    }
+    let stderr = child.stderr.take().ok_or_else(|| {
+        abort_started_child(
+            &mut child,
+            format!("{} adapter stderr 不可用。", runtime.display()),
+        )
+    })?;
+    let (stderr_log, stderr_done) = spawn_stderr_reader(stderr);
 
     let mut stdin = child.stdin.take().ok_or_else(|| {
         abort_started_child(
@@ -405,6 +398,8 @@ fn start_acp_session(
         &mut stdin,
         init["id"].as_i64().unwrap(),
         Some(&stderr_log),
+        Some(&stderr_done),
+        Some(&mut child),
         &mut events,
         on_event,
     ) {
@@ -467,6 +462,8 @@ fn start_acp_session(
         &mut stdin,
         session_request["id"].as_i64().unwrap(),
         Some(&stderr_log),
+        Some(&stderr_done),
+        Some(&mut child),
         &mut events,
         on_event,
     ) {
@@ -513,6 +510,7 @@ fn start_acp_session(
         stdin,
         inbox,
         stderr_log,
+        stderr_done,
         next_id,
         session_id,
     })
@@ -532,7 +530,14 @@ fn send_prompt(
     on_event: &mut Option<&mut dyn FnMut(Value)>,
 ) -> Result<(), String> {
     // 上一轮 response 后才进入缓冲区的 update 已失去可靠归属，发送新 prompt 前必须隔离。
-    let discarded_updates = quarantine_idle_messages(&session.inbox, &mut session.stdin)?;
+    let discarded_updates = quarantine_idle_messages(
+        runtime,
+        &session.inbox,
+        &mut session.stdin,
+        Some(&session.stderr_log),
+        Some(&session.stderr_done),
+        Some(&mut session.child),
+    )?;
     if discarded_updates > 0 {
         eprintln!(
             "{} 隔离了 {discarded_updates} 条失去轮次归属的空闲 update。",
@@ -558,6 +563,8 @@ fn send_prompt(
         &mut session.stdin,
         prompt_request["id"].as_i64().unwrap(),
         Some(&session.stderr_log),
+        Some(&session.stderr_done),
+        Some(&mut session.child),
         events,
         on_event,
     )?;
@@ -601,9 +608,31 @@ fn spawn_stdout_reader(stdout: ChildStdout) -> Receiver<Value> {
     receiver
 }
 
+fn spawn_stderr_reader(stderr: ChildStderr) -> (Arc<Mutex<String>>, Receiver<()>) {
+    let stderr_log = Arc::new(Mutex::new(String::new()));
+    let thread_log = Arc::clone(&stderr_log);
+    let (done_sender, done_receiver) = mpsc::channel();
+    thread::spawn(move || {
+        let mut reader = BufReader::new(stderr);
+        let mut line = String::new();
+        while reader.read_line(&mut line).unwrap_or(0) > 0 {
+            if let Ok(mut log) = thread_log.lock() {
+                log.push_str(&line);
+            }
+            line.clear();
+        }
+        let _ = done_sender.send(());
+    });
+    (stderr_log, done_receiver)
+}
+
 fn quarantine_idle_messages(
+    runtime: &AcpRuntime,
     inbox: &Receiver<Value>,
     stdin: &mut impl Write,
+    stderr_log: Option<&Arc<Mutex<String>>>,
+    stderr_done: Option<&Receiver<()>>,
+    mut child: Option<&mut Child>,
 ) -> Result<usize, String> {
     let mut discarded_updates = 0;
     let started_at = Instant::now();
@@ -618,7 +647,14 @@ fn quarantine_idle_messages(
         let message = match inbox.recv_timeout(quiet_window.min(remaining)) {
             Ok(message) => message,
             Err(RecvTimeoutError::Timeout) => return Ok(discarded_updates),
-            Err(RecvTimeoutError::Disconnected) => return Err("ACP adapter stdout 已关闭。".to_string()),
+            Err(RecvTimeoutError::Disconnected) => {
+                return Err(format_adapter_process_closed(
+                    runtime,
+                    stderr_log,
+                    stderr_done,
+                    child.as_deref_mut(),
+                ));
+            }
         };
 
         if let Some(id) = message.get("id").and_then(|value| value.as_i64()) {
@@ -699,13 +735,15 @@ fn read_response(
     stdin: &mut impl Write,
     target_id: i64,
     stderr_log: Option<&Arc<Mutex<String>>>,
+    stderr_done: Option<&Receiver<()>>,
+    mut child: Option<&mut Child>,
     events: &mut Vec<Value>,
     on_event: &mut Option<&mut dyn FnMut(Value)>,
 ) -> Result<Value, String> {
     loop {
-        let message = inbox
-            .recv()
-            .map_err(|_| format_adapter_stdout_closed(runtime, stderr_log))?;
+        let message = inbox.recv().map_err(|_| {
+            format_adapter_process_closed(runtime, stderr_log, stderr_done, child.as_deref_mut())
+        })?;
 
         if let Some(id) = message.get("id").and_then(|value| value.as_i64()) {
             if message.get("method").is_some() {
@@ -729,20 +767,46 @@ fn read_response(
     }
 }
 
-fn format_adapter_stdout_closed(
+fn format_adapter_process_closed(
     runtime: &AcpRuntime,
     stderr_log: Option<&Arc<Mutex<String>>>,
+    stderr_done: Option<&Receiver<()>>,
+    mut child: Option<&mut Child>,
 ) -> String {
+    // stdout EOF 往往先于 stderr 线程完成，短暂等待可避免吞掉真正退出原因。
+    let mut exit_status = child
+        .as_deref_mut()
+        .and_then(|child| child.try_wait().ok().flatten());
+    if exit_status.is_none() {
+        for _ in 0..5 {
+            thread::sleep(Duration::from_millis(10));
+            exit_status = child
+                .as_deref_mut()
+                .and_then(|child| child.try_wait().ok().flatten());
+            if exit_status.is_some() {
+                break;
+            }
+        }
+    }
+    if let Some(done) = stderr_done {
+        let _ = done.recv_timeout(Duration::from_millis(100));
+    }
     let stderr = stderr_log
         .and_then(|log| log.lock().ok().map(|value| value.trim().to_string()))
         .filter(|value| !value.is_empty());
+    let summary = match exit_status {
+        Some(status) => match status.code() {
+            Some(code) => format!(
+                "{} adapter 进程已退出（exit code {code}）。",
+                runtime.display()
+            ),
+            None => format!("{} adapter 进程已退出。", runtime.display()),
+        },
+        None => format!("{} adapter 意外关闭 stdout。", runtime.display()),
+    };
     match stderr {
-        Some(stderr) => format!(
-            "{} adapter 已关闭 stdout。adapter stderr：{}",
-            runtime.display(),
-            stderr
-        ),
-        None => format!("{} adapter 已关闭 stdout。", runtime.display()),
+        Some(stderr) => format!("{summary} adapter stderr：{stderr}"),
+        None => summary,
     }
 }
 
@@ -783,6 +847,58 @@ fn respond_to_client_request(
 mod tests {
     use super::*;
 
+    fn spawn_failing_adapter() -> Child {
+        #[cfg(windows)]
+        let mut command = {
+            let mut command = Command::new("cmd");
+            command.args(["/C", "echo missing npx 1>&2 & exit /b 7"]);
+            command
+        };
+        #[cfg(not(windows))]
+        let mut command = {
+            let mut command = Command::new("sh");
+            command.args(["-c", "echo missing npx >&2; exit 7"]);
+            command
+        };
+        command
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap()
+    }
+
+    #[test]
+    fn adapter_exit_keeps_exit_code_and_stderr() {
+        let runtime = AcpRuntime::Adapter {
+            id: "test".to_string(),
+            name: "Test".to_string(),
+        };
+        let mut child = spawn_failing_adapter();
+        let stdout = child.stdout.take().unwrap();
+        let stderr = child.stderr.take().unwrap();
+        let inbox = spawn_stdout_reader(stdout);
+        let (stderr_log, stderr_done) = spawn_stderr_reader(stderr);
+        let mut stdin = Vec::new();
+        let mut events = Vec::new();
+        let mut callback = None;
+
+        let error = read_response(
+            &runtime,
+            &inbox,
+            &mut stdin,
+            1,
+            Some(&stderr_log),
+            Some(&stderr_done),
+            Some(&mut child),
+            &mut events,
+            &mut callback,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("exit code 7"), "{error}");
+        assert!(error.contains("missing npx"), "{error}");
+    }
+
     #[test]
     fn late_update_after_response_is_quarantined_before_next_prompt() {
         let runtime = AcpRuntime::Adapter {
@@ -805,12 +921,15 @@ mod tests {
             &mut stdin,
             1,
             None,
+            None,
+            None,
             &mut first_events,
             &mut first_callback,
         )
         .unwrap();
 
-        let discarded = quarantine_idle_messages(&inbox, &mut stdin).unwrap();
+        let discarded =
+            quarantine_idle_messages(&runtime, &inbox, &mut stdin, None, None, None).unwrap();
         assert_eq!(discarded, 1);
     }
 
@@ -826,7 +945,12 @@ mod tests {
         });
         let mut stdin = Vec::new();
 
-        let discarded = quarantine_idle_messages(&inbox, &mut stdin).unwrap();
+        let runtime = AcpRuntime::Adapter {
+            id: "test".to_string(),
+            name: "Test".to_string(),
+        };
+        let discarded =
+            quarantine_idle_messages(&runtime, &inbox, &mut stdin, None, None, None).unwrap();
 
         assert_eq!(discarded, 1);
     }
@@ -852,6 +976,8 @@ mod tests {
             &inbox,
             &mut stdin,
             2,
+            None,
+            None,
             None,
             &mut second_events,
             &mut second_callback,
