@@ -189,6 +189,46 @@ test("runtimeSessionMessageListProjection: completed trace rows drop stale runni
   assert.deepEqual(traceRows.map((row) => row.status), ["completed", "completed"]);
 });
 
+test("runtimeSessionMessageListProjection: failed turn keeps process rows folded under worked row", () => {
+  const result = projectRuntimeSessionMessageList({
+    turns: [{
+      id: "t1",
+      task: "failing task",
+      status: "failed",
+      timelineItems: [
+        item("thinking", "analysis"),
+        item("tool", "Run command", { id: "tool-1", status: "failed" }),
+        item("error", "command failed", { id: "error-1", status: "failed" }),
+      ],
+    }],
+  });
+
+  assert.deepEqual(result.rows.map((row) => row.kind), ["user", "worked_for"]);
+  assert.equal(result.rows.at(-1).status, "failed");
+  assert.deepEqual(result.rows.at(-1).metadata.rows.map((row) => row.kind), ["thinking", "tool", "error"]);
+});
+
+test("runtimeSessionMessageListProjection: cancelled turn keeps final response primary and folds process", () => {
+  const result = projectRuntimeSessionMessageList({
+    turns: [{
+      id: "t1",
+      task: "cancel task",
+      status: "cancelled",
+      finalResponse: "cancelled after partial work",
+      timelineItems: [
+        item("thinking", "analysis"),
+        item("tool", "Read", { id: "read-1" }),
+        item("assistant", "cancelled after partial work"),
+      ],
+    }],
+  });
+
+  assert.deepEqual(result.rows.map((row) => row.kind), ["user", "assistant", "worked_for"]);
+  assert.equal(result.rows[1].content, "cancelled after partial work");
+  assert.equal(result.rows.at(-1).status, "cancelled");
+  assert.deepEqual(result.rows.at(-1).metadata.rows.map((row) => row.kind), ["thinking", "tool"]);
+});
+
 test("runtimeSessionMessageListProjection: 旧历史与队列使用独立消息行", () => {
   const result = projectRuntimeSessionMessageList({
     turns: [{
