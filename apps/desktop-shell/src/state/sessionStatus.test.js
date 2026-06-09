@@ -70,6 +70,18 @@ test("latestTurn and latestTurnOutcome read the latest turn execution fact", () 
   assert.equal(latestTurnOutcome(input), TURN_STATUS.completed);
 });
 
+test("resolveSessionCardStatusView: stale activeTurnId does not override latest terminal turn", () => {
+  const view = resolveSessionCardStatusView(session({
+    activeTurnId: "t1",
+    turns: [
+      { id: "t1", status: TURN_STATUS.running },
+      { id: "t2", status: TURN_STATUS.completed, finalResponse: "done" },
+    ],
+  }), { translate });
+
+  assert.equal(view.status, CARD_STATUS.completed);
+});
+
 test("resolveSessionCardStatusView: empty interactive active session waits for input", () => {
   const view = resolveSessionCardStatusView(session(), { translate });
   assert.equal(view.status, CARD_STATUS.waiting_input);

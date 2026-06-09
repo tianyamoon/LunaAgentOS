@@ -131,7 +131,11 @@ export function activeOrLatestTurn(session) {
   const turns = Array.isArray(session?.turns) ? session.turns : [];
   if (!turns.length) return null;
   const activeTurnId = session?.activeTurnId;
-  return turns.find((turn) => activeTurnId && turn.id === activeTurnId) || turns[turns.length - 1];
+  const latest = turns[turns.length - 1];
+  const active = turns.find((turn) => activeTurnId && turn.id === activeTurnId) || null;
+  if (!active || active === latest) return latest;
+  if (isTerminalTurnStatus(latest?.status) && isRunningTurnStatus(active?.status)) return latest;
+  return active;
 }
 
 export function latestTurnOutcome(session) {
@@ -162,6 +166,10 @@ function hasReadableTurnResult(turn) {
 
 export function isRunningTurnStatus(status) {
   return status === TURN_STATUS.running || status === TURN_STATUS.waiting_confirmation;
+}
+
+export function isTerminalTurnStatus(status) {
+  return status === TURN_STATUS.completed || status === TURN_STATUS.failed || status === TURN_STATUS.cancelled;
 }
 
 export function statusFromRuntimeStateCode(state, hasFinalResponse = false) {

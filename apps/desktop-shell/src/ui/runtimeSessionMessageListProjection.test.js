@@ -143,6 +143,52 @@ test("runtimeSessionMessageListProjection: completed turn folds even when prompt
   assert.deepEqual(result.rows.at(-1).metadata.rows.map((row) => row.kind), ["thinking", "tool"]);
 });
 
+test("runtimeSessionMessageListProjection: stale activeTurnId does not keep old running turn live", () => {
+  const result = projectRuntimeSessionMessageList({
+    activeTurnId: "t1",
+    activePromptRunId: "run-stale",
+    turns: [
+      {
+        id: "t1",
+        task: "old task",
+        status: "running",
+        promptRunId: "run-stale",
+        timelineItems: [item("thinking", "old analysis", { status: "running" })],
+      },
+      {
+        id: "t2",
+        task: "done task",
+        status: "completed",
+        finalResponse: "final answer",
+        timelineItems: [item("assistant", "final answer")],
+      },
+    ],
+  });
+
+  assert.deepEqual(result.rows.map((row) => row.kind), ["user", "worked_for", "user", "assistant"]);
+  assert.equal(result.rows.some((row) => row.status === "running"), false);
+  assert.equal(result.latestTurnId, "t2");
+});
+
+test("runtimeSessionMessageListProjection: completed trace rows drop stale running status", () => {
+  const result = projectRuntimeSessionMessageList({
+    turns: [{
+      id: "t1",
+      task: "done task",
+      status: "completed",
+      finalResponse: "final answer",
+      timelineItems: [
+        item("thinking", "analysis", { status: "running" }),
+        item("tool", "Read", { id: "read-1", status: "running" }),
+        item("assistant", "final answer"),
+      ],
+    }],
+  });
+
+  const traceRows = result.rows.at(-1).metadata.rows;
+  assert.deepEqual(traceRows.map((row) => row.status), ["completed", "completed"]);
+});
+
 test("runtimeSessionMessageListProjection: 旧历史与队列使用独立消息行", () => {
   const result = projectRuntimeSessionMessageList({
     turns: [{

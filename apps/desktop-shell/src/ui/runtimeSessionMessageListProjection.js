@@ -2,13 +2,17 @@
 // 这里把内部 Turn / Timeline 事实整理成稳定 Message 行，视图不再暴露“第 N 轮”容器。
 
 import {
+  activeOrLatestTurn,
+  isRunningTurnStatus,
+  isTerminalTurnStatus,
+} from "../state/sessionStatus.js";
+import {
   projectCompletedTimelineSummary,
   projectLiveTimeline,
   timelineItemsForTurn,
 } from "./turnTimelineProjection.js";
 
 const RUNNING_TURN_STATUSES = new Set(["running", "waiting_confirmation"]);
-const TERMINAL_TURN_STATUSES = new Set(["completed", "failed", "cancelled", "canceled", "stopped"]);
 
 function list(value) {
   return Array.isArray(value) ? value : [];
@@ -39,12 +43,12 @@ function rowId(turn, suffix) {
 // MessageList 的外部接口：调用方只消费 rows，不需要理解 Turn 的内部结构。
 export function projectRuntimeSessionMessageList(session, options = {}) {
   const turns = list(session?.turns);
-  const activeTurnId = session?.activeTurnId || null;
-  const latestTurn = turns.find((turn) => activeTurnId && turn.id === activeTurnId) || turns.at(-1) || null;
+  const latestTurn = activeOrLatestTurn(session);
   const visibleTurns = options.latestOnly && latestTurn ? [latestTurn] : turns;
   const rows = visibleTurns.flatMap((turn) => projectTurnRows(turn, {
     latestTurnId: latestTurn?.id || null,
-    forceLive: Boolean(session?.activePromptRunId && turn.id === activeTurnId),
+    forceLive: Boolean(session?.activePromptRunId && turn.id === latestTurn?.id),
+    isCurrentTurn: turn.id === latestTurn?.id,
     readOnly: session?.access_mode === "read_only",
   }));
   const runtimeRows = !rows.length && session?.runtime_binding?.state === "reconnecting"
@@ -81,19 +85,24 @@ function projectSessionRuntimeRow(session, options = {}) {
   };
 }
 
-function projectTurnRows(turn, { latestTurnId, forceLive, readOnly = false }) {
+function projectTurnRows(turn, { latestTurnId, forceLive, isCurrentTurn = false, readOnly = false }) {
   const rows = [];
   const turnId = turn?.id;
   if (!turnId) return rows;
   // 只读 transcript 没有可执行 runtime；即便旧快照残留 running，也按历史内容投影。
-  const isLive = !readOnly && (RUNNING_TURN_STATUSES.has(turn.status) || (forceLive && !TERMINAL_TURN_STATUSES.has(turn.status)));
+  const isLive = !readOnly
+    && isCurrentTurn
+    && (RUNNING_TURN_STATUSES.has(turn.status) || (forceLive && !isTerminalTurnStatus(turn.status)));
+  const rowStatus = isLive ? turn.status : completedTurnRowStatus(turn);
   if (turn.meta?.historyIntegrity === "legacy_unverified") {
     rows.push(baseTurnRow(turn, "legacy_warning", "legacy-warning", {
+      status: rowStatus,
       content: "",
       metadata: { reason: "legacy_unverified" },
     }));
   }
   rows.push(baseTurnRow(turn, "user", "user", {
+    status: rowStatus,
     content: turn.task || "",
     metadata: {
       attachments: list(turn.meta?.attachments),
@@ -119,7 +128,7 @@ function projectCompletedTurnRows(turn) {
   }
   if (traceRows.length || debug) {
     rows.push(baseTurnRow(turn, "worked_for", "worked-for", {
-      status: turn.status || "completed",
+      status: completedTurnRowStatus(turn),
       metadata: {
         summary: projectCompletedTimelineSummary(turn),
         detailKey: `${completedScope}:worked-for`,
@@ -130,6 +139,13 @@ function projectCompletedTurnRows(turn) {
   }
   return rows;
 }
+
+function completedTurnRowStatus(turn) {
+  const status = turn?.status || "completed";
+  if (isRunningTurnStatus(status)) return "completed";
+  return status;
+}
+
 function projectUnifiedTurnRows(turn) {
   const rows = [];
   const isLive = RUNNING_TURN_STATUSES.has(turn.status);
@@ -221,9 +237,10 @@ function timelineItemRow(turn, item, options = {}) {
   // 完成态的过程折叠必须使用独立 key，避免继承运行中用户曾展开的行。
   const detailBase = options.completedScope ? `${options.completedScope}:${suffix}` : rowId(turn, suffix);
   const detailKey = `${detailBase}:${detailSuffix}`;
+  const status = timelineItemStatus(item, options);
   if (item.type === "tool_group") {
     return baseTurnRow(turn, "tool_group", suffix, {
-      status: item.status || "completed",
+      status,
       content: item.content || "",
       metadata: {
         ...item.metadata,
@@ -234,10 +251,16 @@ function timelineItemRow(turn, item, options = {}) {
     });
   }
   return baseTurnRow(turn, rowKindForTimelineType(item.type), suffix, {
-    status: item.status || "completed",
+    status,
     content: item.content || "",
     metadata: { ...item.metadata, detailKey, turnCompleted: options.turnCompleted || false },
   });
+}
+
+function timelineItemStatus(item, options = {}) {
+  const status = item.status || "completed";
+  if (!options.turnCompleted) return status;
+  return isRunningTurnStatus(status) ? "completed" : status;
 }
 
 function timelineRowSuffix(item, options = {}) {
