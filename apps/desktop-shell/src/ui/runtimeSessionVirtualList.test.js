@@ -428,3 +428,37 @@ test("runtimeSessionVirtualList: running row keeps active classes after body upd
   assert.match(active.className, /is-active/);
   list.dispose();
 });
+
+test("runtimeSessionVirtualList: invalidated details height can shrink without stale offsets", () => {
+  const scroller = fakeScroller();
+  const content = fakeContent();
+  const frames = [];
+  const list = createRuntimeSessionVirtualList({
+    scroller,
+    content,
+    requestFrame: (cb) => { frames.push(cb); return frames.length; },
+    cancelFrame: () => {},
+  });
+
+  list.reconcile(rows(2), {
+    renderRow: (row) => `<div data-message-id="${row.id}" data-message-signature="${row.id}"></div>`,
+    createRowElement: (html) => {
+      const id = html.match(/data-message-id="([^"]+)"/)?.[1] || "missing";
+      return fakeRow(id, id, id === "row-0" ? 180 : 80);
+    },
+  });
+  frames.splice(0).forEach((cb) => cb());
+
+  const row0 = content.children.find((child) => child.dataset.messageId === "row-0");
+  const row1 = content.children.find((child) => child.dataset.messageId === "row-1");
+  const expandedOffset = Number(row1.style.transform.match(/translateY\(([-\d.]+)/)?.[1] || 0);
+
+  row0.offsetHeight = 60;
+  list.measureChangedRows(["row-0"], { invalidate: true });
+  frames.splice(0).forEach((cb) => cb());
+  const collapsedOffset = Number(row1.style.transform.match(/translateY\(([-\d.]+)/)?.[1] || 0);
+
+  assert.equal(expandedOffset, 188);
+  assert.equal(collapsedOffset, 68);
+  list.dispose();
+});

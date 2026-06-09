@@ -291,9 +291,14 @@ export function createRuntimeSessionCardController({
     const rowId = row?.dataset?.messageId;
     const virtualList = rowId ? virtualListRegistry.get(sessionId) : null;
     if (!rowId || !virtualList) return;
+    virtualList.measureChangedRows([rowId], { invalidate: true });
     // details 展开会改变动态行高；下一帧重新测量，避免后续行仍停在旧 offset 上造成遮挡。
     virtualList.measureChangedRows([rowId]);
-    requestFrame(() => virtualList.measureChangedRows([rowId]));
+    requestFrame(() => {
+      virtualList.measureChangedRows([rowId], { invalidate: true });
+      requestFrame(() => virtualList.measureChangedRows([rowId]));
+    });
+    setTimer(() => virtualList.measureChangedRows([rowId], { invalidate: true }), 0);
   }
 
   function revealDebugJson(detail) {

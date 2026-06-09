@@ -289,8 +289,15 @@ export function createRuntimeSessionVirtualList({
     }
   }
 
-  function measureChangedRows(rowIds) {
+  function measureChangedRows(rowIds, { invalidate = false } = {}) {
     if (!rowIds?.length) return;
+    if (invalidate) {
+      rowIds.forEach((id) => {
+        rowHeights.delete(id);
+        const index = rowIndexById.get(id);
+        if (index !== undefined) virtualizer.resizeItem?.(index, estimateRowSize);
+      });
+    }
     scheduleMeasure(rowIds);
   }
 
