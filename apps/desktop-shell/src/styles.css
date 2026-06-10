@@ -1431,6 +1431,61 @@ button:disabled {
   align-items: stretch;
 }
 
+.web-unavailable-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 32px;
+  background: var(--page-bg, #17130f);
+  color: var(--text, #f2eadf);
+  text-align: center;
+}
+
+.web-unavailable-gate[hidden] {
+  display: none;
+}
+
+.web-unavailable-gate img {
+  width: min(320px, 72vw);
+  height: auto;
+  margin-bottom: 18px;
+}
+
+.web-unavailable-gate h1,
+.web-unavailable-gate p {
+  margin: 0;
+}
+
+.web-unavailable-gate h1 {
+  font-size: 2rem;
+}
+
+.web-unavailable-gate p {
+  max-width: 560px;
+  color: var(--muted, #b9aa98);
+  line-height: 1.7;
+}
+
+.web-unavailable-status {
+  padding: 5px 9px;
+  border: 1px solid var(--border, #4b392b);
+  border-radius: 6px;
+  color: var(--accent, #e8773d);
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.web-unavailable-action {
+  color: var(--text, #f2eadf) !important;
+  font-weight: 700;
+}
+
 .session-deck.is-single-session {
   grid-template-columns: minmax(0, 1fr);
 }

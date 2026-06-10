@@ -175,8 +175,10 @@ import { sessionSectionsFromEvents } from "./runtime/streamEvents.js";
 import { FALLBACK_SESSIONS } from "./fixtures/fallbackSessions.js";
 import { createDesktopBridge } from "./platform/desktopBridge.js";
 import { scheduleStartupTasks } from "./platform/startupTaskScheduler.js";
+import { applyWebUnavailableGate } from "./platform/webUnavailableGate.js";
 
-const { invoke, listenRuntimeEvent } = createDesktopBridge(window.__TAURI__);
+const { invoke, listenRuntimeEvent, isWebPreview } = createDesktopBridge(window.__TAURI__);
+applyWebUnavailableGate({ document, isWebPreview });
 
 const HISTORY_SCHEMA_VERSION = 5;
 const STREAM_CARD_RENDER_INTERVAL_MS = 100;
