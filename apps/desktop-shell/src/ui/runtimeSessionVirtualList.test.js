@@ -366,6 +366,39 @@ test("runtimeSessionVirtualList: scrollToRow 使用完整 rows 索引而不是�
   list.dispose();
 });
 
+test("runtimeSessionVirtualList: 滚动后重新挂载新可视窗口而不是只留下 pinned 行", () => {
+  const scroller = fakeScroller();
+  const content = fakeContent();
+  let activeRowId = "row-79";
+  const list = createRuntimeSessionVirtualList({
+    scroller,
+    content,
+    estimateRowSize: 70,
+    overscan: 2,
+    getActiveRowId: () => activeRowId,
+    requestFrame: (cb) => { cb(); return 1; },
+    cancelFrame: () => {},
+  });
+
+  list.reconcile(rows(80), {
+    renderRow: (row) => `<div data-message-id="${row.id}" data-message-signature="${row.id}"></div>`,
+    createRowElement: (html) => {
+      const id = html.match(/data-message-id="([^"]+)"/)?.[1] || "missing";
+      return fakeRow(id, id, 70);
+    },
+  });
+
+  list.scrollToRow("row-79", { align: "end" });
+  scroller.emit("scroll");
+
+  const mountedIds = content.children.map((child) => child.dataset.messageId);
+  assert.ok(mountedIds.includes("row-78"));
+  assert.ok(mountedIds.includes("row-79"));
+  assert.ok(!mountedIds.includes("row-0"));
+  activeRowId = null;
+  list.dispose();
+});
+
 test("runtimeSessionVirtualList: 测量动态高度后重新定位已挂载行", () => {
   const scroller = fakeScroller();
   const content = fakeContent();

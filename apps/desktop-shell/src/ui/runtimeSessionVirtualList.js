@@ -30,6 +30,9 @@ export function createRuntimeSessionVirtualList({
   let pendingMeasureIds = new Set();
   let cleanupVirtualizer = null;
   let measuredWidth = 0;
+  let currentRenderers = null;
+  let reconciling = false;
+  let renderingWindow = false;
 
   prepareContentElement(content);
 
@@ -47,6 +50,10 @@ export function createRuntimeSessionVirtualList({
     observeElementRect,
     observeElementOffset,
     scrollToFn: elementScroll,
+    onChange: () => {
+      if (!currentRenderers || reconciling || renderingWindow) return;
+      renderVirtualWindow(emptyMutationReport());
+    },
   });
 
   cleanupVirtualizer = virtualizer._didMount?.() || null;
@@ -60,31 +67,46 @@ export function createRuntimeSessionVirtualList({
     if (!Array.isArray(nextRows)) return emptyMutationReport();
 
     const report = emptyMutationReport();
-    rows = nextRows;
-    rowIndexById = new Map(rows.map((row, index) => [row.id, index]));
-    adoptExistingRowNodes();
-    dropRemovedRows(report);
-    const widthChanged = invalidateMeasurementsIfWidthChanged();
-    updateVirtualizerOptions();
-
-    const virtualItems = virtualizer.getVirtualItems();
-    content.style.height = `${Math.max(virtualizer.getTotalSize(), scroller.clientHeight || 0)}px`;
-
-    const mountedIds = new Set();
-    const orderedNodes = [];
-    virtualItems.forEach((virtualItem) => {
-      const row = rows[virtualItem.index];
-      if (!row) return;
-      const node = ensureRowNode(row, { renderRow, renderRowBody, createRowElement }, report);
-      positionRowNode(node, virtualItem.index, virtualItem.start);
-      mountedIds.add(row.id);
-      orderedNodes.push(node);
-    });
-
-    unmountRowsOutsideWindow(mountedIds);
-    reconcileMountedOrder(orderedNodes, report);
-    scheduleMeasure(widthChanged ? [...mountedIds] : [...report.addedIds, ...report.changedIds]);
+    currentRenderers = { renderRow, renderRowBody, createRowElement };
+    reconciling = true;
+    try {
+      rows = nextRows;
+      rowIndexById = new Map(rows.map((row, index) => [row.id, index]));
+      adoptExistingRowNodes();
+      dropRemovedRows(report);
+      const widthChanged = invalidateMeasurementsIfWidthChanged();
+      updateVirtualizerOptions();
+      renderVirtualWindow(report, { measureAllMounted: widthChanged });
+    } finally {
+      reconciling = false;
+    }
     return report;
+  }
+
+  function renderVirtualWindow(report, { measureAllMounted = false } = {}) {
+    if (!currentRenderers || renderingWindow) return;
+    renderingWindow = true;
+    try {
+      const virtualItems = virtualizer.getVirtualItems();
+      content.style.height = `${Math.max(virtualizer.getTotalSize(), scroller.clientHeight || 0)}px`;
+
+      const mountedIds = new Set();
+      const orderedNodes = [];
+      virtualItems.forEach((virtualItem) => {
+        const row = rows[virtualItem.index];
+        if (!row) return;
+        const node = ensureRowNode(row, currentRenderers, report);
+        positionRowNode(node, virtualItem.index, virtualItem.start);
+        mountedIds.add(row.id);
+        orderedNodes.push(node);
+      });
+
+      unmountRowsOutsideWindow(mountedIds);
+      reconcileMountedOrder(orderedNodes, report);
+      scheduleMeasure(measureAllMounted ? [...mountedIds] : [...report.addedIds, ...report.changedIds]);
+    } finally {
+      renderingWindow = false;
+    }
   }
 
   function invalidateMeasurementsIfWidthChanged() {
