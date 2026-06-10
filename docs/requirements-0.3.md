@@ -7,6 +7,8 @@ The current 0.3 stage first makes each Agent understandable, configurable, and r
 ## Product Object Boundary
 
 - A **Runtime Session** is an Agent Entry's conversation environment. It owns session state, execution, responses, history, and recovery.
+- A **Session title** is the Runtime Session's stable display title, derived from the first non-empty line of the first prompt. Later Turns do not change it.
+- A **Turn prompt** is one user input. `runtimePrompt` is the actual runtime input after attachment or wrapper expansion.
 - A **Runtime Session Card** presents exactly one Runtime Session. It is not a Task and does not act as a Task Board.
 - A **Task** is a future schedulable work unit that may be split, assigned, and tracked across Runtime Sessions. This stage adds no Task model or management UI.
 
@@ -34,4 +36,4 @@ Conclusions come from the real runtime, adapter health checks, or verifiable loc
 - Marketplace
 - Full billing platform
 
-Session Cards remain focused on conversation readability, execution, responses, history, and recovery, without Task fields or Task states.
+Session Cards remain focused on conversation readability, execution, responses, history, and recovery. Runtime Session uses `title`, Turn uses `prompt`, and neither introduces Task fields or Task states.

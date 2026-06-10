@@ -2,7 +2,7 @@
 
 [中文](./roadmap.zh-CN.md)
 
-LunaAgentOS is heading toward a personal Agent operating system for the AI era. 0.2 Preview has laid down the first foundational stone on that road — a neutral desktop workspace for real AI agent sessions; the roadmap then advances stage by stage toward agent availability management, stronger Runtime Session behavior, clearer adapters, and targeted session handoff.
+LunaAgentOS is heading toward a personal Agent operating system for the AI era. The current 0.3 stage first completes Agent availability management, runtime-backed health diagnostics, and Runtime Session semantics. Task, Handoff, and orchestration remain separate later stages.
 
 ## Now: Product definition and Runtime Session workspace
 
@@ -17,9 +17,9 @@ The current focus is to make the product definition explicit while keeping Claud
 - Live / archived session lifecycle.
 - Runtime detection and clear configuration states.
 
-## Next: 0.3 Agent management and health diagnostics
+## Current: 0.3 Agent management and health diagnostics
 
-0.3 builds on the 0.2 workspace foundation and first hardens two basic layers, paving the way for later cross-agent collaboration:
+0.3 builds on the workspace foundation and hardens two basic layers only:
 
 - Agent management: identity, profiles, models, capabilities, safety boundaries, and best practices.
 - Runtime-backed health diagnostics: installation, invocation, login, configuration, WSL/Bridge, model or key readiness, version attention, failure reasons, and repair guidance.
@@ -29,7 +29,7 @@ The current focus is to make the product definition explicit while keeping Claud
 
 See [0.3 Requirement Definition](./requirements-0.3.md) for the concrete scope.
 
-## Then: Adapter contract seam and call flow
+## Later: Adapter contract seam and call flow
 
 After Agent management and Runtime Sessions are more reliable, adapter call flow can be designed as a separate stage:
 

@@ -4,19 +4,20 @@
 
 LunaAgentOS is heading toward a personal Agent operating system for the AI era — a desktop layer where users install agents like apps, schedule tasks like processes, and own agent memory like local files.
 
-LunaAgentOS 0.2 Preview starts from the neutral desktop workspace for real AI agent sessions, as the first foundational stone on that road. From the workspace, the product grows naturally into agent management, task management, handoff, collaboration, and control-plane behavior — a path that can be validated stage by stage.
+LunaAgentOS starts from a neutral desktop workspace for real AI Agent sessions. The current 0.3 stage makes Agent management, runtime-backed health diagnostics, and Runtime Session semantics reliable. Task, Handoff, orchestration, and collaboration remain separate later product stages.
 
 The product starts from the workspace experience: choose a real runtime entry, send work into a real session, watch the process, and keep local history in one place. Protocol, adapters, and the Runtime Session Model support that experience; they are not the first thing LunaAgentOS asks users to believe.
 
-## The 0.2 Preview product shape
+## The current 0.3 product shape
 
-LunaAgentOS 0.2 Preview is built around five concrete pieces:
+LunaAgentOS 0.3 is built around these concrete pieces:
 
 - **LunaAgentOS App**: a Windows-first Tauri desktop workspace
 - **Runtime Session Cards**: the shared surface for output, thought, runtime events, final response, and restore state
 - **Local history**: JSON-backed session history with restore and read-only archived states
 - **Real runtime entries**: Claude Code and Hermes as real external runtimes
 - **Bridge path**: Trae IDE as an IDE-first bridge direction
+- **Agent management and diagnostics**: identity, model-management mode, capability boundaries, and evidence-backed health
 
 ## Supporting architecture
 
@@ -73,9 +74,9 @@ The current product definition follows a few constraints:
 - Preserve runtime-native strengths instead of flattening everything into one chat surface
 - Make process visibility a first-class part of the product
 - Keep local history durable and recoverable
-- Position 0.2 Preview as the workspace foundation on the road to a complete orchestration platform, without overstating the stage
+- Position 0.3 as the Agent management, health diagnostics, and Runtime Session reliability stage, without overstating it
 - Grow the adapter contract before chasing marketplace or commercial-platform breadth
 
-## Boundary for the next stage
+## 0.3 boundary
 
-The current repository already contains a working app and the first real integrations. The next layer builds on this foundation: harden runtime entries, make restore more reliable, clarify the adapter boundary, and design targeted session handoff — the next stretch of road on the way to an orchestration platform.
+The repository contains a working app and real integrations. 0.3 only hardens runtime entries, Agent management, truthful model control, health diagnostics, and Runtime Session semantics. Task, Task Board, Handoff, automatic assignment, and multi-Agent orchestration are outside this stage.

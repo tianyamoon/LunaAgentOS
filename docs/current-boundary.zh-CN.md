@@ -28,12 +28,12 @@ LunaAgentOS 的目标是 AI 时代的个人 Agent 操作系统：让用户像装
 
 ## 距离完整形态还有多远
 
-0.2 Preview 是奠基阶段，下一段路在这些方向上顺势展开：
+0.3 当前阶段只收尾 Agent 管理、真实健康诊断和 Runtime Session 语义：
 
-- **多 Agent orchestration**：当前以“当前发送目标”承担单线工作流；跨 Agent 调度与协作是下一阶段的核心命题
-- **跨 Agent 上下文桥接与共享记忆**：先做 session 内可恢复，再做可定向的 session handoff，最后再设计跨 Agent 记忆总线
-- **Remote 与 team 入口**：本地稳态之后的扩张方向
-- **Agent marketplace 与生态层**：adapter manifest 已为它留好接入面，产品形态留待后续版本
+- **Agent 管理**：讲清身份、环境、Profile、工作目录、模型控制、能力、安全边界和最佳实践
+- **健康诊断**：只依据真实 runtime、adapter health check 或可验证配置；无法确认时显示未知
+- **Runtime Session**：继续只负责会话状态、执行、响应、历史和恢复
+- **明确不在 0.3**：Task、Task Board、Handoff、自动分派、多 Agent 编排、团队模式、共享记忆和 Marketplace
 
 也借此划清几条边界，避免把 LunaAgentOS 错认成它不是的东西：
 
@@ -74,7 +74,8 @@ new agent product -> adapter manifest + adapter implementation -> LunaAgentOS un
 
 一张 session card 是这些内容的共享界面：
 
-- 用户任务
+- 稳定的 Session title
+- 每个 Turn 的用户 prompt
 - runtime 输出
 - thought stream
 - runtime / tool / plan / usage stream
@@ -83,10 +84,8 @@ new agent product -> adapter manifest + adapter implementation -> LunaAgentOS un
 
 ## 下一层能力
 
-下一层走在 0.2 的工作台底盘之上，重点把这些做扎实：
+0.3 在工作台底盘之上，重点把这些做扎实：
 
-- 加强 Claude Code 和 Hermes runtime entry 的可靠性
-- 让本地历史和恢复行为更可信
-- 讲清 adapter 安装与 capability 边界
-- 加强 Trae IDE bridge path
-- 设计可定向的 session handoff，让用户在能力真正实现后，可以有意地把选中的上下文移动到另一个 entry 或 session
+- 让用户明确知道 Agent 是否可用、依据是什么、下一步如何处理
+- 只有真实支持持久默认模型的 Agent 才提供 LunaAgentOS 模型选择
+- 保持 Runtime Session、Turn 与未来 Task 的字段和语义分离

@@ -7,6 +7,8 @@
 ## 产品对象边界
 
 - **Runtime Session** 是绑定 Agent Entry 的会话环境，负责会话状态、执行过程、响应、历史和恢复。
+- **Session title** 是 Runtime Session 的稳定显示标题，取首轮 prompt 的首个非空行；后续 Turn 不修改它。
+- **Turn prompt** 是某一轮用户输入；`runtimePrompt` 是附加附件或包装后实际发送给 runtime 的内容。
 - **Runtime Session Card** 只呈现一个 Runtime Session，不是 Task，也不承担 Task Board 职责。
 - **Task** 是未来可拆分、分派并跨 Runtime Session 跟踪的工作单元。本阶段不实现 Task 数据模型或管理界面。
 
@@ -34,4 +36,4 @@
 - Marketplace
 - 完整计费平台
 
-Session Card 继续聚焦会话可读性、执行过程、响应、历史与恢复，不引入 Task 字段或 Task 状态。
+Session Card 继续聚焦会话可读性、执行过程、响应、历史与恢复。Runtime Session 使用 `title`，Turn 使用 `prompt`，不引入 Task 字段或 Task 状态。

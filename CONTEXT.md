@@ -57,11 +57,11 @@ _避免使用_：当前活跃 session
 ### Runtime 工作
 
 **Runtime Session（运行时会话）**：
-绑定到一个 Agent Entry 的持久本地工作上下文，包含 turns、lifecycle、runtime binding 和 history metadata。
+绑定到一个 Agent Entry 的持久本地工作上下文，包含稳定 `title`、turns、lifecycle、runtime binding 和 history metadata。`title` 取首轮 prompt 的首个非空行，后续 Turn 不修改。
 _避免使用_：Task、聊天消息、一次性 prompt
 
 **Turn（执行轮次）**：
-Runtime Session 内的一次用户请求及其 runtime 执行。
+Runtime Session 内的一次用户请求及其 runtime 执行。`prompt` 保存用户输入，`runtimePrompt` 保存附加附件或包装后实际发送给 runtime 的内容。
 _避免使用_：Runtime Session、Task
 
 **Prompt Run（提示执行）**：
@@ -97,7 +97,7 @@ Turn 的本地持久记录，可用于组成 archived transcript 和恢复行为
 _避免使用_：活跃 Runtime Session
 
 **Runtime Session Card（运行时会话卡片）**：
-在工作区中渲染一个 Runtime Session 的界面，展示当前摘要、过程可见性和可用动作。
+在工作区中渲染一个 Runtime Session 的界面，展示 Session title、Turn prompts、过程可见性和可用动作。
 _避免使用_：Task、Task Board、通用聊天气泡
 
 **Workspace Focus（工作区聚焦）**：
@@ -156,7 +156,7 @@ _避免使用_：自动多 Agent orchestration
 - “Agent” 曾同时表示外部产品、Fleet 分组和可选择目标。分别使用 **Agent Product**、**Provider** 和 **Agent Entry**。
 - “session active” 曾同时表示持久 lifecycle 和进程连接状态。分别使用 **Session Lifecycle** 和 **Runtime Binding**。
 - “fullscreen” 曾表示工作区展示模式。统一使用 **Workspace Focus**；它不是 Runtime Session 字段。
-- “Session Card 任务化”容易被误解为 Runtime Session 等同于 **Task**。**Runtime Session Card** 可以展示任务式摘要，但 **Task** 和 **Task Board** 仍是独立的未来 orchestration 概念。
+- “Session Card 任务化”会把 Runtime Session 误解为 **Task**。统一使用 Session title 与 Turn prompt；**Task** 和 **Task Board** 保留为独立的未来 orchestration 概念。
 
 ## 当前模块边界
 
@@ -170,7 +170,7 @@ _避免使用_：自动多 Agent orchestration
 - `composerController` 管理输入框、附件、斜杠菜单和键盘发送模式。
 - `agentFleetView` 与 `agentManagementView` 只消费归一化 Provider、Agent Entry 和 Availability 数据，不包含具体 Adapter 的运行规则。
 - `runtimeSessionCardView` 与 `runtimeSessionCardController` 管理卡片外层和交互，避免把大段工作区实现重新塞回 `main.js`。
-- `runtimeSessionCardPatch` 提供 `patchSessionCardFromViewModel`：流式路径从轻量 viewModel 直接更新 Card 外壳（class、header、stats、task），不生成完整 HTML。Card 首次创建、Session 增删、Workspace Focus 切换时仍允许完整渲染。
+- `runtimeSessionCardPatch` 提供 `patchSessionCardFromViewModel`：流式路径从轻量 viewModel 直接更新 Card 外壳（class、header、stats、title），不生成完整 HTML。Card 首次创建、Session 增删、Workspace Focus 切换时仍允许完整渲染。
 - `runtimeSessionMessageListView` 与 `reconcileMessageList` 负责行级对账：使用高效 `rowSignature`、游标顺序检查避免无效 `insertBefore`、签名未变化时完全跳过。`createMergedReconciler` 按动画帧合并高频 delta。
 - `runtimeSessionVirtualList` 基于 `@tanstack/virtual-core` 实现动态高度虚拟列表：只挂载可视区 + overscan 区 + 当前 active row；使用 `data-message-id` 作为稳定 key；动态测量行高度；Session 切换时释放 observer，再次进入时恢复测量缓存和滚动位置。
 - 三层职责分离：Card Shell 只在结构变化时完整重建，流式 delta 永远走局部刷新；MessageList 对账不得无条件 append 已有节点；VirtualList 只挂载必要行，不扫描整列 DOM。
@@ -181,7 +181,7 @@ _避免使用_：自动多 Agent orchestration
 
 ## 兼容策略
 
-- History schema 5 使用通用 `agentEntrySnapshot` 保存 Runtime Session 对应的 Agent Entry 快照。
-- schema 4 和旧 `hermesProfile` 仅保留读取兼容；新写入路径不得继续产生专用字段。
+- History schema 6 使用 `sessionTitle` 与 `prompt`，并用通用 `agentEntrySnapshot` 保存 Runtime Session 对应的 Agent Entry 快照。
+- 旧 `task` history 格式不读取、不迁移、不双写；开发环境旧历史由用户手动清理。
 - 缺少 `promptRunId` 的旧 Turn 标记为 `legacy_unverified`。系统保留原文并提示可能存在旧版事件归属问题，不根据文本相似度自动删改历史。
 - `main.js` 仍处于逐步收缩阶段。新增领域实现必须进入职责明确、可测试的 Module，不能以临时方便为理由扩大 Shell。
