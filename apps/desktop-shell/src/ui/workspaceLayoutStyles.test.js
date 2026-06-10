@@ -70,3 +70,17 @@ test("completed conversation rows keep the answer primary and trace summary seco
     { name: "background", value: "transparent" },
   ]);
 });
+
+test("failed conversation rows use the error token without restoring card backgrounds", () => {
+  assertDeclarations(".runtime-message-status-failed", [
+    { name: "border-color", value: "var\\(--error\\)" },
+  ]);
+  assert.doesNotMatch(rule(".runtime-message-status-failed"), /background\s*:/);
+  assertDeclarations(".runtime-message-worked-for-failed .cb-check", [
+    { name: "background", value: "var\\(--error\\)" },
+  ]);
+  assertDeclarations(".runtime-message-row-assistant.runtime-message-status-failed .runtime-message-assistant", [
+    { name: "border-left", value: "2px solid var\\(--error\\)" },
+    { name: "color", value: "var\\(--error\\)" },
+  ]);
+});

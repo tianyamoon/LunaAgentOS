@@ -1843,7 +1843,7 @@ button:disabled {
 }
 
 .runtime-message-worked-for-failed .cb-check {
-  background: var(--danger);
+  background: var(--error);
 }
 
 .runtime-message-worked-for-failed .cb-check::before {
@@ -1855,7 +1855,7 @@ button:disabled {
 }
 
 .runtime-message-worked-for-failed .runtime-completion-title {
-  color: var(--danger);
+  color: var(--error);
 }
 
 .runtime-completion-stats {
@@ -1969,7 +1969,12 @@ button:disabled {
 
 .runtime-message-status-failed {
   border-color: var(--error);
-  background: rgba(var(--surface-raised-rgb), 0.66);
+}
+
+.runtime-message-row-assistant.runtime-message-status-failed .runtime-message-assistant {
+  padding-left: 10px;
+  border-left: 2px solid var(--error);
+  color: var(--error);
 }
 
 .rich-text {
