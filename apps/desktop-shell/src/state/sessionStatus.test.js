@@ -26,6 +26,8 @@ const translate = (key) => ({
   "sessionStatus.waitingInputDetail": "可以继续输入",
   "sessionStatus.running": "运行中",
   "sessionStatus.runningDetail": "正在处理",
+  "sessionStatus.reconnecting": "重连中",
+  "sessionStatus.reconnectingDetail": "正在恢复 Runtime 连接",
   "sessionStatus.waitingConfirmation": "等待确认",
   "sessionStatus.waitingConfirmationDetail": "需要确认",
   "sessionStatus.blocked": "受阻",
@@ -301,7 +303,7 @@ test("resolveSessionCardStatusView: runtime resume failure is blocked with error
   assert.equal(view.error.detail, "stdout closed");
 });
 
-test("resolveSessionCardStatusView: reconnecting runtime is visible as running before a turn exists", () => {
+test("resolveSessionCardStatusView: reconnecting runtime has an independent presentation state", () => {
   const view = resolveSessionCardStatusView(session({
     runtime_binding: createRuntimeBinding({
       state: RUNTIME_BINDING_STATE.reconnecting,
@@ -309,8 +311,28 @@ test("resolveSessionCardStatusView: reconnecting runtime is visible as running b
     }),
     turns: [],
   }), { translate });
-  assert.equal(view.status, CARD_STATUS.running);
+  assert.equal(view.status, CARD_STATUS.reconnecting);
+  assert.equal(view.label, "重连中");
   assert.equal(view.tone, "busy");
+});
+
+test("resolveSessionCardControlState: reconnecting runtime is not a running turn", () => {
+  const controls = resolveSessionCardControlState(session({
+    runtime_binding: createRuntimeBinding({
+      state: RUNTIME_BINDING_STATE.reconnecting,
+      stage: RUNTIME_BINDING_STAGE.load,
+    }),
+    turns: [{ id: "t", status: TURN_STATUS.completed }],
+  }), {
+    translate,
+    canSendToSession: () => false,
+  });
+
+  assert.equal(controls.statusView.status, CARD_STATUS.reconnecting);
+  assert.equal(controls.statusView.secondary_status?.status, TURN_STATUS.completed);
+  assert.equal(controls.isWaiting, false);
+  assert.equal(controls.isRestoring, true);
+  assert.equal(controls.canStop, false);
 });
 
 test("resolveSessionCardStatusView: runtime exit mid-session is blocked, not failed", () => {

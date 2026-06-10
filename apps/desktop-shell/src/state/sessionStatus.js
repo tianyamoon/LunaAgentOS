@@ -41,6 +41,7 @@ export const TURN_STATUS = Object.freeze({
 export const CARD_STATUS = Object.freeze({
   waiting_input: "waiting_input",
   running: "running",
+  reconnecting: "reconnecting",
   waiting_confirmation: "waiting_confirmation",
   blocked: "blocked",
   failed: "failed",
@@ -52,6 +53,7 @@ export const CARD_STATUS = Object.freeze({
 export const CARD_STATUS_META = Object.freeze({
   waiting_input: { labelKey: "sessionStatus.waitingInput", detailKey: "sessionStatus.waitingInputDetail", tone: "neutral", icon: "dot" },
   running: { labelKey: "sessionStatus.running", detailKey: "sessionStatus.runningDetail", tone: "busy", icon: "spinner" },
+  reconnecting: { labelKey: "sessionStatus.reconnecting", detailKey: "sessionStatus.reconnectingDetail", tone: "busy", icon: "spinner" },
   waiting_confirmation: { labelKey: "sessionStatus.waitingConfirmation", detailKey: "sessionStatus.waitingConfirmationDetail", tone: "attention", icon: "warning" },
   blocked: { labelKey: "sessionStatus.blocked", detailKey: "sessionStatus.blockedDetail", tone: "danger", icon: "warning" },
   failed: { labelKey: "sessionStatus.failed", detailKey: "sessionStatus.failedDetail", tone: "danger", icon: "warning" },
@@ -89,6 +91,8 @@ const DEFAULT_ZH = Object.freeze({
   "sessionStatus.waitingInputDetail": "当前没有运行中的任务，可以继续输入。",
   "sessionStatus.running": "运行中",
   "sessionStatus.runningDetail": "Agent 正在处理当前任务。",
+  "sessionStatus.reconnecting": "重连中",
+  "sessionStatus.reconnectingDetail": "正在恢复 ACP runtime 连接。",
   "sessionStatus.waitingConfirmation": "等待确认",
   "sessionStatus.waitingConfirmationDetail": "当前任务正在等待用户确认。",
   "sessionStatus.blocked": "受阻",
@@ -230,7 +234,7 @@ export function resolveSessionCardStatusView(session, options = {}) {
   }
 
   if (runtimeBinding.state === RUNTIME_BINDING_STATE.reconnecting) {
-    return buildStatusView(CARD_STATUS.running, translate, { secondary });
+    return buildStatusView(CARD_STATUS.reconnecting, translate, { secondary });
   }
 
   if (!turn || turnStatus === TURN_STATUS.created || turnStatus === TURN_STATUS.cancelled) {

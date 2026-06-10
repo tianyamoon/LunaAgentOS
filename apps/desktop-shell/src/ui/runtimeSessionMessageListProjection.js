@@ -76,7 +76,7 @@ function projectSessionRuntimeRow(session, options = {}) {
     kind: "runtime",
     turnId: null,
     promptRunId: null,
-    status: "running",
+    status: "reconnecting",
     content,
     metadata: {
       source: "runtime_binding",

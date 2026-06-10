@@ -381,7 +381,7 @@ test("runtimeSessionMessageListProjection: reconnecting session without turns re
 
   assert.equal(result.rows.length, 1);
   assert.equal(result.rows[0].kind, "runtime");
-  assert.equal(result.rows[0].status, "running");
+  assert.equal(result.rows[0].status, "reconnecting");
   assert.equal(result.rows[0].metadata.stage, "load");
   assert.equal(result.scrollTargetRowId, "s-restore:runtime:load");
 });

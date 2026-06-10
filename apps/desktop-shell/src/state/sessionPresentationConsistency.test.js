@@ -20,6 +20,8 @@ const t = (key) => ({
   "sessionStatus.waitingInputDetail": "waiting detail",
   "sessionStatus.running": "running",
   "sessionStatus.runningDetail": "running detail",
+  "sessionStatus.reconnecting": "reconnecting",
+  "sessionStatus.reconnectingDetail": "reconnecting detail",
   "sessionStatus.waitingConfirmation": "confirm",
   "sessionStatus.waitingConfirmationDetail": "confirm detail",
   "sessionStatus.blocked": "blocked",
@@ -136,6 +138,21 @@ test("session presentation keeps only the live current turn marked running", () 
     messages.rows.filter((row) => row.status === TURN_STATUS.running).map((row) => row.turnId),
     ["latest", "latest"],
   );
+});
+
+test("session presentation shows reconnecting consistently without marking completed rows running", () => {
+  const input = session({
+    runtime_binding: createRuntimeBinding({ state: "reconnecting", stage: "load" }),
+    turns: [{ id: "latest", status: TURN_STATUS.completed, task: "latest", finalResponse: "done" }],
+  });
+
+  const { card, history, workspace, messages } = presentationFor(input);
+
+  assert.equal(card.statusView.status, CARD_STATUS.reconnecting);
+  assert.equal(history.statusView.status, CARD_STATUS.reconnecting);
+  assert.equal(workspace.sessionStatusView.status, CARD_STATUS.reconnecting);
+  assert.equal(card.statusView.secondary_status?.status, TURN_STATUS.completed);
+  assert.equal(messages.rows.some((row) => row.status === TURN_STATUS.running), false);
 });
 
 test("session presentation treats read-only unfinished history as read-only everywhere", () => {

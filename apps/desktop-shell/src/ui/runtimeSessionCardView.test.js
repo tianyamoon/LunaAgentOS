@@ -130,6 +130,48 @@ test("runtimeSessionCardView: live running session exposes waiting classes for a
   assert.match(miniHtml, /session-status-running is-busy/);
 });
 
+test("runtimeSessionCardView: reconnecting session does not use running animation classes", () => {
+  const session = {
+    id: "session-restoring",
+    task: "restore session",
+    turns: [{ id: "t1", status: "completed" }],
+    record_state: "active",
+    access_mode: "interactive",
+    runtime_binding: { state: "reconnecting", stage: "load" },
+  };
+  const view = createView({
+    getCurrentSessionId: () => "session-restoring",
+    getFocusedSessionId: () => null,
+    resolveSessionCardControlState: () => ({
+      statusView: {
+        status: "reconnecting",
+        tone: "busy",
+        label: "重连中",
+        detail: "正在恢复连接",
+        icon: "spinner",
+        secondary_status: { status: "completed", label: "上次已完成" },
+      },
+      isWaiting: false,
+      isRestoring: true,
+      managementDisabled: true,
+      canStop: false,
+      canArchive: true,
+      canRestore: false,
+      actionDigest: "live|reconnecting|active|interactive",
+    }),
+  });
+
+  const cardHtml = view.renderSessionCard(session);
+  const miniHtml = view.renderSessionMiniCard(session);
+  assert.match(cardHtml, /session-status-reconnecting/);
+  assert.match(cardHtml, /上次已完成/);
+  assert.doesNotMatch(cardHtml, /session-card[^\"]*is-waiting/);
+  assert.doesNotMatch(cardHtml, /session-stop-btn/);
+  assert.doesNotMatch(cardHtml, /session-status-running/);
+  assert.match(miniHtml, /session-status-reconnecting/);
+  assert.doesNotMatch(miniHtml, /is-busy/);
+});
+
 test("runtimeSessionCardView: readonly stale running history has no waiting animation classes", () => {
   const session = {
     id: "session-history",

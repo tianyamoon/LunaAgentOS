@@ -248,6 +248,22 @@ test("runtimeSessionMessageListView: running row class is shared by render and r
   assert.match(messageRowClass(row), /is-active/);
 });
 
+test("runtimeSessionMessageListView: reconnecting runtime row is visible without running classes", () => {
+  const row = {
+    id: "session:runtime:load",
+    kind: "runtime",
+    content: "Restoring runtime",
+    status: "reconnecting",
+    metadata: { source: "runtime_binding", stage: "load" },
+  };
+  const view = createView();
+  const html = view.renderMessageRow(row);
+
+  assert.match(html, /runtime-message-status-reconnecting/);
+  assert.doesNotMatch(html, /runtime-message-status-running/);
+  assert.doesNotMatch(messageRowClass(row), /is-active/);
+});
+
 test("runtimeSessionMessageListView: 换序时只移动真实错位的行", () => {
   const first = fakeNode("first", rowSignature({ id: "first", kind: "tool", content: "1" }));
   const second = fakeNode("second", rowSignature({ id: "second", kind: "tool", content: "2" }));
