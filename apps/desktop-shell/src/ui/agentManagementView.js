@@ -178,14 +178,10 @@ export function createAgentManagementView({
       await ensureRuntimeConfigState();
       const provider = providerById(target.providerId) || { id: target.providerId, name: target.providerName || target.providerId };
       const runtimeInstance = runtimeInstanceById(target.runtimeInstanceId);
-      let discoveredModelControl = target.modelControl || runtimeInstance?.modelControl || provider.modelControl || provider.adapterManifest?.modelControl;
-      if (runtimeInstance?.available && typeof discoverModelControl === "function") {
-        try {
-          discoveredModelControl = await discoverModelControl(target);
-        } catch (error) {
-          console.warn("model control discovery failed", error);
-        }
-      }
+      const discoveredModelControl = runtimeInstance?.modelControl
+        || target.modelControl
+        || provider.modelControl
+        || provider.adapterManifest?.modelControl;
       const managedTarget = { ...target, modelControl: discoveredModelControl || { mode: "native_runtime" } };
       const detail = buildAgentDetail({
         target: {
@@ -275,6 +271,11 @@ export function createAgentManagementView({
         setAppNotice(t("connection.rechecking"), "busy");
         try {
           await refreshProviderConnections(target.providerId);
+          const refreshedTarget = agentById(agentId) || target;
+          const refreshedInstance = runtimeInstanceById(refreshedTarget.runtimeInstanceId);
+          if (refreshedInstance?.available && typeof discoverModelControl === "function") {
+            await discoverModelControl(refreshedTarget);
+          }
           setAppNotice(t("connection.checkComplete"));
           await openAgentManager(agentId);
         } catch (error) {

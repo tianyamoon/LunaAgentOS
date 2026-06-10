@@ -1,3 +1,4 @@
+use chrono::Utc;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::env;
@@ -591,13 +592,22 @@ pub fn inspect_adapter_model_control(adapter: AdapterLaunchSpec, cwd: Option<Str
     let option = model_config_option(&session.config_options).cloned();
     let _ = session.child.kill();
     let _ = session.child.wait();
-    let Some(option) = option else { return Ok(json!({ "mode": "native_runtime", "availableModels": [] })); };
+    let checked_at = Utc::now().to_rfc3339();
+    let Some(option) = option else {
+        return Ok(json!({
+            "mode": "native_runtime",
+            "availableModels": [],
+            "source": "acp_session_config",
+            "checkedAt": checked_at
+        }));
+    };
     Ok(json!({
         "mode": "luna_managed",
         "configId": option.get("id").cloned().unwrap_or(Value::String("model".into())),
         "defaultModel": option.get("currentValue").cloned().unwrap_or(Value::Null),
         "availableModels": option_values(&option),
-        "source": "acp_session_config"
+        "source": "acp_session_config",
+        "checkedAt": checked_at
     }))
 }
 

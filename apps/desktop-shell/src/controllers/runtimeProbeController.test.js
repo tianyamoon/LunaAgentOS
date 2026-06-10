@@ -37,6 +37,10 @@ function createProvidersStore() {
     setSlashCommandsForProvider(providerId, commands) {
       store.slashCommands.push({ providerId, commands });
     },
+    setRuntimeInstanceModelControl(instanceId, modelControl) {
+      const instance = store.instances.find((item) => item.id === instanceId);
+      if (instance) instance.modelControl = modelControl;
+    },
     getRuntimeAvailabilitySnapshot() {
       return store.availability || {};
     },
@@ -125,4 +129,26 @@ test("runtimeProbeController: target load failure uses localized notice", async 
   await controller.loadRuntimeTargetsForProvider("demo");
 
   assert.deepEqual(calls.at(-1), ["notice", "provider.runtimeTargetLoadFailed:boom", "error"]);
+});
+
+test("runtimeProbeController: explicit model discovery stores runtime-backed result", async () => {
+  const { controller, providersStore } = createController({
+    runtimeAdapterCatalog: {
+      loadModelControl: async () => ({
+        mode: "luna_managed",
+        availableModels: ["fast", "deep"],
+        source: "acp_session_config",
+        checkedAt: "2026-06-11T00:00:00Z",
+      }),
+    },
+  });
+  providersStore.instances = [{ id: "demo-win", providerId: "demo", available: true }];
+
+  const result = await controller.discoverModelControl({
+    providerId: "demo",
+    runtimeInstanceId: "demo-win",
+  });
+
+  assert.equal(result.checkedAt, "2026-06-11T00:00:00Z");
+  assert.deepEqual(providersStore.instances[0].modelControl.availableModels, ["fast", "deep"]);
 });
