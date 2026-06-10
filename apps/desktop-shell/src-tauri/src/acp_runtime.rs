@@ -568,6 +568,19 @@ fn send_prompt(
         events,
         on_event,
     )?;
+    collect_trailing_updates(
+        runtime,
+        &session.inbox,
+        &mut session.stdin,
+        Some(&session.stderr_log),
+        Some(&session.stderr_done),
+        Some(&mut session.child),
+        events,
+        on_event,
+    )?;
+    if !has_assistant_response(events) {
+        return Err(format!("{} 未返回助手回复。", runtime.display()));
+    }
 
     push_event(
         events,
@@ -589,6 +602,17 @@ fn send_prompt(
 
     let _ = session.child.id();
     Ok(())
+}
+
+fn has_assistant_response(events: &[Value]) -> bool {
+    events.iter().any(|event| {
+        event.get("type").and_then(Value::as_str) == Some("response")
+            && event
+                .get("payload")
+                .and_then(|payload| payload.get("content"))
+                .and_then(Value::as_str)
+                .is_some_and(|content| !content.trim().is_empty())
+    })
 }
 
 fn spawn_stdout_reader(stdout: ChildStdout) -> Receiver<Value> {
@@ -666,6 +690,54 @@ fn quarantine_idle_messages(
 
         if message.get("method").and_then(|value| value.as_str()) == Some("session/update") {
             discarded_updates += 1;
+        }
+    }
+}
+
+fn collect_trailing_updates(
+    runtime: &AcpRuntime,
+    inbox: &Receiver<Value>,
+    stdin: &mut impl Write,
+    stderr_log: Option<&Arc<Mutex<String>>>,
+    stderr_done: Option<&Receiver<()>>,
+    mut child: Option<&mut Child>,
+    events: &mut Vec<Value>,
+    on_event: &mut Option<&mut dyn FnMut(Value)>,
+) -> Result<usize, String> {
+    let mut collected_updates = 0;
+    let started_at = Instant::now();
+    let quiet_window = Duration::from_millis(20);
+    let max_wait = Duration::from_millis(200);
+    loop {
+        let remaining = max_wait.saturating_sub(started_at.elapsed());
+        if remaining.is_zero() {
+            return Ok(collected_updates);
+        }
+        let message = match inbox.recv_timeout(quiet_window.min(remaining)) {
+            Ok(message) => message,
+            Err(RecvTimeoutError::Timeout) => return Ok(collected_updates),
+            Err(RecvTimeoutError::Disconnected) => {
+                return Err(format_adapter_process_closed(
+                    runtime,
+                    stderr_log,
+                    stderr_done,
+                    child.as_deref_mut(),
+                ));
+            }
+        };
+
+        if let Some(id) = message.get("id").and_then(|value| value.as_i64()) {
+            if message.get("method").is_some() {
+                respond_to_client_request(stdin, id, &message)?;
+                continue;
+            }
+        }
+
+        if message.get("method").and_then(|value| value.as_str()) == Some("session/update") {
+            collected_updates += 1;
+            if let Some(event) = map_session_update(&message) {
+                push_event(events, event, on_event);
+            }
         }
     }
 }
@@ -953,6 +1025,71 @@ mod tests {
             quarantine_idle_messages(&runtime, &inbox, &mut stdin, None, None, None).unwrap();
 
         assert_eq!(discarded, 1);
+    }
+
+    #[test]
+    fn post_response_update_is_collected_for_current_prompt() {
+        let runtime = AcpRuntime::Adapter {
+            id: "test".to_string(),
+            name: "Test".to_string(),
+        };
+        let (sender, inbox) = mpsc::channel();
+        sender
+            .send(json!({"jsonrpc":"2.0","id":1,"result":{"stopReason":"end_turn"}}))
+            .unwrap();
+        let delayed_sender = sender.clone();
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(5));
+            delayed_sender
+                .send(json!({"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"session-1","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"trailing response"}}}}))
+                .unwrap();
+        });
+        let mut stdin = Vec::new();
+        let mut events = Vec::new();
+        let mut callback = None;
+
+        read_response(
+            &runtime,
+            &inbox,
+            &mut stdin,
+            1,
+            None,
+            None,
+            None,
+            &mut events,
+            &mut callback,
+        )
+        .unwrap();
+        let collected = collect_trailing_updates(
+            &runtime,
+            &inbox,
+            &mut stdin,
+            None,
+            None,
+            None,
+            &mut events,
+            &mut callback,
+        )
+        .unwrap();
+
+        assert_eq!(collected, 1);
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0]["payload"]["content"], "trailing response");
+    }
+
+    #[test]
+    fn prompt_without_assistant_response_is_not_successful() {
+        let usage_only = vec![json!({
+            "type": "usage",
+            "payload": { "used": 42 }
+        })];
+        let response = vec![json!({
+            "type": "response",
+            "payload": { "content": "answer" }
+        })];
+
+        assert!(!has_assistant_response(&usage_only));
+        assert!(has_assistant_response(&response));
     }
 
     #[test]
