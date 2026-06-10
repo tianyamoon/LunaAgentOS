@@ -23,7 +23,6 @@ export function createAcpRuntimeClient({
       runtimeHost: session.runtimeHost || null,
       runtimeCommand: session.runtimeCommand || null,
       profileExecutable: session.profileExecutable || null,
-      defaultModel: session.defaultModel || null,
       ...args,
     };
   }
@@ -69,6 +68,7 @@ export function createAcpRuntimeClient({
     return invoke(
       runtimeCommands.prompt,
       invokeArgs(runtimeCommands, session.providerId, runtimeArgs(session, {
+        defaultModel: session.defaultModel || null,
         prompt: turn.runtimePrompt || turn.prompt,
         turnId: turn.id,
         promptRunId,

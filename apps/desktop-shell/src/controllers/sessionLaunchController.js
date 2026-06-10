@@ -152,6 +152,16 @@ export function createSessionLaunchController({
       setAppNotice(t("composer.providerUnavailable", { provider: provider.name, state: label }), "error");
       return null;
     }
+    const savedDefaultModel = defaultModelForTarget(agent);
+    if (savedDefaultModel && agent.modelControl?.mode === "luna_managed") {
+      const availableModels = Array.isArray(agent.modelControl.availableModels)
+        ? agent.modelControl.availableModels
+        : [];
+      if (!availableModels.includes(savedDefaultModel)) {
+        setAppNotice(t("agentDetail.model.savedUnavailable"), "error");
+        return null;
+      }
+    }
 
     const selectedSession = getCurrentSession();
     const selectedSessionActive = selectedSession ? isSessionActive(selectedSession.id) : false;

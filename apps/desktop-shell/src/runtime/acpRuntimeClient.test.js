@@ -70,8 +70,10 @@ test("acpRuntimeClient: load, resume and shutdown use session identity", async (
   await client.shutdown(session);
   assert.equal(calls[0].command, "load");
   assert.equal(calls[0].args.acpSessionId, "acp-1");
+  assert.equal("defaultModel" in calls[0].args, false);
   assert.equal(calls[1].command, "resume");
   assert.equal(calls[1].args.acpSessionId, "acp-1");
+  assert.equal("defaultModel" in calls[1].args, false);
   assert.deepEqual(calls[2], {
     command: "shutdown",
     args: { adapterId: "hermes", runtimeSessionId: "runtime-1" },

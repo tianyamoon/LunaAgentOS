@@ -172,6 +172,17 @@ test("sessionLaunchController: Luna-managed default model is copied only to a ne
   assert.equal(sessions[0].defaultModel, "model-2");
 });
 
+test("sessionLaunchController: unverified or stale saved model blocks new Session", () => {
+  const { calls, controller, sessions } = makeHarness({
+    modelControl: { mode: "luna_managed", availableModels: ["model-1"] },
+    savedDefaultModel: "model-2",
+  });
+
+  assert.equal(controller.startSessionFromPrompt(), null);
+  assert.equal(sessions.length, 0);
+  assert.equal(calls.includes("notice:error:agentDetail.model.savedUnavailable"), true);
+});
+
 test("sessionLaunchController: unrestorable history explains that a new session is required", () => {
   const currentSession = {
     id: "history-without-runtime-id",
