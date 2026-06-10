@@ -59,3 +59,14 @@ test("focused workspace keeps the main card bounded above the mini bar", () => {
 test("narrow topbar tools wrap instead of clipping the theme control", () => {
   assert.match(styles, /@media \(max-width: 480px\)[\s\S]*?\.topbar-tools\s*\{[\s\S]*?width:\s*100%;[\s\S]*?min-width:\s*0;[\s\S]*?flex-wrap:\s*wrap;/);
 });
+
+test("completed conversation rows keep the answer primary and trace summary secondary", () => {
+  assertDeclarations(".runtime-message-assistant", [
+    { name: "border", value: "0" },
+    { name: "background", value: "transparent" },
+  ]);
+  assertDeclarations(".terminal-detail.runtime-message-worked-for", [
+    { name: "border", value: "0" },
+    { name: "background", value: "transparent" },
+  ]);
+});

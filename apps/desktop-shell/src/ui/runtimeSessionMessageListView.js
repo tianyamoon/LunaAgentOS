@@ -51,7 +51,6 @@ export function createRuntimeSessionMessageListView({
     const phase = row.metadata?.final ? "final" : "streaming";
     return `
       <section class="runtime-message-assistant ${row.status === "running" ? "is-streaming" : ""}">
-        <div class="runtime-message-label">${escapeHtml(t("turn.timeline.assistant"))}</div>
         ${renderAssistantResponse(row.content || t("turn.waiting"), phase)}
       </section>
     `;

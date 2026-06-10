@@ -1668,12 +1668,16 @@ button:disabled {
   width: 100%;
   max-width: 100%;
   min-height: 100%;
-  padding: 2px 2px 20px;
+  padding: 2px 4px 20px;
 }
 
 .runtime-message-row {
   min-width: 0;
   max-width: 100%;
+}
+
+.runtime-message-row + .runtime-message-row {
+  margin-top: 7px;
 }
 
 .runtime-message-row-user {
@@ -1710,10 +1714,10 @@ button:disabled {
 }
 
 .runtime-message-assistant {
-  padding: 10px 12px;
-  border: 1px solid rgba(var(--surface-raised-rgb), 0.75);
-  border-radius: 10px;
-  background: rgba(var(--surface-raised-rgb), 0.72);
+  padding: 2px 4px 4px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .runtime-message-label,
@@ -1791,18 +1795,19 @@ button:disabled {
   margin: 7px 0 0 20px;
 }
 
-.runtime-message-worked-for {
-  margin-top: 2px;
-  border: 1px solid rgba(var(--done-rgb), 0.16);
-  border-radius: 10px;
-  background: rgba(var(--done-rgb), 0.06);
-  color: var(--label-warm);
-  font-size: 0.76rem;
-  font-weight: 700;
+.terminal-detail.runtime-message-worked-for {
+  margin: -2px 0 3px;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
 }
 
 .runtime-message-worked-for summary {
-  min-height: 26px;
+  min-height: 22px;
 }
 
 .runtime-message-worked-for .cb-check {
@@ -1810,8 +1815,8 @@ button:disabled {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  width: 15px;
-  height: 15px;
+  width: 13px;
+  height: 13px;
   border-radius: 999px;
   background: var(--done);
   color: #fff;
@@ -1829,12 +1834,12 @@ button:disabled {
 }
 
 .runtime-completion-title {
-  color: var(--done);
+  color: var(--muted);
 }
 
-.runtime-message-worked-for-failed {
-  border-color: rgba(var(--danger-rgb), 0.28);
-  background: rgba(var(--danger-rgb), 0.08);
+.terminal-detail.runtime-message-worked-for-failed {
+  border: 0;
+  background: transparent;
 }
 
 .runtime-message-worked-for-failed .cb-check {

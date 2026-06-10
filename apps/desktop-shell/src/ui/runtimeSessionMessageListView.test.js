@@ -24,6 +24,7 @@ test("runtimeSessionMessageListView: 渲染稳定 MessageList 外壳与浮动按
   assert.match(html, /data-runtime-scroll-latest hidden/);
   assert.match(html, /data-message-id="t1:user"/);
   assert.match(html, /data-phase="final"/);
+  assert.doesNotMatch(html, /runtime-message-label/);
 });
 
 test("runtimeSessionMessageListView: worked row folds completed trace and debug into one details", () => {
