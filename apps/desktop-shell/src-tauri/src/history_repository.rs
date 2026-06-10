@@ -395,10 +395,9 @@ fn upsert_entry(entries: &mut Vec<HistoryEntry>, saved: HistoryEntry) {
 }
 
 /// 读取全部历史记录，并按时间倒序返回。
-#[tauri::command]
-pub(crate) fn load_history_entries(app: AppHandle) -> Result<Vec<HistoryEntry>, String> {
+fn load_history_entries_blocking(app: &AppHandle) -> Result<Vec<HistoryEntry>, String> {
     let mut entries = Vec::new();
-    for path in history_json_files(&app)? {
+    for path in history_json_files(app)? {
         if let Some(mut day_entries) = try_load_history_file(&path) {
             entries.append(&mut day_entries);
         }
@@ -407,13 +406,19 @@ pub(crate) fn load_history_entries(app: AppHandle) -> Result<Vec<HistoryEntry>, 
     Ok(entries)
 }
 
-/// 扫描全部历史文件，执行 schema 升级与重复记录压缩。
 #[tauri::command]
-pub(crate) fn compact_history_entries(app: AppHandle) -> Result<HistoryCompactResult, String> {
+pub(crate) async fn load_history_entries(app: AppHandle) -> Result<Vec<HistoryEntry>, String> {
+    tauri::async_runtime::spawn_blocking(move || load_history_entries_blocking(&app))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+/// 扫描全部历史文件，执行 schema 升级与重复记录压缩。
+fn compact_history_entries_blocking(app: &AppHandle) -> Result<HistoryCompactResult, String> {
     let mut removed_count = 0;
     let mut upgraded_count = 0;
     let mut skipped_files = 0;
-    for path in history_json_files(&app)? {
+    for path in history_json_files(app)? {
         let Some(entries) = try_load_history_file(&path) else {
             skipped_files += 1;
             continue;
@@ -432,6 +437,15 @@ pub(crate) fn compact_history_entries(app: AppHandle) -> Result<HistoryCompactRe
         upgraded_count,
         skipped_files,
     })
+}
+
+#[tauri::command]
+pub(crate) async fn compact_history_entries(
+    app: AppHandle,
+) -> Result<HistoryCompactResult, String> {
+    tauri::async_runtime::spawn_blocking(move || compact_history_entries_blocking(&app))
+        .await
+        .map_err(|error| error.to_string())?
 }
 
 /// 从所有分桶中删除指定 Session。

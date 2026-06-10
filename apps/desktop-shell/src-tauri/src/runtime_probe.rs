@@ -251,9 +251,8 @@ pub(crate) fn runtime_adapter_probe(
 }
 
 /// 探测全部可运行 Adapter，identity-only Adapter 只展示身份，不参与探测。
-#[tauri::command]
-pub(crate) fn runtime_probe(app: AppHandle) -> RuntimeProbeResult {
-    let config = load_runtime_config_file(&app);
+fn runtime_probe_blocking(app: &AppHandle) -> RuntimeProbeResult {
+    let config = load_runtime_config_file(app);
     let mut providers = Vec::new();
     let mut instances = Vec::new();
     let adapter_result = adapter_registry::load_adapters(&config.adapter_plugin_paths);
@@ -271,28 +270,57 @@ pub(crate) fn runtime_probe(app: AppHandle) -> RuntimeProbeResult {
     }
 }
 
-/// 获取指定 Runtime Instance 暴露的动态 Agent Entry。
 #[tauri::command]
-pub(crate) fn runtime_adapter_targets(
+pub(crate) async fn runtime_probe(app: AppHandle) -> Result<RuntimeProbeResult, String> {
+    tauri::async_runtime::spawn_blocking(move || runtime_probe_blocking(&app))
+        .await
+        .map_err(|error| error.to_string())
+}
+
+fn runtime_adapter_targets_blocking(
+    app: &AppHandle,
+    adapter_id: &str,
+    runtime_instance_id: Option<&str>,
+) -> Result<Vec<Value>, String> {
+    let config = load_runtime_config_file(app);
+    let adapter = adapter_registry::find_adapter(&config.adapter_plugin_paths, &adapter_id)?;
+    adapter_extensions::adapter_targets(&adapter, &config, runtime_instance_id)
+        .unwrap_or_else(|| Ok(Vec::new()))
+}
+
+#[tauri::command]
+pub(crate) async fn runtime_adapter_targets(
     app: AppHandle,
     adapter_id: String,
     runtime_instance_id: Option<String>,
 ) -> Result<Vec<Value>, String> {
-    let config = load_runtime_config_file(&app);
+    tauri::async_runtime::spawn_blocking(move || {
+        runtime_adapter_targets_blocking(&app, &adapter_id, runtime_instance_id.as_deref())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+fn runtime_adapter_slash_commands_blocking(
+    app: &AppHandle,
+    adapter_id: &str,
+    runtime_instance_id: Option<&str>,
+) -> Result<Vec<adapter_registry::SlashCommandCapability>, String> {
+    let config = load_runtime_config_file(app);
     let adapter = adapter_registry::find_adapter(&config.adapter_plugin_paths, &adapter_id)?;
-    adapter_extensions::adapter_targets(&adapter, &config, runtime_instance_id.as_deref())
+    adapter_extensions::slash_commands(&adapter, &config, runtime_instance_id)
         .unwrap_or_else(|| Ok(Vec::new()))
 }
 
-/// 获取指定 Runtime Instance 暴露的 slash commands。
 #[tauri::command]
-pub(crate) fn runtime_adapter_slash_commands(
+pub(crate) async fn runtime_adapter_slash_commands(
     app: AppHandle,
     adapter_id: String,
     runtime_instance_id: Option<String>,
 ) -> Result<Vec<adapter_registry::SlashCommandCapability>, String> {
-    let config = load_runtime_config_file(&app);
-    let adapter = adapter_registry::find_adapter(&config.adapter_plugin_paths, &adapter_id)?;
-    adapter_extensions::slash_commands(&adapter, &config, runtime_instance_id.as_deref())
-        .unwrap_or_else(|| Ok(Vec::new()))
+    tauri::async_runtime::spawn_blocking(move || {
+        runtime_adapter_slash_commands_blocking(&app, &adapter_id, runtime_instance_id.as_deref())
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }

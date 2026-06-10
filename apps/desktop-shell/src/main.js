@@ -174,6 +174,7 @@ import {
 import { sessionSectionsFromEvents } from "./runtime/streamEvents.js";
 import { FALLBACK_SESSIONS } from "./fixtures/fallbackSessions.js";
 import { createDesktopBridge } from "./platform/desktopBridge.js";
+import { scheduleStartupTasks } from "./platform/startupTaskScheduler.js";
 
 const { invoke, listenRuntimeEvent } = createDesktopBridge(window.__TAURI__);
 
@@ -1557,33 +1558,27 @@ renderProviders();
 applyStaticTranslations();
 applyFontScale();
 applyTheme();
-void loadUserThemes();
 updateSendModeLabel();
 workspaceViewStore.hydrateFromSessions(sessionsSnapshot());
 renderWorkspace();
 renderHistory();
 updateActionLabels();
-setTimeout(() => {
-  loadRuntimeConfigState()
-    .then(() => {
-      renderProviders();
-    })
-    .catch((error) => {
-      console.error(error);
-    });
-}, 0);
-setTimeout(() => {
-  void loadHistory();
-}, 0);
-setTimeout(() => {
-  refreshRuntimeProbe().then(() => {
+scheduleStartupTasks([
+  () => loadUserThemes(),
+  async () => {
+    await loadRuntimeConfigState();
+    renderProviders();
+  },
+  () => loadHistory(),
+  async () => {
+    await refreshRuntimeProbe();
     const providerIds = [...new Set(runtimeInstancesSnapshot()
       .filter((instance) => instance.available)
       .map((instance) => instance.providerId))];
     providerIds.forEach((providerId) => {
       void loadRuntimeTargetsForProvider(providerId);
     });
-  });
-}, 0);
+  },
+]);
 
 setInterval(() => { void runtimeAliveController.sync(); }, 15000);
