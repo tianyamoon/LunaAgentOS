@@ -15,7 +15,7 @@ const translate = (key, params = {}) => {
 
 test("sessionTranscript: 单轮文本包含用户、思考、响应和运行日志", () => {
   const text = turnTranscriptText({
-    task: "检查日志",
+    prompt: "检查日志",
     thoughts: ["先定位入口"],
     finalResponse: "已经完成",
     logs: ["读取文件"],
@@ -34,8 +34,8 @@ test("sessionTranscript: 单轮文本包含用户、思考、响应和运行日�
 test("sessionTranscript: 多轮会话使用稳定分隔符", () => {
   const text = sessionTranscriptText({
     turns: [
-      { task: "A", thoughts: [], outputs: ["答 A"], logs: [] },
-      { task: "B", thoughts: [], outputs: ["答 B"], logs: [] },
+      { prompt: "A", thoughts: [], outputs: ["答 A"], logs: [] },
+      { prompt: "B", thoughts: [], outputs: ["答 B"], logs: [] },
     ],
   }, {
     translate,

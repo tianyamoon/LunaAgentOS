@@ -105,7 +105,7 @@ export function eventLogText(event) {
     const entries = event.payload?.entries;
     if (!Array.isArray(entries) || !entries.length) return t("event.planUpdated");
     const lines = entries.map((entry, index) => {
-      const title = entry.title || entry.content || entry.task || entry.description || t("event.step", { index: index + 1 });
+      const title = entry.title || entry.content || entry.prompt || entry.description || t("event.step", { index: index + 1 });
       const status = entry.status || entry.state || "";
       return `${status ? `[${status}] ` : ""}${title}`;
     });
@@ -157,7 +157,6 @@ export function applyEventsToTurn(session, turn, events, { now = Date.now } = {}
     finalizeTurnTimeline(turn, { now });
   }
   if (acpSessionEvent?.payload?.sessionId) session.acpSessionId = acpSessionEvent.payload.sessionId;
-  session.task = turn.task;
   session.state = turn.state;
   session.activeTurnId = turn.id;
   return turn;

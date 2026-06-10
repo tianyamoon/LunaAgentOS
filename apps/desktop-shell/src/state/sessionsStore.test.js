@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createSessionsStore } from "./sessionsStore.js";
 
 function makeSession(id, overrides = {}) {
-  return { id, task: `task-${id}`, turns: [], ...overrides };
+  return { id, title: `session-${id}`, turns: [], ...overrides };
 }
 
 test("sessionsStore: replaceSessions copies the array (no aliasing)", () => {
@@ -29,9 +29,9 @@ test("sessionsStore: upsertHead inserts at front and dedupes by id", () => {
   store.replaceSessions([makeSession("a"), makeSession("b")]);
   store.upsertHead(makeSession("c"));
   assert.deepEqual(store.getSessionsSnapshot().map((s) => s.id), ["c", "a", "b"]);
-  store.upsertHead(makeSession("a", { task: "updated" }));
+  store.upsertHead(makeSession("a", { title: "updated" }));
   assert.deepEqual(store.getSessionsSnapshot().map((s) => s.id), ["a", "c", "b"]);
-  assert.equal(store.getSession("a").task, "updated");
+  assert.equal(store.getSession("a").title, "updated");
 });
 
 test("sessionsStore: removeSessionById and filterSessions only notify on change", () => {
@@ -80,12 +80,12 @@ test("sessionsStore: updateSession owns object mutation and notifies once", () =
 
   assert.equal(
     store.updateSession("a", (session) => {
-      session.task = "updated";
+      session.title = "updated";
       return true;
     }),
     true,
   );
-  assert.equal(store.getSession("a").task, "updated");
+  assert.equal(store.getSession("a").title, "updated");
   assert.equal(notifyCount, 1);
 
   assert.equal(
@@ -107,11 +107,11 @@ test("sessionsStore: batched session mutations preserve changed session ids", ()
 
   store.batch(() => {
     store.updateSession("a", (session) => {
-      session.task = "updated-a";
+      session.title = "updated-a";
       return true;
     });
     store.updateSession("b", (session) => {
-      session.task = "updated-b";
+      session.title = "updated-b";
       return true;
     });
   });

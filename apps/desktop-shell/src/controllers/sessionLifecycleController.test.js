@@ -5,7 +5,7 @@ import { createSessionLifecycleController } from "./sessionLifecycleController.j
 
 // 创建生命周期控制器的最小可观察依赖。
 function makeHarness({ sessionOverrides = {}, archived = null, shutdownError = null } = {}) {
-  const sessions = [{ id: "s1", agentName: "Agent", task: "Task", lifecycle: "live", turns: [], ...sessionOverrides }];
+  const sessions = [{ id: "s1", agentName: "Agent", title: "Session", lifecycle: "live", turns: [], ...sessionOverrides }];
   const notices = [];
   const calls = [];
   let currentSessionId = "s1";

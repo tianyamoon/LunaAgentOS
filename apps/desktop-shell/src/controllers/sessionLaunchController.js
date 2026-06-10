@@ -9,6 +9,15 @@ import {
   createRuntimeBinding,
 } from "../state/sessionStatus.js";
 
+export function sessionTitleFromPrompt(prompt, maxLength = 80) {
+  const firstNonEmptyLine = String(prompt || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find(Boolean) || "";
+  const title = firstNonEmptyLine.replace(/\s+/g, " ");
+  return title.length > maxLength ? title.slice(0, maxLength) : title;
+}
+
 // 创建发送入口控制器。Shell 仅注入环境能力，控制器不理解具体 Adapter。
 export function createSessionLaunchController({
   getPromptValue,
@@ -49,7 +58,7 @@ export function createSessionLaunchController({
   let sessionSeq = 0;
 
   // 创建通用 Runtime Session。Agent Entry 的 Adapter 差异只作为快照透传。
-  function createSessionForAgent(agent, firstTask) {
+  function createSessionForAgent(agent, initialPrompt) {
     const provider = providerById(agent?.providerId);
     if (!agent || !provider) return null;
 
@@ -71,7 +80,7 @@ export function createSessionLaunchController({
       profileExecutable: agentEntrySnapshot.launch.profileExecutable || null,
       defaultModel: agent.modelControl?.mode === "luna_managed" ? defaultModelForTarget(agent) || null : null,
       agentEntrySnapshot,
-      task: firstTask,
+      title: sessionTitleFromPrompt(initialPrompt) || t("history.newSession"),
       state: 2,
       lifecycle: LIFECYCLE.live,
       runtimeState: LIFECYCLE.live,
@@ -90,21 +99,21 @@ export function createSessionLaunchController({
     return session;
   }
 
-  // 创建 Turn 后立即刷新工作区，使用户先看到已接收任务的反馈。
-  function createTurn(session, task, options = {}) {
-    const turn = createSessionTurn(session, task, options);
+  // 创建 Turn 后立即刷新工作区，使用户先看到已接收输入的反馈。
+  function createTurn(session, prompt, options = {}) {
+    const turn = createSessionTurn(session, prompt, options);
     shellSurface.refreshWorkspace();
     return turn;
   }
 
   // 优先复用当前可交互 Session；目标变化或 Session 失活时创建新会话。
-  function getOrCreateActiveSession(task, forceNew = false) {
+  function getOrCreateActiveSession(prompt, forceNew = false) {
     const agent = getCurrentTargetAgent();
     if (!agent) return null;
     const existing = !forceNew ? getCurrentSession() : null;
-    if (existing && existing.agentId !== agent.id) return createSessionForAgent(agent, task);
-    if (existing && !isSessionActive(existing.id)) return createSessionForAgent(agent, task);
-    return existing || createSessionForAgent(agent, task);
+    if (existing && existing.agentId !== agent.id) return createSessionForAgent(agent, prompt);
+    if (existing && !isSessionActive(existing.id)) return createSessionForAgent(agent, prompt);
+    return existing || createSessionForAgent(agent, prompt);
   }
 
   // 将附件投影为可持久化的轻量元数据，正文仅拼入本轮 runtime prompt。
@@ -120,8 +129,8 @@ export function createSessionLaunchController({
 
   // 从 Composer 启动一次发送。ACP 与 fallback 只在最后一步分流。
   function startSessionFromPrompt(forceNewSession = false) {
-    const task = getPromptValue().trim();
-    if (!task) {
+    const prompt = getPromptValue().trim();
+    if (!prompt) {
       shellSurface.focusComposer();
       return null;
     }
@@ -171,16 +180,16 @@ export function createSessionLaunchController({
       return null;
     }
 
-    const session = getOrCreateActiveSession(task, composingNewSession);
+    const session = getOrCreateActiveSession(prompt, composingNewSession);
     if (!session) return null;
     saveCurrentSession(session.id);
     unmarkStopped(session.id);
     const attachments = getComposerAttachments();
-    const runtimePrompt = buildPromptWithAttachments(task, attachments, {
+    const runtimePrompt = buildPromptWithAttachments(prompt, attachments, {
       title: t("composer.attachment.promptTitle"),
       truncated: t("composer.attachment.truncated"),
     });
-    const submission = sessionPromptQueue.submit(session, task, {
+    const submission = sessionPromptQueue.submit(session, prompt, {
       runtimePrompt,
       attachments: attachmentMetadata(attachments),
     });

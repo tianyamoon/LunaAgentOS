@@ -99,7 +99,7 @@ export function createRuntimeSessionCardView({
     const identityTitle = sessionIdentityTitle(identitySession);
     const identityTitleMarkup = renderSessionIdentityTitle(identitySession);
     return `
-      <article class="session-card ${isFocusedSession ? "fullscreen" : ""} ${isActiveReceiver ? "is-active-receiver" : ""} ${isWaiting ? "is-waiting" : ""}" data-session-id="${session.id}" tabindex="0" aria-label="${escapeHtml(t("session.ariaSwitch", { task: session.task }))}" ${isActiveReceiver ? "aria-current=\"true\"" : ""}>
+      <article class="session-card ${isFocusedSession ? "fullscreen" : ""} ${isActiveReceiver ? "is-active-receiver" : ""} ${isWaiting ? "is-waiting" : ""}" data-session-id="${session.id}" tabindex="0" aria-label="${escapeHtml(t("session.ariaSwitch", { title: session.title }))}" ${isActiveReceiver ? "aria-current=\"true\"" : ""}>
         <div class="session-card-header">
           <div class="session-card-row session-card-identity-line">
             <div class="session-agent-title">
@@ -130,9 +130,9 @@ export function createRuntimeSessionCardView({
             </div>
             ${profileMeta ? `<div class="caption session-profile-meta">${escapeHtml(profileMeta)}</div>` : ""}
           </div>
-          <div class="session-task-line" title="${escapeHtml(session.task)}" aria-label="${escapeHtml(t("session.task", { task: session.task }))}">
-            <span class="session-task-label">${escapeHtml(t("session.taskLabel"))}</span>
-            <span class="session-task-text">${escapeHtml(session.task)}</span>
+          <div class="session-title-line" title="${escapeHtml(session.title)}" aria-label="${escapeHtml(t("session.title", { title: session.title }))}">
+            <span class="session-title-label">${escapeHtml(t("session.titleLabel"))}</span>
+            <span class="session-title-text">${escapeHtml(session.title)}</span>
           </div>
           ${renderSessionStatusError(statusView)}
         </div>
@@ -151,14 +151,14 @@ export function createRuntimeSessionCardView({
     const statusView = controlState.statusView;
     const isActive = getCurrentSessionId() === session.id;
     const isWaiting = controlState.isWaiting;
-    const taskPreview = (session.task || "").replace(/\s+/g, " ").trim();
-    const previewText = taskPreview.length > 64 ? `${taskPreview.slice(0, 64)}\u2026` : taskPreview;
+    const titlePreview = (session.title || "").replace(/\s+/g, " ").trim();
+    const previewText = titlePreview.length > 64 ? `${titlePreview.slice(0, 64)}\u2026` : titlePreview;
     const identityTitle = sessionIdentityTitle(identitySession);
     return `<button type="button" class="session-mini-card ${isActive ? "is-active" : ""} ${isWaiting ? "is-waiting" : ""}" data-session-id="${escapeHtml(session.id)}" title="${escapeHtml(identityTitle)}">
       <span class="session-mini-card-state runtime-pill session-status-${escapeHtml(statusView.tone)} session-status-${escapeHtml(statusView.status)} ${isWaiting ? "is-busy" : ""}" aria-label="${escapeHtml(statusView.label)}"></span>
       <span class="session-mini-card-body">
         <span class="session-mini-card-title">${escapeHtml(identityTitle)}</span>
-        ${previewText ? `<span class="session-mini-card-task">${escapeHtml(previewText)}</span>` : ""}
+        ${previewText ? `<span class="session-mini-card-title-text">${escapeHtml(previewText)}</span>` : ""}
       </span>
       <span class="session-mini-card-action" aria-hidden="true">\u21F1</span>
     </button>`;
@@ -184,7 +184,7 @@ export function createRuntimeSessionCardView({
     const fullscreenLabel = isFocusedSession ? t("action.exitFullscreen") : t("action.enterFullscreen");
 
     const className = `session-card ${isFocusedSession ? "fullscreen" : ""} ${isActiveReceiver ? "is-active-receiver" : ""} ${isWaiting ? "is-waiting" : ""}`;
-    const ariaLabel = t("session.ariaSwitch", { task: session.task });
+    const ariaLabel = t("session.ariaSwitch", { title: session.title });
     const ariaCurrent = isActiveReceiver ? "true" : null;
 
     const headerHtml = `
@@ -217,9 +217,9 @@ export function createRuntimeSessionCardView({
         </div>
         ${profileMeta ? `<div class="caption session-profile-meta">${escapeHtml(profileMeta)}</div>` : ""}
       </div>
-      <div class="session-task-line" title="${escapeHtml(session.task)}" aria-label="${escapeHtml(t("session.task", { task: session.task }))}">
-        <span class="session-task-label">${escapeHtml(t("session.taskLabel"))}</span>
-        <span class="session-task-text">${escapeHtml(session.task)}</span>
+      <div class="session-title-line" title="${escapeHtml(session.title)}" aria-label="${escapeHtml(t("session.title", { title: session.title }))}">
+        <span class="session-title-label">${escapeHtml(t("session.titleLabel"))}</span>
+        <span class="session-title-text">${escapeHtml(session.title)}</span>
       </div>
       ${renderSessionStatusError(statusView)}
     `;
@@ -233,7 +233,7 @@ export function createRuntimeSessionCardView({
       session.turns.length,
       stats.map((s) => s.key + s.label).join(","),
       profileMeta,
-      session.task,
+      session.title,
       statusView.status,
       statusView.tone,
       statusView.error?.title || "",

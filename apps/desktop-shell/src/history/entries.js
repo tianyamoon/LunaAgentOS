@@ -42,7 +42,7 @@ export function archivedSessionsFromHistory(entries, { normalizeSession } = {}) 
     if (!key || !createdAt) return;
     const turn = projectHistoryTurnIntegrity(entry.turn || {
       id: entry.id,
-      task: entry.task,
+      prompt: entry.prompt,
       state: 5,
       status: entry.status || "completed",
       thoughts: [],
@@ -73,7 +73,7 @@ export function archivedSessionsFromHistory(entries, { normalizeSession } = {}) 
         targetName: entry.targetName || entry.target_name || entry.agentName || entry.agent_name,
         profileExecutable: entry.profileExecutable || entry.profile_executable || null,
         acpSessionId: entry.acpSessionId || entry.acp_session_id,
-        title: entry.task,
+        title: entry.sessionTitle,
         summary: entry.summary,
         turnCount: 1,
         turns: [turn],

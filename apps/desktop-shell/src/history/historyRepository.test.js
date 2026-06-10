@@ -55,7 +55,7 @@ test("historyRepository: failed load keeps last usable snapshot and loading stat
 });
 
 test("historyRepository: appendTurn builds payload and upserts returned entry", async () => {
-  const saved = { sessionId: "s1", turn: { id: "t1", task: "saved" } };
+  const saved = { sessionId: "s1", turn: { id: "t1", prompt: "saved" } };
   const { repository, calls } = makeRepository({
     responses: {
       append_history_entry: saved,

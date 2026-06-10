@@ -672,7 +672,7 @@ button:disabled {
   cursor: not-allowed;
 }
 
-/* === Session card 信息层级 v3：3 行紧凑（baseline 复刻 + task 仍在 header） === */
+/* === Session card 信息层级 v3：3 行紧凑（baseline 复刻 + title 仍在 header） === */
 .session-card-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) max-content;
@@ -727,7 +727,7 @@ button:disabled {
   max-width: 50%;
 }
 
-.session-task-line {
+.session-title-line {
   display: flex;
   gap: 6px;
   align-items: baseline;
@@ -738,13 +738,13 @@ button:disabled {
   margin-top: 2px;
 }
 
-.session-task-label {
+.session-title-label {
   flex: 0 0 auto;
   font-weight: 600;
   color: var(--muted);
 }
 
-.session-task-text {
+.session-title-text {
   flex: 1 1 auto;
   min-width: 0;
   color: var(--text);
@@ -1009,8 +1009,7 @@ button:disabled {
 }
 
 .provider-lane,
-.agent-entry-sub,
-.session-task {
+.agent-entry-sub {
   color: var(--muted);
   font-size: 0.88rem;
 }
@@ -1125,15 +1124,6 @@ button:disabled {
   text-align: right;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.session-task {
-  display: -webkit-box;
-  overflow: hidden;
-  line-height: 1.34;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
 }
 
 .connection-instance-top {
@@ -1656,7 +1646,7 @@ button:disabled {
   white-space: nowrap;
 }
 
-.session-mini-card-task {
+.session-mini-card-title-text {
   font-size: 0.72rem;
   color: var(--muted);
   overflow: hidden;
@@ -3047,7 +3037,7 @@ button:disabled {
 
 .history-tool-name,
 .history-item-meta span,
-.history-task-title {
+.history-session-title {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3135,7 +3125,7 @@ button:disabled {
   white-space: nowrap;
 }
 
-.history-task-title {
+.history-session-title {
   margin: 0;
   color: var(--text);
   font-size: 0.84rem;

@@ -3,13 +3,14 @@
   "$id": "https://lunaagentos.dev/protocol/schemas/runtime-session.schema.json",
   "title": "LunaAgentOS Runtime Session",
   "type": "object",
-  "required": ["id", "adapterId", "targetId", "lifecycle", "createdAt", "turns"],
+  "required": ["id", "adapterId", "targetId", "title", "lifecycle", "createdAt", "turns"],
   "properties": {
     "id": { "type": "string" },
     "adapterId": { "type": "string" },
     "runtimeInstanceId": { "type": ["string", "null"] },
     "targetId": { "type": "string" },
     "targetName": { "type": "string" },
+    "title": { "type": "string" },
     "lifecycle": { "type": "string", "enum": ["draft", "live", "stopped", "archived", "restoring", "resume_failed", "deleted"] },
     "runtimeState": { "type": ["string", "null"] },
     "createdAt": { "type": "string" },
@@ -19,10 +20,10 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "task", "createdAt"],
+        "required": ["id", "prompt", "createdAt"],
         "properties": {
           "id": { "type": "string" },
-          "task": { "type": "string" },
+          "prompt": { "type": "string" },
           "createdAt": { "type": "string" },
           "state": { "type": ["integer", "string", "null"] },
           "events": { "type": "array", "items": { "$ref": "./runtime-event.schema.json" } },

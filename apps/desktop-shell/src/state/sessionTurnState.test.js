@@ -33,6 +33,7 @@ function makeSession(id = "session-1", overrides = {}) {
   return {
     id,
     agentName: "Hermes",
+    title: "Stable session title",
     turns: [],
     ...overrides,
   };
@@ -52,6 +53,8 @@ test("sessionTurnState: createTurn owns session and binding mutation", () => {
   assert.equal(turn.finalResponse, "");
   assert.deepEqual(turn.meta.adapterMetadata, { profileName: "default" });
   assert.deepEqual(turn.meta.attachments, [{ name: "a.txt" }]);
+  assert.equal(turn.prompt, "task");
+  assert.equal(session.title, "Stable session title");
   assert.equal(session.activeTurnId, turn.id);
   assert.equal(session.runtime_binding.state, RUNTIME_BINDING_STATE.connected);
 });

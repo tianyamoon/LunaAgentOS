@@ -10,8 +10,8 @@ use std::io::Write;
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
 
-/// 当前写入的历史 schema。旧 schema 仍然可以读取。
-const HISTORY_SCHEMA_VERSION: u32 = 5;
+/// 当前写入的历史 schema。旧 task 字段格式不再读取或迁移。
+const HISTORY_SCHEMA_VERSION: u32 = 6;
 
 /// Serde 在旧数据缺少 schemaVersion 时使用当前版本。
 fn history_schema_version() -> u32 {
@@ -63,7 +63,8 @@ pub(crate) struct HistoryEntry {
     session_id: Option<String>,
     #[serde(alias = "acp_session_id")]
     acp_session_id: Option<String>,
-    task: String,
+    session_title: String,
+    prompt: String,
     status: String,
     summary: String,
     turn: Option<Value>,
@@ -96,7 +97,8 @@ pub(crate) struct HistoryEntryInput {
     agent_entry_snapshot: Option<Value>,
     session_id: Option<String>,
     acp_session_id: Option<String>,
-    task: String,
+    session_title: String,
+    prompt: String,
     status: String,
     summary: String,
     turn: Option<Value>,
@@ -559,7 +561,8 @@ pub(crate) fn append_history_entry(
         agent_entry_snapshot: entry.agent_entry_snapshot,
         session_id: entry.session_id,
         acp_session_id: entry.acp_session_id,
-        task: entry.task,
+        session_title: entry.session_title,
+        prompt: entry.prompt,
         status: entry.status,
         summary: entry.summary,
         turn: entry.turn,
@@ -599,7 +602,8 @@ mod tests {
             agent_entry_snapshot: None,
             session_id: Some("session-1".to_string()),
             acp_session_id: None,
-            task: "task".to_string(),
+            session_title: "Session title".to_string(),
+            prompt: "task".to_string(),
             status: "completed".to_string(),
             summary: "done".to_string(),
             turn: Some(json!({ "id": turn_id })),
@@ -611,18 +615,16 @@ mod tests {
     }
 
     #[test]
-    fn legacy_schema_defaults_and_accepts_missing_agent_entry_snapshot() {
+    fn legacy_task_schema_is_rejected() {
         let raw = r#"[{"id":"legacy","date":"2026-06-01","createdAt":"2026-06-01T00:00:00Z","providerId":"demo","providerName":"Demo","agentId":"demo-main","agentName":"Demo","task":"task","status":"completed","summary":"done"}]"#;
-        let entries = deserialize_history_entries(raw).expect("legacy history should load");
-        assert_eq!(entries[0].schema_version, HISTORY_SCHEMA_VERSION);
-        assert!(entries[0].agent_entry_snapshot.is_none());
+        assert!(deserialize_history_entries(raw).is_err());
     }
 
     #[test]
     fn schema_write_never_downgrades_below_current_version() {
         assert_eq!(schema_version_for_write(None), HISTORY_SCHEMA_VERSION);
         assert_eq!(schema_version_for_write(Some(4)), HISTORY_SCHEMA_VERSION);
-        assert_eq!(schema_version_for_write(Some(6)), 6);
+        assert_eq!(schema_version_for_write(Some(7)), 7);
     }
 
     #[test]
@@ -663,11 +665,13 @@ mod tests {
     }
 
     #[test]
-    fn schema_five_serializes_agent_entry_snapshot() {
+    fn schema_six_serializes_session_title_prompt_and_agent_entry_snapshot() {
         let mut item = entry("one", "turn-1", HISTORY_SCHEMA_VERSION);
         item.agent_entry_snapshot = Some(json!({ "agentId": "demo-main" }));
         let json = serde_json::to_value(item).expect("history should serialize");
         assert_eq!(json["schemaVersion"], HISTORY_SCHEMA_VERSION);
+        assert_eq!(json["sessionTitle"], "Session title");
+        assert_eq!(json["prompt"], "task");
         assert_eq!(json["agentEntrySnapshot"]["agentId"], "demo-main");
     }
 

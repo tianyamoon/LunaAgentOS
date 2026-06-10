@@ -101,7 +101,7 @@ export function projectSessionFromArchived(archived, {
     runtimeCommand: archived.runtimeCommand || null,
     targetId: archived.targetId || archived.agentId,
     targetName: archived.targetName || archived.agentName,
-    task: archived.title,
+    title: archived.title,
     state: 5,
     turns: archived.turns,
     createdAt: archived.createdAt,

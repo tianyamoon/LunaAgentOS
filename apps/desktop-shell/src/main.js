@@ -1,4 +1,4 @@
-﻿import {
+import {
   closeStreamingMarkdown,
   escapeHtml,
   isMarkdownTable,
@@ -180,7 +180,7 @@ import { applyWebUnavailableGate } from "./platform/webUnavailableGate.js";
 const { invoke, listenRuntimeEvent, isWebPreview } = createDesktopBridge(window.__TAURI__);
 applyWebUnavailableGate({ document, isWebPreview });
 
-const HISTORY_SCHEMA_VERSION = 5;
+const HISTORY_SCHEMA_VERSION = 6;
 const STREAM_CARD_RENDER_INTERVAL_MS = 100;
 const FONT_SCALE_OPTIONS = [
   { id: "compact", labelKey: "font.compact", scale: 0.92 },
@@ -804,8 +804,8 @@ function createSessionForAgent(agent, firstTask) {
 }
 
 // Agent Brief 与 Composer 共用同一条 Turn 创建路径。
-function createTurn(session, task, options = {}) {
-  return sessionLaunchController?.createTurn(session, task, options) || null;
+function createTurn(session, prompt, options = {}) {
+  return sessionLaunchController?.createTurn(session, prompt, options) || null;
 }
 
 function renderWorkspaceEmptyCopy() {

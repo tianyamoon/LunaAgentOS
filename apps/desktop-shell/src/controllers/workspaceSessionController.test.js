@@ -9,8 +9,8 @@ function makeHarness(overrides = {}) {
   const sessionsStore = createSessionsStore();
   const workspaceViewStore = createWorkspaceViewStore(overrides.workspaceView || {});
   const sessions = [
-    { id: "a", agentId: "agent-a", task: "task a", runtimeState: "live", sendable: true },
-    { id: "b", agentId: "agent-b", task: "task b", runtimeState: "live", sendable: true },
+    { id: "a", agentId: "agent-a", title: "session a", runtimeState: "live", sendable: true },
+    { id: "b", agentId: "agent-b", title: "session b", runtimeState: "live", sendable: true },
   ];
   sessionsStore.replaceSessions(sessions);
   const calls = [];
@@ -33,7 +33,7 @@ function makeHarness(overrides = {}) {
     shellSurface,
     sessionRuntimeState: (session) => session.runtimeState,
     setAppNotice: (message) => calls.push(["notice", message]),
-    t: (key, params = {}) => `${key}${params.task ? `:${params.task}` : ""}`,
+    t: (key, params = {}) => `${key}${params.title ? `:${params.title}` : ""}`,
   });
   return { calls, controller, sessionsStore, workspaceViewStore };
 }
@@ -79,7 +79,7 @@ test("workspaceSessionController: unrestorable history does not instruct the use
   sessionsStore.upsertHead({
     id: "history",
     agentId: "agent-a",
-    task: "history",
+    title: "history",
     runtimeState: "archived",
     sendable: false,
     restorable: false,

@@ -16,7 +16,7 @@ export function turnTranscriptText(turn, index, {
   const logs = Array.isArray(turn?.logs) ? turn.logs : [];
   const parts = [
     `# ${translate("turn.transcriptTitle", { index: index + 1 })}`,
-    `user:\n${turn?.task || ""}`,
+    `user:\n${turn?.prompt || ""}`,
   ];
   if (thoughts.length) parts.push(`${translate("turn.thoughtStreamLabel")}:\n${thoughts.join("\n\n")}`);
   const response = turnResponseText(turn);

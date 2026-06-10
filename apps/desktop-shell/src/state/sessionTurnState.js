@@ -39,14 +39,14 @@ export function createSessionTurnState({
       || null;
   }
 
-  function createTurn(session, task, options = {}) {
+  function createTurn(session, prompt, options = {}) {
     if (!session) return null;
     turnSeq += 1;
     const turnMeta = buildTurnMeta(session, options);
     const turn = {
       id: `turn-${now()}-${turnSeq}`,
-      task,
-      runtimePrompt: options.runtimePrompt || task,
+      prompt,
+      runtimePrompt: options.runtimePrompt || prompt,
       state: 0,
       status: TURN_STATUS.running,
       thoughts: [],
@@ -62,7 +62,6 @@ export function createSessionTurnState({
     };
     // 新 Turn 从创建时就拥有 Timeline，保证启动提示和早期错误也能进入同一条过程流。
     ensureTurnTimeline(turn, { now });
-    session.task = task;
     session.state = 2;
     session.activeTurnId = turn.id;
     sessionRuntimeState.clearRuntimeBindingError(session, {

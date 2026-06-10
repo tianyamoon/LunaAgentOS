@@ -42,7 +42,7 @@ function createView(overrides = {}) {
 test("runtimeSessionCardView: focused and active state sync to card and mini card", () => {
   const session = {
     id: "session-a",
-    task: "check architecture",
+    title: "check architecture",
     turns: [],
     record_state: "active",
     access_mode: "interactive",
@@ -59,7 +59,7 @@ test("runtimeSessionCardView: focused and active state sync to card and mini car
 test("runtimeSessionCardView: readonly history does not expose live management actions", () => {
   const session = {
     id: "session-history",
-    task: "old transcript",
+    title: "old transcript",
     turns: [{ id: "t1", status: "running" }],
     record_state: "active",
     access_mode: "read_only",
@@ -94,7 +94,7 @@ test("runtimeSessionCardView: readonly history does not expose live management a
 test("runtimeSessionCardView: live running session exposes waiting classes for animation", () => {
   const session = {
     id: "session-running",
-    task: "run task",
+    title: "run session",
     turns: [{ id: "t1", status: "running" }],
     record_state: "active",
     access_mode: "interactive",
@@ -133,7 +133,7 @@ test("runtimeSessionCardView: live running session exposes waiting classes for a
 test("runtimeSessionCardView: reconnecting session does not use running animation classes", () => {
   const session = {
     id: "session-restoring",
-    task: "restore session",
+    title: "restore session",
     turns: [{ id: "t1", status: "completed" }],
     record_state: "active",
     access_mode: "interactive",
@@ -175,7 +175,7 @@ test("runtimeSessionCardView: reconnecting session does not use running animatio
 test("runtimeSessionCardView: readonly stale running history has no waiting animation classes", () => {
   const session = {
     id: "session-history",
-    task: "old transcript",
+    title: "old transcript",
     turns: [{ id: "t1", status: "running" }],
     record_state: "active",
     access_mode: "read_only",

@@ -6,7 +6,7 @@ import { createSessionExecutionController } from "./sessionExecutionController.j
 // 创建可观察执行副作用的控制器。
 function makeHarness({ prompt, capabilities = {}, fallbackSessions = {}, tombstoned = false, saveError = null } = {}) {
   const session = { id: "s1", providerId: "demo", agentId: "a1", agentName: "Demo", turns: [] };
-  const turn = { id: "t1", task: "task", logs: [], outputs: [], finalResponse: "", status: "running" };
+  const turn = { id: "t1", prompt: "task", logs: [], outputs: [], finalResponse: "", status: "running" };
   session.turns.push(turn);
   const calls = [];
   const shellSurface = createShellSurface({

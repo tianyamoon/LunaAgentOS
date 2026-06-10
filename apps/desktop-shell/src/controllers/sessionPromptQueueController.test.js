@@ -12,9 +12,9 @@ function makeHarness({ persistTurnSnapshot } = {}) {
     renderHistory: () => calls.push("history"),
   });
   const controller = createSessionPromptQueueController({
-    createSessionTurn: (session, task, options) => {
+    createSessionTurn: (session, prompt, options) => {
       turnSeq += 1;
-      const turn = { id: `turn-${turnSeq}`, task, ...options };
+      const turn = { id: `turn-${turnSeq}`, prompt, ...options };
       session.turns.push(turn);
       return turn;
     },
@@ -45,7 +45,7 @@ test("sessionPromptQueueController: 运行中输入进入 FIFO 队列且不会�
   controller.submit(session, "第三条");
 
   assert.equal(session.turns.length, 0);
-  assert.deepEqual(session.queuedSubmissions.map((item) => item.task), ["第二条", "第三条"]);
+  assert.deepEqual(session.queuedSubmissions.map((item) => item.prompt), ["第二条", "第三条"]);
 });
 
 test("sessionPromptQueueController: pump 按 FIFO 启动下一条输入", () => {
@@ -57,8 +57,8 @@ test("sessionPromptQueueController: pump 按 FIFO 启动下一条输入", () => 
 
   const result = controller.pump(session);
 
-  assert.equal(result.turn.task, "第二条");
-  assert.deepEqual(session.queuedSubmissions.map((item) => item.task), ["第三条"]);
+  assert.equal(result.turn.prompt, "第二条");
+  assert.deepEqual(session.queuedSubmissions.map((item) => item.prompt), ["第三条"]);
   assert.equal(calls.includes("dispatch:turn-1"), true);
 });
 

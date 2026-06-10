@@ -52,7 +52,7 @@ function session(overrides = {}) {
     providerName: "Test",
     agentId: "agent-a",
     agentName: "Agent A",
-    task: "task",
+    title: "session",
     createdAt: "2026-06-01T00:00:00.000Z",
     record_state: RECORD_STATE.active,
     access_mode: ACCESS_MODE.interactive,
@@ -100,8 +100,8 @@ test("session presentation stays consistent for a completed stale-active session
     activeTurnId: "old",
     activePromptRunId: "run-old",
     turns: [
-      { id: "old", status: TURN_STATUS.running, promptRunId: "run-old", task: "old", timelineItems: [] },
-      { id: "latest", status: TURN_STATUS.completed, task: "latest", finalResponse: "done" },
+      { id: "old", status: TURN_STATUS.running, promptRunId: "run-old", prompt: "old", timelineItems: [] },
+      { id: "latest", status: TURN_STATUS.completed, prompt: "latest", finalResponse: "done" },
     ],
   });
 
@@ -118,11 +118,11 @@ test("session presentation keeps only the live current turn marked running", () 
     activeTurnId: "latest",
     activePromptRunId: "run-latest",
     turns: [
-      { id: "old", status: TURN_STATUS.completed, task: "old", finalResponse: "old done" },
+      { id: "old", status: TURN_STATUS.completed, prompt: "old", finalResponse: "old done" },
       {
         id: "latest",
         status: TURN_STATUS.running,
-        task: "latest",
+        prompt: "latest",
         promptRunId: "run-latest",
         timelineItems: [{ id: "think", type: "thinking", status: "running", content: "thinking" }],
       },
@@ -143,7 +143,7 @@ test("session presentation keeps only the live current turn marked running", () 
 test("session presentation shows reconnecting consistently without marking completed rows running", () => {
   const input = session({
     runtime_binding: createRuntimeBinding({ state: "reconnecting", stage: "load" }),
-    turns: [{ id: "latest", status: TURN_STATUS.completed, task: "latest", finalResponse: "done" }],
+    turns: [{ id: "latest", status: TURN_STATUS.completed, prompt: "latest", finalResponse: "done" }],
   });
 
   const { card, history, workspace, messages } = presentationFor(input);
@@ -158,7 +158,7 @@ test("session presentation shows reconnecting consistently without marking compl
 test("session presentation treats read-only unfinished history as read-only everywhere", () => {
   const input = session({
     access_mode: ACCESS_MODE.read_only,
-    turns: [{ id: "old", status: TURN_STATUS.running, task: "old" }],
+    turns: [{ id: "old", status: TURN_STATUS.running, prompt: "old" }],
   });
 
   const { card, history, workspace, messages } = presentationFor(input);
@@ -173,7 +173,7 @@ test("session presentation keeps manual archive as the visible state", () => {
   const input = session({
     record_state: RECORD_STATE.archived,
     access_mode: ACCESS_MODE.read_only,
-    turns: [{ id: "done", status: TURN_STATUS.completed, task: "done", finalResponse: "done" }],
+    turns: [{ id: "done", status: TURN_STATUS.completed, prompt: "done", finalResponse: "done" }],
   });
 
   const { card, history, workspace } = presentationFor(input, { canRestore: true });

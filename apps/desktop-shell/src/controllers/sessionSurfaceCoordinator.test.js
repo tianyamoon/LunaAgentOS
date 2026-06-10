@@ -22,7 +22,7 @@ test("sessionSurfaceCoordinator: 同一帧的状态变化只刷新一次相关�
   const sessionsStore = createSessionsStore();
   const harness = createFrameHarness();
   const calls = [];
-  sessionsStore.replaceSessions([{ id: "s1", task: "demo", turns: [] }]);
+  sessionsStore.replaceSessions([{ id: "s1", title: "demo", turns: [] }]);
 
   const coordinator = createSessionSurfaceCoordinator({
     sessionsStore,

@@ -13,7 +13,7 @@ import { TURN_STATUS } from "../state/sessionStatus.js";
 function makeSession() {
   return {
     id: "session-1",
-    task: "old task",
+    title: "old task",
     state: 1,
     turns: [],
     activeTurnId: "turn-1",
@@ -23,7 +23,7 @@ function makeSession() {
 function makeTurn() {
   return {
     id: "turn-1",
-    task: "build feature",
+    prompt: "build feature",
     thoughts: [],
     outputs: [],
     finalResponse: "",
@@ -93,7 +93,7 @@ test("applyEventsToTurn replaces aggregate turn sections and updates session ide
   assert.equal(turn.state, 5);
   assert.equal(turn.status, TURN_STATUS.completed);
   assert.equal(session.state, 5);
-  assert.equal(session.task, "build feature");
+  assert.equal(session.title, "old task");
   assert.equal(session.activeTurnId, "turn-1");
   assert.equal(session.acpSessionId, "acp-1");
 });

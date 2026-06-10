@@ -89,7 +89,7 @@ test("projectSessionListItems merges live sessions and archived history without 
   const liveSession = {
     id: "live-1",
     createdAt: "2026-06-01T12:00:00.000Z",
-    task: "继续分析",
+    title: "继续分析",
     turns: [{
       id: "turn-1",
       createdAt: "2026-06-01T12:01:00.000Z",
@@ -176,7 +176,7 @@ test("projectSessionListItems prefers disk history over an inactive hidden memor
   const staleMemorySession = {
     id: "same-session",
     createdAt: "2026-06-08T00:00:00.000Z",
-    task: "旧内存状态",
+    title: "旧内存状态",
     lifecycle: "live",
     access_mode: "interactive",
     inWorkspace: false,
@@ -226,7 +226,7 @@ test("projectSessionListItems keeps a hidden memory session authoritative while 
     sessions: [{
       id: "live-hidden",
       createdAt: "2026-06-08T00:00:00.000Z",
-      task: "仍在执行",
+      title: "仍在执行",
       lifecycle: "live",
       access_mode: "interactive",
       inWorkspace: false,
@@ -257,7 +257,7 @@ test("projectSessionListItems keeps dismissed active session in active section w
     sessions: [{
       id: "dismissed-active",
       createdAt: "2026-06-08T00:00:00.000Z",
-      task: "hidden but active",
+      title: "hidden but active",
       lifecycle: "live",
       record_state: "active",
       access_mode: "interactive",

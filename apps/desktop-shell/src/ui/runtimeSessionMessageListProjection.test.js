@@ -9,7 +9,7 @@ test("runtimeSessionMessageListProjection: 运行中按真实 Timeline 顺序输
     activePromptRunId: "run-1",
     turns: [{
       id: "t1",
-      task: "检查项目",
+      prompt: "检查项目",
       status: "running",
       promptRunId: "run-1",
       timelineItems: [
@@ -30,7 +30,7 @@ test("runtimeSessionMessageListProjection: 只聚合相邻 explore 工具且不�
   const result = projectRuntimeSessionMessageList({
     turns: [{
       id: "t1",
-      task: "读文件",
+      prompt: "读文件",
       status: "running",
       timelineItems: [
         item("tool", "Read A", { id: "read-a", metadata: { category: "explore" } }),
@@ -49,7 +49,7 @@ test("runtimeSessionMessageListProjection: 完成态最终回答为主体并生�
   const result = projectRuntimeSessionMessageList({
     turns: [{
       id: "t1",
-      task: "summarize",
+      prompt: "summarize",
       status: "completed",
       finalResponse: "done summary",
       timelineStartedAt: "2026-06-01T00:00:00.000Z",
@@ -74,7 +74,7 @@ test("runtimeSessionMessageListProjection: completed trace rows use completion s
   const result = projectRuntimeSessionMessageList({
     turns: [{
       id: "t1",
-      task: "summarize",
+      prompt: "summarize",
       status: "completed",
       finalResponse: "done summary",
       timelineStartedAt: "2026-06-01T00:00:00.000Z",
@@ -102,7 +102,7 @@ test("runtimeSessionMessageListProjection: debug metadata is folded under comple
   const result = projectRuntimeSessionMessageList({
     turns: [{
       id: "t1",
-      task: "failed task",
+      prompt: "failed task",
       status: "failed",
       logs: ["tool failed"],
       timelineItems: [
@@ -127,7 +127,7 @@ test("runtimeSessionMessageListProjection: completed turn folds even when prompt
     activePromptRunId: "run-stale",
     turns: [{
       id: "t1",
-      task: "done task",
+      prompt: "done task",
       status: "completed",
       promptRunId: "run-stale",
       finalResponse: "final answer",
@@ -150,14 +150,14 @@ test("runtimeSessionMessageListProjection: stale activeTurnId does not keep old 
     turns: [
       {
         id: "t1",
-        task: "old task",
+        prompt: "old task",
         status: "running",
         promptRunId: "run-stale",
         timelineItems: [item("thinking", "old analysis", { status: "running" })],
       },
       {
         id: "t2",
-        task: "done task",
+        prompt: "done task",
         status: "completed",
         finalResponse: "final answer",
         timelineItems: [item("assistant", "final answer")],
@@ -174,7 +174,7 @@ test("runtimeSessionMessageListProjection: completed trace rows drop stale runni
   const result = projectRuntimeSessionMessageList({
     turns: [{
       id: "t1",
-      task: "done task",
+      prompt: "done task",
       status: "completed",
       finalResponse: "final answer",
       timelineItems: [
@@ -193,7 +193,7 @@ test("runtimeSessionMessageListProjection: failed turn keeps process rows folded
   const result = projectRuntimeSessionMessageList({
     turns: [{
       id: "t1",
-      task: "failing task",
+      prompt: "failing task",
       status: "failed",
       timelineItems: [
         item("thinking", "analysis"),
@@ -212,7 +212,7 @@ test("runtimeSessionMessageListProjection: cancelled turn keeps final response p
   const result = projectRuntimeSessionMessageList({
     turns: [{
       id: "t1",
-      task: "cancel task",
+      prompt: "cancel task",
       status: "cancelled",
       finalResponse: "cancelled after partial work",
       timelineItems: [
@@ -233,14 +233,14 @@ test("runtimeSessionMessageListProjection: 旧历史与队列使用独立消息�
   const result = projectRuntimeSessionMessageList({
     turns: [{
       id: "t1",
-      task: "旧问题",
+      prompt: "旧问题",
       status: "completed",
       finalResponse: "旧回答",
       meta: { historyIntegrity: "legacy_unverified" },
     }],
     queuedSubmissions: [{
       id: "q1",
-      task: "后续输入",
+      prompt: "后续输入",
       attachments: [{ name: "a.md" }],
       createdAt: "2026-06-01T00:00:00.000Z",
     }],
@@ -254,7 +254,7 @@ test("runtimeSessionMessageListProjection: usage 不进入默认阅读流", () =
   const result = projectRuntimeSessionMessageList({
     turns: [{
       id: "t1",
-      task: "检查用量",
+      prompt: "检查用量",
       status: "running",
       timelineItems: [
         item("usage", ""),
@@ -270,8 +270,8 @@ test("runtimeSessionMessageListProjection: latest-only 只保留当前消息段"
   const result = projectRuntimeSessionMessageList({
     activeTurnId: "t2",
     turns: [
-      { id: "t1", task: "旧问题", status: "completed", finalResponse: "旧回答" },
-      { id: "t2", task: "新问题", status: "running", timelineItems: [item("thinking", "处理中")] },
+      { id: "t1", prompt: "旧问题", status: "completed", finalResponse: "旧回答" },
+      { id: "t2", prompt: "新问题", status: "running", timelineItems: [item("thinking", "处理中")] },
     ],
   }, { latestOnly: true });
 
@@ -285,7 +285,7 @@ test("runtimeSessionMessageListProjection: running runtime logs hide low-value a
     activePromptRunId: "run-1",
     turns: [{
       id: "t1",
-      task: "show progress",
+      prompt: "show progress",
       status: "running",
       promptRunId: "run-1",
       logs: ["Reading config", "tool call completed", "Message entered current session, waiting for runtime response."],
@@ -303,7 +303,7 @@ test("runtimeSessionMessageListProjection: waiting acknowledgement stays visible
     activePromptRunId: "run-1",
     turns: [{
       id: "t1",
-      task: "wait for feedback",
+      prompt: "wait for feedback",
       status: "running",
       promptRunId: "run-1",
       logs: ["tool call completed", "Message entered current session, waiting for runtime response."],
@@ -321,7 +321,7 @@ test("runtimeSessionMessageListProjection: waiting acknowledgement hides after t
     activePromptRunId: "run-1",
     turns: [{
       id: "t1",
-      task: "think",
+      prompt: "think",
       status: "running",
       promptRunId: "run-1",
       logs: ["Message entered current session, waiting for runtime response."],
@@ -340,7 +340,7 @@ test("runtimeSessionMessageListProjection: 只读历史不展示运行中的等�
     activeTurnId: "t1",
     turns: [{
       id: "t1",
-      task: "旧历史",
+      prompt: "旧历史",
       status: "running",
       logs: ["Message entered current session, waiting for runtime response."],
       timelineItems: [],
@@ -357,7 +357,7 @@ test("runtimeSessionMessageListProjection: running runtime logs keep blocking or
     activePromptRunId: "run-1",
     turns: [{
       id: "t1",
-      task: "check runtime",
+      prompt: "check runtime",
       status: "running",
       promptRunId: "run-1",
       logs: ["tool call completed", "Permission denied", "Message entered current session, waiting for runtime response."],

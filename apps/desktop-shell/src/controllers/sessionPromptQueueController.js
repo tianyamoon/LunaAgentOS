@@ -23,12 +23,12 @@ export function createSessionPromptQueueController({
   }
 
   // 队列项保存发送瞬间的输入快照，避免 Composer 后续变化污染排队内容。
-  function createSubmission(task, options = {}) {
+  function createSubmission(prompt, options = {}) {
     submissionSeq += 1;
     return {
       id: `submission-${now()}-${submissionSeq}`,
-      task,
-      runtimePrompt: options.runtimePrompt || task,
+      prompt,
+      runtimePrompt: options.runtimePrompt || prompt,
       attachments: cloneAttachments(options.attachments),
       createdAt: new Date(now()).toISOString(),
     };
@@ -54,7 +54,7 @@ export function createSessionPromptQueueController({
 
   // 真正开始执行时才创建 Turn，使一个用户输入严格对应一个 Runtime Prompt Run。
   function startSubmission(session, submission) {
-    const turn = createSessionTurn(session, submission.task, {
+    const turn = createSessionTurn(session, submission.prompt, {
       runtimePrompt: submission.runtimePrompt,
       attachments: cloneAttachments(submission.attachments),
     });
@@ -64,9 +64,9 @@ export function createSessionPromptQueueController({
     return { queued: false, submission, turn };
   }
 
-  function submit(session, task, options = {}) {
-    if (!session || !task) return null;
-    const submission = createSubmission(task, options);
+  function submit(session, prompt, options = {}) {
+    if (!session || !prompt) return null;
+    const submission = createSubmission(prompt, options);
     if (!session.activePromptRunId) return startSubmission(session, submission);
 
     const queue = ensureQueue(session);

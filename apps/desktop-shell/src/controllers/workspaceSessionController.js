@@ -53,7 +53,7 @@ export function createWorkspaceSessionController({
     });
     const runtimeState = sessionRuntimeState(session);
     setAppNotice(canSendToSession(session)
-      ? t("session.activated", { task: session.task })
+      ? t("session.activated", { title: session.title })
       : runtimeState === "restoring"
         ? t("session.restoringFocused")
         : canRestoreSession(session)

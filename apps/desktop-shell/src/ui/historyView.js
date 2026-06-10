@@ -121,7 +121,7 @@ export function createHistoryView({
           <span>${escapeHtml(item.agentName)}</span>
           <time>${escapeHtml(item.updatedAt.slice(5, 10))} ${formatTime(item.updatedAt)}</time>
         </div>
-        <p class="history-task-title">${escapeHtml(item.title)}</p>
+        <p class="history-session-title">${escapeHtml(item.title)}</p>
       </article>
     `;
   }

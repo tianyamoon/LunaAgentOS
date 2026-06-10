@@ -1,7 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createShellSurface } from "../ui/shellSurface.js";
-import { createSessionLaunchController } from "./sessionLaunchController.js";
+import {
+  createSessionLaunchController,
+  sessionTitleFromPrompt,
+} from "./sessionLaunchController.js";
+
+test("sessionTitleFromPrompt uses the first non-empty line and truncates to 80 characters", () => {
+  assert.equal(sessionTitleFromPrompt("\n  First   session title  \nsecond line"), "First session title");
+  assert.equal(sessionTitleFromPrompt("x".repeat(100)).length, 80);
+});
 
 // 创建可观察发送行为的控制器夹具，覆盖 Launch Controller 的稳定接口。
 function makeHarness({
@@ -31,12 +39,12 @@ function makeHarness({
     updateActionLabels: () => calls.push("labels"),
   });
   const sessionPromptQueue = {
-    submit: (session, task, options) => {
+    submit: (session, prompt, options) => {
       if (session.activePromptRunId) {
-        session.queuedSubmissions = [...(session.queuedSubmissions || []), { task, ...options }];
+        session.queuedSubmissions = [...(session.queuedSubmissions || []), { prompt, ...options }];
         return { queued: true, turn: null };
       }
-      const turn = { id: "turn-1", task, ...options };
+      const turn = { id: "turn-1", prompt, ...options };
       session.turns.push(turn);
       if (commands) calls.push(`acp:${turn.id}`);
       else calls.push(`fallback:${turn.id}`);
@@ -69,8 +77,8 @@ function makeHarness({
     isSessionActive: () => currentSessionActive,
     saveCurrentSession: (sessionId) => calls.push(`current:${sessionId}`),
     unmarkStopped: (sessionId) => calls.push(`unstopped:${sessionId}`),
-    createSessionTurn: (session, task, options) => {
-      const turn = { id: "turn-1", task, ...options };
+    createSessionTurn: (session, prompt, options) => {
+      const turn = { id: "turn-1", prompt, ...options };
       session.turns.push(turn);
       return turn;
     },
@@ -235,7 +243,7 @@ test("sessionLaunchController: explicit new session can branch from read-only tr
 
   assert.equal(sessions.length, 1);
   assert.notEqual(result.session, currentSession);
-  assert.equal(result.session.task, "检查项目");
+  assert.equal(result.session.title, "检查项目");
   assert.equal(calls.some((item) => item === "notice:error:should-not-block"), false);
   assert.equal(calls.includes("notice:busy:session.startedNewFromHistory:Demo Agent"), true);
 });
@@ -293,6 +301,6 @@ test("sessionLaunchController: 运行中 Session 的 follow-up 进入队列且�
   const result = controller.startSessionFromPrompt();
 
   assert.equal(result.queued, true);
-  assert.deepEqual(currentSession.queuedSubmissions.map((item) => item.task), ["第二条"]);
+  assert.deepEqual(currentSession.queuedSubmissions.map((item) => item.prompt), ["第二条"]);
   assert.equal(calls.some((item) => item.startsWith("acp:")), false);
 });

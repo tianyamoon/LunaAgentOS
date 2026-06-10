@@ -146,7 +146,7 @@ export function createSessionLifecycleController({
   function requestDeleteConfirmation(sessionId) {
     const session = getSession(sessionId);
     const archived = getArchivedSession(sessionId);
-    const title = session?.task || archived?.title || t("confirm.sessionFallback");
+    const title = session?.title || archived?.title || t("confirm.sessionFallback");
     openConfirmDialog({
       title: t("confirm.deleteSessionTitle"),
       message: t("confirm.deleteSessionMessage", { title }),

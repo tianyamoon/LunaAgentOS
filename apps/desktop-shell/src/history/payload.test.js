@@ -12,6 +12,7 @@ const getStateName = (state) => stateNames[state];
 function makeSession(overrides = {}) {
   return {
     id: "session-1",
+    title: "Session title",
     providerId: "claude",
     providerName: "Claude Code",
     agentId: "claude-main",
@@ -34,7 +35,7 @@ function makeSession(overrides = {}) {
 function makeTurn(overrides = {}) {
   return {
     id: "turn-1",
-    task: "task text",
+    prompt: "task text",
     state: 5,
     status: "completed",
     finalResponse: null,
@@ -51,11 +52,13 @@ test("buildHistoryEntryPayload: copies session/turn fields and falls back to def
     session: makeSession(),
     turn: makeTurn(),
     agentEntrySnapshot: null,
-    schemaVersion: 5,
+    schemaVersion: 6,
     runtimeState: "live",
     getStateName,
   });
-  assert.equal(payload.schemaVersion, 5);
+  assert.equal(payload.schemaVersion, 6);
+  assert.equal(payload.sessionTitle, "Session title");
+  assert.equal(payload.prompt, "task text");
   assert.equal(payload.providerId, "claude");
   assert.equal(payload.sessionId, "session-1");
   assert.equal(payload.runtime_state, "live");
@@ -74,7 +77,7 @@ test("buildHistoryEntryPayload: prefers finalResponse > last output > first log 
     session: makeSession(),
     turn: makeTurn({ finalResponse: "final-text" }),
     agentEntrySnapshot: null,
-    schemaVersion: 5,
+    schemaVersion: 6,
     runtimeState: "live",
     getStateName,
   });
@@ -84,7 +87,7 @@ test("buildHistoryEntryPayload: prefers finalResponse > last output > first log 
     session: makeSession(),
     turn: makeTurn({ outputs: ["a", "b"] }),
     agentEntrySnapshot: null,
-    schemaVersion: 5,
+    schemaVersion: 6,
     runtimeState: "live",
     getStateName,
   });
@@ -94,7 +97,7 @@ test("buildHistoryEntryPayload: prefers finalResponse > last output > first log 
     session: makeSession(),
     turn: makeTurn({ logs: ["log-1", "log-2"] }),
     agentEntrySnapshot: null,
-    schemaVersion: 5,
+    schemaVersion: 6,
     runtimeState: "live",
     getStateName,
   });
@@ -107,7 +110,7 @@ test("buildHistoryEntryPayload: agentEntrySnapshot is stored without mutating tu
     session: makeSession({ providerId: "hermes" }),
     turn: makeTurn({ meta: { foo: 1 } }),
     agentEntrySnapshot: snapshot,
-    schemaVersion: 5,
+    schemaVersion: 6,
     runtimeState: "live",
     getStateName,
   });
@@ -122,7 +125,7 @@ test("buildHistoryEntryPayload: Timeline 随 Turn 一起持久化", () => {
   const payload = buildHistoryEntryPayload({
     session: makeSession(),
     turn,
-    schemaVersion: 5,
+    schemaVersion: 6,
     runtimeState: "archived",
   });
   assert.equal(payload.turn.timelineItems[0].type, "assistant");
@@ -134,7 +137,7 @@ test("buildHistoryEntryPayload: targetId / targetName fall back to agent fields"
     session: makeSession({ targetId: undefined, targetName: undefined }),
     turn: makeTurn(),
     agentEntrySnapshot: null,
-    schemaVersion: 5,
+    schemaVersion: 6,
     runtimeState: "live",
     getStateName,
   });
@@ -147,7 +150,7 @@ test("buildHistoryEntryPayload: status defaults to UNKNOWN when status and getSt
     session: makeSession(),
     turn: makeTurn({ state: 99, status: undefined }),
     agentEntrySnapshot: null,
-    schemaVersion: 5,
+    schemaVersion: 6,
     runtimeState: "live",
   });
   assert.equal(payload.status, "UNKNOWN");

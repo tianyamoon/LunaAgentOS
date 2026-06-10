@@ -57,7 +57,7 @@ export function projectSessionListItems({
         providerId: identitySession.providerId,
         providerName: identitySession.providerName,
         agentName: identitySession.agentName,
-        title: session.task || t("history.newSession"),
+        title: session.title || t("history.newSession"),
         summary: lastTurn?.finalResponse
           || lastTurn?.outputs?.at?.(-1)
           || lastTurn?.logs?.at?.(-1)

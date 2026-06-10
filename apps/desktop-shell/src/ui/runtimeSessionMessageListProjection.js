@@ -103,7 +103,7 @@ function projectTurnRows(turn, { latestTurnId, forceLive, isCurrentTurn = false,
   }
   rows.push(baseTurnRow(turn, "user", "user", {
     status: rowStatus,
-    content: turn.task || "",
+    content: turn.prompt || "",
     metadata: {
       attachments: list(turn.meta?.attachments),
       isLatestTurn: turn.id === latestTurnId,
@@ -302,7 +302,7 @@ function projectQueueRow(submission) {
     turnId: null,
     promptRunId: null,
     status: "queued",
-    content: compactText(submission.task),
+    content: compactText(submission.prompt),
     metadata: {
       attachmentCount: list(submission.attachments).length,
       createdAt: submission.createdAt || null,

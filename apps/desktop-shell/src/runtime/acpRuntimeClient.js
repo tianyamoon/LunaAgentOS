@@ -69,7 +69,7 @@ export function createAcpRuntimeClient({
     return invoke(
       runtimeCommands.prompt,
       invokeArgs(runtimeCommands, session.providerId, runtimeArgs(session, {
-        prompt: turn.runtimePrompt || turn.task,
+        prompt: turn.runtimePrompt || turn.prompt,
         turnId: turn.id,
         promptRunId,
       })),
