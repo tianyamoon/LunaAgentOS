@@ -116,7 +116,7 @@ export function deriveProviderHealth(provider = {}, availability = {}, instances
     logged_in: HEALTH_STATE.unknown,
     cli_callable: available ? HEALTH_STATE.ok : anyFailedRuntime ? HEALTH_STATE.failed : HEALTH_STATE.unknown,
     profile_configured: HEALTH_STATE.unknown,
-    wsl_or_bridge_available: anyFailedRuntime ? HEALTH_STATE.failed : HEALTH_STATE.unknown,
+    wsl_or_bridge_available: available ? HEALTH_STATE.unknown : anyFailedRuntime ? HEALTH_STATE.failed : HEALTH_STATE.unknown,
     model_or_key_configured: HEALTH_STATE.unknown,
     version_status: HEALTH_STATE.unknown,
     unavailable_reason: available ? null : configured ? "no_available_runtime" : "provider_not_configured",

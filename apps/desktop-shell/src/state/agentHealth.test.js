@@ -92,3 +92,16 @@ test("deriveProviderHealth: explicit adapter health fields override shell infere
   assert.equal(health.unavailable_reason, "auth_required");
   assert.equal(health.repair_hint, "run_agent_login");
 });
+
+test("deriveProviderHealth: one available runtime keeps provider available despite failed siblings", () => {
+  const health = deriveProviderHealth(
+    {},
+    { configured: true, available: true },
+    [{ available: true }, { available: false, commandKind: "wsl" }],
+  );
+
+  assert.equal(health.cli_callable, HEALTH_STATE.ok);
+  assert.equal(health.wsl_or_bridge_available, HEALTH_STATE.unknown);
+  assert.equal(health.unavailable_reason, null);
+  assert.notEqual(health.overall, "unavailable");
+});
