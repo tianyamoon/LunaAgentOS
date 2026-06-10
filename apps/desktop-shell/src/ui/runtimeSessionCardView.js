@@ -39,7 +39,6 @@ export function createRuntimeSessionCardView({
     const activityText = renderActivityText(statusView.activity);
     const summaryText = renderSummaryText(statusView.summary);
     return `<span class="runtime-pill session-card-status-pill session-status-${escapeHtml(statusView.tone)} session-status-${escapeHtml(statusView.status)}" aria-label="${escapeHtml(t("session.statusAria", { state: statusView.label }))}" title="${escapeHtml(statusView.detail)}">
-      ${renderSessionStatusIcon(statusView.icon)}
       <span>${escapeHtml(statusView.label)}${activityText}${summaryText}</span>
       ${secondary}
     </span>`;

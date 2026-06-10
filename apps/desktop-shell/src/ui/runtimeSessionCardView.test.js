@@ -124,6 +124,7 @@ test("runtimeSessionCardView: live running session exposes waiting classes for a
   const miniHtml = view.renderSessionMiniCard(session);
   assert.match(cardHtml, /session-card[^"]*is-waiting/);
   assert.match(cardHtml, /session-card-status-pill session-status-busy session-status-running/);
+  assert.doesNotMatch(cardHtml, /session-status-icon/);
   assert.match(cardHtml, /session-stop-btn/);
   assert.match(miniHtml, /session-mini-card[^"]*is-waiting/);
   assert.match(miniHtml, /session-status-running is-busy/);

@@ -1321,16 +1321,6 @@ button:disabled {
   gap: 6px;
 }
 
-.session-card-status-pill .session-status-icon {
-  display: inline-flex;
-  width: 14px;
-  height: 14px;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.7rem;
-  font-weight: 700;
-}
-
 .session-card-status-pill .session-status-secondary {
   margin-left: 6px;
   font-weight: 500;
