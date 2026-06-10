@@ -65,14 +65,22 @@ test("providerRuntimeProjection: provider state and availability summarize runti
     { id: "one", providerId: "demo", available: true, configured: true },
     { id: "two", providerId: "demo", available: false, configured: true },
   ];
-  assert.equal(projectProviderState(providers[0], { runtimeInstances }), 2);
+  assert.equal(projectProviderState(providers[0], { runtimeInstances }), 1);
   assert.deepEqual(projectProviderAvailability("demo", { runtimeInstances }), {
-    summary: "partial",
+    summary: "available",
     configured: true,
     available: true,
     command: "1/2",
     detail: "",
   });
+});
+
+test("providerRuntimeProjection: unverified launchable runtime keeps provider status unknown", () => {
+  const runtimeInstances = [
+    { id: "one", providerId: "demo", available: true, configured: true, verificationStatus: "unknown" },
+  ];
+  assert.equal(projectProviderState(providers[0], { runtimeInstances }), 2);
+  assert.equal(projectProviderAvailability("demo", { runtimeInstances }).summary, "unknown");
 });
 
 test("providerRuntimeProjection: canSendToProviderRuntime follows launch support and target startability", () => {

@@ -79,8 +79,11 @@ export function projectProviderState(provider, {
 } = {}) {
   const instances = runtimeInstancesForProviderRaw(runtimeInstances, provider.id);
   if (instances.length) {
+    const verifiedAvailableCount = instances.filter((instance) =>
+      (instance.verificationStatus || (instance.available ? "verified_available" : "verified_unavailable")) === "verified_available"
+    ).length;
     const availableCount = instances.filter((instance) => instance.available).length;
-    if (availableCount === instances.length) return 1;
+    if (verifiedAvailableCount > 0) return 1;
     if (availableCount > 0) return 2;
     return 9;
   }
@@ -108,10 +111,13 @@ export function projectProviderAvailability(providerId, {
   const instances = runtimeInstancesForProviderRaw(runtimeInstances, providerId);
   if (instances.length) {
     const availableCount = instances.filter((instance) => instance.available).length;
-    const summary = availableCount === instances.length
+    const verifiedAvailableCount = instances.filter((instance) =>
+      (instance.verificationStatus || (instance.available ? "verified_available" : "verified_unavailable")) === "verified_available"
+    ).length;
+    const summary = verifiedAvailableCount > 0
       ? "available"
       : availableCount > 0
-        ? "partial"
+        ? "unknown"
         : "not_connected";
     return {
       summary,

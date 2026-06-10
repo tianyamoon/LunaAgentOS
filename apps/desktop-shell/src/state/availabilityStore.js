@@ -80,12 +80,15 @@ export function createAvailabilityStore() {
 
       // Check provider availability
       const availableCount = instancesForProvider.filter((i) => i.available).length;
-      const isAvailable = instancesForProvider.length > 0 && availableCount > 0;
+      const verifiedAvailableCount = instancesForProvider.filter((instance) =>
+        (instance.verificationStatus || (instance.available ? "verified_available" : "verified_unavailable")) === "verified_available"
+      ).length;
+      const isAvailable = verifiedAvailableCount > 0;
       const availabilitySummary = isAvailable
-        ? availableCount === instancesForProvider.length
-          ? "available"
-          : "partial"
-        : "not_connected";
+        ? "available"
+        : availableCount > 0
+          ? "unknown"
+          : "not_connected";
       const availability = runtimeAvailability[provider.id] || {
         configured: instancesForProvider.length ? instancesForProvider.some((instance) => instance.configured) : undefined,
         available: isAvailable,

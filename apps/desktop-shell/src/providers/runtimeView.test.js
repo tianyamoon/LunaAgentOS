@@ -203,6 +203,29 @@ test("targetsForRuntimeInstance: manifest adapter produces a generic runtime row
   assert.equal(targets[0].subtitle, "stdio_json");
 });
 
+test("targetsForRuntimeInstance: unverified manifest runtime remains launchable but is not presented as verified", () => {
+  const providers = [{
+    id: "demo",
+    name: "Demo",
+    adapterManifest: { id: "demo", transport: "stdio_json" },
+  }];
+  const instance = {
+    id: "demo-manifest",
+    providerId: "demo",
+    available: true,
+    verificationStatus: "unknown",
+    runtimeLabel: "Manifest",
+  };
+  const [target] = targetsForRuntimeInstance(instance, {
+    providers,
+    runtimeInstances: [instance],
+    runtimeTargetsByInstance: {},
+  });
+  assert.equal(target.available, true);
+  assert.equal(target.verificationStatus, "unknown");
+  assert.equal(target.status.state, "unknown");
+});
+
 test("runtimeTargets: flattens across all instances", () => {
   const profiles = [{ id: "hermes-wsl:profile:default", displayName: "default" }];
   const all = runtimeTargets({

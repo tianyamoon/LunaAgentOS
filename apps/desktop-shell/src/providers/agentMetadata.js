@@ -2,6 +2,7 @@ const providerStatusLabelKeys = {
   probing: "provider.probing",
   available: "provider.available",
   partial: "provider.partial",
+  unknown: "provider.probing",
   not_connected: "provider.notConnected",
   not_configured: "provider.not_configured",
   unavailable: "provider.unavailable",
@@ -10,6 +11,7 @@ const providerStatusLabelKeys = {
 
 const targetStatusLabelKeys = {
   available: "availability.sendable",
+  unknown: "availability.unverified",
   unavailable: "availability.unavailable",
   gateway_running: "availability.gatewayRunning",
   gateway_stopped: "availability.gatewayStopped",

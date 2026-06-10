@@ -5,6 +5,7 @@ use crate::adapter_extensions;
 use crate::adapter_registry;
 use crate::runtime_config::load_runtime_config_file;
 use crate::adapter_host::adapter_launch_spec_with_context;
+use chrono::Utc;
 use serde::Serialize;
 use serde_json::Value;
 use std::process::Command;
@@ -60,6 +61,7 @@ pub(crate) struct RuntimeInstanceProbe {
     pub(crate) model_control: Option<adapter_registry::AdapterModelControl>,
     pub(crate) configured: bool,
     pub(crate) available: bool,
+    pub(crate) verification_status: String,
     pub(crate) summary: String,
     pub(crate) detail: String,
     pub(crate) version: Option<String>,
@@ -87,6 +89,16 @@ pub(crate) struct HealthEvidence {
     pub(crate) field: String,
     pub(crate) source: String,
     pub(crate) detail: String,
+    pub(crate) checked_at: String,
+}
+
+pub(crate) fn health_evidence(field: &str, source: &str, detail: String) -> HealthEvidence {
+    HealthEvidence {
+        field: field.into(),
+        source: source.into(),
+        detail,
+        checked_at: Utc::now().to_rfc3339(),
+    }
 }
 
 fn unknown_health() -> RuntimeHealth {
@@ -205,7 +217,7 @@ pub(crate) fn runtime_instance_probe(
         health.wsl_or_bridge_available = if available { "ok" } else { "failed" }.into();
     }
     if !available { health.unavailable_reason = Some("cli_not_callable".into()); health.repair_hint = Some("check_runtime_command".into()); }
-    let health_evidence = vec![HealthEvidence { field: "cli_callable".into(), source: "runtime_command".into(), detail: detail.clone() }];
+    let health_evidence = vec![health_evidence("cli_callable", "runtime_command", detail.clone())];
     RuntimeInstanceProbe {
         id: id.to_string(),
         provider_id: provider_id.to_string(),
@@ -218,6 +230,7 @@ pub(crate) fn runtime_instance_probe(
         model_control: None,
         configured,
         available,
+        verification_status: if available { "verified_available" } else { "verified_unavailable" }.into(),
         summary: summary.to_string(),
         detail,
         version,
@@ -234,9 +247,15 @@ pub(crate) fn provider_probe_from_instances(
     instances: &[RuntimeInstanceProbe],
 ) -> RuntimeProviderProbe {
     let available_count = instances.iter().filter(|item| item.available).count();
+    let verified_available_count = instances
+        .iter()
+        .filter(|item| item.verification_status == "verified_available")
+        .count();
     let available = available_count > 0;
-    let summary = if available {
+    let summary = if verified_available_count > 0 {
         "available"
+    } else if available {
+        "unknown"
     } else if configured {
         "unavailable"
     } else {
@@ -270,24 +289,51 @@ pub(crate) fn adapter_instance_probe(
             .and_then(|_| run_shell_owned(&health.command, &health.args))
     });
     let available = result.as_ref().map(|item| item.is_ok()).unwrap_or(true);
+    let verification_status = match &result {
+        Some(Ok(_)) => "verified_available",
+        Some(Err(_)) => "verified_unavailable",
+        None => "unknown",
+    };
     let detail = match result {
         Some(Ok(output)) => safe_detail(&output),
         Some(Err(error)) => safe_detail(&error),
         None => "Manifest loaded; no healthCheck configured.".to_string(),
     };
-    let summary = if available { "available" } else { "unavailable" };
-    let version = available.then(|| first_output_line(&detail)).flatten();
+    let summary = match verification_status {
+        "verified_available" => "available",
+        "verified_unavailable" => "unavailable",
+        _ => "unknown",
+    };
+    let version = (verification_status == "verified_available")
+        .then(|| first_output_line(&detail))
+        .flatten();
     let mut health = unknown_health();
-    health.installed = if available { "ok".into() } else { "unknown".into() };
-    health.cli_callable = if available { "ok".into() } else { "failed".into() };
+    if verification_status == "verified_available" {
+        health.installed = "ok".into();
+        health.cli_callable = "ok".into();
+    } else if verification_status == "verified_unavailable" {
+        health.cli_callable = "failed".into();
+    }
     health.version_status = version_status(version.as_deref(), adapter.version_policy.as_ref().and_then(|policy| policy.minimum_version.as_deref()));
-    if !available { health.unavailable_reason = Some("cli_not_callable".into()); health.repair_hint = Some("check_runtime_command".into()); }
+    if verification_status == "verified_unavailable" {
+        health.unavailable_reason = Some("cli_not_callable".into());
+        health.repair_hint = Some("check_runtime_command".into());
+    }
     let configured_keys: Vec<_> = adapter.env.keys().filter(|key| {
         let key = key.to_ascii_uppercase(); key.contains("KEY") || key.contains("TOKEN") || key.contains("SECRET")
     }).collect();
-    let mut health_evidence = vec![HealthEvidence { field: "cli_callable".into(), source: "manifest_health_check".into(), detail: detail.clone() }];
+    let evidence_source = if adapter.health_check.is_some() {
+        "manifest_health_check"
+    } else {
+        "manifest_loaded"
+    };
+    let mut evidence = vec![health_evidence("cli_callable", evidence_source, detail.clone())];
     if !configured_keys.is_empty() {
-        health_evidence.push(HealthEvidence { field: "model_or_key_configured".into(), source: "manifest_env_presence".into(), detail: "credential-like configuration is present; validity was not verified".into() });
+        evidence.push(health_evidence(
+            "model_or_key_configured",
+            "manifest_env_presence",
+            "credential-like configuration is present; validity was not verified".into(),
+        ));
     }
     RuntimeInstanceProbe {
         id: format!("{}-manifest", adapter.id),
@@ -303,11 +349,12 @@ pub(crate) fn adapter_instance_probe(
         model_control: adapter.model_control.clone(),
         configured: true,
         available,
+        verification_status: verification_status.into(),
         summary: summary.to_string(),
         detail,
         version,
         health,
-        health_evidence,
+        health_evidence: evidence,
     }
 }
 
