@@ -3510,6 +3510,15 @@ button:disabled {
   }
 }
 
+@media (max-width: 480px) {
+  .topbar-tools {
+    width: 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+}
+
 @container (max-width: 560px) {
   .session-card-actions {
     justify-self: end;

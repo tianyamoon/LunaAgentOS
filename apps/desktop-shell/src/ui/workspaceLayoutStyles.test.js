@@ -55,3 +55,7 @@ test("focused workspace keeps the main card bounded above the mini bar", () => {
     { name: "overflow-x", value: "auto" },
   ]);
 });
+
+test("narrow topbar tools wrap instead of clipping the theme control", () => {
+  assert.match(styles, /@media \(max-width: 480px\)[\s\S]*?\.topbar-tools\s*\{[\s\S]*?width:\s*100%;[\s\S]*?min-width:\s*0;[\s\S]*?flex-wrap:\s*wrap;/);
+});

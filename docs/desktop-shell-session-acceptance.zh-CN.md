@@ -17,7 +17,9 @@ npm.cmd run dev
 - `src/main.js` 返回 `200`。
 - `npm.cmd run test:all`、`lint:undef`、`lint:architecture`、`build` 全部通过。
 - `cargo test` 通过。
-- 当前环境的 bundled Playwright 缺少 `playwright-core`，因此本轮未完成浏览器 DOM 自动点击矩阵。
+- 应用内浏览器可完成 DOM 与交互验收；普通浏览器预览通过 `desktopBridge` 使用只读空快照启动，不伪造桌面写操作。
+- 1280x720 与 390x844 视口均无页面级横向溢出；窄屏顶栏工具会自然换行，workspace、composer、history 均保持在视口内。
+- 中英文切换、主题切换、无 runtime 时发送阻断均已通过浏览器交互验证。
 
 ## 手动验收矩阵
 
@@ -75,6 +77,6 @@ npm.cmd run dev
 
 ## 本轮验收结论
 
-- 纯逻辑与构建验收已完成。
-- Vite dev server HTTP smoke 已完成。
+- 纯逻辑、构建、Vite HTTP smoke 和应用内浏览器基础交互验收已完成。
+- 普通浏览器预览启动不再依赖 `window.__TAURI__.core`，且不会把不可用的桌面写操作伪装为成功。
 - 需要真实 ACP runtime 与可恢复历史数据的四条端到端路径，需在桌面环境手动完成。

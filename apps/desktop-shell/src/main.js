@@ -173,9 +173,9 @@ import {
 } from "./providers/agentBrief.js";
 import { sessionSectionsFromEvents } from "./runtime/streamEvents.js";
 import { FALLBACK_SESSIONS } from "./fixtures/fallbackSessions.js";
+import { createDesktopBridge } from "./platform/desktopBridge.js";
 
-const { invoke } = window.__TAURI__.core;
-const listenRuntimeEvent = window.__TAURI__?.event?.listen?.bind(window.__TAURI__.event);
+const { invoke, listenRuntimeEvent } = createDesktopBridge(window.__TAURI__);
 
 const HISTORY_SCHEMA_VERSION = 5;
 const STREAM_CARD_RENDER_INTERVAL_MS = 100;
