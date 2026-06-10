@@ -351,12 +351,13 @@ export function createRuntimeSessionCardController({
     // 新 Prompt：通过虚拟列表定位到 user row
     if (projection.activePromptRunId && nextTarget && lastScrollTargetRows.get(sessionId) !== nextTarget) {
       lastScrollTargetRows.set(sessionId, nextTarget);
-      if (virtualList) {
-        virtualList.scrollToRow(nextTarget, { align: "start" });
-      } else {
+      if (!focusNewPromptInMessageList({ virtualList, controller, targetRowId: nextTarget })) {
         const elements = messageListElements(body);
         const targetRow = elements.contentElement?.querySelector?.(`[data-message-id="${nextTarget}"]`) || null;
-        if (targetRow) controller.scrollElementIntoView(targetRow, { behavior: "auto", block: "start" });
+        if (targetRow) {
+          controller.scrollElementIntoView(targetRow, { behavior: "auto", block: "start" });
+          controller.notifyUserSubmission?.();
+        }
       }
       return;
     }
@@ -427,6 +428,14 @@ export function createRuntimeSessionCardController({
 }
 
 // 兼容旧测试入口：新实现不再替换外围 Card，只 patch 稳定外壳与正文 seam。
+export function focusNewPromptInMessageList({ virtualList, controller, targetRowId } = {}) {
+  if (!virtualList || !controller || !targetRowId) return false;
+  virtualList.scrollToRow(targetRowId, { align: "start" });
+  // 先挂载目标行，再恢复贴底；短 turn 不应在输入区上方留下整屏空白。
+  controller.notifyUserSubmission?.();
+  return true;
+}
+
 export function patchSessionCardPreservingBody(previousCard, nextArticle, { reconcileBody } = {}) {
   return patchSessionCardShell(previousCard, nextArticle, { reconcileBody });
 }

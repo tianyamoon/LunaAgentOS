@@ -1,8 +1,35 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { createRuntimeSessionCardController } from "./runtimeSessionCardController.js";
-import { patchSessionCardPreservingBody } from "./runtimeSessionCardController.js";
+import {
+  createRuntimeSessionCardController,
+  focusNewPromptInMessageList,
+  patchSessionCardPreservingBody,
+} from "./runtimeSessionCardController.js";
+
+test("focusNewPromptInMessageList: 新 prompt 定位后恢复跟随底部", () => {
+  const calls = [];
+
+  const focused = focusNewPromptInMessageList({
+    targetRowId: "turn-5:user",
+    virtualList: {
+      scrollToRow(rowId, options) {
+        calls.push(["target", rowId, options.align]);
+      },
+    },
+    controller: {
+      notifyUserSubmission() {
+        calls.push(["follow-bottom"]);
+      },
+    },
+  });
+
+  assert.equal(focused, true);
+  assert.deepEqual(calls, [
+    ["target", "turn-5:user", "start"],
+    ["follow-bottom"],
+  ]);
+});
 
 // mini card 必须同时更新焦点和当前 Session，避免全屏内容与缩略图脱节。
 test("runtimeSessionCardController: mini card 点击统一切换焦点与当前 Session", () => {
