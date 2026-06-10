@@ -39,6 +39,20 @@ function field(labelKey, value, emptyKey = "agentDetail.unknown") {
 }
 
 function modelSection(models = {}) {
+  const managed = models.control?.mode === "luna_managed" && (models.control.availableModels || []).length;
+  const controls = managed ? `
+    <div class="agent-detail-model-control">
+      <label><span>${t("agentDetail.modelSelect")}</span>
+        <select class="agent-default-model-select">
+          ${(models.control.availableModels || []).map((model) => `<option value="${escapeHtml(model)}" ${model === models.defaultModel ? "selected" : ""}>${escapeHtml(model)}</option>`).join("")}
+        </select>
+      </label>
+      <button type="button" class="mini-btn agent-default-model-save">${t("agentDetail.modelSave")}</button>
+      <small>${t("agentDetail.modelNewSession")}</small>
+    </div>
+  ` : models.control?.mode === "luna_managed"
+    ? `<p class="agent-detail-empty">${t("agentDetail.modelDiscoveryUnavailable")}</p>`
+    : `<p class="agent-detail-empty">${t("agentDetail.modelNativeManaged")}</p>`;
   return `
     <section class="agent-detail-section">
       <h4>${t("agentDetail.models")}</h4>
@@ -47,6 +61,7 @@ function modelSection(models = {}) {
         ${field("agentDetail.modelDefault", models.defaultModel, "agentDetail.notConfigured")}
         ${field("agentDetail.modelRecommended", (models.recommended || []).map(text).join(" / "), "agentDetail.notConfigured")}
       </dl>
+      ${controls}
     </section>
   `;
 }

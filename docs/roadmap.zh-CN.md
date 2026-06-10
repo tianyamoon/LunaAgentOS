@@ -17,12 +17,13 @@ LunaAgentOS 的长期方向是 AI 时代的个人 Agent 操作系统。0.2 Previ
 - Live / archived session lifecycle。
 - Runtime detection 和清晰配置状态。
 
-## 下一步：0.3 Agent 可用性和 Session 卡片
+## 下一步：0.3 Agent 管理和健康诊断
 
 0.3 在 0.2 的工作台底盘之上，先把两件基础能力做扎实，为后续的跨 Agent 协作铺路：
 
-- Agent 可用性管理：身份、profile、模型、能力、健康状态、修复建议和最佳实践。
-- Session 卡片任务化：任务状态、过程层级、产物摘要、继续/重试/归档动作和手动 handoff。
+- Agent 管理：身份、profile、模型、能力、安全边界和最佳实践。
+- 真实健康诊断：安装、调用、登录、配置、WSL/Bridge、模型或密钥、版本、失败原因和修复建议。
+- Runtime Session Card 继续只负责会话状态、执行过程、响应、历史和恢复。
 - 继续把 adapter manifest fields 和 capability metadata 做实，让 Agent 管理不是纯 UI 文案。
 - 继续保持 App 作为协议的具体控制台和当前官方推荐使用路径。
 
@@ -30,15 +31,12 @@ LunaAgentOS 的长期方向是 AI 时代的个人 Agent 操作系统。0.2 Previ
 
 ## 然后：Adapter contract seam 和 call flow
 
-在 Agent 可用性和 Session 卡片更可靠之后，下一层架构工作是把 adapter 边界和可见 routing 做实：
+在 Agent 管理和 Runtime Session 更可靠之后，再单独设计 adapter call flow：
 
 - 把 Claude Code 和 Hermes 作为 registry adapters；需要时通过 built-in extensions 扩展。
 - 让 Trae IDE 保持在 IDE-first bridge 路线上。
 - 让新 Agent 产品通过 Adapter Contract 进入。
-- 从 session card 中选择内容。
-- 把它发送给另一个 runtime entry 或另一个已有 session。
-- 保留 source、target 和 task context。
-- 让调用关系在 workspace 中可见。
+- Task、Task Board、handoff 和跨 Agent call flow 均属于后续阶段。
 
 ## 后续：协作工作台
 

@@ -65,6 +65,56 @@ struct AcpSession {
     stderr_done: Receiver<()>,
     next_id: i64,
     session_id: String,
+    config_options: Vec<Value>,
+}
+
+fn model_config_option(options: &[Value]) -> Option<&Value> {
+    options.iter().find(|option| {
+        option.get("category").and_then(Value::as_str) == Some("model")
+            || option.get("id").and_then(Value::as_str) == Some("model")
+    })
+}
+
+fn option_values(option: &Value) -> Vec<String> {
+    let mut values = Vec::new();
+    for item in option.get("options").and_then(Value::as_array).into_iter().flatten() {
+        if let Some(value) = item.get("value").and_then(Value::as_str) {
+            values.push(value.to_string());
+        } else if let Some(group) = item.get("options").and_then(Value::as_array) {
+            values.extend(group.iter().filter_map(|entry| entry.get("value").and_then(Value::as_str).map(ToString::to_string)));
+        }
+    }
+    values
+}
+
+fn apply_preferred_model(
+    runtime: &AcpRuntime,
+    session_id: &str,
+    preferred_model: Option<&str>,
+    config_options: &mut Vec<Value>,
+    next_id: &mut i64,
+    inbox: &Receiver<Value>,
+    stdin: &mut ChildStdin,
+    stderr_log: &Arc<Mutex<String>>,
+    stderr_done: &Receiver<()>,
+    child: &mut Child,
+    events: &mut Vec<Value>,
+    on_event: &mut Option<&mut dyn FnMut(Value)>,
+) -> Result<(), String> {
+    let Some(preferred_model) = preferred_model.map(str::trim).filter(|value| !value.is_empty()) else { return Ok(()); };
+    let option = model_config_option(config_options).ok_or_else(|| format!("{} 未提供可配置模型列表。", runtime.display()))?;
+    let config_id = option.get("id").and_then(Value::as_str).ok_or_else(|| format!("{} 模型配置缺少 id。", runtime.display()))?;
+    if !option_values(option).iter().any(|value| value == preferred_model) {
+        return Err(format!("{} 不支持已保存的默认模型 {preferred_model}。", runtime.display()));
+    }
+    let request = json!({
+        "jsonrpc": "2.0", "id": next_request_id(next_id), "method": "session/set_config_option",
+        "params": { "sessionId": session_id, "configId": config_id, "value": preferred_model }
+    });
+    write_message(stdin, &request)?;
+    let result = read_response(runtime, inbox, stdin, request["id"].as_i64().unwrap(), Some(stderr_log), Some(stderr_done), Some(child), events, on_event)?;
+    *config_options = result.get("configOptions").and_then(Value::as_array).cloned().unwrap_or_default();
+    Ok(())
 }
 
 pub fn run_adapter_acp_prompt(
@@ -74,6 +124,7 @@ pub fn run_adapter_acp_prompt(
     cwd: Option<String>,
     _config: RuntimeConfig,
     on_event: Option<&mut dyn FnMut(Value)>,
+    preferred_model: Option<String>,
 ) -> Result<Vec<Value>, String> {
     run_acp_prompt(
         AcpRuntime::Adapter {
@@ -85,6 +136,7 @@ pub fn run_adapter_acp_prompt(
         cwd,
         Some(adapter),
         on_event,
+        preferred_model,
     )
 }
 
@@ -95,6 +147,7 @@ fn run_acp_prompt(
     cwd: Option<String>,
     adapter: Option<AdapterLaunchSpec>,
     mut on_event: Option<&mut dyn FnMut(Value)>,
+    preferred_model: Option<String>,
 ) -> Result<Vec<Value>, String> {
     let cwd = match cwd {
         Some(value) if !value.trim().is_empty() => PathBuf::from(value),
@@ -114,6 +167,7 @@ fn run_acp_prompt(
                 SessionStartMode::New,
                 adapter.as_ref(),
                 &mut on_event,
+                preferred_model.as_deref(),
             )?;
             sessions.insert(session_key.clone(), session);
             sessions
@@ -187,6 +241,7 @@ fn resume_acp_session(
         SessionStartMode::Resume(acp_session_id.clone()),
         adapter.as_ref(),
         &mut on_event,
+        None,
     )?;
     sessions.insert(session_key, session);
     Ok(events)
@@ -245,6 +300,7 @@ fn load_acp_session(
         SessionStartMode::Load(acp_session_id.clone()),
         adapter.as_ref(),
         &mut on_event,
+        None,
     )?;
     sessions.insert(session_key, session);
     Ok(events)
@@ -339,7 +395,9 @@ fn start_acp_session(
     mode: SessionStartMode,
     adapter: Option<&AdapterLaunchSpec>,
     on_event: &mut Option<&mut dyn FnMut(Value)>,
+    preferred_model: Option<&str>,
 ) -> Result<AcpSession, String> {
+    let is_new_session = matches!(mode, SessionStartMode::New);
     let mut child = build_acp_command(cwd, adapter)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -485,6 +543,12 @@ fn start_acp_session(
                 format!("{} 未返回 sessionId。", runtime.display()),
             )
         })?;
+    let mut config_options = session_result.get("configOptions").and_then(Value::as_array).cloned().unwrap_or_default();
+    if is_new_session {
+        if let Err(error) = apply_preferred_model(runtime, &session_id, preferred_model, &mut config_options, &mut next_id, &inbox, &mut stdin, &stderr_log, &stderr_done, &mut child, &mut events, on_event) {
+            return Err(abort_started_child(&mut child, error));
+        }
+    }
 
     let content = match method {
         "session/resume" => format!("{} 会话已恢复。", runtime.display()),
@@ -499,7 +563,8 @@ fn start_acp_session(
             "state": 1,
             "payload": {
                 "content": content,
-                "sessionId": session_id
+                "sessionId": session_id,
+                "configOptions": config_options
             }
         }),
         on_event,
@@ -513,7 +578,27 @@ fn start_acp_session(
         stderr_done,
         next_id,
         session_id,
+        config_options,
     })
+}
+
+pub fn inspect_adapter_model_control(adapter: AdapterLaunchSpec, cwd: Option<String>) -> Result<Value, String> {
+    let runtime = AcpRuntime::Adapter { id: adapter.id.clone(), name: adapter.name.clone() };
+    let cwd = match cwd { Some(value) if !value.trim().is_empty() => PathBuf::from(value), _ => isolated_runtime_cwd("model-discovery")? };
+    let mut events = Vec::new();
+    let mut on_event = None;
+    let mut session = start_acp_session(&runtime, &cwd, &mut events, SessionStartMode::New, Some(&adapter), &mut on_event, None)?;
+    let option = model_config_option(&session.config_options).cloned();
+    let _ = session.child.kill();
+    let _ = session.child.wait();
+    let Some(option) = option else { return Ok(json!({ "mode": "native_runtime", "availableModels": [] })); };
+    Ok(json!({
+        "mode": "luna_managed",
+        "configId": option.get("id").cloned().unwrap_or(Value::String("model".into())),
+        "defaultModel": option.get("currentValue").cloned().unwrap_or(Value::Null),
+        "availableModels": option_values(&option),
+        "source": "acp_session_config"
+    }))
 }
 
 fn abort_started_child(child: &mut Child, error: String) -> String {
@@ -918,6 +1003,19 @@ fn respond_to_client_request(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn model_config_options_support_flat_and_grouped_values() {
+        let flat = json!({ "id": "model", "category": "model", "options": [
+            { "value": "fast", "name": "Fast" }, { "value": "deep", "name": "Deep" }
+        ] });
+        assert_eq!(option_values(&flat), ["fast", "deep"]);
+        let grouped = json!({ "id": "model", "category": "model", "options": [
+            { "group": "family", "name": "Family", "options": [{ "value": "pro", "name": "Pro" }] }
+        ] });
+        assert_eq!(option_values(&grouped), ["pro"]);
+        assert!(model_config_option(&[flat]).is_some());
+    }
 
     fn spawn_failing_adapter() -> Child {
         #[cfg(windows)]

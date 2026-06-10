@@ -23,6 +23,7 @@ export function createAcpRuntimeClient({
       runtimeHost: session.runtimeHost || null,
       runtimeCommand: session.runtimeCommand || null,
       profileExecutable: session.profileExecutable || null,
+      defaultModel: session.defaultModel || null,
       ...args,
     };
   }

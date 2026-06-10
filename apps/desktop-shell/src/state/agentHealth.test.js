@@ -8,6 +8,17 @@ import {
   deriveTargetHealth,
 } from "./agentHealth.js";
 
+test("explicit unknown runtime facts are not promoted by heuristics", () => {
+  const health = deriveTargetHealth({
+    health: { installed: "unknown", cliCallable: "unknown", modelOrKeyConfigured: "unknown" },
+    healthEvidence: [{ field: "cli_callable", source: "probe", detail: "not verified" }],
+  }, { sendable: true });
+  assert.equal(health.installed, "unknown");
+  assert.equal(health.cli_callable, "unknown");
+  assert.equal(health.model_or_key_configured, "unknown");
+  assert.equal(health.evidence[0].source, "probe");
+});
+
 test("deriveRuntimeHealth: unavailable configured runtime explains CLI failure", () => {
   const health = deriveRuntimeHealth({
     configured: true,

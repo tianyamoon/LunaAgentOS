@@ -401,6 +401,7 @@ pub(super) fn targets(
             profile_name.clone()
         };
         let state = if gateway == "running" { 1 } else { 9 };
+        let model_or_key = if !model.is_empty() || has_env { "unknown" } else { "unknown" };
         targets.push(serde_json::json!({
             "id": profile_id,
             "providerId": adapter.id,
@@ -428,6 +429,22 @@ pub(super) fn targets(
             "hasEnv": has_env,
             "hasSoul": has_soul,
             "isDefault": is_default,
+            "modelControl": adapter.model_control.clone(),
+            "health": {
+                "installed": "ok",
+                "loggedIn": "unknown",
+                "cliCallable": "ok",
+                "profileConfigured": "ok",
+                "wslOrBridgeAvailable": if command_kind == "wsl" { "ok" } else { "unknown" },
+                "modelOrKeyConfigured": model_or_key,
+                "versionStatus": "unknown",
+                "unavailableReason": if gateway == "running" { Value::Null } else { Value::String("runtime_stopped".into()) },
+                "repairHint": if gateway == "running" { Value::Null } else { Value::String("send_to_connect".into()) }
+            },
+            "healthEvidence": [
+                { "field": "profile_configured", "source": "hermes_profile_show", "detail": if path.is_empty() { "profile discovered" } else { "profile path discovered" } },
+                { "field": "model_or_key_configured", "source": "hermes_profile_show", "detail": "configuration presence observed; validity was not verified" }
+            ]
         }));
     }
 

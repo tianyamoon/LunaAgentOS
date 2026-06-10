@@ -20,6 +20,12 @@ pub(crate) struct AgentBriefConfig {
     pub(crate) updated_at: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AgentPreferenceConfig {
+    pub(crate) default_model: Option<String>,
+}
+
 /// 桌面 Shell 的本地运行时配置文件。
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
@@ -33,6 +39,8 @@ pub(crate) struct RuntimeConfigFile {
     pub(crate) adapter_plugin_paths: Vec<String>,
     #[serde(default)]
     pub(crate) agent_briefs: HashMap<String, HashMap<String, AgentBriefConfig>>,
+    #[serde(default)]
+    pub(crate) agent_preferences: HashMap<String, AgentPreferenceConfig>,
 }
 
 /// ACP runtime 当前不需要读取桌面配置，但保留显式转换 Seam。

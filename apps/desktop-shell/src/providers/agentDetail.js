@@ -68,10 +68,13 @@ function inferRuntimeEnvironment(target = {}, runtimeInstance = {}, source = {})
   );
 }
 
-function modelInfo(target = {}, provider = {}, runtimeInstance = {}, source = {}) {
+function modelInfo(target = {}, provider = {}, runtimeInstance = {}, source = {}, savedDefaultModel = "") {
   const manifest = provider.adapterManifest || {};
   const modelSource = source.models || manifest.models || provider.models || runtimeInstance.models || target.models || {};
+  const control = target.modelControl || runtimeInstance.modelControl || provider.modelControl || manifest.modelControl || { mode: "native_runtime" };
   const available = mergeUnique(
+    control.availableModels,
+    control.available_models,
     modelSource.available,
     modelSource.availableModels,
     target.availableModels,
@@ -81,8 +84,12 @@ function modelInfo(target = {}, provider = {}, runtimeInstance = {}, source = {}
   );
   return {
     available,
-    defaultModel: firstValue(target.defaultModel, target.model, runtimeInstance.defaultModel, modelSource.default, modelSource.defaultModel),
+    defaultModel: firstValue(control.mode === "luna_managed" ? savedDefaultModel : "", target.defaultModel, target.model, runtimeInstance.defaultModel, control.defaultModel, modelSource.default, modelSource.defaultModel),
     recommended: mergeUnique(modelSource.recommended, modelSource.recommendedModels, target.recommendedModels),
+    control: {
+      mode: control.mode || "native_runtime",
+      availableModels: mergeUnique(control.availableModels, control.available_models),
+    },
   };
 }
 
@@ -104,9 +111,10 @@ export function buildAgentDetail({
   runtimeInstance = null,
   availabilityTarget = null,
   agentBrief = "",
+  savedDefaultModel = "",
 } = {}) {
   const source = detailSource(provider, target);
-  const models = modelInfo(target, provider, runtimeInstance || {}, source);
+  const models = modelInfo(target, provider, runtimeInstance || {}, source, savedDefaultModel);
   const capabilities = capabilityInfo(target, provider, runtimeInstance || {}, source);
   const health = availabilityTarget?.health || target.health || null;
   const runtimeEnvironment = inferRuntimeEnvironment(target, runtimeInstance || {}, source);

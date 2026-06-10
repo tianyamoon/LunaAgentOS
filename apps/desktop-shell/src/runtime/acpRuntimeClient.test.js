@@ -37,6 +37,7 @@ function makeSession() {
     runtimeHost: "wsl",
     runtimeCommand: "agent",
     profileExecutable: "default",
+    defaultModel: "model-2",
   };
 }
 
@@ -53,6 +54,7 @@ test("acpRuntimeClient: prompt builds generic adapter args", async () => {
       runtimeHost: "wsl",
       runtimeCommand: "agent",
       profileExecutable: "default",
+      defaultModel: "model-2",
       prompt: "actual",
       turnId: "turn-1",
       promptRunId: "run-1",

@@ -23,7 +23,7 @@ If you are new here, start with the docs that answer three practical questions f
 - [Why LunaAgentOS](./why-lunaagentos.md): the problem this project is trying to solve
 - [Light-Core Principles](./light-core-principles.md): the constraints that keep the control layer focused
 - [Roadmap](./roadmap.md): near-term and longer-term direction
-- [0.3 Requirement Definition](./requirements-0.3.md): the next step around agent availability management and session cards as task surfaces
+- [0.3 Requirement Definition](./requirements-0.3.md): Agent management and runtime-backed health diagnostics, with Runtime Session kept separate from Task
 
 ## Architecture and integration
 

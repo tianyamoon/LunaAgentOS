@@ -519,6 +519,14 @@ async function saveAgentBriefRecords(nextBriefs) {
   return runtimeConfigState.saveAgentBriefRecords(nextBriefs);
 }
 
+async function saveDefaultModel(target, model) {
+  return runtimeConfigState.saveDefaultModel(target, model);
+}
+
+function defaultModelForTarget(target) {
+  return runtimeConfigState.defaultModelForTarget(target);
+}
+
 function cloneAgentBriefs() {
   return runtimeConfigState.getAgentBriefsSnapshot();
 }
@@ -749,6 +757,10 @@ async function refreshRuntimeProbe() {
 // 连接弹窗重查时统一刷新探测结果和该 Provider 的目标列表。
 async function refreshProviderConnections(providerId) {
   return runtimeProbeController?.refreshProviderConnections(providerId);
+}
+
+async function discoverModelControl(target) {
+  return runtimeProbeController?.discoverModelControl(target) || { mode: "native_runtime", availableModels: [] };
 }
 
 function latestActiveSessionForAgent(agentId) {
@@ -1021,10 +1033,13 @@ agentManagementView = createAgentManagementView({
   cloneAgentBriefs,
   writeBriefValue,
   saveAgentBriefRecords,
+  saveDefaultModel,
+  defaultModelForTarget,
   ensureRuntimeConfigState,
   refreshAgentBriefForTarget,
   refreshRuntimeProbe,
   refreshProviderConnections,
+  discoverModelControl,
   renderProviders,
   closeConfirmDialog,
   setAppNotice,
@@ -1518,6 +1533,7 @@ agentBriefController = createAgentBriefController({
   targetDisplayName,
   setAppNotice,
   t,
+  defaultModelForTarget,
 });
 
 // DOM 事件仅调用 Launch Controller，不再持有发送流程 Implementation。

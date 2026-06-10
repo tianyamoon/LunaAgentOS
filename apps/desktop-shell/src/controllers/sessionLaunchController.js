@@ -43,6 +43,7 @@ export function createSessionLaunchController({
   runFallbackSession,
   setAppNotice,
   t,
+  defaultModelForTarget = () => "",
   now = () => Date.now(),
 }) {
   let sessionSeq = 0;
@@ -68,6 +69,7 @@ export function createSessionLaunchController({
       runtimeHost: agent.runtimeHost || null,
       runtimeCommand: agent.runtimeCommand || null,
       profileExecutable: agentEntrySnapshot.launch.profileExecutable || null,
+      defaultModel: agent.modelControl?.mode === "luna_managed" ? defaultModelForTarget(agent) || null : null,
       agentEntrySnapshot,
       task: firstTask,
       state: 2,

@@ -100,7 +100,11 @@ export function createAvailabilityStore() {
       summary.targets.total += targets.length;
       summary.targets.sendable += targets.filter(isTargetSendable).length;
 
-      const providerHealth = deriveProviderHealth(provider, availability, instancesForProvider);
+      const providerHealth = deriveProviderHealth({
+        ...provider,
+        health: availability.health || provider.health,
+        healthEvidence: availability.healthEvidence || provider.healthEvidence,
+      }, availability, instancesForProvider);
       return {
         id: provider.id,
         name: provider.name,
@@ -119,6 +123,7 @@ export function createAvailabilityStore() {
             commandKind: instance.commandKind,
             command: instance.command,
             health,
+            healthEvidence: instance.healthEvidence || [],
           };
         }),
         targets: targets.map((target) => {
@@ -139,6 +144,7 @@ export function createAvailabilityStore() {
             runtimeInstanceId: target.runtimeInstanceId,
             isCurrent: currentTarget && target.id === currentTarget.id,
             health,
+            healthEvidence: target.healthEvidence || [],
           };
         }),
       };

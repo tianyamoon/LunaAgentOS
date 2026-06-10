@@ -4,6 +4,7 @@
 use crate::adapter_extensions;
 use crate::adapter_registry;
 use crate::runtime_config::load_runtime_config_file;
+use crate::adapter_host::adapter_launch_spec_with_context;
 use serde::Serialize;
 use serde_json::Value;
 use std::process::Command;
@@ -26,6 +27,10 @@ pub(crate) struct RuntimeProviderProbe {
     pub(crate) command: String,
     pub(crate) summary: String,
     pub(crate) detail: String,
+    pub(crate) health: RuntimeHealth,
+    pub(crate) health_evidence: Vec<HealthEvidence>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) model_control: Option<adapter_registry::AdapterModelControl>,
 }
 
 /// 一次完整探测的 Provider 与 Runtime Instance 集合。
@@ -51,11 +56,66 @@ pub(crate) struct RuntimeInstanceProbe {
     pub(crate) adapter_source_path: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) capabilities: Option<adapter_registry::AdapterCapabilities>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) model_control: Option<adapter_registry::AdapterModelControl>,
     pub(crate) configured: bool,
     pub(crate) available: bool,
     pub(crate) summary: String,
     pub(crate) detail: String,
     pub(crate) version: Option<String>,
+    pub(crate) health: RuntimeHealth,
+    pub(crate) health_evidence: Vec<HealthEvidence>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct RuntimeHealth {
+    pub(crate) installed: String,
+    pub(crate) logged_in: String,
+    pub(crate) cli_callable: String,
+    pub(crate) profile_configured: String,
+    pub(crate) wsl_or_bridge_available: String,
+    pub(crate) model_or_key_configured: String,
+    pub(crate) version_status: String,
+    pub(crate) unavailable_reason: Option<String>,
+    pub(crate) repair_hint: Option<String>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct HealthEvidence {
+    pub(crate) field: String,
+    pub(crate) source: String,
+    pub(crate) detail: String,
+}
+
+fn unknown_health() -> RuntimeHealth {
+    RuntimeHealth {
+        installed: "unknown".into(), logged_in: "unknown".into(), cli_callable: "unknown".into(),
+        profile_configured: "unknown".into(), wsl_or_bridge_available: "unknown".into(),
+        model_or_key_configured: "unknown".into(), version_status: "unknown".into(),
+        unavailable_reason: None, repair_hint: None,
+    }
+}
+
+fn safe_detail(value: &str) -> String {
+    let secret_markers = ["api_key", "apikey", "token", "secret", "authorization", "bearer "];
+    value.lines().map(|line| {
+        let lower = line.to_ascii_lowercase();
+        if secret_markers.iter().any(|marker| lower.contains(marker)) { "[redacted]".to_string() } else { line.to_string() }
+    }).collect::<Vec<_>>().join("\n")
+}
+
+pub(crate) fn redact_diagnostic_detail(value: &str) -> String { safe_detail(value) }
+
+fn numeric_version(value: &str) -> Vec<u64> {
+    value.split(|ch: char| !ch.is_ascii_digit()).filter(|part| !part.is_empty())
+        .take(3).filter_map(|part| part.parse().ok()).collect()
+}
+
+pub(crate) fn version_status(version: Option<&str>, minimum: Option<&str>) -> String {
+    let (Some(version), Some(minimum)) = (version, minimum) else { return if version.is_some() { "unknown".into() } else { "unknown".into() }; };
+    if numeric_version(version) < numeric_version(minimum) { "outdated".into() } else { "ok".into() }
 }
 
 /// 创建不会在 Windows 上闪出控制台窗口的子进程。
@@ -127,8 +187,8 @@ pub(crate) fn runtime_instance_probe(
     result: Result<String, String>,
 ) -> RuntimeInstanceProbe {
     let (available, detail) = match result {
-        Ok(output) => (true, output),
-        Err(error) => (false, error),
+        Ok(output) => (true, safe_detail(&output)),
+        Err(error) => (false, safe_detail(&error)),
     };
     let summary = if available {
         "available"
@@ -138,6 +198,14 @@ pub(crate) fn runtime_instance_probe(
         "not_configured"
     };
     let version = available.then(|| first_output_line(&detail)).flatten();
+    let mut health = unknown_health();
+    health.installed = if available { "ok" } else if detail.to_ascii_lowercase().contains("not found") || detail.to_ascii_lowercase().contains("not recognized") { "missing" } else { "unknown" }.into();
+    health.cli_callable = if available { "ok" } else { "failed" }.into();
+    if ["wsl", "bridge", "remote", "ide"].contains(&command_kind) {
+        health.wsl_or_bridge_available = if available { "ok" } else { "failed" }.into();
+    }
+    if !available { health.unavailable_reason = Some("cli_not_callable".into()); health.repair_hint = Some("check_runtime_command".into()); }
+    let health_evidence = vec![HealthEvidence { field: "cli_callable".into(), source: "runtime_command".into(), detail: detail.clone() }];
     RuntimeInstanceProbe {
         id: id.to_string(),
         provider_id: provider_id.to_string(),
@@ -147,11 +215,14 @@ pub(crate) fn runtime_instance_probe(
         transport: None,
         adapter_source_path: None,
         capabilities: None,
+        model_control: None,
         configured,
         available,
         summary: summary.to_string(),
         detail,
         version,
+        health,
+        health_evidence,
     }
 }
 
@@ -176,6 +247,7 @@ pub(crate) fn provider_probe_from_instances(
     } else {
         format!("{} / {} runtime 可用。", available_count, instances.len())
     };
+    let representative = instances.iter().find(|item| item.available).or_else(|| instances.first());
     RuntimeProviderProbe {
         provider_id: provider_id.to_string(),
         configured,
@@ -183,6 +255,9 @@ pub(crate) fn provider_probe_from_instances(
         command: command.to_string(),
         summary: summary.to_string(),
         detail,
+        health: representative.map(|item| item.health.clone()).unwrap_or_else(unknown_health),
+        health_evidence: representative.map(|item| item.health_evidence.clone()).unwrap_or_default(),
+        model_control: representative.and_then(|item| item.model_control.clone()),
     }
 }
 
@@ -196,12 +271,24 @@ pub(crate) fn adapter_instance_probe(
     });
     let available = result.as_ref().map(|item| item.is_ok()).unwrap_or(true);
     let detail = match result {
-        Some(Ok(output)) => output,
-        Some(Err(error)) => error,
+        Some(Ok(output)) => safe_detail(&output),
+        Some(Err(error)) => safe_detail(&error),
         None => "Manifest loaded; no healthCheck configured.".to_string(),
     };
     let summary = if available { "available" } else { "unavailable" };
     let version = available.then(|| first_output_line(&detail)).flatten();
+    let mut health = unknown_health();
+    health.installed = if available { "ok".into() } else { "unknown".into() };
+    health.cli_callable = if available { "ok".into() } else { "failed".into() };
+    health.version_status = version_status(version.as_deref(), adapter.version_policy.as_ref().and_then(|policy| policy.minimum_version.as_deref()));
+    if !available { health.unavailable_reason = Some("cli_not_callable".into()); health.repair_hint = Some("check_runtime_command".into()); }
+    let configured_keys: Vec<_> = adapter.env.keys().filter(|key| {
+        let key = key.to_ascii_uppercase(); key.contains("KEY") || key.contains("TOKEN") || key.contains("SECRET")
+    }).collect();
+    let mut health_evidence = vec![HealthEvidence { field: "cli_callable".into(), source: "manifest_health_check".into(), detail: detail.clone() }];
+    if !configured_keys.is_empty() {
+        health_evidence.push(HealthEvidence { field: "model_or_key_configured".into(), source: "manifest_env_presence".into(), detail: "credential-like configuration is present; validity was not verified".into() });
+    }
     RuntimeInstanceProbe {
         id: format!("{}-manifest", adapter.id),
         provider_id: adapter.id.clone(),
@@ -213,11 +300,14 @@ pub(crate) fn adapter_instance_probe(
         transport: Some(adapter.transport.clone()),
         adapter_source_path: Some(adapter.source_path.clone()),
         capabilities: Some(adapter.capabilities.clone()),
+        model_control: adapter.model_control.clone(),
         configured: true,
         available,
         summary: summary.to_string(),
         detail,
         version,
+        health,
+        health_evidence,
     }
 }
 
@@ -233,6 +323,9 @@ pub(crate) fn adapter_provider_probe(
         command: adapter.name.clone(),
         summary: instance.summary.clone(),
         detail: instance.detail.clone(),
+        health: instance.health.clone(),
+        health_evidence: instance.health_evidence.clone(),
+        model_control: adapter.model_control.clone(),
     }
 }
 
@@ -323,4 +416,44 @@ pub(crate) async fn runtime_adapter_slash_commands(
     })
     .await
     .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+pub(crate) async fn runtime_adapter_model_control(
+    app: AppHandle,
+    adapter_id: String,
+    runtime_host: Option<String>,
+    runtime_command: Option<String>,
+    profile_executable: Option<String>,
+    cwd: Option<String>,
+) -> Result<Value, String> {
+    let adapter = adapter_launch_spec_with_context(
+        &app,
+        &adapter_id,
+        runtime_host,
+        runtime_command,
+        profile_executable,
+    )?;
+    tauri::async_runtime::spawn_blocking(move || crate::acp_runtime::inspect_adapter_model_control(adapter, cwd))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn diagnostic_detail_redacts_secret_bearing_lines() {
+        let detail = safe_detail("ready\nOPENAI_API_KEY=<configured>\nAuthorization: <configured>");
+        assert_eq!(detail, "ready\n[redacted]\n[redacted]");
+        assert!(!detail.contains("<configured>"));
+    }
+
+    #[test]
+    fn version_attention_requires_declared_minimum() {
+        assert_eq!(version_status(Some("demo 1.2.0"), Some("1.3.0")), "outdated");
+        assert_eq!(version_status(Some("demo 1.3.1"), Some("1.3.0")), "ok");
+        assert_eq!(version_status(Some("demo 1.0.0"), None), "unknown");
+    }
 }

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createRuntimeConfigState, normalizedAgentBriefs } from "./runtimeConfigState.js";
+import { createRuntimeConfigState, normalizedAgentBriefs, normalizedAgentPreferences } from "./runtimeConfigState.js";
 
 function makeState({ responses = {}, now = () => "2026-06-03T10:00:00.000Z" } = {}) {
   const calls = [];
@@ -79,4 +79,18 @@ test("runtimeConfigState: empty brief removes language and parent key", () => {
   const next = { "claude:win:default": { "zh-CN": { text: "全栈工程师" } } };
   state.writeBriefValue(next, { providerId: "claude", runtimeHost: "win", profileName: "default" }, "zh-CN", "");
   assert.deepEqual(next, {});
+});
+
+test("runtimeConfigState: saves model preference while preserving other runtime config", async () => {
+  const { state, calls } = makeState({ responses: {
+    load_runtime_config: { theme: "dark", agentBriefs: { keep: {} } },
+    save_runtime_config: ({ config }) => config,
+  } });
+  const target = { providerId: "demo", runtimeHost: "win", name: "main" };
+  await state.load();
+  await state.saveDefaultModel(target, "deep");
+  assert.equal(state.defaultModelForTarget(target), "deep");
+  assert.equal(calls.at(-1).args.config.theme, "dark");
+  assert.deepEqual(calls.at(-1).args.config.agentBriefs, { keep: {} });
+  assert.deepEqual(normalizedAgentPreferences(null), {});
 });

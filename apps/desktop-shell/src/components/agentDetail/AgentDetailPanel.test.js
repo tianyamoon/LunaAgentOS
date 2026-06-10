@@ -59,3 +59,28 @@ test("AgentDetailPanel escapes user supplied values", () => {
   assert.match(html, /&lt;script&gt;/);
   assert.doesNotMatch(html, /<script>/);
 });
+
+test("AgentDetailPanel only renders model selector for Luna-managed models", () => {
+  const managed = AgentDetailPanel({
+    name: "Demo", providerName: "Demo", capabilities: {}, safety: [], bestPractices: [],
+    models: { defaultModel: "fast", control: { mode: "luna_managed", availableModels: ["fast", "deep"] } },
+  });
+  assert.match(managed, /agent-default-model-select/);
+  assert.match(managed, /deep/);
+
+  const native = AgentDetailPanel({
+    name: "Native", providerName: "Native", capabilities: {}, safety: [], bestPractices: [],
+    models: { control: { mode: "native_runtime", availableModels: [] } },
+  });
+  assert.doesNotMatch(native, /agent-default-model-select/);
+  assert.match(native, /native runtime/i);
+});
+
+test("AgentDetailPanel does not fabricate a selector when ACP model discovery is unavailable", () => {
+  const html = AgentDetailPanel({
+    name: "Claude", providerName: "Claude", capabilities: {}, safety: [], bestPractices: [],
+    models: { control: { mode: "luna_managed", availableModels: [] } },
+  });
+  assert.doesNotMatch(html, /agent-default-model-select/);
+  assert.match(html, /did not return a verifiable model list/i);
+});

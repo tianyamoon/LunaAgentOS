@@ -72,6 +72,9 @@ export function targetsForRuntimeInstance(
         profileAlias: target.profileAlias || target.alias || null,
         profileExecutable: target.profileExecutable || target.alias || null,
         profilePath: target.profilePath || target.path || null,
+        health: target.health || instance.health || null,
+        healthEvidence: target.healthEvidence || instance.healthEvidence || [],
+        modelControl: target.modelControl || instance.modelControl || provider.modelControl || provider.adapterManifest?.modelControl || null,
       };
       return {
         ...normalized,
@@ -91,6 +94,9 @@ export function targetsForRuntimeInstance(
     subtitle: instance.transport || instance.runtimeLabel || "Manifest Runtime",
     state: 1,
     available: true,
+    health: instance.health || null,
+    healthEvidence: instance.healthEvidence || [],
+    modelControl: instance.modelControl || provider.modelControl || provider.adapterManifest?.modelControl || null,
   };
   return [{
     ...target,

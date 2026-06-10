@@ -30,10 +30,13 @@ export function createAgentManagementView({
   cloneAgentBriefs,
   writeBriefValue,
   saveAgentBriefRecords,
+  saveDefaultModel,
+  defaultModelForTarget,
   ensureRuntimeConfigState,
   refreshAgentBriefForTarget,
   refreshRuntimeProbe,
   refreshProviderConnections,
+  discoverModelControl,
   renderProviders,
   closeConfirmDialog,
   setAppNotice,
@@ -175,15 +178,25 @@ export function createAgentManagementView({
       await ensureRuntimeConfigState();
       const provider = providerById(target.providerId) || { id: target.providerId, name: target.providerName || target.providerId };
       const runtimeInstance = runtimeInstanceById(target.runtimeInstanceId);
+      let discoveredModelControl = target.modelControl || runtimeInstance?.modelControl || provider.modelControl || provider.adapterManifest?.modelControl;
+      if (runtimeInstance?.available && typeof discoverModelControl === "function") {
+        try {
+          discoveredModelControl = await discoverModelControl(target);
+        } catch (error) {
+          console.warn("model control discovery failed", error);
+        }
+      }
+      const managedTarget = { ...target, modelControl: discoveredModelControl || { mode: "native_runtime" } };
       const detail = buildAgentDetail({
         target: {
-          ...target,
+          ...managedTarget,
           name: targetDisplayName(target) || displayAgentName(target),
         },
         provider,
         runtimeInstance,
         availabilityTarget: availabilityTargetForAgent(target),
         agentBrief: targetBriefText(target),
+        savedDefaultModel: defaultModelForTarget(target),
       });
       const title = detail.name || targetDisplayName(target);
       const instances = runtimeInstance
@@ -242,6 +255,20 @@ export function createAgentManagementView({
         button.addEventListener("click", closeConfirmDialog);
       });
       bindAutoFetchBriefButtons(confirmDialog);
+      confirmDialog.querySelector(".agent-default-model-save")?.addEventListener("click", async (event) => {
+        const button = event.currentTarget;
+        const select = confirmDialog.querySelector(".agent-default-model-select");
+        button.disabled = true;
+        try {
+          await saveDefaultModel(managedTarget, select?.value || "");
+          setAppNotice(t("agentDetail.modelSaved"));
+          await openAgentManager(agentId);
+        } catch (error) {
+          console.error(error);
+          button.disabled = false;
+          setAppNotice(t("runtimeConfig.failed", { error: formatBackendError(error) }), "error");
+        }
+      });
       confirmDialog.querySelector(".agent-manager-recheck")?.addEventListener("click", async (event) => {
         const button = event.currentTarget;
         button.disabled = true;

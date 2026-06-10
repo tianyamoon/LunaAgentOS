@@ -89,3 +89,13 @@ test("buildAgentDetail lets target fields override provider detail", () => {
   assert.equal(detail.capabilities.network.state, "enabled");
   assert.deepEqual(detail.bestPractices, ["Target practice"]);
 });
+
+test("buildAgentDetail applies saved model only to declared Luna-managed controls", () => {
+  const detail = buildAgentDetail({
+    provider: { id: "demo", name: "Demo", modelControl: { mode: "luna_managed", availableModels: ["fast", "deep"] } },
+    target: { id: "target", providerId: "demo" },
+    savedDefaultModel: "deep",
+  });
+  assert.equal(detail.models.defaultModel, "deep");
+  assert.equal(detail.models.control.mode, "luna_managed");
+});

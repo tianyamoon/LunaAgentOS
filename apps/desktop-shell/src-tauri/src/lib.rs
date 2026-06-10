@@ -17,7 +17,7 @@ use runtime_config::{
 };
 use runtime_probe::{
     adapter_instance_probe, adapter_provider_probe, is_configured, provider_probe_from_instances,
-    run_shell, runtime_adapter_probe, runtime_adapter_slash_commands, runtime_adapter_targets,
+    run_shell, runtime_adapter_model_control, runtime_adapter_probe, runtime_adapter_slash_commands, runtime_adapter_targets,
     runtime_instance_probe, runtime_probe, RuntimeInstanceProbe, RuntimeProviderProbe,
 };
 use runtime_session_commands::{
@@ -44,6 +44,7 @@ pub fn run() {
             runtime_adapter_probe,
             runtime_adapter_targets,
             runtime_adapter_slash_commands,
+            runtime_adapter_model_control,
             runtime_acp_adapter_prompt,
             runtime_acp_adapter_resume,
             runtime_acp_adapter_load,

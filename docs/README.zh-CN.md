@@ -23,7 +23,7 @@
 - [为什么做 LunaAgentOS](./why-lunaagentos.zh-CN.md)：这个项目试图解决什么问题
 - [轻核心原则](./light-core-principles.zh-CN.md)：控制层要保持聚焦的约束条件
 - [路线图](./roadmap.zh-CN.md)：近期和中长期方向
-- [0.3 需求定义](./requirements-0.3.zh-CN.md)：下一步聚焦 Agent 可用性管理和 Session 卡片任务化
+- [0.3 需求定义](./requirements-0.3.zh-CN.md)：聚焦 Agent 管理和真实健康诊断，并保持 Runtime Session 与 Task 分离
 
 ## 架构与接入
 

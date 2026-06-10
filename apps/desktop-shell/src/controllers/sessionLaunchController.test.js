@@ -14,13 +14,15 @@ function makeHarness({
   currentSessionActive = true,
   currentSessionRestorable = false,
   blockReason = "",
+  modelControl = null,
+  savedDefaultModel = "",
 } = {}) {
   const sessions = [];
   const calls = [];
   let promptValue = prompt;
   let activeSession = currentSession;
   let composerAttachments = attachments;
-  const agent = { id: "agent-1", providerId: "demo", name: "Demo Agent", runtimeHost: "win" };
+  const agent = { id: "agent-1", providerId: "demo", name: "Demo Agent", runtimeHost: "win", modelControl };
   const provider = { id: "demo", name: "Demo" };
   const shellSurface = createShellSurface({
     focusComposerInput: () => calls.push("focus"),
@@ -85,6 +87,7 @@ function makeHarness({
       if (values.target) return `${key}:${values.target}`;
       return key;
     },
+    defaultModelForTarget: () => savedDefaultModel,
     now: () => 100,
   });
   return {
@@ -150,6 +153,15 @@ test("sessionLaunchController: read-only transcript blocks normal send", () => {
   assert.equal(sessions.length, 0);
   assert.equal(calls.some((item) => item === "notice:error:should-not-block"), false);
   assert.equal(calls.includes("notice:error:session.readOnlySwitchBlocked"), true);
+});
+
+test("sessionLaunchController: Luna-managed default model is copied only to a new Session", () => {
+  const { controller, sessions } = makeHarness({
+    modelControl: { mode: "luna_managed", availableModels: ["model-1", "model-2"] },
+    savedDefaultModel: "model-2",
+  });
+  controller.startSessionFromPrompt();
+  assert.equal(sessions[0].defaultModel, "model-2");
 });
 
 test("sessionLaunchController: unrestorable history explains that a new session is required", () => {

@@ -11,6 +11,7 @@
     "--accept-hooks"
   ],
   "requires_pty": false,
+  "modelControl": { "mode": "native_runtime" },
   "capabilities": {
     "startupNotice": {
       "prefix": "Hermes profile",

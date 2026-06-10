@@ -64,6 +64,7 @@ pub(crate) async fn runtime_acp_adapter_prompt(
     runtime_host: Option<String>,
     runtime_command: Option<String>,
     profile_executable: Option<String>,
+    default_model: Option<String>,
 ) -> Result<Vec<Value>, String> {
     let runtime_session_id_for_emit = runtime_session_id.clone();
     let turn_id_for_emit = turn_id.clone();
@@ -93,6 +94,7 @@ pub(crate) async fn runtime_acp_adapter_prompt(
             cwd,
             config,
             Some(&mut emit_update),
+            default_model,
         )
     })
     .await

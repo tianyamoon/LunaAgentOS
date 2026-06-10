@@ -26,25 +26,35 @@ function state(value, fallback = HEALTH_STATE.unknown) {
 
 function explicitHealth(source = {}) {
   const input = source.health && typeof source.health === "object" ? source.health : {};
+  const camelFields = {
+    logged_in: "loggedIn",
+    cli_callable: "cliCallable",
+    profile_configured: "profileConfigured",
+    wsl_or_bridge_available: "wslOrBridgeAvailable",
+    model_or_key_configured: "modelOrKeyConfigured",
+    version_status: "versionStatus",
+  };
   const health = {};
   for (const field of HEALTH_FIELDS) {
-    health[field] = state(input[field]);
+    health[field] = state(input[field] ?? input[camelFields[field]]);
   }
   health.unavailable_reason = input.unavailable_reason || input.unavailableReason || null;
   health.repair_hint = input.repair_hint || input.repairHint || null;
   health.unavailable_reason_params = input.unavailable_reason_params || input.unavailableReasonParams || {};
   health.repair_hint_params = input.repair_hint_params || input.repairHintParams || {};
+  health.evidence = source.healthEvidence || source.health_evidence || input.evidence || [];
   return health;
 }
 
 function healthWithDefaults(source, defaults) {
   const explicit = explicitHealth(source);
+  const hasExplicitHealth = Boolean(source?.health && typeof source.health === "object");
   const health = {
     ...explicit,
     ...Object.fromEntries(
       HEALTH_FIELDS.map((field) => [
         field,
-        explicit[field] !== HEALTH_STATE.unknown ? explicit[field] : defaults[field],
+        hasExplicitHealth ? explicit[field] : explicit[field] !== HEALTH_STATE.unknown ? explicit[field] : defaults[field],
       ]),
     ),
     unavailable_reason: explicit.unavailable_reason || defaults.unavailable_reason || null,
@@ -57,6 +67,7 @@ function healthWithDefaults(source, defaults) {
       ...(defaults.repair_hint_params || {}),
       ...(explicit.repair_hint_params || {}),
     },
+    evidence: explicit.evidence,
   };
   health.overall = deriveOverallHealth(health);
   health.diagnostics = HEALTH_FIELDS.map((field) => ({ field, state: health[field] }));
@@ -119,7 +130,6 @@ export function deriveProviderHealth(provider = {}, availability = {}, instances
 export function deriveTargetHealth(target = {}, { sendable = false, activatable = false } = {}) {
   const profileLike = target.kind === "profile" || Boolean(target.profileName || target.profilePath);
   const hasProfileIdentity = Boolean(target.profileName || target.profilePath || target.profileAlias || target.profileExecutable);
-  const hasModelOrKeySignal = Boolean(target.profileModel || target.model || target.hasEnv);
   const unavailableReason = sendable
     ? null
     : activatable
@@ -142,7 +152,7 @@ export function deriveTargetHealth(target = {}, { sendable = false, activatable 
       ? hasProfileIdentity ? HEALTH_STATE.ok : HEALTH_STATE.missing
       : HEALTH_STATE.unknown,
     wsl_or_bridge_available: HEALTH_STATE.unknown,
-    model_or_key_configured: hasModelOrKeySignal ? HEALTH_STATE.ok : HEALTH_STATE.unknown,
+    model_or_key_configured: HEALTH_STATE.unknown,
     version_status: derivedVersionStatus(target),
     unavailable_reason: unavailableReason,
     repair_hint: repairHint,

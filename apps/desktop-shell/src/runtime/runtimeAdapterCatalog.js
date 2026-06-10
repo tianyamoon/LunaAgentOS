@@ -91,11 +91,23 @@ export function createRuntimeAdapterCatalog({
     return { targetsByInstanceId, loadedCount };
   }
 
+  async function loadModelControl({ providerId, target }) {
+    if (typeof invoke !== "function" || !providerId || !target) return { mode: "native_runtime", availableModels: [] };
+    return invoke("runtime_adapter_model_control", {
+      adapterId: providerId,
+      runtimeHost: target.runtimeHost || null,
+      runtimeCommand: target.runtimeCommand || null,
+      profileExecutable: target.profileExecutable || null,
+      cwd: target.defaultWorkingDirectory || target.cwd || null,
+    });
+  }
+
   return {
     loadAdapters,
     loadAdapterIcons,
     probeRuntime,
     loadSlashCommands,
     loadTargets,
+    loadModelControl,
   };
 }

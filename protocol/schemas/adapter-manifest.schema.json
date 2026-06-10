@@ -11,6 +11,22 @@
     "kind": { "type": "string", "enum": ["registry", "community", "internal", "legacy"] },
     "status": { "type": "string", "enum": ["active", "planned", "legacy", "experimental"] },
     "description": { "type": "string" },
+    "agentDetail": { "type": "object", "additionalProperties": true },
+    "modelControl": {
+      "type": "object",
+      "required": ["mode"],
+      "properties": {
+        "mode": { "type": "string", "enum": ["luna_managed", "native_runtime"] },
+        "availableModels": { "type": "array", "items": { "type": "string" } },
+        "defaultModel": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "versionPolicy": {
+      "type": "object",
+      "properties": { "minimumVersion": { "type": "string" } },
+      "additionalProperties": true
+    },
     "entryRole": { "type": "string", "enum": ["runtime", "bridge", "example"] },
     "surfaces": {
       "type": "array",

@@ -22,12 +22,19 @@ pub struct AdapterDefinition {
     pub transport: String,
     pub command: String,
     pub args: Vec<String>,
+    #[serde(skip_serializing, default)]
     pub env: HashMap<String, String>,
     pub cwd: Option<String>,
     pub requires_pty: bool,
     pub health_check: Option<AdapterHealthCheck>,
     pub capabilities: AdapterCapabilities,
     pub permissions: AdapterPermissions,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_detail: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_control: Option<AdapterModelControl>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version_policy: Option<AdapterVersionPolicy>,
     pub source_path: String,
     pub manifest_id: String,
     /// Absolute filesystem path to the icon asset declared by the manifest's
@@ -48,6 +55,26 @@ pub struct AdapterDefinition {
     /// of the pipeline happy.
     #[serde(default, skip_serializing_if = "is_false")]
     pub identity_only: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdapterModelControl {
+    #[serde(default = "native_runtime_mode")]
+    pub mode: String,
+    #[serde(default)]
+    pub available_models: Vec<String>,
+    pub default_model: Option<String>,
+}
+
+fn native_runtime_mode() -> String {
+    "native_runtime".to_string()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdapterVersionPolicy {
+    pub minimum_version: Option<String>,
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)]
@@ -126,6 +153,9 @@ struct RawManifest {
     capabilities: AdapterCapabilities,
     #[serde(default)]
     permissions: AdapterPermissions,
+    agent_detail: Option<serde_json::Value>,
+    model_control: Option<AdapterModelControl>,
+    version_policy: Option<AdapterVersionPolicy>,
     /// Identity fields. Read by `load_manifest_file` and forwarded to
     /// `AdapterDefinition`. Per-contribution overrides live on
     /// `RawAdapterContribution`.
@@ -163,6 +193,9 @@ struct RawAdapterContribution {
     capabilities: AdapterCapabilities,
     #[serde(default)]
     permissions: AdapterPermissions,
+    agent_detail: Option<serde_json::Value>,
+    model_control: Option<AdapterModelControl>,
+    version_policy: Option<AdapterVersionPolicy>,
     /// Per-contribution identity overrides. When `None`, the loader falls
     /// back to the parent manifest's `icon` / `brand_color` (which is the
     /// common case: one logo per manifest, shared by all contributions).
@@ -335,6 +368,9 @@ fn load_manifest_file(path: &Path) -> Result<Vec<AdapterDefinition>, String> {
         health_check,
         capabilities: manifest.capabilities,
         permissions,
+        agent_detail: manifest.agent_detail,
+        model_control: manifest.model_control,
+        version_policy: manifest.version_policy,
         source_path,
         manifest_id: manifest.id,
         icon_path,
@@ -380,6 +416,9 @@ fn adapter_from_contribution(
         health_check: raw_health_check(adapter.health_check)?,
         capabilities: adapter.capabilities,
         permissions: adapter.permissions,
+        agent_detail: adapter.agent_detail.or_else(|| manifest.agent_detail.clone()),
+        model_control: adapter.model_control.or_else(|| manifest.model_control.clone()),
+        version_policy: adapter.version_policy.or_else(|| manifest.version_policy.clone()),
         source_path: source_path.to_string(),
         manifest_id: manifest.id.clone(),
         icon_path,
@@ -598,6 +637,9 @@ mod tests {
                     ],
                 }],
             },
+            agent_detail: None,
+            model_control: None,
+            version_policy: None,
             source_path: "".to_string(),
             manifest_id: "codex".to_string(),
             icon_path: None,
@@ -685,6 +727,24 @@ mod tests {
         assert_eq!(adapter.brand_color.as_deref(), Some("#123456"));
 
         fs::remove_dir_all(&dir).expect("remove temp manifest dir");
+    }
+
+    #[test]
+    fn serialized_adapter_never_exposes_manifest_environment_values() {
+        let mut env = HashMap::new();
+        env.insert("OPENAI_API_KEY".to_string(), "<configured>".to_string());
+        let adapter = AdapterDefinition {
+            id: "demo".into(), name: "Demo".into(), extension: None, version: None,
+            description: None, transport: "stdio_json".into(), command: "demo".into(), args: vec![],
+            env, cwd: None, requires_pty: false, health_check: None,
+            capabilities: AdapterCapabilities::default(), permissions: AdapterPermissions::default(),
+            agent_detail: None, model_control: None, version_policy: None,
+            source_path: "".into(), manifest_id: "demo".into(), icon_path: None,
+            brand_color: None, identity_only: false,
+        };
+        let json = serde_json::to_string(&adapter).expect("serialize adapter");
+        assert!(!json.contains("<configured>"));
+        assert!(!json.contains("OPENAI_API_KEY"));
     }
 
     #[test]

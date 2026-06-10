@@ -122,9 +122,17 @@ export function createRuntimeProbeController({
     await loadRuntimeTargetsForProvider(providerId);
   }
 
+  async function discoverModelControl(target) {
+    if (!target?.providerId || !target?.runtimeInstanceId) return { mode: "native_runtime", availableModels: [] };
+    const modelControl = await runtimeAdapterCatalog.loadModelControl({ providerId: target.providerId, target });
+    providersStore.setRuntimeInstanceModelControl(target.runtimeInstanceId, modelControl);
+    return modelControl;
+  }
+
   return {
     refreshRuntimeProbe,
     refreshProviderConnections,
+    discoverModelControl,
     loadRuntimeSlashCommandsForProvider,
     loadRuntimeTargetsForProvider,
   };

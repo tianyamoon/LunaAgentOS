@@ -327,6 +327,12 @@ export function createProvidersStore(initial = {}) {
       if (Array.isArray(next)) runtimeInstances.push(...next.map((instance) => ({ ...instance })));
       notify();
     },
+    setRuntimeInstanceModelControl(instanceId, modelControl) {
+      const instance = runtimeInstances.find((item) => item.id === instanceId);
+      if (!instance) return;
+      instance.modelControl = modelControl && typeof modelControl === "object" ? { ...modelControl } : null;
+      notify();
+    },
 
     getRuntimeTargetsByInstanceSnapshot() {
       return Object.fromEntries(

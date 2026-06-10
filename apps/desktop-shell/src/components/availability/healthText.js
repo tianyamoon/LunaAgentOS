@@ -31,12 +31,14 @@ export function renderHealthDiagnostics(health) {
   if (!items.length) return "";
   return `
     <dl class="health-diagnostics">
-      ${items.map((item) => `
+      ${items.map((item) => {
+        const evidence = (health.evidence || []).find((entry) => entry.field === item.field);
+        return `
         <div class="health-diagnostic-item health-state-${escapeHtml(item.state)}">
           <dt>${escapeHtml(t(`availability.healthField.${item.field}`))}</dt>
-          <dd>${escapeHtml(t(`availability.healthState.${item.state}`))}</dd>
+          <dd>${escapeHtml(t(`availability.healthState.${item.state}`))}${evidence ? `<small>${escapeHtml(evidence.source)} · ${escapeHtml(evidence.detail)}</small>` : ""}</dd>
         </div>
-      `).join("")}
+      `; }).join("")}
     </dl>
   `;
 }

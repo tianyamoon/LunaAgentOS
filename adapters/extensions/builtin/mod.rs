@@ -77,6 +77,14 @@ pub(super) fn attach_adapter_metadata(
     instance.transport = Some(adapter.transport.clone());
     instance.adapter_source_path = Some(adapter.source_path.clone());
     instance.capabilities = Some(adapter.capabilities.clone());
+    instance.model_control = adapter.model_control.clone();
+    instance.health.version_status = crate::runtime_probe::version_status(
+        instance.version.as_deref(),
+        adapter.version_policy.as_ref().and_then(|policy| policy.minimum_version.as_deref()),
+    );
+    if instance.health.version_status == "outdated" && instance.health.repair_hint.is_none() {
+        instance.health.repair_hint = Some("update_runtime".into());
+    }
     instance
 }
 
@@ -160,6 +168,9 @@ mod tests {
                     ],
                 }],
             },
+            agent_detail: None,
+            model_control: None,
+            version_policy: None,
             source_path: "".to_string(),
             manifest_id: "codex".to_string(),
             icon_path: None,

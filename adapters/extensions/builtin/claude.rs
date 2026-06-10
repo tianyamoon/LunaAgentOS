@@ -11,7 +11,7 @@ pub(super) fn probe(adapter: &AdapterDefinition, config: &RuntimeConfigFile) -> 
     let configured = is_configured(&config.claude_command) || !config.claude_args.is_empty();
     let mut instances = Vec::new();
     if cfg!(windows) {
-        instances.push(runtime_instance_probe_with_metadata(
+        let mut win = runtime_instance_probe_with_metadata(
             "claude-win",
             adapter,
             "Win",
@@ -19,8 +19,10 @@ pub(super) fn probe(adapter: &AdapterDefinition, config: &RuntimeConfigFile) -> 
             "npx.cmd",
             configured,
             run_shell("claude.cmd", &["--version"]),
-        ));
-        instances.push(runtime_instance_probe_with_metadata(
+        );
+        apply_auth_status(&mut win, run_shell("claude.cmd", &["auth", "status"]));
+        instances.push(win);
+        let mut wsl = runtime_instance_probe_with_metadata(
             "claude-wsl",
             adapter,
             "WSL",
@@ -31,13 +33,15 @@ pub(super) fn probe(adapter: &AdapterDefinition, config: &RuntimeConfigFile) -> 
                 "wsl.exe",
                 &["--exec", "bash", "-lc", "command -v claude >/dev/null && claude --version && command -v npx >/dev/null && npx --version"],
             ),
-        ));
+        );
+        apply_auth_status(&mut wsl, run_shell("wsl.exe", &["--exec", "bash", "-lc", "claude auth status"]));
+        instances.push(wsl);
     } else {
         let command = config
             .claude_command
             .clone()
             .unwrap_or_else(|| "claude".to_string());
-        instances.push(runtime_instance_probe_with_metadata(
+        let mut native = runtime_instance_probe_with_metadata(
             "claude-native",
             adapter,
             "",
@@ -45,7 +49,9 @@ pub(super) fn probe(adapter: &AdapterDefinition, config: &RuntimeConfigFile) -> 
             &command,
             configured,
             run_shell(&command, &["--version"]),
-        ));
+        );
+        apply_auth_status(&mut native, run_shell(&command, &["auth", "status"]));
+        instances.push(native);
     }
     AdapterProbeResult {
         provider: provider_probe_from_instances(
@@ -55,6 +61,39 @@ pub(super) fn probe(adapter: &AdapterDefinition, config: &RuntimeConfigFile) -> 
             &instances,
         ),
         instances,
+    }
+}
+
+fn apply_auth_status(instance: &mut crate::RuntimeInstanceProbe, result: Result<String, String>) {
+    match result {
+        Ok(raw) => match serde_json::from_str::<Value>(&raw) {
+            Ok(value) => {
+                let logged_in = value.get("loggedIn").and_then(Value::as_bool);
+                instance.health.logged_in = match logged_in { Some(true) => "ok", Some(false) => "required", None => "unknown" }.to_string();
+                instance.health.model_or_key_configured = match logged_in { Some(true) => "ok", Some(false) => "missing", None => "unknown" }.to_string();
+                instance.health_evidence.push(crate::runtime_probe::HealthEvidence {
+                    field: "logged_in".into(), source: "claude_auth_status".into(),
+                    detail: match logged_in { Some(true) => "Claude Code reports an authenticated account", Some(false) => "Claude Code reports no authenticated account", None => "Claude Code did not report a recognizable login state" }.into(),
+                });
+                instance.health_evidence.push(crate::runtime_probe::HealthEvidence {
+                    field: "model_or_key_configured".into(), source: "claude_auth_status".into(),
+                    detail: "credential readiness inferred from Claude Code authentication; no secret value was read".into(),
+                });
+                if logged_in == Some(false) {
+                    instance.health.unavailable_reason = Some("auth_required".into());
+                    instance.health.repair_hint = Some("run_agent_login".into());
+                }
+            }
+            Err(_) => {
+                instance.health.logged_in = "failed".into();
+                instance.health_evidence.push(crate::runtime_probe::HealthEvidence { field: "logged_in".into(), source: "claude_auth_status".into(), detail: "authentication command returned an unrecognized response".into() });
+            }
+        },
+        Err(error) => {
+            instance.health.logged_in = "failed".into();
+            instance.health_evidence.push(crate::runtime_probe::HealthEvidence { field: "logged_in".into(), source: "claude_auth_status".into(), detail: crate::runtime_probe::redact_diagnostic_detail(&error) });
+            if instance.available { instance.health.unavailable_reason = Some("login_verification_failed".into()); instance.health.repair_hint = Some("check_runtime_login".into()); }
+        }
     }
 }
 
