@@ -120,14 +120,28 @@ fn safe_detail(value: &str) -> String {
 
 pub(crate) fn redact_diagnostic_detail(value: &str) -> String { safe_detail(value) }
 
-fn numeric_version(value: &str) -> Vec<u64> {
-    value.split(|ch: char| !ch.is_ascii_digit()).filter(|part| !part.is_empty())
-        .take(3).filter_map(|part| part.parse().ok()).collect()
+fn semantic_version(value: &str) -> Option<(u64, u64, u64)> {
+    value
+        .split_whitespace()
+        .map(|part| part.trim_matches(|ch: char| !ch.is_ascii_alphanumeric() && ch != '.' && ch != '-'))
+        .find_map(|part| {
+            let core = part.split_once('-').map(|(core, _)| core).unwrap_or(part);
+            let mut segments = core.split('.');
+            let major = segments.next()?.parse().ok()?;
+            let minor = segments.next()?.parse().ok()?;
+            let patch = segments.next()?.parse().ok()?;
+            if segments.next().is_some() {
+                return None;
+            }
+            Some((major, minor, patch))
+        })
 }
 
 pub(crate) fn version_status(version: Option<&str>, minimum: Option<&str>) -> String {
-    let (Some(version), Some(minimum)) = (version, minimum) else { return if version.is_some() { "unknown".into() } else { "unknown".into() }; };
-    if numeric_version(version) < numeric_version(minimum) { "outdated".into() } else { "ok".into() }
+    let (Some(version), Some(minimum)) = (version.and_then(semantic_version), minimum.and_then(semantic_version)) else {
+        return "unknown".into();
+    };
+    if version < minimum { "outdated".into() } else { "ok".into() }
 }
 
 /// 创建不会在 Windows 上闪出控制台窗口的子进程。
@@ -216,8 +230,16 @@ pub(crate) fn runtime_instance_probe(
     if ["wsl", "bridge", "remote", "ide"].contains(&command_kind) {
         health.wsl_or_bridge_available = if available { "ok" } else { "failed" }.into();
     }
+    health.version_status = "unknown".into();
     if !available { health.unavailable_reason = Some("cli_not_callable".into()); health.repair_hint = Some("check_runtime_command".into()); }
-    let health_evidence = vec![health_evidence("cli_callable", "runtime_command", detail.clone())];
+    let mut evidence = vec![health_evidence("cli_callable", "runtime_command", detail.clone())];
+    if let Some(version) = &version {
+        evidence.push(health_evidence(
+            "version_status",
+            "runtime_command",
+            format!("runtime version detected: {version}; compatibility was not declared"),
+        ));
+    }
     RuntimeInstanceProbe {
         id: id.to_string(),
         provider_id: provider_id.to_string(),
@@ -235,7 +257,7 @@ pub(crate) fn runtime_instance_probe(
         detail,
         version,
         health,
-        health_evidence,
+        health_evidence: evidence,
     }
 }
 
@@ -328,6 +350,17 @@ pub(crate) fn adapter_instance_probe(
         "manifest_loaded"
     };
     let mut evidence = vec![health_evidence("cli_callable", evidence_source, detail.clone())];
+    if let Some(version) = &version {
+        evidence.push(health_evidence(
+            "version_status",
+            evidence_source,
+            if adapter.version_policy.as_ref().and_then(|policy| policy.minimum_version.as_deref()).is_some() {
+                format!("runtime version detected: {version}")
+            } else {
+                format!("runtime version detected: {version}; compatibility was not declared")
+            },
+        ));
+    }
     if !configured_keys.is_empty() {
         evidence.push(health_evidence(
             "model_or_key_configured",
@@ -502,5 +535,7 @@ mod tests {
         assert_eq!(version_status(Some("demo 1.2.0"), Some("1.3.0")), "outdated");
         assert_eq!(version_status(Some("demo 1.3.1"), Some("1.3.0")), "ok");
         assert_eq!(version_status(Some("demo 1.0.0"), None), "unknown");
+        assert_eq!(version_status(Some("demo 2"), Some("1.3.0")), "unknown");
+        assert_eq!(version_status(Some("build 2026 release 1.2.0"), Some("1.3.0")), "outdated");
     }
 }

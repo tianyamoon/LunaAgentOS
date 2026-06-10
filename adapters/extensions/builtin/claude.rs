@@ -70,7 +70,7 @@ fn apply_auth_status(instance: &mut crate::RuntimeInstanceProbe, result: Result<
             Ok(value) => {
                 let logged_in = value.get("loggedIn").and_then(Value::as_bool);
                 instance.health.logged_in = match logged_in { Some(true) => "ok", Some(false) => "required", None => "unknown" }.to_string();
-                instance.health.model_or_key_configured = match logged_in { Some(true) => "ok", Some(false) => "missing", None => "unknown" }.to_string();
+                instance.health.model_or_key_configured = match logged_in { Some(false) => "missing", _ => "unknown" }.to_string();
                 instance.health_evidence.push(crate::runtime_probe::health_evidence(
                     "logged_in",
                     "claude_auth_status",
@@ -79,7 +79,7 @@ fn apply_auth_status(instance: &mut crate::RuntimeInstanceProbe, result: Result<
                 instance.health_evidence.push(crate::runtime_probe::health_evidence(
                     "model_or_key_configured",
                     "claude_auth_status",
-                    "credential readiness inferred from Claude Code authentication; no secret value was read".into(),
+                    "authentication status does not verify model access or credential validity".into(),
                 ));
                 if logged_in == Some(false) {
                     instance.health.unavailable_reason = Some("auth_required".into());
@@ -88,6 +88,8 @@ fn apply_auth_status(instance: &mut crate::RuntimeInstanceProbe, result: Result<
             }
             Err(_) => {
                 instance.health.logged_in = "failed".into();
+                instance.health.unavailable_reason = Some("login_verification_failed".into());
+                instance.health.repair_hint = Some("check_runtime_login".into());
                 instance.health_evidence.push(crate::runtime_probe::health_evidence(
                     "logged_in",
                     "claude_auth_status",
@@ -102,7 +104,10 @@ fn apply_auth_status(instance: &mut crate::RuntimeInstanceProbe, result: Result<
                 "claude_auth_status",
                 crate::runtime_probe::redact_diagnostic_detail(&error),
             ));
-            if instance.available { instance.health.unavailable_reason = Some("login_verification_failed".into()); instance.health.repair_hint = Some("check_runtime_login".into()); }
+            if instance.available {
+                instance.health.unavailable_reason = Some("login_verification_failed".into());
+                instance.health.repair_hint = Some("check_runtime_login".into());
+            }
         }
     }
 }
