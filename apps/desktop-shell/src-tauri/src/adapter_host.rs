@@ -91,12 +91,12 @@ pub(crate) fn read_adapter_icon(
     let bytes = match fs::read(path) {
         Ok(bytes) => bytes,
         Err(error) => {
-            eprintln!(
+            crate::log_diagnostic(&format!(
                 "read_adapter_icon: failed to read {} for {}: {}",
                 path.display(),
                 adapter_id,
                 error
-            );
+            ));
             return Ok(None);
         }
     };

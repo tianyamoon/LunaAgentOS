@@ -634,10 +634,10 @@ fn send_prompt(
         Some(&mut session.child),
     )?;
     if discarded_updates > 0 {
-        eprintln!(
+        crate::log_diagnostic(&format!(
             "{} 隔离了 {discarded_updates} 条失去轮次归属的空闲 update。",
             runtime.display()
-        );
+        ));
     }
     let prompt_request = json!({
         "jsonrpc": "2.0",

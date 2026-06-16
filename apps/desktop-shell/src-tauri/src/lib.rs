@@ -7,6 +7,17 @@ mod runtime_config;
 mod runtime_probe;
 mod runtime_session_commands;
 
+/// 输出一条诊断日志，且永不 panic。
+///
+/// `eprintln!` 在 stderr 管道被关闭时（无控制台窗口的 GUI 构建里很常见）会触发
+/// "failed printing to stderr" panic（Windows os error 232）。后台线程的此类
+/// panic 会向上冒泡成 "task N panicked"，进而中断发送 prompt 等正常流程。
+/// 这里直接写 stderr 并忽略写入错误，确保诊断日志不会成为崩溃源。
+pub(crate) fn log_diagnostic(message: &str) {
+    use std::io::Write;
+    let _ = writeln!(std::io::stderr(), "{message}");
+}
+
 use adapter_host::{load_adapters, read_adapter_icon};
 use history_repository::{
     append_history_entry, archive_history_session_entries, compact_history_entries,

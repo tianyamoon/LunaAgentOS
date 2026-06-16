@@ -269,7 +269,7 @@ fn try_load_history_file(path: &PathBuf) -> Option<Vec<HistoryEntry>> {
     match load_history_file(path) {
         Ok(entries) => Some(entries),
         Err(error) => {
-            eprintln!("跳过损坏的历史文件 {}：{}", path.display(), error);
+            crate::log_diagnostic(&format!("跳过损坏的历史文件 {}：{}", path.display(), error));
             None
         }
     }

@@ -102,17 +102,17 @@ pub(crate) fn load_user_themes(app: AppHandle) -> Vec<Value> {
             continue;
         }
         let Ok(raw) = fs::read_to_string(&path) else {
-            eprintln!("跳过无法读取的用户主题文件 {}", path.display());
+            crate::log_diagnostic(&format!("跳过无法读取的用户主题文件 {}", path.display()));
             continue;
         };
         match serde_json::from_str::<Value>(&raw) {
             Ok(value) => themes.push(value),
             Err(error) => {
-                eprintln!(
+                crate::log_diagnostic(&format!(
                     "跳过解析失败的用户主题文件 {}：{}",
                     path.display(),
                     error
-                );
+                ));
             }
         }
     }
