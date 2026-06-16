@@ -5,6 +5,9 @@ export const HEALTH_STATE = Object.freeze({
   required: "required",
   unknown: "unknown",
   outdated: "outdated",
+  // not_applicable 表示该字段对当前 Agent 形态无意义（如 Claude 无 profile 概念），
+  // 与 unknown（已检测但无法确认）区分，且不会把总体健康拉低为 unknown。
+  not_applicable: "not_applicable",
 });
 
 export const HEALTH_FIELDS = Object.freeze([
@@ -92,10 +95,11 @@ export function deriveRuntimeHealth(instance = {}) {
     installed: available ? HEALTH_STATE.ok : configured ? HEALTH_STATE.unknown : HEALTH_STATE.missing,
     logged_in: HEALTH_STATE.unknown,
     cli_callable: available ? HEALTH_STATE.ok : HEALTH_STATE.failed,
-    profile_configured: HEALTH_STATE.unknown,
+    // Runtime 实例本身不承载 profile 身份，profile 配置在 target 层判断。
+    profile_configured: HEALTH_STATE.not_applicable,
     wsl_or_bridge_available: bridgeLike
       ? available ? HEALTH_STATE.ok : HEALTH_STATE.failed
-      : HEALTH_STATE.unknown,
+      : HEALTH_STATE.not_applicable,
     model_or_key_configured: HEALTH_STATE.unknown,
     version_status: derivedVersionStatus(instance),
     unavailable_reason: available ? null : "cli_not_callable",
@@ -115,8 +119,9 @@ export function deriveProviderHealth(provider = {}, availability = {}, instances
     installed: available || hasRuntime ? HEALTH_STATE.ok : configured ? HEALTH_STATE.unknown : HEALTH_STATE.missing,
     logged_in: HEALTH_STATE.unknown,
     cli_callable: available ? HEALTH_STATE.ok : anyFailedRuntime ? HEALTH_STATE.failed : HEALTH_STATE.unknown,
-    profile_configured: HEALTH_STATE.unknown,
-    wsl_or_bridge_available: available ? HEALTH_STATE.unknown : anyFailedRuntime ? HEALTH_STATE.failed : HEALTH_STATE.unknown,
+    // Provider 聚合层不直接持有 profile，profile 配置归属各 target。
+    profile_configured: HEALTH_STATE.not_applicable,
+    wsl_or_bridge_available: available ? HEALTH_STATE.not_applicable : anyFailedRuntime ? HEALTH_STATE.failed : HEALTH_STATE.unknown,
     model_or_key_configured: HEALTH_STATE.unknown,
     version_status: HEALTH_STATE.unknown,
     unavailable_reason: available ? null : configured ? "no_available_runtime" : "provider_not_configured",
@@ -150,8 +155,8 @@ export function deriveTargetHealth(target = {}, { sendable = false, activatable 
     cli_callable: sendable || activatable ? HEALTH_STATE.ok : HEALTH_STATE.unknown,
     profile_configured: profileLike
       ? hasProfileIdentity ? HEALTH_STATE.ok : HEALTH_STATE.missing
-      : HEALTH_STATE.unknown,
-    wsl_or_bridge_available: HEALTH_STATE.unknown,
+      : HEALTH_STATE.not_applicable,
+    wsl_or_bridge_available: HEALTH_STATE.not_applicable,
     model_or_key_configured: HEALTH_STATE.unknown,
     version_status: derivedVersionStatus(target),
     unavailable_reason: unavailableReason,
@@ -169,6 +174,8 @@ export function deriveOverallHealth(health = {}) {
     return "unavailable";
   }
   if (health.version_status === HEALTH_STATE.outdated) return "attention";
+  // not_applicable 字段对当前 Agent 形态无意义，刻意不计入 unknown 判定，
+  // 因此它既不会触发上面的 unavailable，也不会让总体退化为 unknown。
   if (HEALTH_FIELDS.some((field) => health[field] === HEALTH_STATE.unknown)) return "unknown";
   return "available";
 }

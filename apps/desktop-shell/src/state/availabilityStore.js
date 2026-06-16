@@ -161,6 +161,7 @@ export function createAvailabilityStore() {
           problems.push({
             type: "target",
             provider: p.name,
+            providerId: p.id,
             target: t.name,
             reason: t.health?.unavailable_reason,
             reasonParams: t.health?.unavailable_reason_params,
@@ -174,7 +175,10 @@ export function createAvailabilityStore() {
           problems.push({
             type: "runtime",
             provider: p.name,
+            providerId: p.id,
             runtime: i.runtimeLabel,
+            commandKind: i.commandKind,
+            command: i.command,
             reason: i.health?.unavailable_reason,
             reasonParams: i.health?.unavailable_reason_params,
             repairHint: i.health?.repair_hint,

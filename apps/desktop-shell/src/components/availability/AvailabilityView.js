@@ -2,6 +2,8 @@ import { SummaryStats } from "./SummaryStats.js";
 import { ProviderSection } from "./ProviderSection.js";
 import { getLanguage, t } from "../../i18n/index.js";
 import { escapeHtml, healthReasonText, healthRepairText } from "./healthText.js";
+import { renderRepairActions } from "./repairActions.js";
+import { buildRepairActions } from "../../state/repairActions.js";
 
 export function AvailabilityView(data, options = {}) {
   const { summary, providers, problems, lastCheck } = data;
@@ -34,7 +36,13 @@ export function AvailabilityView(data, options = {}) {
                 repair_hint: p.repairHint,
                 repair_hint_params: p.repairHintParams,
               });
-              return `<li><strong>${escapeHtml(p.provider)}</strong> / ${escapeHtml(p.target || p.runtime)}: ${escapeHtml(reason || t("availability.reason.unknown"))}${repair ? `<br><small>${escapeHtml(repair)}</small>` : ""}</li>`;
+              const actions = renderRepairActions(
+                buildRepairActions(
+                  { repair_hint: p.repairHint, repair_hint_params: p.repairHintParams },
+                  { providerId: p.providerId, instance: { commandKind: p.commandKind, command: p.command } },
+                ),
+              );
+              return `<li><strong>${escapeHtml(p.provider)}</strong> / ${escapeHtml(p.target || p.runtime)}: ${escapeHtml(reason || t("availability.reason.unknown"))}${repair ? `<br><small>${escapeHtml(repair)}</small>` : ""}${actions}</li>`;
             })
             .join("")}
         </ul>

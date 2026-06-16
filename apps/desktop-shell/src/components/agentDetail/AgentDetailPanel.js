@@ -8,6 +8,8 @@ import {
   renderHealthDiagnostics,
 } from "../availability/healthText.js";
 import { CAPABILITY_KEYS } from "../../providers/agentDetail.js";
+import { buildRepairActions } from "../../state/repairActions.js";
+import { renderRepairActions } from "../availability/repairActions.js";
 
 function text(value) {
   if (!value) return "";
@@ -89,7 +91,7 @@ function capabilitySection(capabilities = {}) {
   `;
 }
 
-function healthSection(health) {
+function healthSection(health, context = {}) {
   if (!health) {
     return `
       <section class="agent-detail-section">
@@ -102,6 +104,7 @@ function healthSection(health) {
   const statusText = healthStateText(health, t("availability.healthOverall.unknown"));
   const reason = healthReasonText(health);
   const repair = healthRepairText(health);
+  const repairActions = renderRepairActions(buildRepairActions(health, context));
   return `
     <section class="agent-detail-section">
       <div class="agent-detail-section-head">
@@ -110,6 +113,7 @@ function healthSection(health) {
       </div>
       ${reason ? `<p class="health-message">${escapeHtml(reason)}</p>` : ""}
       ${repair ? `<p class="health-repair">${escapeHtml(repair)}</p>` : ""}
+      ${repairActions}
       ${renderHealthDiagnostics(health)}
     </section>
   `;
@@ -140,7 +144,10 @@ export function AgentDetailPanel(detail) {
 
       ${modelSection(detail.models)}
       ${capabilitySection(detail.capabilities)}
-      ${healthSection(detail.health)}
+      ${healthSection(detail.health, {
+        providerId: detail.providerId,
+        instance: { commandKind: detail.commandKind, command: detail.runtimeCommand, runtimeLabel: detail.runtimeLabel },
+      })}
 
       <section class="agent-detail-section">
         <h4>${t("agentDetail.safety")}</h4>

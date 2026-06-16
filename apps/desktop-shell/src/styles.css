@@ -3891,6 +3891,23 @@ button:disabled {
   color: rgb(165, 102, 36);
 }
 
+.health-state-not_applicable dd {
+  color: var(--muted);
+  font-weight: 600;
+  opacity: 0.7;
+}
+
+.health-repair-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 2px 0 0;
+}
+
+.health-repair-action {
+  white-space: nowrap;
+}
+
 .availability-footer {
   display: flex;
   justify-content: flex-end;

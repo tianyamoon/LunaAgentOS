@@ -128,6 +128,8 @@ export function buildAgentDetail({
     accountIdentity: firstValue(target.accountIdentity, target.account, target.user, target.email, source.accountIdentity, ""),
     runtimeEnvironment,
     runtimeLabel: firstValue(target.runtimeLabel, runtimeInstance?.runtimeLabel, ""),
+    // commandKind 用于修复动作推断命令变体（如 wsl 前缀），无则留空走 native。
+    commandKind: firstValue(target.commandKind, runtimeInstance?.commandKind, ""),
     runtimeCommand: firstValue(target.runtimeCommand, runtimeInstance?.command, source.runtimeCommand, ""),
     defaultWorkingDirectory: firstValue(target.defaultWorkingDirectory, target.cwd, runtimeInstance?.cwd, source.defaultWorkingDirectory, source.defaultWorkingDirectoryKey, ""),
     brief: firstValue(agentBrief, target.brief, target.description, source.summary, source.summaryKey, source.description, source.descriptionKey, ""),

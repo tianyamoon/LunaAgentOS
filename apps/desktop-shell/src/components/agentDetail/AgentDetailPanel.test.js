@@ -76,6 +76,28 @@ test("AgentDetailPanel only renders model selector for Luna-managed models", () 
   assert.match(native, /native runtime/i);
 });
 
+test("AgentDetailPanel renders interactive repair actions when health carries a repair hint", () => {
+  const html = AgentDetailPanel({
+    name: "Claude", providerName: "Claude", providerId: "claude", commandKind: "native",
+    capabilities: {}, safety: [], bestPractices: [],
+    models: {},
+    health: { overall: "unavailable", repair_hint: "run_agent_login", diagnostics: [] },
+  });
+  assert.match(html, /health-repair-action/);
+  assert.match(html, /data-repair-action="copy_command"/);
+  assert.match(html, /data-repair-command="claude auth login"/);
+});
+
+test("AgentDetailPanel shows no repair actions when health has no actionable hint", () => {
+  const html = AgentDetailPanel({
+    name: "Claude", providerName: "Claude", providerId: "claude",
+    capabilities: {}, safety: [], bestPractices: [],
+    models: {},
+    health: { overall: "available", diagnostics: [] },
+  });
+  assert.doesNotMatch(html, /health-repair-action/);
+});
+
 test("AgentDetailPanel does not fabricate a selector when ACP model discovery is unavailable", () => {
   const html = AgentDetailPanel({
     name: "Claude", providerName: "Claude", capabilities: {}, safety: [], bestPractices: [],

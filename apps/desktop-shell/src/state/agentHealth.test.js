@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 
 import {
   HEALTH_STATE,
+  HEALTH_FIELDS,
+  deriveOverallHealth,
   deriveProviderHealth,
   deriveRuntimeHealth,
   deriveTargetHealth,
@@ -101,7 +103,40 @@ test("deriveProviderHealth: one available runtime keeps provider available despi
   );
 
   assert.equal(health.cli_callable, HEALTH_STATE.ok);
-  assert.equal(health.wsl_or_bridge_available, HEALTH_STATE.unknown);
+  assert.equal(health.wsl_or_bridge_available, HEALTH_STATE.not_applicable);
   assert.equal(health.unavailable_reason, null);
   assert.notEqual(health.overall, "unavailable");
+});
+
+test("deriveTargetHealth: non-profile target marks profile/bridge as not applicable, not unknown", () => {
+  const health = deriveTargetHealth({}, { sendable: true });
+
+  assert.equal(health.profile_configured, HEALTH_STATE.not_applicable);
+  assert.equal(health.wsl_or_bridge_available, HEALTH_STATE.not_applicable);
+  // not_applicable 字段本身不应被计入 unknown 判定。
+  assert.ok(![health.profile_configured, health.wsl_or_bridge_available].includes(HEALTH_STATE.unknown));
+});
+
+test("deriveOverallHealth: not_applicable fields are inert and do not produce unknown", () => {
+  // 所有字段 ok，仅 profile/bridge 为 not_applicable —— 总体应为 available 而非 unknown。
+  const health = Object.fromEntries(HEALTH_FIELDS.map((field) => [field, HEALTH_STATE.ok]));
+  health.profile_configured = HEALTH_STATE.not_applicable;
+  health.wsl_or_bridge_available = HEALTH_STATE.not_applicable;
+
+  assert.equal(deriveOverallHealth(health), "available");
+
+  // 仍存在真实 unknown 时，总体应如实退化为 unknown。
+  health.logged_in = HEALTH_STATE.unknown;
+  assert.equal(deriveOverallHealth(health), "unknown");
+});
+
+test("deriveRuntimeHealth: native runtime treats bridge availability as not applicable", () => {
+  const health = deriveRuntimeHealth({
+    configured: true,
+    available: true,
+    commandKind: "native",
+  });
+
+  assert.equal(health.wsl_or_bridge_available, HEALTH_STATE.not_applicable);
+  assert.equal(health.profile_configured, HEALTH_STATE.not_applicable);
 });

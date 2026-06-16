@@ -157,6 +157,43 @@ export function createAgentManagementView({
     setAppNotice(t("agentBrief.fetchAllComplete", { count: targets.length }));
   }
 
+  // 修复按钮事件统一绑定：复制命令、跳转连接弹窗、重新探测、打开外部链接。
+  // 全部为前端动作，不执行任何进程。onReprobe 让各弹窗在重新探测后自行重渲染。
+  function bindRepairActions(root, { onReprobe } = {}) {
+    root.querySelectorAll(".health-repair-action").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const action = button.dataset.repairAction;
+        if (action === "copy_command") {
+          try {
+            await clipboard?.writeText(button.dataset.repairCommand || "");
+            setAppNotice(t("availability.repairAction.copied"));
+          } catch (error) {
+            console.error(error);
+            setAppNotice(t("common.copyFailed"), "error");
+          }
+          return;
+        }
+        if (action === "open_dialog") {
+          openProviderManager(button.dataset.repairProvider || undefined);
+          return;
+        }
+        if (action === "reprobe") {
+          button.disabled = true;
+          setAppNotice(t("availability.rechecking"), "busy");
+          try {
+            await refreshProviderConnections(button.dataset.repairProvider || undefined);
+            setAppNotice(t("availability.checkComplete"));
+            await onReprobe?.();
+          } catch (error) {
+            console.error(error);
+            button.disabled = false;
+            setAppNotice(t("availability.checkFailed", { error: formatBackendError(error) }), "error");
+          }
+        }
+      });
+    });
+  }
+
   // Agent Detail 使用 availability 快照补充健康信息，不自行发起探测。
   function availabilityTargetForAgent(target) {
     if (!target) return null;
@@ -251,6 +288,7 @@ export function createAgentManagementView({
         button.addEventListener("click", closeConfirmDialog);
       });
       bindAutoFetchBriefButtons(confirmDialog);
+      bindRepairActions(confirmDialog, { onReprobe: () => openAgentManager(agentId) });
       confirmDialog.querySelector(".agent-default-model-save")?.addEventListener("click", async (event) => {
         const button = event.currentTarget;
         const select = confirmDialog.querySelector(".agent-default-model-select");
@@ -441,9 +479,17 @@ export function createAgentManagementView({
         </div>
       </form>
     `;
+    // 重新探测后重渲染弹窗主体，并重新绑定其中的修复按钮。
+    function renderAvailabilityBody() {
+      store.refresh(providersSnapshot(), runtimeInstancesSnapshot(), currentTargetAgent(), getRuntimeAvailabilitySnapshot());
+      const body = confirmDialog.querySelector(".availability-dialog-body");
+      if (body) body.innerHTML = AvailabilityView(store.getData(), { showTitle: false, compact: true });
+      bindRepairActions(confirmDialog, { onReprobe: renderAvailabilityBody });
+    }
     confirmDialog.querySelectorAll(".availability-close").forEach((button) => {
       button.addEventListener("click", closeConfirmDialog);
     });
+    bindRepairActions(confirmDialog, { onReprobe: renderAvailabilityBody });
     confirmDialog.querySelector(".availability-copy")?.addEventListener("click", () => {
       clipboard?.writeText(JSON.stringify(freshData, null, 2)).then(() => {
         setAppNotice(t("availability.reportCopied"));
@@ -458,8 +504,7 @@ export function createAgentManagementView({
       setAppNotice(t("availability.rechecking"), "busy");
       try {
         await refreshRuntimeProbe();
-        store.refresh(providersSnapshot(), runtimeInstancesSnapshot(), currentTargetAgent(), getRuntimeAvailabilitySnapshot());
-        confirmDialog.querySelector(".availability-dialog-body").innerHTML = AvailabilityView(store.getData(), { showTitle: false, compact: true });
+        renderAvailabilityBody();
         setAppNotice(t("availability.checkComplete"));
       } catch (error) {
         setAppNotice(t("availability.checkFailed", { error: formatBackendError(error) }), "error");
