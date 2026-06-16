@@ -279,6 +279,27 @@ body {
   color: var(--error);
 }
 
+/* 模态操作区内联状态：重新探测/复制等模态内操作的就地反馈。
+   靠左放置并把操作按钮推到右侧，避免反馈飘到被遮罩盖住的顶部通知条。 */
+.modal-action-status {
+  margin-right: auto;
+  align-self: center;
+  font-size: 0.82rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60%;
+}
+
+.modal-action-status.is-busy {
+  color: var(--accent);
+}
+
+.modal-action-status.is-error {
+  color: var(--error);
+}
+
 .topbar-notice {
   flex: 1 1 200px;
   min-width: 0;

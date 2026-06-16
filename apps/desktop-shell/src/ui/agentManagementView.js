@@ -1,6 +1,8 @@
 import { AvailabilityView } from "../components/availability/AvailabilityView.js";
 import { AgentDetailPanel } from "../components/agentDetail/AgentDetailPanel.js";
 import { buildAgentDetail } from "../providers/agentDetail.js";
+import { deriveTargetHealth } from "../state/agentHealth.js";
+import { isTargetActivatable } from "../state/targetActivation.js";
 
 // Agent 管理视图统一承接连接详情、职责简报和可用性弹窗。
 // 运行时探测、配置持久化和 Session 执行通过命令回调注入。
@@ -127,7 +129,7 @@ export function createAgentManagementView({
           if (enInput) enInput.value = result["en-US"];
         } catch (error) {
           console.error(error);
-          setAppNotice(t("agentBrief.fetchFailed", { error: formatBackendError(error) }), "error");
+          setModalStatus(root, t("agentBrief.fetchFailed", { error: formatBackendError(error) }), "error");
         } finally {
           button.disabled = !isTargetSendable(target);
         }
@@ -138,12 +140,12 @@ export function createAgentManagementView({
   async function autoFetchProviderBriefs(providerId, root) {
     const targets = targetsForProvider(providerId).filter(isTargetSendable);
     if (!targets.length) {
-      setAppNotice(t("agentBrief.noSendableTargets"), "error");
+      setModalStatus(root, t("agentBrief.noSendableTargets"), "error");
       return;
     }
     for (let index = 0; index < targets.length; index += 1) {
       const target = targets[index];
-      setAppNotice(t("agentBrief.fetchingProgress", {
+      setModalStatus(root, t("agentBrief.fetchingProgress", {
         current: index + 1,
         total: targets.length,
         target: targetDisplayName(target),
@@ -154,11 +156,31 @@ export function createAgentManagementView({
       if (zhInput) zhInput.value = result["zh-CN"];
       if (enInput) enInput.value = result["en-US"];
     }
-    setAppNotice(t("agentBrief.fetchAllComplete", { count: targets.length }));
+    setModalStatus(root, t("agentBrief.fetchAllComplete", { count: targets.length }), "ok");
   }
 
-  // 修复按钮事件统一绑定：复制命令、跳转连接弹窗、重新探测、打开外部链接。
+  // 模态内状态行：重新探测/复制等模态内操作的反馈写在弹窗操作区，
+  // 不再用主窗口顶部的 setAppNotice（会被模态遮罩盖住，用户看不到）。
+  // 在最小 DOM 壳（测试）下 querySelector 返回 null 时安全跳过。
+  function setModalStatus(root, message, tone = "") {
+    if (!root || typeof root.querySelector !== "function") return;
+    const actions = root.querySelector(".confirm-dialog-actions");
+    if (!actions) return;
+    let status = actions.querySelector(".modal-action-status");
+    if (!status) {
+      status = root.ownerDocument?.createElement?.("span");
+      if (!status) return;
+      status.className = "modal-action-status";
+      actions.insertBefore(status, actions.firstChild);
+    }
+    status.textContent = message || "";
+    status.classList.remove("is-busy", "is-error", "is-ok");
+    if (tone) status.classList.add(`is-${tone}`);
+  }
+
+  // 修复按钮事件统一绑定：复制命令、跳转连接弹窗、重新探测。
   // 全部为前端动作，不执行任何进程。onReprobe 让各弹窗在重新探测后自行重渲染。
+  // 反馈写入所在模态的状态行，避免飘到被遮罩盖住的顶部通知条。
   function bindRepairActions(root, { onReprobe } = {}) {
     root.querySelectorAll(".health-repair-action").forEach((button) => {
       button.addEventListener("click", async () => {
@@ -166,10 +188,10 @@ export function createAgentManagementView({
         if (action === "copy_command") {
           try {
             await clipboard?.writeText(button.dataset.repairCommand || "");
-            setAppNotice(t("availability.repairAction.copied"));
+            setModalStatus(root, t("availability.repairAction.copied"), "ok");
           } catch (error) {
             console.error(error);
-            setAppNotice(t("common.copyFailed"), "error");
+            setModalStatus(root, t("common.copyFailed"), "error");
           }
           return;
         }
@@ -179,15 +201,16 @@ export function createAgentManagementView({
         }
         if (action === "reprobe") {
           button.disabled = true;
-          setAppNotice(t("availability.rechecking"), "busy");
+          setModalStatus(root, t("availability.rechecking"), "busy");
           try {
             await refreshProviderConnections(button.dataset.repairProvider || undefined);
-            setAppNotice(t("availability.checkComplete"));
+            // onReprobe 可能重渲染整个模态，先重渲染再写"完成"，使其落在新 DOM 上。
             await onReprobe?.();
+            setModalStatus(root, t("availability.checkComplete"), "ok");
           } catch (error) {
             console.error(error);
             button.disabled = false;
-            setAppNotice(t("availability.checkFailed", { error: formatBackendError(error) }), "error");
+            setModalStatus(root, t("availability.checkFailed", { error: formatBackendError(error) }), "error");
           }
         }
       });
@@ -205,7 +228,18 @@ export function createAgentManagementView({
       getRuntimeAvailabilitySnapshot(),
     );
     const provider = data.providers.find((entry) => entry.id === target.providerId);
-    return provider?.targets.find((entry) => entry.id === target.id) || null;
+    const found = provider?.targets.find((entry) => entry.id === target.id);
+    if (found) return found;
+    // 运行时探测出的 target（如 Hermes WSL/Win profile）不在 provider.agents 静态列表里，
+    // store 查不到。就地用 deriveTargetHealth 归一化：补齐 overall + diagnostics，
+    // 并把可发送/可连接判断转成明确的状态+原因+修复，避免回退到裸后端 health 导致
+    // 健康区显示空白的"状态未知"。deriveTargetHealth 内部会吸收 target 上已有的 health 字段。
+    return {
+      health: deriveTargetHealth(target, {
+        sendable: isTargetSendable(target),
+        activatable: isTargetActivatable(target),
+      }),
+    };
   }
 
   async function openAgentManager(agentId) {
@@ -295,18 +329,19 @@ export function createAgentManagementView({
         button.disabled = true;
         try {
           await saveDefaultModel(managedTarget, select?.value || "");
-          setAppNotice(t("agentDetail.modelSaved"));
+          // openAgentManager 重渲染整个模态，先重渲染再写"已保存"，使其落在新 DOM 上。
           await openAgentManager(agentId);
+          setModalStatus(confirmDialog, t("agentDetail.modelSaved"), "ok");
         } catch (error) {
           console.error(error);
           button.disabled = false;
-          setAppNotice(t("runtimeConfig.failed", { error: formatBackendError(error) }), "error");
+          setModalStatus(confirmDialog, t("runtimeConfig.failed", { error: formatBackendError(error) }), "error");
         }
       });
       confirmDialog.querySelector(".agent-manager-recheck")?.addEventListener("click", async (event) => {
         const button = event.currentTarget;
         button.disabled = true;
-        setAppNotice(t("connection.rechecking"), "busy");
+        setModalStatus(confirmDialog, t("connection.rechecking"), "busy");
         try {
           await refreshProviderConnections(target.providerId);
           const refreshedTarget = agentById(agentId) || target;
@@ -314,12 +349,12 @@ export function createAgentManagementView({
           if (refreshedInstance?.available && typeof discoverModelControl === "function") {
             await discoverModelControl(refreshedTarget);
           }
-          setAppNotice(t("connection.checkComplete"));
           await openAgentManager(agentId);
+          setModalStatus(confirmDialog, t("connection.checkComplete"), "ok");
         } catch (error) {
           console.error(error);
           button.disabled = false;
-          setAppNotice(t("runtimeConfig.failed", { error: formatBackendError(error) }), "error");
+          setModalStatus(confirmDialog, t("runtimeConfig.failed", { error: formatBackendError(error) }), "error");
         }
       });
       confirmDialog.querySelector(".agent-manager-dialog")?.addEventListener("submit", async (event) => {
@@ -412,10 +447,10 @@ export function createAgentManagementView({
       confirmDialog.querySelector(".agent-brief-save-all")?.addEventListener("click", async () => {
         try {
           await saveBriefInputs(confirmDialog);
-          setAppNotice(t("agentBrief.saved"));
+          setModalStatus(confirmDialog, t("agentBrief.saved"), "ok");
         } catch (error) {
           console.error(error);
-          setAppNotice(t("agentBrief.saveFailed", { error: formatBackendError(error) }), "error");
+          setModalStatus(confirmDialog, t("agentBrief.saveFailed", { error: formatBackendError(error) }), "error");
         }
       });
       confirmDialog.querySelector(".agent-brief-fetch-all")?.addEventListener("click", async (event) => {
@@ -425,7 +460,7 @@ export function createAgentManagementView({
           await autoFetchProviderBriefs(selectedProviderId, confirmDialog);
         } catch (error) {
           console.error(error);
-          setAppNotice(t("agentBrief.fetchFailed", { error: formatBackendError(error) }), "error");
+          setModalStatus(confirmDialog, t("agentBrief.fetchFailed", { error: formatBackendError(error) }), "error");
         } finally {
           button.disabled = !targetsForProvider(selectedProviderId).some(isTargetSendable);
         }
@@ -434,15 +469,16 @@ export function createAgentManagementView({
         event.preventDefault();
         const saveButton = event.currentTarget.querySelector(".runtime-config-save");
         saveButton.disabled = true;
-        setAppNotice(t("connection.rechecking"), "busy");
+        setModalStatus(confirmDialog, t("connection.rechecking"), "busy");
         try {
           await refreshProviderConnections(selectedProviderId);
-          closeConfirmDialog();
-          setAppNotice(t("connection.checkComplete"));
+          // 重新探测后重开弹窗以就地刷新结果，反馈留在模态内。
+          await openProviderManager(selectedProviderId);
+          setModalStatus(confirmDialog, t("connection.checkComplete"), "ok");
         } catch (error) {
           console.error(error);
           saveButton.disabled = false;
-          setAppNotice(t("runtimeConfig.failed", { error: formatBackendError(error) }), "error");
+          setModalStatus(confirmDialog, t("runtimeConfig.failed", { error: formatBackendError(error) }), "error");
         }
       });
     } catch (error) {
@@ -492,22 +528,22 @@ export function createAgentManagementView({
     bindRepairActions(confirmDialog, { onReprobe: renderAvailabilityBody });
     confirmDialog.querySelector(".availability-copy")?.addEventListener("click", () => {
       clipboard?.writeText(JSON.stringify(freshData, null, 2)).then(() => {
-        setAppNotice(t("availability.reportCopied"));
+        setModalStatus(confirmDialog, t("availability.reportCopied"), "ok");
       }).catch(() => {
-        setAppNotice(t("common.copyFailed"), "error");
+        setModalStatus(confirmDialog, t("common.copyFailed"), "error");
       });
     });
     confirmDialog.querySelector(".availability-dialog")?.addEventListener("submit", async (event) => {
       event.preventDefault();
       const recheckBtn = event.currentTarget.querySelector(".availability-recheck");
       recheckBtn.disabled = true;
-      setAppNotice(t("availability.rechecking"), "busy");
+      setModalStatus(confirmDialog, t("availability.rechecking"), "busy");
       try {
         await refreshRuntimeProbe();
         renderAvailabilityBody();
-        setAppNotice(t("availability.checkComplete"));
+        setModalStatus(confirmDialog, t("availability.checkComplete"), "ok");
       } catch (error) {
-        setAppNotice(t("availability.checkFailed", { error: formatBackendError(error) }), "error");
+        setModalStatus(confirmDialog, t("availability.checkFailed", { error: formatBackendError(error) }), "error");
       } finally {
         recheckBtn.disabled = false;
       }
