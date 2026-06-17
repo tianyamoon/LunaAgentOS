@@ -714,14 +714,25 @@ fn spawn_stdout_reader(stdout: ChildStdout) -> Receiver<Value> {
     let (sender, receiver) = mpsc::channel();
     thread::spawn(move || {
         let mut reader = BufReader::new(stdout);
-        let mut line = String::new();
-        while reader.read_line(&mut line).unwrap_or(0) > 0 {
-            if let Ok(message) = serde_json::from_str::<Value>(line.trim()) {
-                if sender.send(message).is_err() {
-                    break;
+        // 按字节读取并用 from_utf8_lossy 解码：一个非 UTF-8/ANSI/二进制坏字节只会
+        // 损坏一行，而不会像 read_line 那样把 InvalidData 当成 EOF 永久终止读取线程，
+        // 进而丢失后续有效响应并把"放弃读取"误报成"adapter 关闭了 stdout"。
+        let mut buf = Vec::new();
+        loop {
+            buf.clear();
+            match reader.read_until(b'\n', &mut buf) {
+                Ok(0) => break, // 真正的 EOF
+                Ok(_) => {
+                    let line = String::from_utf8_lossy(&buf);
+                    if let Ok(message) = serde_json::from_str::<Value>(line.trim()) {
+                        if sender.send(message).is_err() {
+                            break;
+                        }
+                    }
                 }
+                Err(ref error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(_) => break,
             }
-            line.clear();
         }
     });
     receiver
@@ -733,12 +744,20 @@ fn spawn_stderr_reader(stderr: ChildStderr) -> (Arc<Mutex<String>>, Receiver<()>
     let (done_sender, done_receiver) = mpsc::channel();
     thread::spawn(move || {
         let mut reader = BufReader::new(stderr);
-        let mut line = String::new();
-        while reader.read_line(&mut line).unwrap_or(0) > 0 {
-            if let Ok(mut log) = thread_log.lock() {
-                log.push_str(&line);
+        // 同 stdout reader：字节式读取 + lossy 解码，避免一个坏字节杀死 stderr 日志线程。
+        let mut buf = Vec::new();
+        loop {
+            buf.clear();
+            match reader.read_until(b'\n', &mut buf) {
+                Ok(0) => break,
+                Ok(_) => {
+                    if let Ok(mut log) = thread_log.lock() {
+                        log.push_str(&String::from_utf8_lossy(&buf));
+                    }
+                }
+                Err(ref error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(_) => break,
             }
-            line.clear();
         }
         let _ = done_sender.send(());
     });

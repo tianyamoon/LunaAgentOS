@@ -401,7 +401,8 @@ pub(super) fn targets(
             profile_name.clone()
         };
         let state = if gateway == "running" { 1 } else { 9 };
-        let model_or_key = if !model.is_empty() || has_env { "unknown" } else { "unknown" };
+        // 模型/密钥只按"是否配置存在"展示，绝不因存在就声称有效；此处一律 unknown（presence-only honesty）。
+        let model_or_key = "unknown";
         targets.push(serde_json::json!({
             "id": profile_id,
             "providerId": adapter.id,
