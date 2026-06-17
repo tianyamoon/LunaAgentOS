@@ -8,7 +8,20 @@ use std::collections::HashSet;
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
+use std::sync::Mutex;
 use tauri::{AppHandle, Manager};
+
+/// 串行化历史文件的 read-modify-write。append/delete/archive/compact 都对同一批
+/// live|archive/{date}.json 做整文件读改写；Tauri 并发派发命令时缺乏互斥，会出现
+/// 后写覆盖前写、静默丢失另一处改动。一把进程级锁足够（文件小、操作不频繁）。
+static HISTORY_WRITE_LOCK: Mutex<()> = Mutex::new(());
+
+/// 获取历史写锁；锁中毒（持锁线程 panic）时恢复内部值，避免历史功能整体瘫痪。
+fn lock_history_writes() -> std::sync::MutexGuard<'static, ()> {
+    HISTORY_WRITE_LOCK
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner())
+}
 
 /// 当前写入的历史 schema。旧 task 字段格式不再读取或迁移。
 const HISTORY_SCHEMA_VERSION: u32 = 6;
@@ -417,6 +430,7 @@ pub(crate) async fn load_history_entries(app: AppHandle) -> Result<Vec<HistoryEn
 
 /// 扫描全部历史文件，执行 schema 升级与重复记录压缩。
 fn compact_history_entries_blocking(app: &AppHandle) -> Result<HistoryCompactResult, String> {
+    let _history_guard = lock_history_writes();
     let mut removed_count = 0;
     let mut upgraded_count = 0;
     let mut skipped_files = 0;
@@ -460,6 +474,7 @@ pub(crate) fn delete_history_session_entries(
     if session_id.is_empty() {
         return Err("session_id 不能为空".to_string());
     }
+    let _history_guard = lock_history_writes();
     let mut removed_count = 0;
     let mut skipped_files = 0;
     for path in history_json_files(&app)? {
@@ -491,6 +506,7 @@ pub(crate) fn archive_history_session_entries(
     if session_id.is_empty() {
         return Err("session_id 不能为空".to_string());
     }
+    let _history_guard = lock_history_writes();
     let mut moved_count = 0;
     let mut skipped_files = 0;
     let live_dir = history_bucket_dir(&app, "live")?;
@@ -540,6 +556,7 @@ pub(crate) fn append_history_entry(
     } else {
         "archive"
     };
+    let _history_guard = lock_history_writes();
     let (path, date, timestamp) = history_file_for_today(&app, bucket)?;
     let mut entries = load_history_file(&path)?;
     let saved = HistoryEntry {
