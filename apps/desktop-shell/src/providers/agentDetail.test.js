@@ -83,11 +83,26 @@ test("buildAgentDetail lets target fields override provider detail", () => {
   });
 
   assert.equal(detail.name, "Target");
-  assert.equal(detail.runtimeEnvironment, "WSL");
+  // 探测得到的 runtimeHost 映射为可读标签 key（渲染时 t() 翻译），而非裸 token。
+  assert.equal(detail.runtimeEnvironment, "agentDetail.runtimeHost.wsl");
   assert.equal(detail.defaultWorkingDirectory, "/target");
   assert.equal(detail.brief, "Target summary");
   assert.equal(detail.capabilities.network.state, "enabled");
   assert.deepEqual(detail.bestPractices, ["Target practice"]);
+});
+
+test("buildAgentDetail: verifiable runtime host beats provider's static runtime label", () => {
+  // 内建 provider 带静态 runtimeEnvironmentKey（"Windows / WSL"），但 target 探测到真实 host。
+  // 真实 host 必须胜出，不能被静态默认标签掩盖。
+  const detail = buildAgentDetail({
+    provider: {
+      id: "claude",
+      name: "Claude Code",
+      agentDetail: { runtimeEnvironmentKey: "agentDetail.runtime.windowsWsl" },
+    },
+    target: { id: "claude-native", providerId: "claude", runtimeHost: "native" },
+  });
+  assert.equal(detail.runtimeEnvironment, "agentDetail.runtimeHost.native");
 });
 
 test("buildAgentDetail applies saved model only to declared Luna-managed controls", () => {

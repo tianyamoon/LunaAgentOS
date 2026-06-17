@@ -52,17 +52,34 @@ function normalizeCapability(value) {
   return { state: "unknown", note: "", noteKey: "" };
 }
 
+// 已探测的运行宿主 token（native/wsl/bridge…）映射为可读 i18n 标签；未知 token 原样返回。
+const RUNTIME_HOST_LABEL_KEYS = Object.freeze({
+  native: "agentDetail.runtimeHost.native",
+  wsl: "agentDetail.runtimeHost.wsl",
+  bridge: "agentDetail.runtimeHost.bridge",
+  remote: "agentDetail.runtimeHost.remote",
+  ide: "agentDetail.runtime.ideBridge",
+  manifest: "agentDetail.runtimeHost.manifest",
+});
+
+function runtimeHostLabel(value) {
+  if (!value) return "";
+  return RUNTIME_HOST_LABEL_KEYS[String(value).toLowerCase()] || value;
+}
+
 function inferRuntimeEnvironment(target = {}, runtimeInstance = {}, source = {}) {
+  // 优先展示可验证的真实运行宿主（探测得到的 runtimeHost / 实例标签），
+  // provider 的静态默认标签（如 "Windows / WSL"）只作为兜底，绝不覆盖已知的真实 host。
   return firstValue(
     target.runtimeEnvironment,
-    target.runtimeEnvironmentKey,
-    source.runtimeEnvironment,
-    source.runtimeEnvironmentKey,
+    runtimeHostLabel(target.runtimeHost),
+    runtimeHostLabel(runtimeInstance.runtimeHost),
     runtimeInstance.runtimeEnvironment,
-    target.runtimeHost,
-    runtimeInstance.runtimeHost,
     runtimeInstance.runtimeLabel,
     target.runtimeLabel,
+    source.runtimeEnvironment,
+    source.runtimeEnvironmentKey,
+    target.runtimeEnvironmentKey,
     runtimeInstance.transport,
     "unknown",
   );

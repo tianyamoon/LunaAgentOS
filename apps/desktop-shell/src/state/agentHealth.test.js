@@ -130,6 +130,23 @@ test("deriveOverallHealth: not_applicable fields are inert and do not produce un
   assert.equal(deriveOverallHealth(health), "unknown");
 });
 
+test("deriveTargetHealth: install state is unknown at target layer (no probe), not a fake ok", () => {
+  const health = deriveTargetHealth({}, { sendable: true });
+  // Target 层不运行安装探测，installed 不可确认，应为 unknown 而非伪装 ok。
+  assert.equal(health.installed, HEALTH_STATE.unknown);
+  assert.equal(health.overall, "unknown");
+});
+
+test("deriveOverallHealth: no genuinely-verified field never reports available", () => {
+  // 全部 not_applicable、无任何 ok、无 unavailable_reason —— 不得声称 available。
+  const allNa = Object.fromEntries(HEALTH_FIELDS.map((field) => [field, HEALTH_STATE.not_applicable]));
+  assert.equal(deriveOverallHealth(allNa), "unknown");
+
+  // 至少一项 ok（其余 not_applicable）才允许 available。
+  const oneOk = { ...allNa, cli_callable: HEALTH_STATE.ok };
+  assert.equal(deriveOverallHealth(oneOk), "available");
+});
+
 test("deriveRuntimeHealth: native runtime treats bridge availability as not applicable", () => {
   const health = deriveRuntimeHealth({
     configured: true,

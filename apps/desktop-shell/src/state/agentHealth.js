@@ -150,7 +150,9 @@ export function deriveTargetHealth(target = {}, { sendable = false, activatable 
         ? "configure_profile"
         : "check_agent_configuration";
   const defaults = {
-    installed: HEALTH_STATE.ok,
+    // Target 层不做安装探测，installed 在此层无法确认，如实标记 unknown 而非伪装 ok。
+    // 真实探测来自 deriveRuntimeHealth；target 携带显式 health 时会覆盖此默认。
+    installed: HEALTH_STATE.unknown,
     logged_in: HEALTH_STATE.unknown,
     cli_callable: sendable || activatable ? HEALTH_STATE.ok : HEALTH_STATE.unknown,
     profile_configured: profileLike
@@ -177,5 +179,8 @@ export function deriveOverallHealth(health = {}) {
   // not_applicable 字段对当前 Agent 形态无意义，刻意不计入 unknown 判定，
   // 因此它既不会触发上面的 unavailable，也不会让总体退化为 unknown。
   if (HEALTH_FIELDS.some((field) => health[field] === HEALTH_STATE.unknown)) return "unknown";
+  // 没有任何字段被真正验证为 ok（如 adapter 上报全部 not_applicable），不得声称 available。
+  // 至少要有一项可验证的正向信号，否则如实退化为 unknown。
+  if (!HEALTH_FIELDS.some((field) => health[field] === HEALTH_STATE.ok)) return "unknown";
   return "available";
 }
