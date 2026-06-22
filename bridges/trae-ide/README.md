@@ -24,4 +24,4 @@ Bridge implementation can use:
 
 ## Product rule
 
-Trae IDE remains a real IDE bridge entry in the Agent Fleet and follows the same adapter contract as other runtime entries.
+Trae IDE remains the IDE bridge path for LunaAgentOS, but the desktop app does not show a placeholder Trae entry until the bridge is real.

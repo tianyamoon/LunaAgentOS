@@ -90,45 +90,13 @@ const DEFAULT_PROVIDERS = [
       },
     ],
   },
-  {
-    id: "trae",
-    name: "Trae IDE",
-    lane: "",
-    noteKey: "provider.trae.note",
-    agentDetail: {
-      summaryKey: "agentDetail.trae.summary",
-      runtimeEnvironmentKey: "agentDetail.runtime.ideBridge",
-      defaultWorkingDirectoryKey: "agentDetail.cwd.ideWorkspace",
-      models: {
-        available: ["agentDetail.model.ideManaged"],
-        default: "agentDetail.model.ideManaged",
-        recommended: ["agentDetail.model.ideManaged"],
-      },
-      capabilities: {
-        files: { state: "depends", noteKey: "agentDetail.capabilityNote.ideBridge" },
-        commands: { state: "depends", noteKey: "agentDetail.capabilityNote.ideBridge" },
-        network: { state: "unknown", noteKey: "agentDetail.capabilityNote.ideManaged" },
-        images: { state: "unknown", noteKey: "agentDetail.capabilityNote.ideManaged" },
-        browser: { state: "depends", noteKey: "agentDetail.capabilityNote.ideBridge" },
-        localRepo: { state: "depends", noteKey: "agentDetail.capabilityNote.ideWorkspace" },
-      },
-      safetyBoundaries: [
-        "agentDetail.trae.safety.bridge",
-      ],
-      bestPractices: [
-        "agentDetail.trae.practice.useIde",
-      ],
-    },
-    // Trae 仅注册 IDE 身份；真正 bridge 入口由独立集成提供。
-    agents: [],
-  },
 ];
 const BUILTIN_PROVIDER_IDS = new Set(DEFAULT_PROVIDERS.map((provider) => provider.id));
+const HIDDEN_DESKTOP_PROVIDER_IDS = new Set(["trae"]);
 
 const DEFAULT_RUNTIME_AVAILABILITY = {
   claude: { summary: "probing", configured: false, available: false, command: "" },
   hermes: { summary: "probing", configured: false, available: false, command: "" },
-  trae: { summary: "planned", configured: false, available: false, command: "IDE Bridge" },
 };
 
 function clonePlainData(value) {
@@ -152,6 +120,7 @@ function cloneProvider(entry) {
 function providerFromAdapter(adapter) {
   const id = adapter?.id;
   if (!id) return null;
+  if (HIDDEN_DESKTOP_PROVIDER_IDS.has(id)) return null;
   const identityOnly = adapter.identityOnly === true;
   return {
     id,

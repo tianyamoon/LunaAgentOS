@@ -36,7 +36,7 @@ export function providerStatusForFleet(provider, availability = {}) {
     state,
     className: classNameForState("is-", state),
     labelKey: explicit?.labelKey || providerStatusLabelKeys[state] || providerStatusLabelKeys.unavailable,
-    mutedCard: state === "planned" || state === "not_configured" || (!availability.available && provider?.id === "trae"),
+    mutedCard: state === "planned" || state === "not_configured",
   };
 }
 

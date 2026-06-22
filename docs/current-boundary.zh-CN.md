@@ -18,13 +18,13 @@ LunaAgentOS 的目标是 AI 时代的个人 Agent 操作系统：让用户像装
 
 - Claude Code 可以作为真实 runtime entry 使用
 - Hermes 可以通过 Windows / WSL ACP runtime instance 和 profile 使用
-- Trae IDE 被表达为 IDE-first bridge path
+- Trae IDE 仍保留为文档中的 IDE-first bridge path，但在真实 bridge 落地前不展示在当前桌面 Agent Fleet 中
 - 左侧展示 Agent Fleet 和当前发送目标
 - 中间工作台展示活跃的 Runtime Session Cards
 - 每张卡片同时承载 output、thought、runtime stream 和 final response
 - 右侧区分 live sessions 和 archived sessions
 - 本地 JSON history 支持 session turn 保存、恢复和只读归档
-- 当某个 runtime 未安装时，对应入口仍然显示在 Agent Fleet 中，并显示明确的配置状态。这是可解释状态，不是崩溃或静默失败
+- 当当前已展示的 runtime 未安装时，对应入口仍然显示在 Agent Fleet 中，并显示明确的配置状态。这是可解释状态，不是崩溃或静默失败
 
 ## 距离完整形态还有多远
 
@@ -48,7 +48,7 @@ LunaAgentOS 的目标是 AI 时代的个人 Agent 操作系统：让用户像装
 
 - Claude Code
 - Hermes
-- Trae IDE bridge path
+- 未来的 Trae IDE bridge path
 
 Claude 内部的 subagent 或 delegation worker 仍然属于 Claude 自身机制。
 

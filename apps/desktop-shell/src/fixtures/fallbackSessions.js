@@ -9,12 +9,4 @@ export const FALLBACK_SESSIONS = {
       { type: "state", state: 5, contentKey: "fallback.hermes.stateDone" },
     ],
   },
-  trae: {
-    events: [
-      { type: "state", state: 0, contentKey: "fallback.trae.stateStart" },
-      { type: "thought", state: 2, contentKey: "fallback.trae.thought" },
-      { type: "response", state: 4, contentKey: "fallback.trae.response" },
-      { type: "state", state: 5, contentKey: "fallback.trae.stateDone" },
-    ],
-  },
 };

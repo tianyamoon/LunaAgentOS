@@ -2,10 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createProvidersStore } from "./providersStore.js";
 
-test("providersStore: default providers contain claude/hermes/trae", () => {
+test("providersStore: default providers contain only surfaced desktop entries", () => {
   const store = createProvidersStore();
   const ids = store.getProvidersSnapshot().map((p) => p.id);
-  assert.deepEqual(ids, ["claude", "hermes", "trae"]);
+  assert.deepEqual(ids, ["claude", "hermes"]);
 });
 
 test("providersStore: provider snapshots isolate callers", () => {
@@ -20,7 +20,7 @@ test("providersStore: provider snapshots isolate callers", () => {
   assert.deepEqual(store.providerById("hermes").agents, []);
   assert.deepEqual(store.providerById("claude").agentDetail.models.available, ["agentDetail.model.nativeRuntime"]);
   store.reset();
-  assert.deepEqual(store.getProvidersSnapshot().map((provider) => provider.id), ["claude", "hermes", "trae"]);
+  assert.deepEqual(store.getProvidersSnapshot().map((provider) => provider.id), ["claude", "hermes"]);
 });
 
 test("providersStore: providerById returns null for unknown id", () => {
@@ -116,12 +116,11 @@ test("providersStore: runtimeAvailability snapshot + patch", () => {
   assert.equal(store.getRuntimeAvailabilityFor("nope"), null);
 });
 
-test("providersStore: identityOnly manifest registers identity without a launch target", () => {
+test("providersStore: hidden bridge manifests do not surface placeholder providers", () => {
   const store = createProvidersStore();
   store.syncAdapterProviders([{ id: "trae", name: "Trae IDE", identityOnly: true }]);
-  const trae = store.providerById("trae");
-  assert.equal(trae.identityOnly, true);
-  assert.deepEqual(trae.agents, []);
+  assert.equal(store.providerById("trae"), null);
+  assert.deepEqual(store.getProvidersSnapshot().map((provider) => provider.id), ["claude", "hermes"]);
 });
 
 test("providersStore: runtime instance snapshots isolate callers", () => {

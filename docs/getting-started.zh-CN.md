@@ -86,7 +86,7 @@ npm run test:all
 ## 当前产品形态
 
 - Claude Code 和 Hermes 是今天真实可用的 runtime entries
-- Trae IDE 是 IDE-first adapter path 的 bridge 目标
+- Trae IDE 仍是后续 IDE-first bridge 路线，在真实 bridge 落地前不展示在当前桌面 Fleet 中
 - 中间工作台围绕 Runtime Session Card 组织
 - 右侧面板区分活会话和归档会话
 - entry 与 session 之间的 call flow 属于下一层产品能力

@@ -26,7 +26,7 @@ Its architecture uses a unified adapter contract and Runtime Session Model to co
 │      ACP / CLI / Gateway / IDE Bridge         │
 ├──────────────────────────────────────────────┤
 │              External Runtimes               │
-│        Claude Code / Hermes / Trae IDE        │
+│        Claude Code / Hermes / future bridges  │
 └──────────────────────────────────────────────┘
 ```
 
@@ -98,7 +98,7 @@ Hermes represents profile-based runtime entries and process visibility. Its ACP 
 
 ### Trae IDE
 
-Trae IDE is the IDE-first bridge adapter path. LunaAgentOS keeps it visible as a real bridge entry in the Agent Fleet.
+Trae IDE is the IDE-first bridge adapter path. LunaAgentOS keeps the bridge contract documented, but does not surface a placeholder Trae entry in the current Agent Fleet until the bridge is real.
 
 ## Direction
 

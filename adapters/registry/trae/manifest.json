@@ -5,5 +5,5 @@
   "brandColor": "#325AB4",
   "identityOnly": true,
   "modelControl": { "mode": "native_runtime" },
-  "description": "Trae IDE entry on the LunaAgentOS desktop. The IDE bridge ships through its own integration path; this manifest registers the identity so Trae appears alongside the other agents."
+  "description": "Trae IDE bridge identity for LunaAgentOS. The desktop app hides this placeholder until the IDE bridge ships through its own integration path."
 }

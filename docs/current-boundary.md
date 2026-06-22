@@ -18,13 +18,13 @@ This page captures the current release boundary: what is actually built today, w
 
 - Claude Code can be used as a real runtime entry.
 - Hermes can be used through Windows / WSL ACP runtime instances and profiles.
-- Trae IDE is represented as an IDE-first bridge path.
+- Trae IDE remains a documented IDE-first bridge path, but it is not surfaced in the current desktop Agent Fleet until the bridge is real.
 - The left side shows the Agent Fleet and current send target.
 - The center workspace shows active Runtime Session Cards.
 - Each card holds output stream, thought stream, runtime stream, and final response.
 - The right side separates live sessions from archived sessions.
 - Local JSON history stores session turns and supports restore/read-only states.
-- When a runtime entry is not installed, its entry remains visible in the Agent Fleet with a clear configuration state. This is an explainable state, not a crash or silent failure.
+- When a surfaced runtime entry is not installed, its entry remains visible in the Agent Fleet with a clear configuration state. This is an explainable state, not a crash or silent failure.
 
 ## How far the full form still is
 
@@ -48,7 +48,7 @@ The left fleet represents external entry objects:
 
 - Claude Code
 - Hermes
-- Trae IDE bridge path
+- Future Trae IDE bridge path
 
 Claude internal subagents or delegation workers remain part of Claude's own internal mechanism.
 
