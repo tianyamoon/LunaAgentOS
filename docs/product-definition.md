@@ -4,7 +4,7 @@
 
 LunaAgentOS is heading toward a personal Agent operating system for the AI era — a desktop layer where users install agents like apps, schedule tasks like processes, and own agent memory like local files.
 
-LunaAgentOS starts from a neutral desktop workspace for real AI Agent sessions. The current 0.3 stage makes Agent management, runtime-backed health diagnostics, and Runtime Session semantics reliable. Task, Handoff, orchestration, and collaboration remain separate later product stages.
+LunaAgentOS starts from a neutral desktop workspace for real AI Agent sessions. The current 0.3 stage tightens Agent management, evidence-backed health diagnostics, and Runtime Session semantics. Task, Handoff, orchestration, and collaboration remain separate later product stages.
 
 The product starts from the workspace experience: choose a real runtime entry, send work into a real session, watch the process, and keep local history in one place. Protocol, adapters, and the Runtime Session Model support that experience; they are not the first thing LunaAgentOS asks users to believe.
 
@@ -74,9 +74,9 @@ The current product definition follows a few constraints:
 - Preserve runtime-native strengths instead of flattening everything into one chat surface
 - Make process visibility a first-class part of the product
 - Keep local history durable and recoverable
-- Position 0.3 as the Agent management, health diagnostics, and Runtime Session reliability stage, without overstating it
+- Position 0.3 as the Agent management, evidence-backed health diagnostics, and Runtime Session semantics stage, without overstating it
 - Grow the adapter contract before chasing marketplace or commercial-platform breadth
 
 ## 0.3 boundary
 
-The repository contains a working app and real integrations. 0.3 only hardens runtime entries, Agent management, truthful model control, health diagnostics, and Runtime Session semantics. Task, Task Board, Handoff, automatic assignment, and multi-Agent orchestration are outside this stage.
+The repository contains a working app and real integrations. 0.3 only hardens runtime entries, Agent management, model-control expression, the health evidence chain, and Runtime Session semantics. Task, Task Board, Handoff, automatic assignment, and multi-Agent orchestration are outside this stage.

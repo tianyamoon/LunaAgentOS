@@ -2,7 +2,7 @@
 
 [English](./roadmap.md)
 
-LunaAgentOS 的长期方向是 AI 时代的个人 Agent 操作系统。当前 0.3 先完成 Agent 可用性管理、真实健康诊断和 Runtime Session 语义；Task、Handoff 与编排保持为后续独立阶段。
+LunaAgentOS 的长期方向是 AI 时代的个人 Agent 操作系统。当前 0.3 先收紧 Agent 可用性管理、证据化健康诊断和 Runtime Session 语义；Task、Handoff 与编排保持为后续独立阶段。
 
 ## 当前：产品定义和 Runtime Session workspace
 
@@ -19,10 +19,10 @@ LunaAgentOS 的长期方向是 AI 时代的个人 Agent 操作系统。当前 0.
 
 ## 当前：0.3 Agent 管理和健康诊断
 
-0.3 在工作台底盘之上，只把两件基础能力做扎实：
+0.3 在工作台底盘之上，只把两件基础能力先收紧：
 
 - Agent 管理：身份、profile、模型、能力、安全边界和最佳实践。
-- 真实健康诊断：安装、调用、登录、配置、WSL/Bridge、模型或密钥、版本、失败原因和修复建议。
+- 证据化健康诊断：安装、调用、WSL/Bridge、版本、失败原因和修复建议尽量来自 runtime / adapter 证据；登录、配置、模型或密钥等无法确认时保持未知。
 - Runtime Session Card 继续只负责会话状态、执行过程、响应、历史和恢复。
 - 继续把 adapter manifest fields 和 capability metadata 做实，让 Agent 管理不是纯 UI 文案。
 - 继续保持 App 作为协议的具体控制台和当前官方推荐使用路径。

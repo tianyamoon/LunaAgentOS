@@ -28,10 +28,10 @@ LunaAgentOS 的目标是 AI 时代的个人 Agent 操作系统：让用户像装
 
 ## 距离完整形态还有多远
 
-0.3 当前阶段只收尾 Agent 管理、真实健康诊断和 Runtime Session 语义：
+0.3 当前阶段只收尾 Agent 管理、证据化健康诊断和 Runtime Session 语义：
 
 - **Agent 管理**：讲清身份、环境、Profile、工作目录、模型控制、能力、安全边界和最佳实践
-- **健康诊断**：只依据真实 runtime、adapter health check 或可验证配置；无法确认时显示未知
+- **健康诊断**：优先依据 runtime 探测、adapter health check 或可验证配置；无法确认时显示未知
 - **Runtime Session**：继续只负责会话状态、执行、响应、历史和恢复
 - **明确不在 0.3**：Task、Task Board、Handoff、自动分派、多 Agent 编排、团队模式、共享记忆和 Marketplace
 
@@ -84,7 +84,7 @@ new agent product -> adapter manifest + adapter implementation -> LunaAgentOS un
 
 ## 下一层能力
 
-0.3 在工作台底盘之上，重点把这些做扎实：
+0.3 在工作台底盘之上，重点把这些收紧：
 
 - 让用户明确知道 Agent 是否可用、依据是什么、下一步如何处理
 - 只有真实支持持久默认模型的 Agent 才提供 LunaAgentOS 模型选择

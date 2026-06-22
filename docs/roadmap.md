@@ -2,7 +2,7 @@
 
 [中文](./roadmap.zh-CN.md)
 
-LunaAgentOS is heading toward a personal Agent operating system for the AI era. The current 0.3 stage first completes Agent availability management, runtime-backed health diagnostics, and Runtime Session semantics. Task, Handoff, and orchestration remain separate later stages.
+LunaAgentOS is heading toward a personal Agent operating system for the AI era. The current 0.3 stage first tightens Agent availability management, evidence-backed health diagnostics, and Runtime Session semantics. Task, Handoff, and orchestration remain separate later stages.
 
 ## Now: Product definition and Runtime Session workspace
 
@@ -22,7 +22,7 @@ The current focus is to make the product definition explicit while keeping Claud
 0.3 builds on the workspace foundation and hardens two basic layers only:
 
 - Agent management: identity, profiles, models, capabilities, safety boundaries, and best practices.
-- Runtime-backed health diagnostics: installation, invocation, login, configuration, WSL/Bridge, model or key readiness, version attention, failure reasons, and repair guidance.
+- Evidence-backed health diagnostics: installation, invocation, WSL/Bridge, version attention, failure reasons, and repair guidance prefer real probes; login, configuration, model, or key readiness remain unknown when they cannot be verified.
 - Runtime Session Cards remain limited to session state, execution, responses, history, and recovery.
 - Continue making adapter manifest fields and capability metadata real, so agent management is not only UI copy.
 - Keep the App as the protocol's concrete control console and official recommended use path.

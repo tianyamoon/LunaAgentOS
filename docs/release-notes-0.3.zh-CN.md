@@ -2,27 +2,27 @@
 
 [English](./release-notes-0.3.md)
 
-LunaAgentOS 0.3.0 在 runtime session 工作台之上，把两件基础能力做扎实：**Agent 管理**（身份、profile、模型、能力、安全边界、最佳实践）和**真实健康诊断**。本版本继续严格区分 Runtime Session 与 Task —— Task、Handoff 和编排仍属于后续阶段。
+LunaAgentOS 0.3.0 在 runtime session 工作台之上，把两件基础能力往可用方向收紧：**Agent 管理**（身份、profile、模型、能力、安全边界、最佳实践）和**证据化健康诊断第一版**。本版本继续严格区分 Runtime Session 与 Task —— Task、Handoff 和编排仍属于后续阶段。
 
 完整范围定义见 [0.3 需求定义](./requirements-0.3.zh-CN.md)。
 
 ## Agent 管理
 
-- **Agent 身份与运行信息**：每个 Agent 展示名称、provider、profile、账号身份、运行环境、运行命令和默认工作目录。
+- **Agent 身份与运行信息**：每个 Agent 展示名称、provider、profile、运行环境、运行命令和默认工作目录；账号身份等字段只在 runtime 或 adapter 能提供时展示。
 - **模型控制如实表达**：支持 LunaAgentOS 持久配置的 adapter，可选择并保存新 Runtime Session 的默认模型；其他 Agent 明确显示模型由原生 runtime 管理，会话内 `/model` 不等同于持久默认配置。
 - **能力矩阵**：按 Agent 呈现文件、命令、网络、图像、浏览器和本地仓库能力。
 - **安全边界与最佳实践**：每个 Agent 展示自己的安全边界和推荐用途。
-- **由 manifest 驱动，不是纯 UI 文案**：能力和模型信息来自 adapter manifest，让管理反映真实 adapter 事实，而非前端硬编码文本。
+- **优先由 manifest / runtime target 驱动**：能力和模型信息优先来自 adapter manifest、runtime target 或探测结果；内置默认只作为当前入口的保守兜底。
 
-## 真实健康诊断
+## 健康诊断
 
-健康结论来自真实 runtime 探测、adapter health check 或可验证的本地配置，绝不靠猜测。
+健康结论优先来自 runtime 探测、adapter health check 或可验证的本地配置；无法确认的事实保持 `unknown`，不把推断写成确定结论。
 
-- **真实探测**：安装 / 可调用 / 登录 / 配置 / WSL 或 Bridge / 模型或密钥 / 版本，均由实际执行 runtime 命令得出，不是占位数据。
+- **探测口径更诚实**：安装、可调用、WSL/Bridge 和版本等信息尽量来自实际 runtime 命令或 adapter 上报；登录、配置、模型或密钥等字段只有在 runtime/adapter 能给出可验证信号时才给出结论，否则保持未知。
 - **如实标记未知**：无法确认的字段显示 `unknown`，绝不伪装成健康；除非至少有一项被正向验证，否则不会把 Agent 报告为可用。
 - **凭据安全**：密钥只检查是否存在，永不显示值，也不因存在就声称有效；诊断输出会对含密信息的行做脱敏。
 - **证据链**：每个健康字段可显示其来源和检测时间，让状态可追溯而非黑盒。
-- **交互式修复动作**：不可用项提供可操作的下一步 —— 复制修复命令、打开对应配置对话框，或就地重新探测。
+- **交互式修复动作**：当健康结果提供 `repair_hint` 时，界面会给出可操作的下一步 —— 复制修复命令、打开对应配置对话框，或就地重新探测。
 
 ## 输入区图片输入
 

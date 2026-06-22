@@ -13,7 +13,7 @@
 ## 先看这些
 
 - [快速开始](./getting-started.zh-CN.md)：安装依赖、运行桌面应用、验证当前工作台
-- [0.3.0 发布说明](./release-notes-0.3.zh-CN.md)：Agent 管理、真实健康诊断、图片输入和保留边界
+- [0.3.0 发布说明](./release-notes-0.3.zh-CN.md)：Agent 管理、证据化健康诊断、图片输入和保留边界
 - [当前产品边界](./current-boundary.zh-CN.md)：LunaAgentOS 现在做实了什么、下一段路怎么走、哪些常见误解需要先讲清
 - [贡献指南](../CONTRIBUTING.zh-CN.md)：开发环境、测试命令、贡献方向、PR 预期
 
@@ -23,7 +23,7 @@
 - [为什么做 LunaAgentOS](./why-lunaagentos.zh-CN.md)：这个项目试图解决什么问题
 - [轻核心原则](./light-core-principles.zh-CN.md)：控制层要保持聚焦的约束条件
 - [路线图](./roadmap.zh-CN.md)：近期和中长期方向
-- [0.3 需求定义](./requirements-0.3.zh-CN.md)：聚焦 Agent 管理和真实健康诊断，并保持 Runtime Session 与 Task 分离
+- [0.3 需求定义](./requirements-0.3.zh-CN.md)：聚焦 Agent 管理和证据化健康诊断，并保持 Runtime Session 与 Task 分离
 
 ## 架构与接入
 

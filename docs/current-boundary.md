@@ -28,10 +28,10 @@ This page captures the current release boundary: what is actually built today, w
 
 ## How far the full form still is
 
-The current 0.3 stage closes out Agent management, runtime-backed health diagnostics, and Runtime Session semantics:
+The current 0.3 stage closes out Agent management, evidence-backed health diagnostics, and Runtime Session semantics:
 
 - **Agent management**: identity, environment, Profile, working directory, model control, capabilities, safety, and best practices.
-- **Health diagnostics**: conclusions come only from real runtimes, adapter health checks, or verifiable configuration; unconfirmed facts stay unknown.
+- **Health diagnostics**: conclusions prefer runtime probes, adapter health checks, or verifiable configuration; unconfirmed facts stay unknown.
 - **Runtime Session**: remains responsible only for session state, execution, responses, history, and recovery.
 - **Explicitly outside 0.3**: Task, Task Board, Handoff, automatic assignment, multi-Agent orchestration, team mode, shared memory, and Marketplace.
 

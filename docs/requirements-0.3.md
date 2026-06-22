@@ -2,7 +2,7 @@
 
 [简体中文](./requirements-0.3.zh-CN.md)
 
-The current 0.3 stage first makes each Agent understandable, configurable, and reliable while keeping Runtime Session and Task as distinct product objects.
+The current 0.3 stage first makes each Agent easier to understand, configure, and try reliably while keeping Runtime Session and Task as distinct product objects.
 
 ## Product Object Boundary
 
@@ -16,16 +16,16 @@ The current 0.3 stage first makes each Agent understandable, configurable, and r
 
 ### Agent Management
 
-Users can inspect Agent identity, runtime environment, Profile, working directory, models, capability boundaries, safety boundaries, and best practices.
+Users can inspect Agent identity, runtime environment, Profile, working directory, models, capability boundaries, safety boundaries, and best practices. Account, model, and capability facts prefer adapter manifests, runtime targets, or probe results; unconfirmed fields are not presented as known.
 
 - Adapters that declare persistent LunaAgentOS model control may offer a saved default for newly created Runtime Sessions.
 - Other Agents state that models are managed by the native runtime. An in-session `/model` command is not persistent default-model management.
 
 ### Agent Health Diagnostics
 
-Users can inspect installation and invocation, login or configuration requirements, Profile, WSL/Bridge, model or key readiness, version attention, concrete failure reasons, and suggested next steps.
+Users can inspect installation and invocation, login or configuration requirements, Profile, WSL/Bridge, model or key readiness, version attention, concrete failure reasons, and suggested next steps. Login, model, and key conclusions are only shown as certain when the runtime or adapter exposes a verifiable signal.
 
-Conclusions come from the real runtime, adapter health checks, or verifiable local configuration. Unconfirmed fields remain unknown. Secret values are never displayed, and presence alone does not claim validity.
+Conclusions prefer runtime probes, adapter health checks, or verifiable local configuration. Unconfirmed fields remain unknown. Secret values are never displayed, and presence alone does not claim validity.
 
 ## Not In This Stage
 

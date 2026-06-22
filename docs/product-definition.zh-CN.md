@@ -4,7 +4,7 @@
 
 LunaAgentOS 的长期方向是 AI 时代的个人 Agent 操作系统：让用户像装应用一样装 Agent、像调度进程一样调度任务、像管本地资料一样掌控 Agent 记忆。
 
-LunaAgentOS 从真实 AI Agent 会话的中立桌面工作台开始。0.3 当前阶段只把 Agent 管理、真实健康诊断和 Runtime Session 语义做可靠；Task、Handoff、编排与协作仍是独立的后续产品阶段。
+LunaAgentOS 从真实 AI Agent 会话的中立桌面工作台开始。0.3 当前阶段先收紧 Agent 管理、证据化健康诊断和 Runtime Session 语义；Task、Handoff、编排与协作仍是独立的后续产品阶段。
 
 产品从工作台体验开始：选择真实 runtime 入口，把 prompt 送进真实 session，观察过程，并把本地历史留在一个地方。Protocol、adapters 和 Runtime Session Model 是支撑这套体验的结构，而不是 LunaAgentOS 首先要求用户理解的卖点。
 
@@ -74,9 +74,9 @@ agent product
 - 保留 runtime 原生强项，不把一切强行压成同一种聊天界面
 - 把过程可见性当成一等公民
 - 让本地历史可持久、可恢复
-- 把 0.3 定位为 Agent 管理、健康诊断和 Runtime Session 可靠性阶段，不越阶表达
+- 把 0.3 定位为 Agent 管理、证据化健康诊断和 Runtime Session 语义收紧阶段，不越阶表达
 - 在追求 marketplace 或商业平台广度之前，先把 adapter contract 做扎实
 
 ## 0.3 边界
 
-当前仓库已经有可运行的 app 和第一批真实接入。0.3 只加强 runtime 入口稳定性、Agent 管理、模型控制真实性、健康诊断和 Runtime Session 语义。Task、Task Board、Handoff、自动分派和多 Agent 编排不属于本阶段。
+当前仓库已经有可运行的 app 和第一批真实接入。0.3 只加强 runtime 入口稳定性、Agent 管理、模型控制表达、健康诊断证据链和 Runtime Session 语义。Task、Task Board、Handoff、自动分派和多 Agent 编排不属于本阶段。

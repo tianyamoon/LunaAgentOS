@@ -2,7 +2,7 @@
 
 [English](./requirements-0.3.md)
 
-0.3 当前阶段先让用户能看懂、配置并可靠使用自己的 Agent，同时保持 Runtime Session 与 Task 的边界清楚。
+0.3 当前阶段先让用户更清楚地理解、配置并尝试使用自己的 Agent，同时保持 Runtime Session 与 Task 的边界清楚。
 
 ## 产品对象边界
 
@@ -16,16 +16,16 @@
 
 ### Agent 管理
 
-用户可以查看 Agent 身份、运行环境、Profile、工作目录、模型信息、能力边界、安全边界和最佳实践。
+用户可以查看 Agent 身份、运行环境、Profile、工作目录、模型信息、能力边界、安全边界和最佳实践。账号、模型、能力等事实优先来自 adapter manifest、runtime target 或探测结果；无法确认的字段不伪装成已知。
 
 - adapter 明确支持 LunaAgentOS 持久配置时，用户可以选择并保存新 Runtime Session 的默认模型。
 - 其他 Agent 明确显示模型由原生 runtime 管理；会话内 `/model` 不等同于持久默认模型配置。
 
 ### Agent 健康诊断
 
-用户可以查看安装与调用状态、登录或配置需求、Profile、WSL/Bridge、模型或密钥准备情况、版本关注项、具体不可用原因和下一步建议。
+用户可以查看安装与调用状态、登录或配置需求、Profile、WSL/Bridge、模型或密钥准备情况、版本关注项、具体不可用原因和下一步建议；其中登录、模型或密钥等结论只有在 runtime/adapter 能提供可验证信号时才显示为确定状态。
 
-诊断结论优先来自真实 runtime、adapter health check 或可验证的本地配置。无法确认的字段显示未知；密钥只检查是否存在，永不显示值，也不因存在就声称有效。
+诊断结论优先参考 runtime 探测、adapter health check 或可验证的本地配置。无法确认的字段显示未知；密钥只检查是否存在，永不显示值，也不因存在就声称有效。
 
 ## 本阶段不做
 
