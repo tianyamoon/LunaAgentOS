@@ -14,7 +14,7 @@ LunaAgentOS 0.2.2 是一个小版本 bugfix 发布，重点修复 provider 图�
 ## 仍然有效的基础能力
 
 - Windows 优先的本地桌面工作台。
-- Claude Code、Hermes 和 OpenAI Codex Manifest 入口表达。
+- Claude Code、Hermes 和 OpenAI Codex 入口表达。
 - Runtime Session Card 展示 output、thought、runtime events 和 final response。
 - Session Card 事件流、Focus 主视图、Agent 原生命令入口和 provider identity。
 - live sessions、history sessions 和 archived sessions 分区。

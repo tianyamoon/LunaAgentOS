@@ -16,7 +16,7 @@
 
 LunaAgentOS is a personal desktop operating environment built for multi-agent work and collaboration.
 
-It brings agent tools such as Claude Code, Hermes, and OpenAI Codex Manifest into one desktop entry point, so you can start tasks, inspect process, switch sessions, and recover history in one place instead of carrying context between separate tools.
+It brings agent tools such as Claude Code, Hermes, and OpenAI Codex into one desktop entry point, so you can start tasks, inspect process, switch sessions, and recover history in one place instead of carrying context between separate tools.
 
 **Humans command. Agents execute. The workspace remembers.**
 
@@ -88,7 +88,7 @@ That is why LunaAgentOS ultimately does not want to be only a session viewer. It
 | LunaAgentOS App | Working | Open a local Windows-first desktop workspace |
 | Claude Code | Working | Send tasks into a real Claude Code runtime session |
 | Hermes | Working | Use Windows / WSL ACP runtime instances and profiles |
-| OpenAI Codex Manifest | Working | Identify and host Codex as a manifest-backed agent entry |
+| OpenAI Codex | Working | Identify and host Codex through a manifest-backed adapter |
 | Runtime Session Card | Working | See output, thought, runtime events, and final response together |
 | Session Card event flow | Working | Render thought, tool, plan, usage, error, and related process signals as expandable event nodes |
 | Focus view | Working | Focus a single session inside the workspace while keeping the input area available |
@@ -110,7 +110,7 @@ That is why LunaAgentOS ultimately does not want to be only a session viewer. It
 
 The next stage is no longer just placing multiple agents in one interface. It is about letting LunaAgentOS become the management layer for personal agent work.
 
-The workspace can already host Claude Code, Hermes, and OpenAI Codex Manifest. It can show process, focus sessions, and separate history from archives. The next more important step is to make these entries, sessions, accounts, models, and resources manageable, transferable, and governable.
+The workspace can already host Claude Code, Hermes, and OpenAI Codex. It can show process, focus sessions, and separate history from archives. The next more important step is to make these entries, sessions, accounts, models, and resources manageable, transferable, and governable.
 
 - **Manage agent assets in one place**: bring providers, runtimes, accounts, API keys, model quotas, subscription cycles, and trial states together so users know what still works, what is expiring, and what has been abandoned.
 - **Reduce invisible waste**: identify duplicate capabilities, idle entries, expired configuration, and keys that still consume budget, so cost no longer depends on memory.
@@ -148,7 +148,7 @@ It is a new kind of working environment: agent work becomes less trapped in scat
 - Claude Code installed if you want the Claude entry
 - WSL and Hermes installed if you want the Hermes entry
 
-Claude Code, Hermes, and OpenAI Codex Manifest are the runtime entries that make the workspace valuable. LunaAgentOS can also open when they are not installed; each entry shows a clear configuration state rather than a crash or silent failure.
+Claude Code, Hermes, and OpenAI Codex are the runtime entries that make the workspace valuable. LunaAgentOS can also open when they are not installed; each entry shows a clear configuration state rather than a crash or silent failure.
 
 ### Run the App
 
@@ -178,7 +178,7 @@ More detail: [Getting Started](./docs/getting-started.md)
 LunaAgentOS 0.3.0 is:
 
 - A neutral desktop workspace for real AI agent sessions
-- A Windows-first local app for Claude Code, Hermes, and OpenAI Codex Manifest sessions
+- A Windows-first local app for Claude Code, Hermes, and OpenAI Codex sessions
 - A workspace centered on Runtime Session Cards, event flow, and Focus view
 - A session workspace with native agent commands and provider identity
 - The first working slice of a Human Command Workspace

@@ -10,14 +10,14 @@ LunaAgentOS 0.2.1 把产品表达从“真实 Agent session 工作台”推进�
 
 - **产品定位升级**：中文 README 和应用顶部文案更新为“AI 时代的个人桌面操作系统”，更贴近个人操作环境、多 Agent 协作和资源治理的长期方向。
 - **英文 README 对齐中文主线**：英文版重新按中文 README 结构整理，补齐多 Agent 工作的新问题、账号 / API key / 模型额度管理、下一阶段和长期愿景。
-- **OpenAI Codex Manifest 进入当前可用入口表达**：README 将 Claude Code、Hermes 和 OpenAI Codex Manifest 放在同一层级描述，强调多供应商 Agent 统一入口。
+- **OpenAI Codex 进入当前可用入口表达**：README 将 Claude Code、Hermes 和 OpenAI Codex 放在同一层级描述，强调多供应商 Agent 统一入口。
 - **下一阶段重新定位**：从“补工作台基础”推进到“个人 Agent 管理层”，覆盖 Agent 资产、预算浪费、跨 Agent 继续工作、协作关系和入口健康状态。
 - **本地 App 启动方式修正**：文档统一使用 `npm run tauri dev` 启动桌面应用，构建命令更新为 `npm run tauri build -- --no-bundle`。
 
 ## 仍然有效的基础能力
 
 - Windows 优先的本地桌面工作台。
-- Claude Code、Hermes 和 OpenAI Codex Manifest 入口表达。
+- Claude Code、Hermes 和 OpenAI Codex 入口表达。
 - Runtime Session Card 展示 output、thought、runtime events 和 final response。
 - Session Card 事件流、Focus 主视图、Agent 原生命令入口和 provider identity。
 - live sessions、history sessions 和 archived sessions 分区。

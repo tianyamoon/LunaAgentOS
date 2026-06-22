@@ -43,7 +43,7 @@ The Session Card continues to focus on session readability, execution process, r
 ## Still-Valid Foundation
 
 - Windows-first local desktop workspace.
-- Claude Code, Hermes, and OpenAI Codex Manifest entry messaging.
+- Claude Code, Hermes, and OpenAI Codex entry messaging.
 - Runtime Session Card surfaces for output, thought, runtime events, and final response.
 - Separation between live, history, and archived sessions.
 - Local JSON session history, restore, and read-only archive open.

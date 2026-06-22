@@ -43,7 +43,7 @@ Session Card 继续聚焦会话可读性、执行过程、响应、历史与恢�
 ## 仍然有效的基础能力
 
 - Windows 优先的本地桌面工作台。
-- Claude Code、Hermes 和 OpenAI Codex Manifest 入口表达。
+- Claude Code、Hermes 和 OpenAI Codex 入口表达。
 - Runtime Session Card 展示 output、thought、runtime events 和 final response。
 - live sessions、history sessions 和 archived sessions 分区。
 - 本地 JSON session history、恢复和只读归档打开。
