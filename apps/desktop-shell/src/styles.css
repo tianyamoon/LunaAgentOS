@@ -1524,6 +1524,7 @@ button:disabled {
 
 .session-card {
   position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   container-type: inline-size;
@@ -1560,41 +1561,34 @@ button:disabled {
 }
 
 .session-card.is-reconnecting {
-  border: 2px solid transparent;
-  background:
-    linear-gradient(rgba(var(--surface-raised-rgb), 0.62), rgba(var(--surface-raised-rgb), 0.62)) padding-box,
-    linear-gradient(
-      90deg,
-      #ff6b6b 0%,
-      #ffb347 16%,
-      #ffe66d 32%,
-      #4cd6a7 48%,
-      #58a6ff 64%,
-      #9b7bff 82%,
-      #ff6b6b 100%
-    ) border-box;
-  background-size: 100% 100%, 220% 100%;
-  background-repeat: no-repeat;
+  border-color: rgba(255, 255, 255, 0.08);
   box-shadow: 0 16px 34px rgba(52, 37, 18, 0.14), 0 0 0 1px rgba(255, 255, 255, 0.04);
-  animation: reconnectingBorderMarquee 2.8s linear infinite, reconnectingCardGlow 1.35s ease-in-out infinite;
+  animation: reconnectingCardGlow 1.35s ease-in-out infinite;
 }
 
 .session-card.is-active-receiver.is-reconnecting {
-  background:
-    linear-gradient(135deg, var(--accent-tint-from), var(--accent-tint-to)) padding-box,
-    linear-gradient(
-      90deg,
-      #ff6b6b 0%,
-      #ffb347 16%,
-      #ffe66d 32%,
-      #4cd6a7 48%,
-      #58a6ff 64%,
-      #9b7bff 82%,
-      #ff6b6b 100%
-    ) border-box;
-  background-size: 100% 100%, 220% 100%;
-  background-repeat: no-repeat;
   box-shadow: 0 18px 42px rgba(151, 85, 44, 0.2), 0 0 0 1px rgba(217, 108, 58, 0.14);
+}
+
+.session-card.is-reconnecting::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 25px;
+  background: linear-gradient(
+    90deg,
+    #ff6b6b 0%,
+    #ffb347 16%,
+    #ffe66d 32%,
+    #4cd6a7 48%,
+    #58a6ff 64%,
+    #9b7bff 82%,
+    #ff6b6b 100%
+  );
+  background-size: 220% 100%;
+  background-repeat: repeat;
+  z-index: -1;
+  animation: reconnectingBorderMarquee 2.8s linear infinite;
 }
 
 .session-card.is-active-receiver::before {
