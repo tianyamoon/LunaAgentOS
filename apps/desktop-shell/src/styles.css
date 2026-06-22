@@ -1394,12 +1394,18 @@ button:disabled {
   color: var(--text);
 }
 
-@keyframes reconnectingBorderMarquee {
+@keyframes reconnectingRuntimeRowRipple {
   0% {
-    background-position: 0 0, 0% 50%;
+    background-position: -120% 50%, 0% 50%;
+    filter: saturate(1.05) brightness(1);
+  }
+  50% {
+    background-position: 40% 50%, 100% 50%;
+    filter: saturate(1.25) brightness(1.1);
   }
   100% {
-    background-position: 0 0, 220% 50%;
+    background-position: 180% 50%, 200% 50%;
+    filter: saturate(1.05) brightness(1);
   }
 }
 
@@ -1570,27 +1576,6 @@ button:disabled {
   box-shadow: 0 18px 42px rgba(151, 85, 44, 0.2), 0 0 0 1px rgba(217, 108, 58, 0.14);
 }
 
-.session-card.is-reconnecting::after {
-  content: "";
-  position: absolute;
-  inset: -3px;
-  border-radius: 25px;
-  background: linear-gradient(
-    90deg,
-    #ff6b6b 0%,
-    #ffb347 16%,
-    #ffe66d 32%,
-    #4cd6a7 48%,
-    #58a6ff 64%,
-    #9b7bff 82%,
-    #ff6b6b 100%
-  );
-  background-size: 220% 100%;
-  background-repeat: repeat;
-  z-index: -1;
-  animation: reconnectingBorderMarquee 2.8s linear infinite;
-}
-
 .session-card.is-active-receiver::before {
   content: "";
   position: absolute;
@@ -1606,15 +1591,78 @@ button:disabled {
   align-items: center;
   min-height: 20px;
   padding: 0 7px;
-  border: 1px solid rgba(217, 108, 58, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.32);
   border-radius: 999px;
-  background: rgba(217, 108, 58, 0.08);
+  background:
+    radial-gradient(circle at 18% 50%, rgba(255, 255, 255, 0.5) 0 12%, transparent 30%),
+    linear-gradient(
+      100deg,
+      #ff6b6b 0%,
+      #ffb347 16%,
+      #ffe66d 32%,
+      #4cd6a7 49%,
+      #58a6ff 66%,
+      #9b7bff 84%,
+      #ff6b6b 100%
+    );
+  background-size: 80px 100%, 220% 100%;
   margin: 0;
-  color: var(--accent);
+  color: #20130e;
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.28);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18), 0 8px 18px rgba(255, 139, 84, 0.18);
+}
+
+.runtime-message-row-runtime.runtime-message-status-reconnecting > .runtime-message-event {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-color: rgba(255, 255, 255, 0.26);
+  background: rgba(var(--surface-raised-rgb), 0.54);
+  box-shadow: 0 10px 22px rgba(76, 52, 28, 0.12), 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.runtime-message-row-runtime.runtime-message-status-reconnecting > .runtime-message-event::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 18% 50%, rgba(255, 255, 255, 0.42) 0 11%, transparent 28%),
+    linear-gradient(
+      100deg,
+      #ff6b6b 0%,
+      #ffb347 16%,
+      #ffe66d 32%,
+      #4cd6a7 49%,
+      #58a6ff 66%,
+      #9b7bff 84%,
+      #ff6b6b 100%
+    );
+  background-size: 86px 100%, 220% 100%;
+  opacity: 0.88;
+  animation: reconnectingRuntimeRowRipple 2.6s linear infinite;
+}
+
+.runtime-message-row-runtime.runtime-message-status-reconnecting > .runtime-message-event summary,
+.runtime-message-row-runtime.runtime-message-status-reconnecting > .runtime-message-event .terminal-pre,
+.runtime-message-row-runtime.runtime-message-status-reconnecting > .runtime-message-event .runtime-message-event-title,
+.runtime-message-row-runtime.runtime-message-status-reconnecting > .runtime-message-event .runtime-message-event-kind {
+  position: relative;
+  z-index: 1;
+  color: #20130e;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.runtime-message-row-runtime.runtime-message-status-reconnecting > .runtime-message-event .turn-event-dot {
+  position: relative;
+  z-index: 1;
+  background: rgba(32, 19, 14, 0.72);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.16);
 }
 
 .session-status-cluster .runtime-pill {

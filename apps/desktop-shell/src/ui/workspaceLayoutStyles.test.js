@@ -56,12 +56,15 @@ test("focused workspace keeps the main card bounded above the mini bar", () => {
   ]);
 });
 
-test("reconnecting session card exposes a local animation layer", () => {
+test("reconnecting surfaces use scoped colorful indicators", () => {
   assert.match(styles, /\.session-card\s*\{[\s\S]*?isolation:\s*isolate;/);
   assert.match(styles, /\.session-card\.is-reconnecting\s*\{[\s\S]*?animation:\s*reconnectingCardGlow 1\.35s ease-in-out infinite/);
-  assert.match(styles, /\.session-card\.is-reconnecting::after\s*\{[\s\S]*?linear-gradient\(\s*90deg,\s*#ff6b6b/);
-  assert.match(styles, /\.session-card\.is-reconnecting::after\s*\{[\s\S]*?z-index:\s*-1;/);
-  assert.match(styles, /\.session-card\.is-reconnecting::after\s*\{[\s\S]*?animation:\s*reconnectingBorderMarquee 2\.8s linear infinite/);
+  assert.match(styles, /\.active-receiver-banner\s*\{[\s\S]*?linear-gradient\(\s*100deg,\s*#ff6b6b/);
+  assert.doesNotMatch(styles, /\.session-card\.is-reconnecting \.active-receiver-banner\s*\{[\s\S]*?animation:/);
+  assert.match(styles, /\.runtime-message-row-runtime\.runtime-message-status-reconnecting\s*>\s*\.runtime-message-event\s*\{[\s\S]*?isolation:\s*isolate;/);
+  assert.match(styles, /\.runtime-message-row-runtime\.runtime-message-status-reconnecting\s*>\s*\.runtime-message-event\s*\{[\s\S]*?overflow:\s*hidden;/);
+  assert.match(styles, /\.runtime-message-row-runtime\.runtime-message-status-reconnecting\s*>\s*\.runtime-message-event::before\s*\{[\s\S]*?linear-gradient\(\s*100deg,\s*#ff6b6b/);
+  assert.match(styles, /\.runtime-message-row-runtime\.runtime-message-status-reconnecting\s*>\s*\.runtime-message-event::before\s*\{[\s\S]*?animation:\s*reconnectingRuntimeRowRipple 2\.6s linear infinite/);
   assert.match(styles, /\.session-card\.is-active-receiver\.is-reconnecting\s*\{/);
   assert.doesNotMatch(styles, /\.app-shell\.is-restoring::after/);
   assert.doesNotMatch(styles, /\.workspace-panel\.is-restoring::after/);
