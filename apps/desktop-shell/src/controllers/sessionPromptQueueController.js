@@ -29,6 +29,8 @@ export function createSessionPromptQueueController({
       id: `submission-${now()}-${submissionSeq}`,
       prompt,
       runtimePrompt: options.runtimePrompt || prompt,
+      // 图片块（ACP image content）随队列项快照保存，发送时旁路透传给 runtime。
+      images: Array.isArray(options.images) ? options.images.map((block) => ({ ...block })) : [],
       attachments: cloneAttachments(options.attachments),
       createdAt: new Date(now()).toISOString(),
     };
@@ -56,6 +58,7 @@ export function createSessionPromptQueueController({
   function startSubmission(session, submission) {
     const turn = createSessionTurn(session, submission.prompt, {
       runtimePrompt: submission.runtimePrompt,
+      images: Array.isArray(submission.images) ? submission.images.map((block) => ({ ...block })) : [],
       attachments: cloneAttachments(submission.attachments),
     });
     persistAcceptedTurn(session, turn);

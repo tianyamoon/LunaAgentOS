@@ -20,7 +20,9 @@ pub(crate) fn adapter_launch_spec_with_context(
     let config = load_runtime_config_file(app);
     let adapter = adapter_registry::find_adapter(&config.adapter_plugin_paths, adapter_id)?;
     if adapter.identity_only {
-        return Err(format!("adapter {adapter_id} is identity-only and cannot be launched"));
+        return Err(format!(
+            "adapter {adapter_id} is identity-only and cannot be launched"
+        ));
     }
     if let Some(result) = adapter_extensions::build_launch_spec(
         &adapter,

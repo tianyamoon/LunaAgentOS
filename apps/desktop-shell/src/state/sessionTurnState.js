@@ -47,6 +47,8 @@ export function createSessionTurnState({
       id: `turn-${now()}-${turnSeq}`,
       prompt,
       runtimePrompt: options.runtimePrompt || prompt,
+      // 传输态：随本轮发送的图片块（ACP image content），不进 meta、不持久化到 history。
+      runtimeImages: Array.isArray(options.images) ? options.images : [],
       state: 0,
       status: TURN_STATUS.running,
       thoughts: [],

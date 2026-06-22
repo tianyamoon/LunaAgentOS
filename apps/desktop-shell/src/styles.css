@@ -2802,6 +2802,15 @@ button:disabled {
   color: var(--error);
 }
 
+.composer-attachment-thumb {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: rgba(var(--surface-raised-rgb), 0.9);
+}
+
 .composer-attachment-name {
   overflow: hidden;
   max-width: 180px;

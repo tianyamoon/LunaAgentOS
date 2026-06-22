@@ -5,6 +5,7 @@ import {
   attachmentStatus,
   composerStats,
   formatAttachmentBytes,
+  isLikelyImageAttachment,
   isLikelyTextAttachment,
 } from "./composerAttachments.js";
 import {
@@ -32,6 +33,9 @@ export function createComposerController({
   getSlashCommandsForProvider,
   mergeSlashCommands,
   getUsageAgentKey,
+  // 返回当前发送目标是否支持图片输入（ACP promptCapabilities.image）。
+  // 默认保守允许；真实门控数据由 Shell 注入。
+  getImageCapableForCurrentTarget = () => true,
   isComposingNewSession,
   currentComposerTargetLabel,
   getSendAsNewSession,
@@ -156,8 +160,13 @@ export function createComposerController({
       const statusClass = status === "ready" ? "is-ready" : status === "error" ? "is-error" : "is-muted";
       const size = attachment.sizeLabel || formatAttachmentBytes(attachment.size);
       const removeLabel = t("composer.attachment.remove", { name: attachment.name });
+      // 图片附件展示缩略图（内存 dataUrl，零后端读盘）。
+      const thumbnail = attachment.kind === "image" && attachment.dataUrl
+        ? `<img class="composer-attachment-thumb" src="${escapeHtml(attachment.dataUrl)}" alt="" aria-hidden="true">`
+        : "";
       return `
-        <span class="composer-attachment-chip ${statusClass}" title="${escapeHtml(attachmentStatusLabel(attachment))}">
+        <span class="composer-attachment-chip ${statusClass} ${attachment.kind === "image" ? "is-image" : ""}" title="${escapeHtml(attachmentStatusLabel(attachment))}">
+          ${thumbnail}
           <span class="composer-attachment-name">${escapeHtml(attachment.name)}</span>
           <span class="composer-attachment-meta">${escapeHtml(size)}</span>
           <span class="composer-attachment-state">${escapeHtml(attachmentStatusLabel(attachment))}</span>
@@ -188,6 +197,25 @@ export function createComposerController({
     });
   }
 
+  // 读取图片为 data URL，拆出 mime 与裸 base64。
+  // dataUrl 用于预览，base64 用于发送（ACP image block 要纯 base64，不含 data: 前缀）。
+  function readFileAsImage(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReaderClass();
+      reader.addEventListener("load", () => {
+        const dataUrl = String(reader.result || "");
+        const match = /^data:([^;]+);base64,(.*)$/s.exec(dataUrl);
+        if (!match) {
+          reject(new Error("unexpected data url"));
+          return;
+        }
+        resolve({ dataUrl, mime: match[1], base64: match[2] });
+      });
+      reader.addEventListener("error", () => reject(reader.error || new Error("read failed")));
+      reader.readAsDataURL(file);
+    });
+  }
+
   // 添加附件并执行数量、文本类型和长度限制。
   async function addFiles(fileList) {
     const files = [...(fileList || [])];
@@ -207,6 +235,30 @@ export function createComposerController({
         sizeLabel: formatAttachmentBytes(file.size),
         content: "",
       };
+      if (isLikelyImageAttachment(file)) {
+        // 当前发送目标不支持图片输入：阻止并提示，不入附件。
+        if (!getImageCapableForCurrentTarget()) {
+          setAppNotice(t("composer.attachment.imageUnsupported"), "error");
+          continue;
+        }
+        if (file.size > DEFAULT_ATTACHMENT_LIMITS.maxImageBytes) {
+          attachments.push({
+            ...base,
+            kind: "image",
+            error: t("composer.attachment.imageTooLarge", {
+              max: formatAttachmentBytes(DEFAULT_ATTACHMENT_LIMITS.maxImageBytes),
+            }),
+          });
+          continue;
+        }
+        try {
+          const { dataUrl, mime, base64 } = await readFileAsImage(file);
+          attachments.push({ ...base, kind: "image", mime, dataUrl, base64 });
+        } catch {
+          attachments.push({ ...base, kind: "image", error: t("composer.attachment.readFailed") });
+        }
+        continue;
+      }
       if (!isLikelyTextAttachment(file)) {
         attachments.push({ ...base, error: t("composer.attachment.unsupported") });
         continue;
@@ -497,6 +549,18 @@ export function createComposerController({
       event.preventDefault();
       composerInputShell.classList.remove("is-drag-over");
       void addFiles(event.dataTransfer.files);
+    });
+    // 粘贴图片：只截获剪贴板里的图片文件项，文本粘贴仍走 textarea 原生行为。
+    promptBox.addEventListener("paste", (event) => {
+      const items = event.clipboardData?.items;
+      if (!items) return;
+      const imageFiles = [...items]
+        .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+        .map((item) => item.getAsFile())
+        .filter(Boolean);
+      if (!imageFiles.length) return;
+      event.preventDefault();
+      void addFiles(imageFiles);
     });
     promptBox.addEventListener("keydown", (event) => {
       if (handleCommandMenuKeydown(event)) return;

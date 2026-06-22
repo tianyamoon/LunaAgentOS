@@ -398,9 +398,7 @@ fn adapter_from_contribution(
         adapter.icon.as_deref().or(manifest.icon.as_deref()),
         manifest_dir,
     );
-    let brand_color = adapter
-        .brand_color
-        .or_else(|| manifest.brand_color.clone());
+    let brand_color = adapter.brand_color.or_else(|| manifest.brand_color.clone());
     Ok(finalize_adapter(AdapterDefinition {
         id: adapter.id,
         name: adapter.name,
@@ -416,9 +414,15 @@ fn adapter_from_contribution(
         health_check: raw_health_check(adapter.health_check)?,
         capabilities: adapter.capabilities,
         permissions: adapter.permissions,
-        agent_detail: adapter.agent_detail.or_else(|| manifest.agent_detail.clone()),
-        model_control: adapter.model_control.or_else(|| manifest.model_control.clone()),
-        version_policy: adapter.version_policy.or_else(|| manifest.version_policy.clone()),
+        agent_detail: adapter
+            .agent_detail
+            .or_else(|| manifest.agent_detail.clone()),
+        model_control: adapter
+            .model_control
+            .or_else(|| manifest.model_control.clone()),
+        version_policy: adapter
+            .version_policy
+            .or_else(|| manifest.version_policy.clone()),
         source_path: source_path.to_string(),
         manifest_id: manifest.id.clone(),
         icon_path,
@@ -734,13 +738,28 @@ mod tests {
         let mut env = HashMap::new();
         env.insert("OPENAI_API_KEY".to_string(), "<configured>".to_string());
         let adapter = AdapterDefinition {
-            id: "demo".into(), name: "Demo".into(), extension: None, version: None,
-            description: None, transport: "stdio_json".into(), command: "demo".into(), args: vec![],
-            env, cwd: None, requires_pty: false, health_check: None,
-            capabilities: AdapterCapabilities::default(), permissions: AdapterPermissions::default(),
-            agent_detail: None, model_control: None, version_policy: None,
-            source_path: "".into(), manifest_id: "demo".into(), icon_path: None,
-            brand_color: None, identity_only: false,
+            id: "demo".into(),
+            name: "Demo".into(),
+            extension: None,
+            version: None,
+            description: None,
+            transport: "stdio_json".into(),
+            command: "demo".into(),
+            args: vec![],
+            env,
+            cwd: None,
+            requires_pty: false,
+            health_check: None,
+            capabilities: AdapterCapabilities::default(),
+            permissions: AdapterPermissions::default(),
+            agent_detail: None,
+            model_control: None,
+            version_policy: None,
+            source_path: "".into(),
+            manifest_id: "demo".into(),
+            icon_path: None,
+            brand_color: None,
+            identity_only: false,
         };
         let json = serde_json::to_string(&adapter).expect("serialize adapter");
         assert!(!json.contains("<configured>"));

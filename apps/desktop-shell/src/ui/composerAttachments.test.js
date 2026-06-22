@@ -5,7 +5,9 @@ import {
   buildPromptWithAttachments,
   composerStats,
   formatAttachmentBytes,
+  isLikelyImageAttachment,
   isLikelyTextAttachment,
+  toPromptImageBlocks,
 } from "./composerAttachments.js";
 
 test("isLikelyTextAttachment accepts text mime types and common code extensions", () => {
@@ -35,6 +37,39 @@ test("attachmentStatus distinguishes ready, metadata, and error attachments", ()
   assert.equal(attachmentStatus({ content: "x" }), "ready");
   assert.equal(attachmentStatus({ content: "" }), "metadata");
   assert.equal(attachmentStatus({ error: "too large" }), "error");
+  // 图片以 base64 是否就绪判定，而非 content。
+  assert.equal(attachmentStatus({ kind: "image", base64: "AAAA" }), "ready");
+  assert.equal(attachmentStatus({ kind: "image", base64: "" }), "metadata");
+  assert.equal(attachmentStatus({ kind: "image", error: "too large" }), "error");
+});
+
+test("isLikelyImageAttachment accepts whitelisted image types and rejects svg", () => {
+  assert.equal(isLikelyImageAttachment({ name: "a.png", type: "image/png" }), true);
+  assert.equal(isLikelyImageAttachment({ name: "a.jpg", type: "image/jpeg" }), true);
+  // 剪贴板图片 type 可能为空，回退扩展名。
+  assert.equal(isLikelyImageAttachment({ name: "shot.webp", type: "" }), true);
+  // svg 含脚本风险，明确排除。
+  assert.equal(isLikelyImageAttachment({ name: "icon.svg", type: "image/svg+xml" }), false);
+  assert.equal(isLikelyImageAttachment({ name: "notes.md", type: "text/markdown" }), false);
+});
+
+test("toPromptImageBlocks collects ready images as ACP image blocks with raw base64", () => {
+  const blocks = toPromptImageBlocks([
+    { kind: "image", base64: "AAAA", mime: "image/png" },
+    { kind: "image", base64: "", error: "too large" },
+    { name: "a.md", content: "hello" },
+  ]);
+  assert.deepEqual(blocks, [{ type: "image", data: "AAAA", mimeType: "image/png" }]);
+});
+
+test("buildPromptWithAttachments never inlines image attachments", () => {
+  const prompt = buildPromptWithAttachments("Look at this.", [
+    { name: "a.md", type: "text/markdown", size: 12, content: "hello" },
+    { kind: "image", name: "shot.png", base64: "AAAA", mime: "image/png" },
+  ], { title: "附加上下文", truncated: "已截断" });
+  assert.match(prompt, /hello/);
+  assert.doesNotMatch(prompt, /shot\.png/);
+  assert.doesNotMatch(prompt, /AAAA/);
 });
 
 test("composerStats and formatAttachmentBytes provide compact display values", () => {

@@ -12,7 +12,7 @@
   <a href="./README.md">中文说明</a>
 </p>
 
-**LunaAgentOS 0.2.2**
+**LunaAgentOS 0.3.0**
 
 LunaAgentOS is a personal desktop operating environment built for multi-agent work and collaboration.
 
@@ -175,7 +175,7 @@ More detail: [Getting Started](./docs/getting-started.md)
 
 ## Product Boundary
 
-LunaAgentOS 0.2.2 is:
+LunaAgentOS 0.3.0 is:
 
 - A neutral desktop workspace for real AI agent sessions
 - A Windows-first local app for Claude Code, Hermes, and OpenAI Codex Manifest sessions
@@ -184,7 +184,7 @@ LunaAgentOS 0.2.2 is:
 - The first working slice of a Human Command Workspace
 - A product surface backed by protocol, adapters, and the Runtime Session Model
 
-LunaAgentOS 0.2.2 is not:
+LunaAgentOS 0.3.0 is not:
 
 - A product that absorbs external runtimes into one built-in agent
 - A complete multi-agent orchestration platform
@@ -197,7 +197,7 @@ LunaAgentOS 0.2.2 is not:
 ### Start Here
 
 - [Docs index](./docs/README.md)
-- [0.2.2 Release Notes](./docs/release-notes-0.2.2.md)
+- [0.3.0 Release Notes](./docs/release-notes-0.3.md)
 - [Getting Started](./docs/getting-started.md)
 - [Current Product Boundary](./docs/current-boundary.md)
 - [Contributing](./CONTRIBUTING.md)

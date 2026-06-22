@@ -4,7 +4,7 @@
 use chrono::Local;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
@@ -525,17 +525,29 @@ pub(crate) fn archive_history_session_entries(
             continue;
         }
         moved_count += moved.len();
-        let json = serde_json::to_string_pretty(&retained).map_err(|error| error.to_string())?;
-        write_history_file(&app, &path, json, "archive-live")?;
+        let mut moved_by_date: HashMap<String, Vec<HistoryEntry>> = HashMap::new();
         for entry in moved {
-            let archive_path = history_file_for_date(&app, "archive", &entry.date)?;
+            moved_by_date
+                .entry(entry.date.clone())
+                .or_default()
+                .push(entry);
+        }
+        // Archive first, then prune live. If the archive write fails, the live
+        // file remains the source of truth instead of silently losing entries.
+        for (date, entries_for_date) in moved_by_date {
+            let archive_path = history_file_for_date(&app, "archive", &date)?;
             let mut archive_entries = load_history_file(&archive_path)?;
-            archive_entries.push(entry);
+            archive_entries.extend(entries_for_date);
+            // Reuse compacting semantics so a failed retry cannot append the
+            // same archived turn twice.
+            let (mut archive_entries, _, _) = compact_entries(archive_entries);
             archive_entries.sort_by(|left, right| right.created_at.cmp(&left.created_at));
             let json = serde_json::to_string_pretty(&archive_entries)
                 .map_err(|error| error.to_string())?;
             write_history_file(&app, &archive_path, json, "archive-target")?;
         }
+        let json = serde_json::to_string_pretty(&retained).map_err(|error| error.to_string())?;
+        write_history_file(&app, &path, json, "archive-live")?;
     }
     Ok(HistoryDeleteResult {
         removed_count: moved_count,

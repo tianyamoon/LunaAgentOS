@@ -1,6 +1,6 @@
 mod acp_runtime;
-mod adapter_host;
 mod adapter_extensions;
+mod adapter_host;
 mod adapter_registry;
 mod history_repository;
 mod runtime_config;
@@ -28,8 +28,9 @@ use runtime_config::{
 };
 use runtime_probe::{
     adapter_instance_probe, adapter_provider_probe, is_configured, provider_probe_from_instances,
-    run_shell, runtime_adapter_model_control, runtime_adapter_probe, runtime_adapter_slash_commands, runtime_adapter_targets,
-    runtime_instance_probe, runtime_probe, RuntimeInstanceProbe, RuntimeProviderProbe,
+    run_shell, runtime_adapter_model_control, runtime_adapter_probe,
+    runtime_adapter_slash_commands, runtime_adapter_targets, runtime_instance_probe, runtime_probe,
+    RuntimeInstanceProbe, RuntimeProviderProbe,
 };
 use runtime_session_commands::{
     runtime_acp_adapter_alive_ids, runtime_acp_adapter_load, runtime_acp_adapter_prompt,

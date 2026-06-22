@@ -41,7 +41,7 @@ test("runtimeSessionMessageListView: worked row folds completed trace and debug 
   });
 
   assert.match(html, /runtime-message-worked-for/);
-  assert.match(html, /Task completed/);
+  assert.match(html, /Turn completed/);
   assert.match(html, /Duration 1m 5s/);
   assert.match(html, /Expand/);
   assert.match(html, /Collapse trace/);
@@ -115,7 +115,7 @@ test("runtimeSessionMessageListView: completed timeline does not render a separa
 
   assert.doesNotMatch(html, /runtime-completion-bar/);
   assert.match(html, /runtime-message-worked-for/);
-  assert.match(html, /Task completed/);
+  assert.match(html, /Turn completed/);
   assert.match(html, /Duration 8s/);
   assert.match(html, /runtime-message-trace-row-tool/);
 });
@@ -133,8 +133,8 @@ test("runtimeSessionMessageListView: failed worked row does not claim completion
     },
   });
 
-  assert.match(html, /Task failed/);
-  assert.doesNotMatch(html, /Task completed/);
+  assert.match(html, /Turn failed/);
+  assert.doesNotMatch(html, /Turn completed/);
   assert.match(html, /runtime-message-worked-for-failed/);
 });
 
@@ -150,8 +150,8 @@ test("runtimeSessionMessageListView: cancelled worked row uses cancelled title",
     },
   });
 
-  assert.match(html, /Task cancelled/);
-  assert.doesNotMatch(html, /Task completed/);
+  assert.match(html, /Turn cancelled/);
+  assert.doesNotMatch(html, /Turn completed/);
 });
 
 test("runtimeSessionMessageListView: Debug 折叠态保留可展开 JSON 模板", () => {
@@ -294,9 +294,9 @@ function createView(overrides = {}) {
         "turn.timeline.assistant": "Assistant",
         "turn.timeline.thinking": "Thinking",
         "turn.timeline.workedFor": "Worked for {duration}{tools}{files}",
-        "turn.timeline.completionTitle": "Task completed",
-        "turn.timeline.failedTitle": "Task failed",
-        "turn.timeline.cancelledTitle": "Task cancelled",
+        "turn.timeline.completionTitle": "Turn completed",
+        "turn.timeline.failedTitle": "Turn failed",
+        "turn.timeline.cancelledTitle": "Turn cancelled",
         "turn.timeline.duration": "Duration {duration}",
         "turn.timeline.expandHint": "Expand",
         "turn.timeline.collapseHint": "Collapse trace",

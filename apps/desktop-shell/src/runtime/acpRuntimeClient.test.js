@@ -62,6 +62,22 @@ test("acpRuntimeClient: prompt builds generic adapter args", async () => {
   });
 });
 
+test("acpRuntimeClient: prompt attaches extraBlocks only when the turn carries images", async () => {
+  const { calls, client } = makeClient({ responses: { prompt: ["done"] } });
+  const images = [{ type: "image", data: "AAAA", mimeType: "image/png" }];
+  await client.prompt(
+    makeSession(),
+    { id: "turn-1", prompt: "fallback", runtimePrompt: "actual", runtimeImages: images },
+    "run-1",
+  );
+  assert.deepEqual(calls[0].args.extraBlocks, images);
+
+  // 无图片的 turn：args 中绝不出现 extraBlocks 键（保持与旧行为逐字节一致）。
+  const { calls: bareCalls, client: bareClient } = makeClient({ responses: { prompt: ["done"] } });
+  await bareClient.prompt(makeSession(), { id: "turn-2", prompt: "x", runtimeImages: [] }, "run-2");
+  assert.equal("extraBlocks" in bareCalls[0].args, false);
+});
+
 test("acpRuntimeClient: load, resume and shutdown use session identity", async () => {
   const { calls, client } = makeClient();
   const session = makeSession();

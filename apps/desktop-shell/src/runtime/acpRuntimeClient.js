@@ -70,6 +70,8 @@ export function createAcpRuntimeClient({
       invokeArgs(runtimeCommands, session.providerId, runtimeArgs(session, {
         defaultModel: session.defaultModel || null,
         prompt: turn.runtimePrompt || turn.prompt,
+        // 仅在有图片时附带 extraBlocks，保持无图场景的 invoke 参数与旧行为完全一致。
+        ...(turn.runtimeImages?.length ? { extraBlocks: turn.runtimeImages } : {}),
         turnId: turn.id,
         promptRunId,
       })),

@@ -2,9 +2,9 @@
 //! 集中执行运行环境探测，并把不同 Adapter 的结果归一化为稳定的前端视图数据。
 
 use crate::adapter_extensions;
+use crate::adapter_host::adapter_launch_spec_with_context;
 use crate::adapter_registry;
 use crate::runtime_config::load_runtime_config_file;
-use crate::adapter_host::adapter_launch_spec_with_context;
 use chrono::Utc;
 use serde::Serialize;
 use serde_json::Value;
@@ -103,27 +103,55 @@ pub(crate) fn health_evidence(field: &str, source: &str, detail: String) -> Heal
 
 fn unknown_health() -> RuntimeHealth {
     RuntimeHealth {
-        installed: "unknown".into(), logged_in: "unknown".into(), cli_callable: "unknown".into(),
-        profile_configured: "unknown".into(), wsl_or_bridge_available: "unknown".into(),
-        model_or_key_configured: "unknown".into(), version_status: "unknown".into(),
-        unavailable_reason: None, repair_hint: None,
+        installed: "unknown".into(),
+        logged_in: "unknown".into(),
+        cli_callable: "unknown".into(),
+        profile_configured: "unknown".into(),
+        wsl_or_bridge_available: "unknown".into(),
+        model_or_key_configured: "unknown".into(),
+        version_status: "unknown".into(),
+        unavailable_reason: None,
+        repair_hint: None,
     }
 }
 
 fn safe_detail(value: &str) -> String {
-    let secret_markers = ["api_key", "apikey", "token", "secret", "authorization", "bearer "];
-    value.lines().map(|line| {
-        let lower = line.to_ascii_lowercase();
-        if secret_markers.iter().any(|marker| lower.contains(marker)) { "[redacted]".to_string() } else { line.to_string() }
-    }).collect::<Vec<_>>().join("\n")
+    let secret_markers = [
+        "api key",
+        "api-key",
+        "api_key",
+        "apikey",
+        "token",
+        "secret",
+        "authorization",
+        "bearer ",
+        "password",
+        "passwd",
+    ];
+    value
+        .lines()
+        .map(|line| {
+            let lower = line.to_ascii_lowercase();
+            if secret_markers.iter().any(|marker| lower.contains(marker)) {
+                "[redacted]".to_string()
+            } else {
+                line.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
-pub(crate) fn redact_diagnostic_detail(value: &str) -> String { safe_detail(value) }
+pub(crate) fn redact_diagnostic_detail(value: &str) -> String {
+    safe_detail(value)
+}
 
 fn semantic_version(value: &str) -> Option<(u64, u64, u64)> {
     value
         .split_whitespace()
-        .map(|part| part.trim_matches(|ch: char| !ch.is_ascii_alphanumeric() && ch != '.' && ch != '-'))
+        .map(|part| {
+            part.trim_matches(|ch: char| !ch.is_ascii_alphanumeric() && ch != '.' && ch != '-')
+        })
         .find_map(|part| {
             let core = part.split_once('-').map(|(core, _)| core).unwrap_or(part);
             let mut segments = core.split('.');
@@ -138,10 +166,17 @@ fn semantic_version(value: &str) -> Option<(u64, u64, u64)> {
 }
 
 pub(crate) fn version_status(version: Option<&str>, minimum: Option<&str>) -> String {
-    let (Some(version), Some(minimum)) = (version.and_then(semantic_version), minimum.and_then(semantic_version)) else {
+    let (Some(version), Some(minimum)) = (
+        version.and_then(semantic_version),
+        minimum.and_then(semantic_version),
+    ) else {
         return "unknown".into();
     };
-    if version < minimum { "outdated".into() } else { "ok".into() }
+    if version < minimum {
+        "outdated".into()
+    } else {
+        "ok".into()
+    }
 }
 
 /// 创建不会在 Windows 上闪出控制台窗口的子进程。
@@ -225,14 +260,30 @@ pub(crate) fn runtime_instance_probe(
     };
     let version = available.then(|| first_output_line(&detail)).flatten();
     let mut health = unknown_health();
-    health.installed = if available { "ok" } else if detail.to_ascii_lowercase().contains("not found") || detail.to_ascii_lowercase().contains("not recognized") { "missing" } else { "unknown" }.into();
+    health.installed = if available {
+        "ok"
+    } else if detail.to_ascii_lowercase().contains("not found")
+        || detail.to_ascii_lowercase().contains("not recognized")
+    {
+        "missing"
+    } else {
+        "unknown"
+    }
+    .into();
     health.cli_callable = if available { "ok" } else { "failed" }.into();
     if ["wsl", "bridge", "remote", "ide"].contains(&command_kind) {
         health.wsl_or_bridge_available = if available { "ok" } else { "failed" }.into();
     }
     health.version_status = "unknown".into();
-    if !available { health.unavailable_reason = Some("cli_not_callable".into()); health.repair_hint = Some("check_runtime_command".into()); }
-    let mut evidence = vec![health_evidence("cli_callable", "runtime_command", detail.clone())];
+    if !available {
+        health.unavailable_reason = Some("cli_not_callable".into());
+        health.repair_hint = Some("check_runtime_command".into());
+    }
+    let mut evidence = vec![health_evidence(
+        "cli_callable",
+        "runtime_command",
+        detail.clone(),
+    )];
     if let Some(version) = &version {
         evidence.push(health_evidence(
             "version_status",
@@ -252,7 +303,12 @@ pub(crate) fn runtime_instance_probe(
         model_control: None,
         configured,
         available,
-        verification_status: if available { "verified_available" } else { "verified_unavailable" }.into(),
+        verification_status: if available {
+            "verified_available"
+        } else {
+            "verified_unavailable"
+        }
+        .into(),
         summary: summary.to_string(),
         detail,
         version,
@@ -288,7 +344,10 @@ pub(crate) fn provider_probe_from_instances(
     } else {
         format!("{} / {} runtime 可用。", available_count, instances.len())
     };
-    let representative = instances.iter().find(|item| item.available).or_else(|| instances.first());
+    let representative = instances
+        .iter()
+        .find(|item| item.available)
+        .or_else(|| instances.first());
     RuntimeProviderProbe {
         provider_id: provider_id.to_string(),
         configured,
@@ -296,8 +355,12 @@ pub(crate) fn provider_probe_from_instances(
         command: command.to_string(),
         summary: summary.to_string(),
         detail,
-        health: representative.map(|item| item.health.clone()).unwrap_or_else(unknown_health),
-        health_evidence: representative.map(|item| item.health_evidence.clone()).unwrap_or_default(),
+        health: representative
+            .map(|item| item.health.clone())
+            .unwrap_or_else(unknown_health),
+        health_evidence: representative
+            .map(|item| item.health_evidence.clone())
+            .unwrap_or_default(),
         model_control: representative.and_then(|item| item.model_control.clone()),
     }
 }
@@ -336,25 +399,45 @@ pub(crate) fn adapter_instance_probe(
     } else if verification_status == "verified_unavailable" {
         health.cli_callable = "failed".into();
     }
-    health.version_status = version_status(version.as_deref(), adapter.version_policy.as_ref().and_then(|policy| policy.minimum_version.as_deref()));
+    health.version_status = version_status(
+        version.as_deref(),
+        adapter
+            .version_policy
+            .as_ref()
+            .and_then(|policy| policy.minimum_version.as_deref()),
+    );
     if verification_status == "verified_unavailable" {
         health.unavailable_reason = Some("cli_not_callable".into());
         health.repair_hint = Some("check_runtime_command".into());
     }
-    let configured_keys: Vec<_> = adapter.env.keys().filter(|key| {
-        let key = key.to_ascii_uppercase(); key.contains("KEY") || key.contains("TOKEN") || key.contains("SECRET")
-    }).collect();
+    let configured_keys: Vec<_> = adapter
+        .env
+        .keys()
+        .filter(|key| {
+            let key = key.to_ascii_uppercase();
+            key.contains("KEY") || key.contains("TOKEN") || key.contains("SECRET")
+        })
+        .collect();
     let evidence_source = if adapter.health_check.is_some() {
         "manifest_health_check"
     } else {
         "manifest_loaded"
     };
-    let mut evidence = vec![health_evidence("cli_callable", evidence_source, detail.clone())];
+    let mut evidence = vec![health_evidence(
+        "cli_callable",
+        evidence_source,
+        detail.clone(),
+    )];
     if let Some(version) = &version {
         evidence.push(health_evidence(
             "version_status",
             evidence_source,
-            if adapter.version_policy.as_ref().and_then(|policy| policy.minimum_version.as_deref()).is_some() {
+            if adapter
+                .version_policy
+                .as_ref()
+                .and_then(|policy| policy.minimum_version.as_deref())
+                .is_some()
+            {
                 format!("runtime version detected: {version}")
             } else {
                 format!("runtime version detected: {version}; compatibility was not declared")
@@ -418,7 +501,9 @@ pub(crate) fn runtime_adapter_probe(
     let config = load_runtime_config_file(&app);
     let adapter = adapter_registry::find_adapter(&config.adapter_plugin_paths, &adapter_id)?;
     if adapter.identity_only {
-        return Err(format!("adapter {adapter_id} is identity-only and cannot be probed"));
+        return Err(format!(
+            "adapter {adapter_id} is identity-only and cannot be probed"
+        ));
     }
     Ok(adapter_extensions::probe_adapter(&adapter, &config).provider)
 }
@@ -514,9 +599,11 @@ pub(crate) async fn runtime_adapter_model_control(
         runtime_command,
         profile_executable,
     )?;
-    tauri::async_runtime::spawn_blocking(move || crate::acp_runtime::inspect_adapter_model_control(adapter, cwd))
-        .await
-        .map_err(|error| error.to_string())?
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::acp_runtime::inspect_adapter_model_control(adapter, cwd)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[cfg(test)]
@@ -525,17 +612,29 @@ mod tests {
 
     #[test]
     fn diagnostic_detail_redacts_secret_bearing_lines() {
-        let detail = safe_detail("ready\nOPENAI_API_KEY=<configured>\nAuthorization: <configured>");
-        assert_eq!(detail, "ready\n[redacted]\n[redacted]");
+        let detail = safe_detail(
+            "ready\nOPENAI_API_KEY=<configured>\nAPI Key: sk-demo\nAuthorization: <configured>\npassword=secret",
+        );
+        assert_eq!(
+            detail,
+            "ready\n[redacted]\n[redacted]\n[redacted]\n[redacted]"
+        );
         assert!(!detail.contains("<configured>"));
+        assert!(!detail.contains("sk-demo"));
     }
 
     #[test]
     fn version_attention_requires_declared_minimum() {
-        assert_eq!(version_status(Some("demo 1.2.0"), Some("1.3.0")), "outdated");
+        assert_eq!(
+            version_status(Some("demo 1.2.0"), Some("1.3.0")),
+            "outdated"
+        );
         assert_eq!(version_status(Some("demo 1.3.1"), Some("1.3.0")), "ok");
         assert_eq!(version_status(Some("demo 1.0.0"), None), "unknown");
         assert_eq!(version_status(Some("demo 2"), Some("1.3.0")), "unknown");
-        assert_eq!(version_status(Some("build 2026 release 1.2.0"), Some("1.3.0")), "outdated");
+        assert_eq!(
+            version_status(Some("build 2026 release 1.2.0"), Some("1.3.0")),
+            "outdated"
+        );
     }
 }

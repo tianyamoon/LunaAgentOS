@@ -202,11 +202,16 @@ fn skill_command(name: String) -> SlashCommandCapability {
     }
 }
 
-fn discover_skills_from_profile_path(profile_path: &str, command_kind: &str) -> Vec<SlashCommandCapability> {
+fn discover_skills_from_profile_path(
+    profile_path: &str,
+    command_kind: &str,
+) -> Vec<SlashCommandCapability> {
     let names = if cfg!(windows) && command_kind == "wsl" {
         let skills_dir = format!("{}/skills", profile_path.trim_end_matches('/'));
         let quoted = shell_quote(&skills_dir);
-        let script = format!("if [ -d {quoted} ]; then find {quoted} -mindepth 1 -maxdepth 1 -printf '%f\\n'; fi");
+        let script = format!(
+            "if [ -d {quoted} ]; then find {quoted} -mindepth 1 -maxdepth 1 -printf '%f\\n'; fi"
+        );
         run_shell("wsl.exe", &["--exec", "bash", "-lc", &script])
             .map(|raw| {
                 raw.lines()

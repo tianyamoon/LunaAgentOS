@@ -125,6 +125,7 @@ import { createProvidersStore } from "./state/providersStore.js";
 import { createSessionsStore } from "./state/sessionsStore.js";
 import { createWorkspaceViewStore } from "./state/workspaceViewStore.js";
 import { createRuntimeConfigState } from "./state/runtimeConfigState.js";
+import { createRuntimeImageCapabilityStore } from "./state/runtimeImageCapability.js";
 import {
   ensureRestoredAgentEntry,
   projectWorkspaceSessionFromArchived,
@@ -303,6 +304,7 @@ const historyRepository = createHistoryRepository({
 });
 const runtimeConfigState = createRuntimeConfigState({ invoke });
 const workspaceViewStore = createWorkspaceViewStore();
+const runtimeImageCapabilityStore = createRuntimeImageCapabilityStore();
 let workspaceSessionController = null;
 let sessionRestoreController = null;
 let sessionLifecycleController = null;
@@ -1437,6 +1439,11 @@ composerController = createComposerController({
     const target = currentTargetAgent();
     return target?.id || target?.providerId || currentTargetAgentId || "default";
   },
+  // 仅当 Provider 明确上报不支持图片时阻止粘贴；未知（进程未起/无数据）保守允许，由后端兜底。
+  getImageCapableForCurrentTarget: () => {
+    const providerId = currentTargetProvider()?.id;
+    return runtimeImageCapabilityStore.isImageCapable(providerId) !== false;
+  },
   isComposingNewSession,
   currentComposerTargetLabel,
   getSendAsNewSession: () => sendAsNewSession,
@@ -1566,6 +1573,9 @@ if (listenRuntimeEvent) {
     const promptRunId = payload?.payload?.promptRunId;
     const event = payload?.payload?.event;
     if (!runtimeSessionId || !turnId || !promptRunId || !event) return;
+    // 记录该 Provider 在 ACP initialize 上报的图片能力，供 Composer 门控粘贴。
+    const providerId = sessionsStore.getSession(runtimeSessionId)?.providerId;
+    runtimeImageCapabilityStore.recordFromEvent(providerId, event);
     sessionExecutionController?.appendStreamEvent(runtimeSessionId, turnId, promptRunId, event);
   }).catch((error) => {
     console.error(error);

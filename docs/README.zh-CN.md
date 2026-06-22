@@ -13,7 +13,7 @@
 ## 先看这些
 
 - [快速开始](./getting-started.zh-CN.md)：安装依赖、运行桌面应用、验证当前工作台
-- [0.2.2 发布说明](./release-notes-0.2.2.zh-CN.md)：本次发版的新增能力、修复内容和保留边界
+- [0.3.0 发布说明](./release-notes-0.3.zh-CN.md)：Agent 管理、真实健康诊断、图片输入和保留边界
 - [当前产品边界](./current-boundary.zh-CN.md)：LunaAgentOS 现在做实了什么、下一段路怎么走、哪些常见误解需要先讲清
 - [贡献指南](../CONTRIBUTING.zh-CN.md)：开发环境、测试命令、贡献方向、PR 预期
 

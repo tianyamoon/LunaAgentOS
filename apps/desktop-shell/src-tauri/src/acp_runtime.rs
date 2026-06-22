@@ -67,6 +67,26 @@ struct AcpSession {
     next_id: i64,
     session_id: String,
     config_options: Vec<Value>,
+    // Agent 在 initialize 时声明的 promptCapabilities.image。
+    // 仅当为 true 时，send_prompt 才会把 image block 发给该 runtime。
+    prompt_image_capable: bool,
+}
+
+// 旁路随 prompt 一起下传的非文本内容块。首发只支持 image，
+// 未来 audio/resource 只需新增枚举变体，无需改动各层透传签名。
+//
+// 注意：enum 上的 rename_all 只改 variant 标签（Image→image），不改字段名。
+// 前端发的是 camelCase 的 mimeType，必须对字段单独标 rename，否则反序列化报
+// "missing field `mime_type`"。
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum PromptBlock {
+    // data 为裸 base64（不含 data: 前缀），mimeType 必填。
+    Image {
+        data: String,
+        #[serde(rename = "mimeType")]
+        mime_type: String,
+    },
 }
 
 fn model_config_option(options: &[Value]) -> Option<&Value> {
@@ -78,11 +98,21 @@ fn model_config_option(options: &[Value]) -> Option<&Value> {
 
 fn option_values(option: &Value) -> Vec<String> {
     let mut values = Vec::new();
-    for item in option.get("options").and_then(Value::as_array).into_iter().flatten() {
+    for item in option
+        .get("options")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+    {
         if let Some(value) = item.get("value").and_then(Value::as_str) {
             values.push(value.to_string());
         } else if let Some(group) = item.get("options").and_then(Value::as_array) {
-            values.extend(group.iter().filter_map(|entry| entry.get("value").and_then(Value::as_str).map(ToString::to_string)));
+            values.extend(group.iter().filter_map(|entry| {
+                entry
+                    .get("value")
+                    .and_then(Value::as_str)
+                    .map(ToString::to_string)
+            }));
         }
     }
     values
@@ -102,19 +132,48 @@ fn apply_preferred_model(
     events: &mut Vec<Value>,
     on_event: &mut Option<&mut dyn FnMut(Value)>,
 ) -> Result<(), String> {
-    let Some(preferred_model) = preferred_model.map(str::trim).filter(|value| !value.is_empty()) else { return Ok(()); };
-    let option = model_config_option(config_options).ok_or_else(|| format!("{} 未提供可配置模型列表。", runtime.display()))?;
-    let config_id = option.get("id").and_then(Value::as_str).ok_or_else(|| format!("{} 模型配置缺少 id。", runtime.display()))?;
-    if !option_values(option).iter().any(|value| value == preferred_model) {
-        return Err(format!("{} 不支持已保存的默认模型 {preferred_model}。", runtime.display()));
+    let Some(preferred_model) = preferred_model
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    else {
+        return Ok(());
+    };
+    let option = model_config_option(config_options)
+        .ok_or_else(|| format!("{} 未提供可配置模型列表。", runtime.display()))?;
+    let config_id = option
+        .get("id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| format!("{} 模型配置缺少 id。", runtime.display()))?;
+    if !option_values(option)
+        .iter()
+        .any(|value| value == preferred_model)
+    {
+        return Err(format!(
+            "{} 不支持已保存的默认模型 {preferred_model}。",
+            runtime.display()
+        ));
     }
     let request = json!({
         "jsonrpc": "2.0", "id": next_request_id(next_id), "method": "session/set_config_option",
         "params": { "sessionId": session_id, "configId": config_id, "value": preferred_model }
     });
     write_message(stdin, &request)?;
-    let result = read_response(runtime, inbox, stdin, request["id"].as_i64().unwrap(), Some(stderr_log), Some(stderr_done), Some(child), events, on_event)?;
-    *config_options = result.get("configOptions").and_then(Value::as_array).cloned().unwrap_or_default();
+    let result = read_response(
+        runtime,
+        inbox,
+        stdin,
+        request["id"].as_i64().unwrap(),
+        Some(stderr_log),
+        Some(stderr_done),
+        Some(child),
+        events,
+        on_event,
+    )?;
+    *config_options = result
+        .get("configOptions")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
     Ok(())
 }
 
@@ -122,6 +181,7 @@ pub fn run_adapter_acp_prompt(
     adapter: AdapterLaunchSpec,
     runtime_session_id: String,
     prompt: String,
+    extra_blocks: Option<Vec<PromptBlock>>,
     cwd: Option<String>,
     _config: RuntimeConfig,
     on_event: Option<&mut dyn FnMut(Value)>,
@@ -134,6 +194,7 @@ pub fn run_adapter_acp_prompt(
         },
         runtime_session_id,
         prompt,
+        extra_blocks,
         cwd,
         Some(adapter),
         on_event,
@@ -145,6 +206,7 @@ fn run_acp_prompt(
     runtime: AcpRuntime,
     runtime_session_id: String,
     prompt: String,
+    extra_blocks: Option<Vec<PromptBlock>>,
     cwd: Option<String>,
     adapter: Option<AdapterLaunchSpec>,
     mut on_event: Option<&mut dyn FnMut(Value)>,
@@ -177,7 +239,7 @@ fn run_acp_prompt(
         }
     };
 
-    match send_prompt(&runtime, session, prompt, &mut events, &mut on_event) {
+    match send_prompt(&runtime, session, prompt, extra_blocks, &mut events, &mut on_event) {
         Ok(()) => Ok(events),
         Err(error) => {
             if let Some(mut broken) = sessions.remove(&session_key) {
@@ -465,6 +527,13 @@ fn start_acp_session(
         Ok(result) => result,
         Err(error) => return Err(abort_started_child(&mut child, error)),
     };
+    // 捕获 promptCapabilities.image（缺失视为不支持），供 send_prompt 门控图片块。
+    let prompt_image_capable = init_result
+        .get("agentCapabilities")
+        .and_then(|caps| caps.get("promptCapabilities"))
+        .and_then(|prompt_caps| prompt_caps.get("image"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
     push_event(
         &mut events,
         json!({
@@ -544,9 +613,26 @@ fn start_acp_session(
                 format!("{} 未返回 sessionId。", runtime.display()),
             )
         })?;
-    let mut config_options = session_result.get("configOptions").and_then(Value::as_array).cloned().unwrap_or_default();
+    let mut config_options = session_result
+        .get("configOptions")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
     if is_new_session {
-        if let Err(error) = apply_preferred_model(runtime, &session_id, preferred_model, &mut config_options, &mut next_id, &inbox, &mut stdin, &stderr_log, &stderr_done, &mut child, &mut events, on_event) {
+        if let Err(error) = apply_preferred_model(
+            runtime,
+            &session_id,
+            preferred_model,
+            &mut config_options,
+            &mut next_id,
+            &inbox,
+            &mut stdin,
+            &stderr_log,
+            &stderr_done,
+            &mut child,
+            &mut events,
+            on_event,
+        ) {
             return Err(abort_started_child(&mut child, error));
         }
     }
@@ -580,15 +666,33 @@ fn start_acp_session(
         next_id,
         session_id,
         config_options,
+        prompt_image_capable,
     })
 }
 
-pub fn inspect_adapter_model_control(adapter: AdapterLaunchSpec, cwd: Option<String>) -> Result<Value, String> {
-    let runtime = AcpRuntime::Adapter { id: adapter.id.clone(), name: adapter.name.clone() };
-    let cwd = match cwd { Some(value) if !value.trim().is_empty() => PathBuf::from(value), _ => isolated_runtime_cwd("model-discovery")? };
+pub fn inspect_adapter_model_control(
+    adapter: AdapterLaunchSpec,
+    cwd: Option<String>,
+) -> Result<Value, String> {
+    let runtime = AcpRuntime::Adapter {
+        id: adapter.id.clone(),
+        name: adapter.name.clone(),
+    };
+    let cwd = match cwd {
+        Some(value) if !value.trim().is_empty() => PathBuf::from(value),
+        _ => isolated_runtime_cwd("model-discovery")?,
+    };
     let mut events = Vec::new();
     let mut on_event = None;
-    let mut session = start_acp_session(&runtime, &cwd, &mut events, SessionStartMode::New, Some(&adapter), &mut on_event, None)?;
+    let mut session = start_acp_session(
+        &runtime,
+        &cwd,
+        &mut events,
+        SessionStartMode::New,
+        Some(&adapter),
+        &mut on_event,
+        None,
+    )?;
     let option = model_config_option(&session.config_options).cloned();
     let _ = session.child.kill();
     let _ = session.child.wait();
@@ -617,10 +721,36 @@ fn abort_started_child(child: &mut Child, error: String) -> String {
     error
 }
 
+// 构造 ACP session/prompt 的 content blocks 数组。
+// 文本块恒在最前；图片块仅当 runtime 声明 image 能力时追加，否则丢弃，
+// 避免向不支持的 agent 发出无法解析的内容块。无图时与旧行为逐字节一致。
+fn build_prompt_blocks(
+    prompt: &str,
+    extra_blocks: Option<Vec<PromptBlock>>,
+    image_capable: bool,
+) -> Vec<Value> {
+    let mut blocks = vec![json!({ "type": "text", "text": prompt })];
+    if image_capable {
+        for block in extra_blocks.into_iter().flatten() {
+            match block {
+                PromptBlock::Image { data, mime_type } => {
+                    blocks.push(json!({
+                        "type": "image",
+                        "data": data,
+                        "mimeType": mime_type
+                    }));
+                }
+            }
+        }
+    }
+    blocks
+}
+
 fn send_prompt(
     runtime: &AcpRuntime,
     session: &mut AcpSession,
     prompt: String,
+    extra_blocks: Option<Vec<PromptBlock>>,
     events: &mut Vec<Value>,
     on_event: &mut Option<&mut dyn FnMut(Value)>,
 ) -> Result<(), String> {
@@ -639,16 +769,21 @@ fn send_prompt(
             runtime.display()
         ));
     }
+    let dropped_images = !session.prompt_image_capable && extra_blocks.iter().flatten().next().is_some();
+    let prompt_blocks = build_prompt_blocks(&prompt, extra_blocks, session.prompt_image_capable);
+    if dropped_images {
+        crate::log_diagnostic(&format!(
+            "{} 未声明 image 能力，已丢弃随 prompt 附带的图片块。",
+            runtime.display()
+        ));
+    }
     let prompt_request = json!({
         "jsonrpc": "2.0",
         "id": next_request_id(&mut session.next_id),
         "method": "session/prompt",
         "params": {
             "sessionId": session.session_id,
-            "prompt": [{
-                "type": "text",
-                "text": prompt
-            }]
+            "prompt": prompt_blocks
         }
     });
     write_message(&mut session.stdin, &prompt_request)?;
@@ -1032,6 +1167,51 @@ fn respond_to_client_request(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn prompt_block_deserializes_from_frontend_camelcase_json() {
+        // 前端 toPromptImageBlocks 实际发出的形状：{type:"image", data, mimeType}。
+        // 守住这条跨界契约，避免 enum rename_all 不作用于字段导致的 missing field。
+        let json = json!({ "type": "image", "data": "AAAA", "mimeType": "image/png" });
+        let block: PromptBlock = serde_json::from_value(json).expect("should deserialize");
+        match block {
+            PromptBlock::Image { data, mime_type } => {
+                assert_eq!(data, "AAAA");
+                assert_eq!(mime_type, "image/png");
+            }
+        }
+    }
+
+    #[test]
+    fn build_prompt_blocks_text_only_matches_legacy_shape() {
+        let blocks = build_prompt_blocks("hello", None, true);
+        assert_eq!(blocks, vec![json!({ "type": "text", "text": "hello" })]);
+    }
+
+    #[test]
+    fn build_prompt_blocks_appends_image_after_text_when_capable() {
+        let images = vec![PromptBlock::Image {
+            data: "AAAA".into(),
+            mime_type: "image/png".into(),
+        }];
+        let blocks = build_prompt_blocks("look", Some(images), true);
+        assert_eq!(blocks.len(), 2);
+        assert_eq!(blocks[0], json!({ "type": "text", "text": "look" }));
+        assert_eq!(
+            blocks[1],
+            json!({ "type": "image", "data": "AAAA", "mimeType": "image/png" })
+        );
+    }
+
+    #[test]
+    fn build_prompt_blocks_drops_images_when_runtime_lacks_capability() {
+        let images = vec![PromptBlock::Image {
+            data: "AAAA".into(),
+            mime_type: "image/png".into(),
+        }];
+        let blocks = build_prompt_blocks("look", Some(images), false);
+        assert_eq!(blocks, vec![json!({ "type": "text", "text": "look" })]);
+    }
 
     #[test]
     fn model_config_options_support_flat_and_grouped_values() {

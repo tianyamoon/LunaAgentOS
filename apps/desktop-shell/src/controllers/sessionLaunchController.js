@@ -1,6 +1,6 @@
 // Session Launch Controller 模块。
 // 统一处理发送前校验、Session 创建或复用、附件 prompt 装配与执行路由。
-import { attachmentStatus, buildPromptWithAttachments } from "../ui/composerAttachments.js";
+import { attachmentStatus, buildPromptWithAttachments, toPromptImageBlocks } from "../ui/composerAttachments.js";
 import { snapshotAgentEntry } from "../providers/agentEntrySnapshot.js";
 import { LIFECYCLE } from "../state/sessionLifecycle.js";
 import {
@@ -117,6 +117,7 @@ export function createSessionLaunchController({
   }
 
   // 将附件投影为可持久化的轻量元数据，正文仅拼入本轮 runtime prompt。
+  // 图片只保留 kind/mime 等元数据，base64 绝不进历史（避免 history 文件膨胀）。
   function attachmentMetadata(attachments) {
     return attachments.map((attachment) => ({
       name: attachment.name,
@@ -124,6 +125,7 @@ export function createSessionLaunchController({
       size: attachment.size,
       status: attachmentStatus(attachment),
       truncated: Boolean(attachment.truncated),
+      ...(attachment.kind === "image" ? { kind: "image", mime: attachment.mime || attachment.type } : {}),
     }));
   }
 
@@ -199,8 +201,11 @@ export function createSessionLaunchController({
       title: t("composer.attachment.promptTitle"),
       truncated: t("composer.attachment.truncated"),
     });
+    // 图片走 ACP image block（旁路 images），不拼进 runtimePrompt 字符串。
+    const images = toPromptImageBlocks(attachments);
     const submission = sessionPromptQueue.submit(session, prompt, {
       runtimePrompt,
+      images,
       attachments: attachmentMetadata(attachments),
     });
     clearPrompt();

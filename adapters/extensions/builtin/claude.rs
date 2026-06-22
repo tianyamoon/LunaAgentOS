@@ -34,7 +34,10 @@ pub(super) fn probe(adapter: &AdapterDefinition, config: &RuntimeConfigFile) -> 
                 &["--exec", "bash", "-lc", "command -v claude >/dev/null && claude --version && command -v npx >/dev/null && npx --version"],
             ),
         );
-        apply_auth_status(&mut wsl, run_shell("wsl.exe", &["--exec", "bash", "-lc", "claude auth status"]));
+        apply_auth_status(
+            &mut wsl,
+            run_shell("wsl.exe", &["--exec", "bash", "-lc", "claude auth status"]),
+        );
         instances.push(wsl);
     } else {
         let command = config
@@ -69,18 +72,37 @@ fn apply_auth_status(instance: &mut crate::RuntimeInstanceProbe, result: Result<
         Ok(raw) => match serde_json::from_str::<Value>(&raw) {
             Ok(value) => {
                 let logged_in = value.get("loggedIn").and_then(Value::as_bool);
-                instance.health.logged_in = match logged_in { Some(true) => "ok", Some(false) => "required", None => "unknown" }.to_string();
-                instance.health.model_or_key_configured = match logged_in { Some(false) => "missing", _ => "unknown" }.to_string();
-                instance.health_evidence.push(crate::runtime_probe::health_evidence(
-                    "logged_in",
-                    "claude_auth_status",
-                    match logged_in { Some(true) => "Claude Code reports an authenticated account", Some(false) => "Claude Code reports no authenticated account", None => "Claude Code did not report a recognizable login state" }.into(),
-                ));
-                instance.health_evidence.push(crate::runtime_probe::health_evidence(
-                    "model_or_key_configured",
-                    "claude_auth_status",
-                    "authentication status does not verify model access or credential validity".into(),
-                ));
+                instance.health.logged_in = match logged_in {
+                    Some(true) => "ok",
+                    Some(false) => "required",
+                    None => "unknown",
+                }
+                .to_string();
+                instance.health.model_or_key_configured = match logged_in {
+                    Some(false) => "missing",
+                    _ => "unknown",
+                }
+                .to_string();
+                instance
+                    .health_evidence
+                    .push(crate::runtime_probe::health_evidence(
+                        "logged_in",
+                        "claude_auth_status",
+                        match logged_in {
+                            Some(true) => "Claude Code reports an authenticated account",
+                            Some(false) => "Claude Code reports no authenticated account",
+                            None => "Claude Code did not report a recognizable login state",
+                        }
+                        .into(),
+                    ));
+                instance
+                    .health_evidence
+                    .push(crate::runtime_probe::health_evidence(
+                        "model_or_key_configured",
+                        "claude_auth_status",
+                        "authentication status does not verify model access or credential validity"
+                            .into(),
+                    ));
                 if logged_in == Some(false) {
                     instance.health.unavailable_reason = Some("auth_required".into());
                     instance.health.repair_hint = Some("run_agent_login".into());
@@ -90,20 +112,24 @@ fn apply_auth_status(instance: &mut crate::RuntimeInstanceProbe, result: Result<
                 instance.health.logged_in = "failed".into();
                 instance.health.unavailable_reason = Some("login_verification_failed".into());
                 instance.health.repair_hint = Some("check_runtime_login".into());
-                instance.health_evidence.push(crate::runtime_probe::health_evidence(
-                    "logged_in",
-                    "claude_auth_status",
-                    "authentication command returned an unrecognized response".into(),
-                ));
+                instance
+                    .health_evidence
+                    .push(crate::runtime_probe::health_evidence(
+                        "logged_in",
+                        "claude_auth_status",
+                        "authentication command returned an unrecognized response".into(),
+                    ));
             }
         },
         Err(error) => {
             instance.health.logged_in = "failed".into();
-            instance.health_evidence.push(crate::runtime_probe::health_evidence(
-                "logged_in",
-                "claude_auth_status",
-                crate::runtime_probe::redact_diagnostic_detail(&error),
-            ));
+            instance
+                .health_evidence
+                .push(crate::runtime_probe::health_evidence(
+                    "logged_in",
+                    "claude_auth_status",
+                    crate::runtime_probe::redact_diagnostic_detail(&error),
+                ));
             if instance.available {
                 instance.health.unavailable_reason = Some("login_verification_failed".into());
                 instance.health.repair_hint = Some("check_runtime_login".into());

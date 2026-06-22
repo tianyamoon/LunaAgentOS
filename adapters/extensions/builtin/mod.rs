@@ -65,7 +65,9 @@ pub fn slash_commands(
     runtime_instance_id: Option<&str>,
 ) -> Option<Result<Vec<SlashCommandCapability>, String>> {
     match adapter.extension.as_deref() {
-        Some("builtin.hermes") => Some(hermes::slash_commands(adapter, config, runtime_instance_id)),
+        Some("builtin.hermes") => {
+            Some(hermes::slash_commands(adapter, config, runtime_instance_id))
+        }
         _ => None,
     }
 }
@@ -80,7 +82,10 @@ pub(super) fn attach_adapter_metadata(
     instance.model_control = adapter.model_control.clone();
     instance.health.version_status = crate::runtime_probe::version_status(
         instance.version.as_deref(),
-        adapter.version_policy.as_ref().and_then(|policy| policy.minimum_version.as_deref()),
+        adapter
+            .version_policy
+            .as_ref()
+            .and_then(|policy| policy.minimum_version.as_deref()),
     );
     if instance.health.version_status == "outdated" && instance.health.repair_hint.is_none() {
         instance.health.repair_hint = Some("update_runtime".into());
