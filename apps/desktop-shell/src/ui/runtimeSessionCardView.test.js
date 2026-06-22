@@ -172,6 +172,32 @@ test("runtimeSessionCardView: reconnecting session does not use running animatio
   assert.doesNotMatch(miniHtml, /is-busy/);
 });
 
+test("runtimeSessionCardView: reconnecting runtime row uses translated stage labels", () => {
+  const session = {
+    id: "session-restoring",
+    title: "restore session",
+    turns: [],
+    record_state: "active",
+    access_mode: "interactive",
+    runtime_binding: { state: "reconnecting", stage: "load" },
+  };
+  let reconnectingRuntimeText = "";
+  const view = createView({
+    projectRuntimeSessionMessageList: (_session, options) => {
+      reconnectingRuntimeText = options.reconnectingRuntimeText("load");
+      return { rows: [], scrollTargetRowId: null };
+    },
+    t: (key, values = {}) => {
+      if (key === "restore.reconnectingStage.load") return "加载历史会话";
+      if (key === "restore.reconnectingRuntimeRow") return `正在恢复当前会话连接：${values.stage}`;
+      return key;
+    },
+  });
+
+  view.renderSessionCard(session);
+  assert.equal(reconnectingRuntimeText, "正在恢复当前会话连接：加载历史会话");
+});
+
 test("runtimeSessionCardView: readonly stale running history has no waiting animation classes", () => {
   const session = {
     id: "session-history",

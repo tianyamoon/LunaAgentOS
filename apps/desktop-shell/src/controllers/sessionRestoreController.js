@@ -200,6 +200,10 @@ export function createSessionRestoreController({
     }
     try {
       await acpRuntimeClient.load(restored);
+      setRuntimeBinding(restored, {
+        state: RUNTIME_BINDING_STATE.reconnecting,
+        stage: RUNTIME_BINDING_STAGE.runtime,
+      });
       await acpRuntimeClient.verifyAlive(restored.providerId, restored.id);
       markRestoreLive(restored, renderRestoreUpdate, "restore.reconnected");
     } catch (loadError) {
@@ -209,7 +213,15 @@ export function createSessionRestoreController({
         logger.error(shutdownError);
       }
       try {
+        setRuntimeBinding(restored, {
+          state: RUNTIME_BINDING_STATE.reconnecting,
+          stage: RUNTIME_BINDING_STAGE.resume,
+        });
         await acpRuntimeClient.resume(restored);
+        setRuntimeBinding(restored, {
+          state: RUNTIME_BINDING_STATE.reconnecting,
+          stage: RUNTIME_BINDING_STAGE.runtime,
+        });
         await acpRuntimeClient.verifyAlive(restored.providerId, restored.id);
         markRestoreLive(restored, renderRestoreUpdate, "restore.loadFailedResumed");
       } catch (resumeError) {

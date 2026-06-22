@@ -19,6 +19,13 @@ export function createRuntimeSessionCardView({
   t,
   escapeHtml,
 }) {
+  function reconnectingStageLabel(stage) {
+    const normalized = String(stage || "runtime").trim() || "runtime";
+    const key = `restore.reconnectingStage.${normalized}`;
+    const label = t(key);
+    return label === key ? t("restore.reconnectingStage.runtime") : label;
+  }
+
   // 状态图标保持紧凑，避免 Session Card 首行被长文案撑高。
   function renderSessionStatusIcon(icon) {
     const glyphs = {
@@ -90,7 +97,9 @@ export function createRuntimeSessionCardView({
     const latestOnly = isSessionLatestOnly(session);
     const messageList = projectRuntimeSessionMessageList(session, {
       latestOnly,
-      reconnectingRuntimeText: (stage) => t("restore.reconnectingRuntimeRow", { stage }),
+      reconnectingRuntimeText: (stage) => t("restore.reconnectingRuntimeRow", {
+        stage: reconnectingStageLabel(stage),
+      }),
     });
     const managementTitleSuffix = controlState.managementDisabled ? t("action.restoringSuffix") : "";
     const latestOnlyLabel = latestOnly ? t("action.showAllMessages") : t("action.latestMessages");

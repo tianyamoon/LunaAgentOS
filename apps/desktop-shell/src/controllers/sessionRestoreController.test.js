@@ -85,6 +85,31 @@ test("sessionRestoreController: load failure falls back to resume", async () => 
   assert.equal(notices.at(-1).message, "restore.loadFailedResumed");
 });
 
+test("sessionRestoreController: load failure updates reconnecting stage before resume", async () => {
+  let harness;
+  harness = makeHarness({
+    runtime: {
+      load: async () => { throw new Error("load"); },
+      resume: async () => {
+        assert.equal(harness.restored.runtime_binding.stage, "resume");
+      },
+    },
+  });
+  await harness.controller.restoreArchivedSession("s1");
+});
+
+test("sessionRestoreController: alive verification updates reconnecting stage to runtime", async () => {
+  let harness;
+  harness = makeHarness({
+    runtime: {
+      verifyAlive: async () => {
+        assert.equal(harness.restored.runtime_binding.stage, "runtime");
+      },
+    },
+  });
+  await harness.controller.restoreArchivedSession("s1");
+});
+
 test("sessionRestoreController: complete failure becomes read-only resume_failed", async () => {
   const { controller, restored, notices, logs } = makeHarness({
     runtime: {

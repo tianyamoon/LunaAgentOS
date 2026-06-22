@@ -199,6 +199,21 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  position: relative;
+  isolation: isolate;
+  transition: background 160ms ease;
+}
+
+.app-shell.is-restoring::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 18px;
+  background:
+    linear-gradient(120deg, rgba(88, 112, 190, 0.04), rgba(217, 108, 58, 0.06), rgba(88, 112, 190, 0.04));
+  opacity: 0.16;
+  animation: restorePanelPulse 1.2s ease-in-out infinite;
 }
 
 .topbar {
@@ -1395,7 +1410,41 @@ button:disabled {
 }
 
 .workspace-panel {
+  position: relative;
   gap: 12px;
+  transition: box-shadow 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.workspace-panel.is-restoring {
+  border-color: rgba(88, 112, 190, 0.28);
+  box-shadow: 0 18px 46px rgba(88, 112, 190, 0.12), inset 0 0 0 1px rgba(88, 112, 190, 0.1);
+}
+
+.workspace-panel.is-restoring::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    linear-gradient(120deg, rgba(88, 112, 190, 0.06), rgba(217, 108, 58, 0.08), rgba(88, 112, 190, 0.06));
+  opacity: 0.18;
+  animation: restorePanelPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes restorePanelPulse {
+  0% {
+    opacity: 0.1;
+    box-shadow: inset 0 0 0 0 rgba(88, 112, 190, 0.12);
+  }
+  50% {
+    opacity: 0.3;
+    box-shadow: inset 0 0 0 999px rgba(88, 112, 190, 0.03);
+  }
+  100% {
+    opacity: 0.12;
+    box-shadow: inset 0 0 0 0 rgba(88, 112, 190, 0.1);
+  }
 }
 
 .workspace-body {
