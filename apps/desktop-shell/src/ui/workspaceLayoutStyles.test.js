@@ -57,9 +57,10 @@ test("focused workspace keeps the main card bounded above the mini bar", () => {
 });
 
 test("reconnecting session card exposes a local animation layer", () => {
-  assert.match(styles, /\.session-card\.is-reconnecting\s*\{[\s\S]*?animation:\s*reconnectingCardFrame/);
   assert.match(styles, /\.session-card\.is-reconnecting\s*\{[\s\S]*?box-shadow:\s*0 18px 42px/);
-  assert.match(styles, /\.session-card\.is-reconnecting::after\s*\{[\s\S]*?animation:\s*restoreCardPulse/);
+  assert.match(styles, /\.session-card\.is-reconnecting::after\s*\{[\s\S]*?conic-gradient/);
+  assert.match(styles, /\.session-card\.is-reconnecting::after\s*\{[\s\S]*?animation:[\s\S]*?reconnectingRainbowSpin/);
+  assert.match(styles, /\.session-card\.is-reconnecting::after\s*\{[\s\S]*?animation:[\s\S]*?reconnectingBorderPulse/);
   assert.doesNotMatch(styles, /\.app-shell\.is-restoring::after/);
   assert.doesNotMatch(styles, /\.workspace-panel\.is-restoring::after/);
 });
