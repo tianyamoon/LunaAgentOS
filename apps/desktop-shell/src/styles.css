@@ -1395,8 +1395,10 @@ button:disabled {
 }
 
 .session-card.is-reconnecting {
-  border-color: rgba(88, 112, 190, 0.26);
-  box-shadow: 0 16px 36px rgba(88, 112, 190, 0.08), 0 0 0 1px rgba(88, 112, 190, 0.08);
+  border-color: rgba(88, 112, 190, 0.42);
+  background: linear-gradient(135deg, rgba(255, 251, 245, 0.9), rgba(235, 241, 255, 0.92));
+  box-shadow: 0 18px 42px rgba(88, 112, 190, 0.14), 0 0 0 2px rgba(88, 112, 190, 0.16);
+  animation: reconnectingCardFrame 1.1s ease-in-out infinite;
 }
 
 .session-card.is-reconnecting::after {
@@ -1407,21 +1409,39 @@ button:disabled {
   pointer-events: none;
   background:
     linear-gradient(120deg, rgba(88, 112, 190, 0.05), rgba(217, 108, 58, 0.06), rgba(88, 112, 190, 0.05));
-  opacity: 0.12;
+  opacity: 0.22;
   animation: restoreCardPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes reconnectingCardFrame {
+  0% {
+    border-color: rgba(88, 112, 190, 0.34);
+    background: linear-gradient(135deg, rgba(255, 251, 245, 0.88), rgba(232, 239, 255, 0.88));
+    box-shadow: 0 16px 36px rgba(88, 112, 190, 0.1), 0 0 0 1px rgba(88, 112, 190, 0.14);
+  }
+  50% {
+    border-color: rgba(88, 112, 190, 0.72);
+    background: linear-gradient(135deg, rgba(255, 252, 248, 0.98), rgba(221, 233, 255, 1));
+    box-shadow: 0 22px 56px rgba(88, 112, 190, 0.22), 0 0 0 3px rgba(88, 112, 190, 0.26);
+  }
+  100% {
+    border-color: rgba(88, 112, 190, 0.34);
+    background: linear-gradient(135deg, rgba(255, 251, 245, 0.88), rgba(232, 239, 255, 0.88));
+    box-shadow: 0 16px 36px rgba(88, 112, 190, 0.1), 0 0 0 1px rgba(88, 112, 190, 0.14);
+  }
 }
 
 @keyframes restoreCardPulse {
   0% {
-    opacity: 0.08;
+    opacity: 0.12;
     box-shadow: inset 0 0 0 0 rgba(88, 112, 190, 0.12);
   }
   50% {
-    opacity: 0.22;
-    box-shadow: inset 0 0 0 999px rgba(88, 112, 190, 0.03);
+    opacity: 0.42;
+    box-shadow: inset 0 0 0 999px rgba(88, 112, 190, 0.08);
   }
   100% {
-    opacity: 0.08;
+    opacity: 0.12;
     box-shadow: inset 0 0 0 0 rgba(88, 112, 190, 0.1);
   }
 }

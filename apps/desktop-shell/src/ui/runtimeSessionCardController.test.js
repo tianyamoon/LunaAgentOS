@@ -72,6 +72,104 @@ test("runtimeSessionCardController: mini card 点击统一切换焦点与当前 
   ]);
 });
 
+test("runtimeSessionCardController: in-place reconnecting refresh localizes runtime row text", () => {
+  let reconnectingRuntimeText = "";
+  const body = {
+    querySelector() {
+      return null;
+    },
+    addEventListener() {},
+  };
+  const card = {
+    dataset: { sessionId: "session-r" },
+    matches(selector) {
+      return selector === ".session-card";
+    },
+    addEventListener() {},
+    querySelectorAll() {
+      return [];
+    },
+    querySelector(selector) {
+      if (selector === ".session-card-body") return body;
+      if (selector === ".session-card-header") return { innerHTML: "" };
+      return null;
+    },
+    setAttribute() {},
+    removeAttribute() {},
+    className: "session-card",
+  };
+  const sessionDeck = {
+    querySelector(selector) {
+      if (selector === '.session-card[data-session-id="session-r"]') return card;
+      return null;
+    },
+    querySelectorAll() {
+      return [];
+    },
+  };
+  const controller = createRuntimeSessionCardController({
+    sessionDeck,
+    sessionStickRegistry: {
+      get: () => null,
+      ensure: () => ({
+        isFollowing: true,
+        showScrollButton: false,
+        setContentElement() {},
+        notifyContentChanged() {},
+      }),
+      sweep() {},
+    },
+    getSession: () => ({
+      id: "session-r",
+      turns: [],
+      activePromptRunId: null,
+      runtime_binding: { state: "reconnecting", stage: "load" },
+    }),
+    buildSessionCardViewModel: () => ({ className: "session-card is-reconnecting", headerHtml: "", headerDigest: "" }),
+    projectRuntimeSessionMessageList: (_session, options = {}) => {
+      reconnectingRuntimeText = options.reconnectingRuntimeText("load");
+      return { rows: [], scrollTargetRowId: null, activePromptRunId: null };
+    },
+    runtimeSessionMessageListView: {
+      renderMessageRow: () => "",
+      renderMessageRowBody: () => "",
+      syncMessageList() {},
+    },
+    isSessionLatestOnly: () => false,
+    renderMermaidDiagrams: () => Promise.resolve(),
+    scheduleWorkspaceRender() {},
+    focusSessionInWorkspace() {},
+    activateWorkspaceSession() {},
+    toggleSessionFocus() {},
+    dismissWorkspaceSession() {},
+    archiveLiveSession() {},
+    stopSession() {},
+    requestDeleteConfirmation() {},
+    restoreArchivedSession() {},
+    setFlowDetailOpen() {},
+    sessionTranscriptText: () => "",
+    copyTextToClipboard: async () => true,
+    toggleSessionLatestOnly() {},
+    setAppNotice() {},
+    isAtBottom: () => true,
+    t: (key, values = {}) => {
+      if (key === "restore.reconnectingStage.load") return "加载历史会话";
+      if (key === "restore.reconnectingStage.runtime") return "确认连接状态";
+      if (key === "restore.reconnectingRuntimeRow") return `正在恢复当前会话连接：${values.stage}`;
+      return key;
+    },
+    streamRenderIntervalMs: 0,
+    requestFrame: (callback) => {
+      callback();
+      return 0;
+    },
+    setTimer: () => 0,
+  });
+
+  controller.refreshSessionCard("session-r");
+  assert.equal(reconnectingRuntimeText, "正在恢复当前会话连接：加载历史会话");
+});
+
 test("patchSessionCardPreservingBody: 流式局部更新保留滚动容器身份", () => {
   const previousHeader = { innerHTML: "旧头部" };
   const previousBody = { innerHTML: "旧内容" };

@@ -46,6 +46,22 @@ export function createRuntimeSessionCardController({
   let pendingCardRenderTimer = 0;
   let lastCardRenderAt = 0;
 
+  function reconnectingStageLabel(stage) {
+    const normalized = String(stage || "runtime").trim() || "runtime";
+    const key = `restore.reconnectingStage.${normalized}`;
+    const label = t(key);
+    return label === key ? t("restore.reconnectingStage.runtime") : label;
+  }
+
+  function projectMessageListOptions() {
+    return {
+      latestOnly: false,
+      reconnectingRuntimeText: (stage) => t("restore.reconnectingRuntimeRow", {
+        stage: reconnectingStageLabel(stage),
+      }),
+    };
+  }
+
   // 所有 Card、mini card 与 Turn 操作统一在重绘后重新绑定。
   function bindSessionActions(root = sessionDeck) {
     const actionRoot = root || sessionDeck;
@@ -163,7 +179,10 @@ export function createRuntimeSessionCardController({
     const newBody = patchSessionCardFromViewModel(card, viewModel);
 
     // 对账 MessageList 正文（通过虚拟列表）
-    const projection = projectRuntimeSessionMessageList(session, { latestOnly: isSessionLatestOnly(session) });
+    const projection = projectRuntimeSessionMessageList(session, {
+      latestOnly: isSessionLatestOnly(session),
+      reconnectingRuntimeText: projectMessageListOptions().reconnectingRuntimeText,
+    });
     if (newBody) {
       const elements = messageListElements(newBody);
       if (elements.scroller && elements.contentElement) {
@@ -196,7 +215,10 @@ export function createRuntimeSessionCardController({
       const body = sessionDeck.querySelector(`.session-card[data-session-id="${session.id}"]`)?.querySelector(".session-card-body");
       if (!body) return;
       const previousFollowing = stickyIntent.has(session.id) ? stickyIntent.get(session.id) : true;
-      const projection = projectRuntimeSessionMessageList(session, { latestOnly: isSessionLatestOnly(session) });
+      const projection = projectRuntimeSessionMessageList(session, {
+        latestOnly: isSessionLatestOnly(session),
+        reconnectingRuntimeText: projectMessageListOptions().reconnectingRuntimeText,
+      });
       syncVirtualMessageList(session, body, projection);
       bindMessageListDelegation(session.id, body);
       syncMessageListScroll(session.id, body, projection, previousFollowing);
@@ -252,7 +274,10 @@ export function createRuntimeSessionCardController({
   function activePromptRows(sessionId) {
     const latestSession = getSession(sessionId);
     if (!latestSession?.activePromptRunId) return [];
-    const latestProjection = projectRuntimeSessionMessageList(latestSession, { latestOnly: isSessionLatestOnly(latestSession) });
+    const latestProjection = projectRuntimeSessionMessageList(latestSession, {
+      latestOnly: isSessionLatestOnly(latestSession),
+      reconnectingRuntimeText: projectMessageListOptions().reconnectingRuntimeText,
+    });
     return latestProjection.rows.filter((row) => row.promptRunId === latestSession.activePromptRunId);
   }
 
