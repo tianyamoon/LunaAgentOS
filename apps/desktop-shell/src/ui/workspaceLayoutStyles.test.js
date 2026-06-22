@@ -57,10 +57,10 @@ test("focused workspace keeps the main card bounded above the mini bar", () => {
 });
 
 test("reconnecting session card exposes a local animation layer", () => {
-  assert.match(styles, /\.session-card\.is-reconnecting\s*\{[\s\S]*?box-shadow:\s*0 18px 42px/);
-  assert.match(styles, /\.session-card\.is-reconnecting::after\s*\{[\s\S]*?conic-gradient/);
-  assert.match(styles, /\.session-card\.is-reconnecting::after\s*\{[\s\S]*?animation:[\s\S]*?reconnectingRainbowSpin/);
-  assert.match(styles, /\.session-card\.is-reconnecting::after\s*\{[\s\S]*?animation:[\s\S]*?reconnectingBorderPulse/);
+  assert.match(styles, /\.session-card\.is-reconnecting\s*\{[\s\S]*?linear-gradient\(\s*rgba\(var\(--surface-raised-rgb\), 0\.62\)/);
+  assert.match(styles, /\.session-card\.is-reconnecting\s*\{[\s\S]*?linear-gradient\(\s*90deg,\s*#ff6b6b/);
+  assert.match(styles, /\.session-card\.is-reconnecting\s*\{[\s\S]*?animation:\s*reconnectingBorderMarquee 2\.8s linear infinite, reconnectingCardGlow 1\.35s ease-in-out infinite/);
+  assert.match(styles, /\.session-card\.is-active-receiver\.is-reconnecting\s*\{/);
   assert.doesNotMatch(styles, /\.app-shell\.is-restoring::after/);
   assert.doesNotMatch(styles, /\.workspace-panel\.is-restoring::after/);
 });
