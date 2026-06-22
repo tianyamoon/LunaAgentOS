@@ -163,6 +163,7 @@ test("runtimeSessionCardView: reconnecting session does not use running animatio
 
   const cardHtml = view.renderSessionCard(session);
   const miniHtml = view.renderSessionMiniCard(session);
+  assert.match(cardHtml, /session-card[^\"]*is-reconnecting/);
   assert.match(cardHtml, /session-status-reconnecting/);
   assert.match(cardHtml, /上次已完成/);
   assert.doesNotMatch(cardHtml, /session-card[^\"]*is-waiting/);

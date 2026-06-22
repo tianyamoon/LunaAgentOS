@@ -25,16 +25,10 @@ export function createWorkspaceView({
     // 每次渲染读取快照，View 不长期持有 Store 内部容器。
     const workspaceSessions = getSessionsSnapshot().filter((session) => session.inWorkspace !== false);
     const visibleSessions = [...workspaceSessions].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
-    const currentSession = workspaceSessions.find((session) => session.id === getCurrentSessionId()) || null;
-    const workspacePanel = sessionDeck.closest?.(".workspace-panel") || null;
-    const appShell = sessionDeck.closest?.(".app-shell") || null;
-    const isRestoring = currentSession?.runtime_binding?.state === "reconnecting";
     updatePromptPlaceholder();
     renderWorkspaceStatus();
     workspaceEmpty.style.display = visibleSessions.length ? "none" : "flex";
     if (!visibleSessions.length) renderWorkspaceEmptyCopy();
-    workspacePanel?.classList.toggle("is-restoring", isRestoring);
-    appShell?.classList.toggle("is-restoring", isRestoring);
     sessionDeck.classList.toggle("is-single-session", visibleSessions.length === 1);
     sessionDeck.classList.toggle("is-two-sessions", visibleSessions.length === 2);
     sessionDeck.classList.toggle("is-many-sessions", visibleSessions.length > 2);

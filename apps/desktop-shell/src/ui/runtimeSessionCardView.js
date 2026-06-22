@@ -90,6 +90,7 @@ export function createRuntimeSessionCardView({
     const controlState = resolveSessionCardControlState(session, { translate: t, canRestoreSession });
     const statusView = controlState.statusView;
     const isActiveReceiver = getCurrentSessionId() === session.id;
+    const isReconnecting = session?.runtime_binding?.state === "reconnecting";
     const isWaiting = controlState.isWaiting;
     const managementDisabled = controlState.managementDisabled ? "disabled" : "";
     const profileMeta = [identitySession.profileName, identitySession.profileModel].filter(Boolean).join(" · ");
@@ -108,7 +109,7 @@ export function createRuntimeSessionCardView({
     const identityTitle = sessionIdentityTitle(identitySession);
     const identityTitleMarkup = renderSessionIdentityTitle(identitySession);
     return `
-      <article class="session-card ${isFocusedSession ? "fullscreen" : ""} ${isActiveReceiver ? "is-active-receiver" : ""} ${isWaiting ? "is-waiting" : ""}" data-session-id="${session.id}" tabindex="0" aria-label="${escapeHtml(t("session.ariaSwitch", { title: session.title }))}" ${isActiveReceiver ? "aria-current=\"true\"" : ""}>
+      <article class="session-card ${isFocusedSession ? "fullscreen" : ""} ${isActiveReceiver ? "is-active-receiver" : ""} ${isWaiting ? "is-waiting" : ""} ${isReconnecting ? "is-reconnecting" : ""}" data-session-id="${session.id}" tabindex="0" aria-label="${escapeHtml(t("session.ariaSwitch", { title: session.title }))}" ${isActiveReceiver ? "aria-current=\"true\"" : ""}>
         <div class="session-card-header">
           <div class="session-card-row session-card-identity-line">
             <div class="session-agent-title">
@@ -180,6 +181,7 @@ export function createRuntimeSessionCardView({
     const controlState = resolveSessionCardControlState(session, { translate: t, canRestoreSession });
     const statusView = controlState.statusView;
     const isActiveReceiver = getCurrentSessionId() === session.id;
+    const isReconnecting = session?.runtime_binding?.state === "reconnecting";
     const isWaiting = controlState.isWaiting;
     const profileMeta = [identitySession.profileName, identitySession.profileModel].filter(Boolean).join(" · ");
     const stats = sessionCardStats(session, t);
@@ -192,7 +194,7 @@ export function createRuntimeSessionCardView({
     const latestOnlyLabel = latestOnly ? t("action.showAllMessages") : t("action.latestMessages");
     const fullscreenLabel = isFocusedSession ? t("action.exitFullscreen") : t("action.enterFullscreen");
 
-    const className = `session-card ${isFocusedSession ? "fullscreen" : ""} ${isActiveReceiver ? "is-active-receiver" : ""} ${isWaiting ? "is-waiting" : ""}`;
+    const className = `session-card ${isFocusedSession ? "fullscreen" : ""} ${isActiveReceiver ? "is-active-receiver" : ""} ${isWaiting ? "is-waiting" : ""} ${isReconnecting ? "is-reconnecting" : ""}`;
     const ariaLabel = t("session.ariaSwitch", { title: session.title });
     const ariaCurrent = isActiveReceiver ? "true" : null;
 
