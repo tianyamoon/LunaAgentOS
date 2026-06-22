@@ -12,6 +12,9 @@ export function currentSessionSendBlockReason(session, agent, {
   if (!session) return "";
   if (agent && session.agentId !== agent.id) return translateOrKey(translate, "composer.blockInactiveSession");
   if (canSendToSession(session)) return "";
+  if (session?.runtime_binding?.state === "reconnecting") {
+    return translateOrKey(translate, "session.restoringSendBlocked");
+  }
   if (session.access_mode === ACCESS_MODE.read_only) {
     return canRestoreSession(session)
       ? translateOrKey(translate, "session.readOnlySwitchBlocked")

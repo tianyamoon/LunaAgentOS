@@ -51,7 +51,7 @@ export function projectRuntimeSessionMessageList(session, options = {}) {
     isCurrentTurn: turn.id === latestTurn?.id,
     readOnly: session?.access_mode === "read_only",
   }));
-  const runtimeRows = !rows.length && session?.runtime_binding?.state === "reconnecting"
+  const runtimeRows = session?.runtime_binding?.state === "reconnecting"
     ? [projectSessionRuntimeRow(session, options)]
     : [];
   return {

@@ -46,6 +46,21 @@ test("sessionSendPolicy: failed restorable live session requires restore instead
   assert.equal(reason, "session.notSendableRestoreRequired");
 });
 
+test("sessionSendPolicy: reconnecting live session explains restore is in progress", () => {
+  const reason = currentSessionSendBlockReason({
+    id: "s1",
+    agentId: "agent-a",
+    access_mode: "interactive",
+    runtime_binding: { state: "reconnecting" },
+  }, agent, {
+    canSendToSession: () => false,
+    canRestoreSession: () => true,
+    translate: t,
+  });
+
+  assert.equal(reason, "session.restoringSendBlocked");
+});
+
 test("sessionSendPolicy: failed unrestorable live session requires explicit new session", () => {
   const reason = currentSessionSendBlockReason({ id: "s1", agentId: "agent-a", access_mode: "interactive" }, agent, {
     canSendToSession: () => false,

@@ -386,6 +386,27 @@ test("runtimeSessionMessageListProjection: reconnecting session without turns re
   assert.equal(result.scrollTargetRowId, "s-restore:runtime:load");
 });
 
+test("runtimeSessionMessageListProjection: reconnecting session with history still renders a runtime row", () => {
+  const result = projectRuntimeSessionMessageList({
+    id: "s-restore",
+    turns: [{
+      id: "t1",
+      prompt: "old prompt",
+      status: "completed",
+      finalResponse: "old response",
+    }],
+    runtime_binding: {
+      state: "reconnecting",
+      stage: "load",
+    },
+  });
+
+  const runtimeRows = result.rows.filter((row) => row.kind === "runtime");
+  assert.equal(runtimeRows.length, 1);
+  assert.equal(runtimeRows[0].status, "reconnecting");
+  assert.equal(runtimeRows[0].metadata.stage, "load");
+});
+
 function item(type, content, overrides = {}) {
   return {
     id: overrides.id || `${type}-${content}`,
