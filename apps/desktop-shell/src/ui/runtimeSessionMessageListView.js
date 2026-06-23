@@ -41,9 +41,20 @@ export function createRuntimeSessionMessageListView({
 
   function renderUserRow(row) {
     const attachments = Array.isArray(row.metadata?.attachments) ? row.metadata.attachments : [];
+    const runtimeImages = Array.isArray(row.metadata?.runtimeImages) ? row.metadata.runtimeImages : [];
+    const imageUrls = runtimeImages
+      .filter((block) => block.type === "image" && block.data)
+      .map((block) => `data:${block.mimeType || "image/png"};base64,${block.data}`);
+    let imageIndex = 0;
     return `
       <div class="runtime-message-user-bubble">${escapeHtml(row.content)}</div>
-      ${attachments.length ? `<div class="runtime-message-attachments">${attachments.map((attachment) => `<span>${escapeHtml(attachment.name || t("turn.attachment.unnamed"))}</span>`).join("")}</div>` : ""}
+      ${attachments.length ? `<div class="runtime-message-attachments">${attachments.map((attachment) => {
+        const imageUrl = attachment.kind === "image" ? imageUrls[imageIndex++] : "";
+        const thumbnail = imageUrl
+          ? `<img class="runtime-message-attachment-thumb" src="${escapeHtml(imageUrl)}" alt="" aria-hidden="true">`
+          : "";
+        return `<span class="runtime-message-attachment ${attachment.kind === "image" ? "is-image" : ""}">${thumbnail}<span>${escapeHtml(attachment.name || t("turn.attachment.unnamed"))}</span></span>`;
+      }).join("")}</div>` : ""}
     `;
   }
 
@@ -323,6 +334,8 @@ export function rowSignature(row) {
   const meta = row.metadata || {};
   const items = Array.isArray(meta.items) ? meta.items.map((item) => item.content || "").join(",") : "";
   const traceRows = Array.isArray(meta.rows) ? meta.rows.map((r) => rowSignature(r)).join(";") : "";
+  const attachments = Array.isArray(meta.attachments) ? JSON.stringify(meta.attachments) : "";
+  const runtimeImages = Array.isArray(meta.runtimeImages) ? JSON.stringify(meta.runtimeImages) : "";
   return [
     row.kind,
     row.status,
@@ -333,6 +346,8 @@ export function rowSignature(row) {
     traceRows,
     meta.debug ? JSON.stringify(meta.debug) : "",
     meta.attachmentCount ?? "",
+    attachments,
+    runtimeImages,
   ].join("|");
 }
 

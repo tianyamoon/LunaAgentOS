@@ -1866,6 +1866,41 @@ button:disabled {
   font-size: 0.7rem;
 }
 
+.runtime-message-attachment-thumb {
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  object-fit: cover;
+  vertical-align: middle;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.runtime-message-attachment-thumb:hover {
+  opacity: 0.85;
+}
+
+.runtime-message-attachments span.runtime-message-attachment.is-image {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+/* 图片 chip 内的文件名不再套自己的药丸边框，只作为缩略图下方的小标签。 */
+.runtime-message-attachment.is-image span {
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .runtime-message-assistant {
   padding: 2px 4px 4px;
   border: 0;
@@ -2289,6 +2324,68 @@ button:disabled {
 
 .rich-text a:hover {
   border-bottom-color: var(--accent);
+}
+
+.rich-text img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.rich-text img:hover {
+  opacity: 0.85;
+}
+
+/* ---- session message image lightbox ---- */
+.msg-image-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  animation: msg-image-lightbox-fadein 0.15s ease-out;
+}
+
+@keyframes msg-image-lightbox-fadein {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.msg-image-lightbox img {
+  max-width: 90vw;
+  max-height: 90vh;
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  object-fit: contain;
+  cursor: default;
+}
+
+.msg-image-lightbox-close {
+  position: fixed;
+  top: 18px;
+  right: 22px;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.msg-image-lightbox-close:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .rich-text del {

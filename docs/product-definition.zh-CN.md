@@ -64,7 +64,7 @@ agent product
 - **Hermes**：验证 profile 身份、Windows / WSL 路由、ACP sessions 和更丰富的 runtime event 可见性
 - **Trae IDE**：代表 IDE-first bridge 路线
 
-它们是真实外部产品进入工作台。LunaAgentOS 0.2 Preview 把工作台做成它们共同的承载面，每个 Agent 自己的能力仍由它们提供。
+它们是真实外部产品进入工作台。LunaAgentOS 0.3 把工作台做成它们共同的承载面，每个 Agent 自己的能力仍由它们提供。
 
 ## 设计约束
 

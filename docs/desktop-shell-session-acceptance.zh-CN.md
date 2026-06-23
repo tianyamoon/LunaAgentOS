@@ -15,8 +15,7 @@ npm.cmd run dev
 
 - Vite 首页返回 `200`。
 - `src/main.js` 返回 `200`。
-- `npm.cmd run test:all`、`lint:undef`、`lint:architecture`、`build` 全部通过。
-- `cargo test` 通过。
+- `npm.cmd run test:all`、`npm.cmd run lint:undef`、`npm.cmd run lint:architecture`、`npm.cmd run build` 全部通过。
 - 应用内浏览器可完成 DOM 与交互验收；普通浏览器预览通过 `desktopBridge` 使用只读空快照启动，不伪造桌面写操作。
 - 1280x720 与 390x844 视口均无页面级横向溢出；窄屏顶栏工具会自然换行，workspace、composer、history 均保持在视口内。
 - 中英文切换、主题切换、无 runtime 时发送阻断均已通过浏览器交互验证。

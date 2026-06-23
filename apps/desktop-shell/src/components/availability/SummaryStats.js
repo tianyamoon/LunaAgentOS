@@ -23,15 +23,15 @@ export function SummaryStats(data) {
     <div class="summary-stats">
       <div class="summary-card">
         <span class="summary-number">${summary.providers.available}/${summary.providers.total}</span>
-        <span class="summary-label">Provider</span>
+        <span class="summary-label">${t("availability.providers")}</span>
       </div>
       <div class="summary-card">
         <span class="summary-number">${summary.runtimes.available}/${summary.runtimes.total}</span>
-        <span class="summary-label">Runtime</span>
+        <span class="summary-label">${t("availability.runtimes")}</span>
       </div>
       <div class="summary-card">
         <span class="summary-number">${summary.targets.sendable}/${summary.targets.total}</span>
-        <span class="summary-label">Agent</span>
+        <span class="summary-label">${t("availability.agents")}</span>
       </div>
       ${currentTargetHtml}
     </div>

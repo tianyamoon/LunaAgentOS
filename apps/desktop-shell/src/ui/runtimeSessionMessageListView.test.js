@@ -264,6 +264,29 @@ test("runtimeSessionMessageListView: reconnecting runtime row is visible without
   assert.doesNotMatch(messageRowClass(row), /is-active/);
 });
 
+test("runtimeSessionMessageListView: image attachments match runtime image blocks by image order", () => {
+  const view = createView();
+  const html = view.renderMessageRow({
+    id: "t1:user",
+    kind: "user",
+    content: "see image",
+    metadata: {
+      attachments: [
+        { name: "notes.txt", kind: "file" },
+        { name: "screen.png", kind: "image" },
+      ],
+      runtimeImages: [
+        { type: "image", mimeType: "image/png", data: "abc123" },
+      ],
+    },
+  });
+
+  assert.match(html, /notes\.txt/);
+  assert.match(html, /screen\.png/);
+  assert.match(html, /runtime-message-attachment-thumb/);
+  assert.match(html, /src="data:image\/png;base64,abc123"/);
+});
+
 test("runtimeSessionMessageListView: 换序时只移动真实错位的行", () => {
   const first = fakeNode("first", rowSignature({ id: "first", kind: "tool", content: "1" }));
   const second = fakeNode("second", rowSignature({ id: "second", kind: "tool", content: "2" }));
@@ -439,6 +462,29 @@ test("rowSignature: 相同内容产生相同签名", () => {
 test("rowSignature: 不同内容产生不同签名", () => {
   const row1 = { id: "a", kind: "assistant", content: "hello", status: "completed", metadata: {} };
   const row2 = { id: "a", kind: "assistant", content: "world", status: "completed", metadata: {} };
+  assert.notEqual(rowSignature(row1), rowSignature(row2));
+});
+
+test("rowSignature: attachment render inputs affect the signature", () => {
+  const row1 = {
+    id: "a",
+    kind: "user",
+    content: "hello",
+    metadata: {
+      attachments: [{ name: "screen.png", kind: "image" }],
+      runtimeImages: [{ type: "image", mimeType: "image/png", data: "one" }],
+    },
+  };
+  const row2 = {
+    id: "a",
+    kind: "user",
+    content: "hello",
+    metadata: {
+      attachments: [{ name: "screen.png", kind: "image" }],
+      runtimeImages: [{ type: "image", mimeType: "image/png", data: "two" }],
+    },
+  };
+
   assert.notEqual(rowSignature(row1), rowSignature(row2));
 });
 

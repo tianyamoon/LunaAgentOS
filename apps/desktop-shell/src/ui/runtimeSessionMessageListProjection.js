@@ -107,6 +107,9 @@ function projectTurnRows(turn, { latestTurnId, forceLive, isCurrentTurn = false,
     metadata: {
       attachments: list(turn.meta?.attachments),
       isLatestTurn: turn.id === latestTurnId,
+      // runtimeImages 仅 live turn 期间存在（不进 history），
+      // 用于在用户行中渲染图片缩略图。
+      runtimeImages: Array.isArray(turn.runtimeImages) ? turn.runtimeImages : [],
     },
   }));
 

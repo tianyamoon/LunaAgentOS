@@ -20,7 +20,7 @@ Health conclusions prefer runtime probes, adapter health checks, or verifiable l
 
 - **More honest probing**: installation, callability, WSL/Bridge, and version information are derived from runtime commands or adapter-reported facts where possible; login, configuration, model, and key readiness are reported only when the runtime or adapter exposes a verifiable signal, otherwise they stay unknown.
 - **Honest unknowns**: any field that cannot be confirmed is shown as `unknown` instead of being faked as healthy. An Agent is never reported as available unless at least one field is positively verified.
-- **Credential safety**: keys are only checked for presence, never displayed, and presence alone is never claimed as validity. Diagnostic output redacts secret-bearing lines.
+- **Credential safety**: login and key configuration status remain `unknown` unless the runtime or adapter provides a verifiable signal; key values are never displayed, and diagnostic output redacts secret-bearing lines.
 - **Evidence chain**: each health field can show its source and check time, so a status is traceable rather than opaque.
 - **Interactive repair actions**: when a health result includes a `repair_hint`, the UI can offer actionable next steps — copy the fix command, open the relevant configuration dialog, or re-probe in place.
 

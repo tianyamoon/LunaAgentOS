@@ -61,7 +61,7 @@ export function runtimeDefaultsForProvider(providerId, runtimeInstanceId = null,
   };
 }
 
-export function profileMetaFromTarget(target) {
+function profileMetaFromTarget(target) {
   if (!target || target.providerId !== "hermes") return null;
   return {
     profileName: target.profileName || null,
@@ -75,11 +75,11 @@ export function profileMetaFromTarget(target) {
   };
 }
 
-export function profileMetaFromTurns(turns = []) {
+function profileMetaFromTurns(turns = []) {
   return turns.find((turn) => turn?.meta?.hermesProfile)?.meta?.hermesProfile || null;
 }
 
-export function profileKeyFromSession(session = {}) {
+function profileKeyFromSession(session = {}) {
   return session.profileAlias
     || session.profileExecutable
     || session.profileName
@@ -88,7 +88,7 @@ export function profileKeyFromSession(session = {}) {
     || "";
 }
 
-export function findHermesProfileTarget(session, runtimeTargets = []) {
+function findHermesProfileTarget(session, runtimeTargets = []) {
   if (!session || session.providerId !== "hermes") return null;
   const runtimeInstanceId = session.runtimeInstanceId || null;
   const profileKey = profileKeyFromSession(session);
@@ -103,7 +103,7 @@ export function findHermesProfileTarget(session, runtimeTargets = []) {
   }) || null;
 }
 
-export function displayProviderName(providerId, providerName, providers = []) {
+function displayProviderName(providerId, providerName, providers = []) {
   return providers.find((provider) => provider.id === providerId)?.name || providerName || "";
 }
 

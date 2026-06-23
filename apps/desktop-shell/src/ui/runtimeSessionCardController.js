@@ -281,12 +281,60 @@ export function createRuntimeSessionCardController({
     return latestProjection.rows.filter((row) => row.promptRunId === latestSession.activePromptRunId);
   }
 
+  function showImageLightbox(src) {
+    // 挂到 document.body：脱离卡片虚拟列表与频繁 patch 重渲染，
+    // 否则 overlay 会被下一次卡片重绘连带清掉，表现为"一闪就消失"。
+    const existing = document.body.querySelector(".msg-image-lightbox");
+    if (existing) existing.remove();
+
+    const overlay = document.createElement("div");
+    overlay.className = "msg-image-lightbox";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-label", "Image preview");
+
+    const img = document.createElement("img");
+    img.src = src;
+    img.alt = "";
+    overlay.appendChild(img);
+
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "msg-image-lightbox-close";
+    closeBtn.setAttribute("aria-label", "Close");
+    closeBtn.textContent = "×";
+    overlay.appendChild(closeBtn);
+
+    function close() {
+      document.removeEventListener("keydown", onKeydown);
+      overlay.remove();
+    }
+
+    function onKeydown(e) {
+      if (e.key === "Escape") close();
+    }
+
+    // 点击背景（overlay 本身）或关闭按钮才关闭；点击大图不关闭，避免误触。
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay || e.target === closeBtn) close();
+    });
+    document.addEventListener("keydown", onKeydown);
+
+    document.body.appendChild(overlay);
+  }
+
   function bindMessageListDelegation(sessionId, body) {
     if (!body?.addEventListener || delegatedBodies.has(body)) return;
     delegatedBodies.add(body);
     body.addEventListener("click", (event) => {
       if (event.target.closest?.("[data-runtime-scroll-latest]")) {
         ensureMessageListStickController(sessionId, body, true)?.resumeFollowing();
+        return;
+      }
+      const clickedImage = event.target.closest?.(".rich-text img, .runtime-message-attachment-thumb");
+      if (clickedImage) {
+        event.preventDefault();
+        event.stopPropagation();
+        showImageLightbox(clickedImage.src);
         return;
       }
       const copyButton = event.target.closest?.(".md-code-copy-btn");

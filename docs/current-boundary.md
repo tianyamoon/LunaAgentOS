@@ -2,7 +2,7 @@
 
 [中文](./current-boundary.zh-CN.md)
 
-LunaAgentOS is heading toward a personal Agent operating system for the AI era — a desktop layer where users install agents like apps, schedule tasks like processes, and own agent memory like local files. 0.2 Preview lays down the foundational capabilities on the way to that goal: a credible, archivable, neutral desktop workspace that hosts real AI agent sessions.
+LunaAgentOS is heading toward a personal Agent operating system for the AI era — a desktop layer where users install agents like apps, schedule tasks like processes, and own agent memory like local files. 0.3 lays down the foundational capabilities on the way to that goal: a credible, archivable, neutral desktop workspace that hosts real AI agent sessions.
 
 This page captures the current release boundary: what is actually built today, where the next stretch of road goes, and which common misreadings to clear up early.
 

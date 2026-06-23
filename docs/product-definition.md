@@ -64,7 +64,7 @@ This keeps the workspace neutral while allowing each runtime to preserve its own
 - **Hermes**: validates profile-based identity, Windows / WSL routing, ACP sessions, and richer runtime event visibility
 - **Trae IDE**: represents the IDE-first bridge path
 
-These are real external products entering the workspace. LunaAgentOS 0.2 Preview makes the workspace their shared host surface; each agent's own capabilities continue to come from those agents.
+These are real external products entering the workspace. LunaAgentOS 0.3 makes the workspace their shared host surface; each agent's own capabilities continue to come from those agents.
 
 ## Design constraints
 

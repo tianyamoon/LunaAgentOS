@@ -11,3 +11,5 @@ spike/
 docs/research/
 prototype/
 temps/
+target/
+**/target/
