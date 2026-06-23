@@ -1,0 +1,408 @@
+// Runtime Session 连续 MessageList 视图。
+// 行使用稳定 data-message-id；流式刷新时仅更新变化行，避免替换整个滚动容器。
+
+export function createRuntimeSessionMessageListView({
+  renderAssistantResponse,
+  isOpenForKey,
+  t,
+  escapeHtml,
+}) {
+  function renderMessageListShell(projection) {
+    return `
+      <div class="runtime-message-list">
+        <div class="runtime-message-list-scroller" data-runtime-message-scroller>
+          <div class="runtime-message-list-content" data-runtime-message-content>
+            ${projection.rows.map(renderMessageRow).join("")}
+          </div>
+        </div>
+        <button type="button" class="runtime-message-scroll-latest-btn" data-runtime-scroll-latest hidden title="${escapeHtml(t("action.scrollLatest"))}" aria-label="${escapeHtml(t("action.scrollLatest"))}">
+          <span aria-hidden="true">↓</span>
+        </button>
+      </div>
+    `;
+  }
+
+  function renderMessageRow(row) {
+    const signature = rowSignature(row);
+    return `<div class="${escapeHtml(messageRowClass(row))}" data-message-id="${escapeHtml(row.id)}" data-message-kind="${escapeHtml(row.kind)}" data-message-signature="${escapeHtml(signature)}">${renderMessageRowBody(row)}</div>`;
+  }
+
+  function renderMessageRowBody(row) {
+    if (row.kind === "user") return renderUserRow(row);
+    if (row.kind === "assistant") return renderAssistantRow(row);
+    if (row.kind === "thinking") return renderThinkingRow(row);
+    if (row.kind === "tool_group") return renderToolGroupRow(row);
+    if (row.kind === "worked_for") return renderWorkedForRow(row);
+    if (row.kind === "debug") return renderDebugRow(row);
+    if (row.kind === "queue") return renderQueueRow(row);
+    if (row.kind === "legacy_warning") return renderLegacyWarningRow();
+    return renderCompactEventRow(row);
+  }
+
+  function renderUserRow(row) {
+    const attachments = Array.isArray(row.metadata?.attachments) ? row.metadata.attachments : [];
+    const runtimeImages = Array.isArray(row.metadata?.runtimeImages) ? row.metadata.runtimeImages : [];
+    const imageUrls = runtimeImages
+      .filter((block) => block.type === "image" && block.data)
+      .map((block) => `data:${block.mimeType || "image/png"};base64,${block.data}`);
+    let imageIndex = 0;
+    return `
+      <div class="runtime-message-user-bubble">${escapeHtml(row.content)}</div>
+      ${attachments.length ? `<div class="runtime-message-attachments">${attachments.map((attachment) => {
+        const imageUrl = attachment.kind === "image" ? imageUrls[imageIndex++] : "";
+        const thumbnail = imageUrl
+          ? `<img class="runtime-message-attachment-thumb" src="${escapeHtml(imageUrl)}" alt="" aria-hidden="true">`
+          : "";
+        return `<span class="runtime-message-attachment ${attachment.kind === "image" ? "is-image" : ""}">${thumbnail}<span>${escapeHtml(attachment.name || t("turn.attachment.unnamed"))}</span></span>`;
+      }).join("")}</div>` : ""}
+    `;
+  }
+
+  function renderAssistantRow(row) {
+    const phase = row.metadata?.final ? "final" : "streaming";
+    return `
+      <section class="runtime-message-assistant ${row.status === "running" ? "is-streaming" : ""}">
+        ${renderAssistantResponse(row.content || t("turn.waiting"), phase)}
+      </section>
+    `;
+  }
+
+  function renderThinkingRow(row) {
+    const completed = row.metadata?.turnCompleted ? "is-completed" : "";
+    const active = row.status === "running" ? "is-active" : "";
+    const open = row.status === "running" ? " open" : "";
+    return `
+      <section class="runtime-message-thinking ${statusClass(row)} ${escapeHtml(completed)} ${escapeHtml(active)}">
+        ${renderEventHeading(row, t("turn.timeline.thinking"))}
+        <div class="runtime-message-event-content">${escapeHtml(row.content || t("turn.timeline.thinking"))}</div>
+      </section>
+    `;
+  }
+
+  function renderCompactEventRow(row) {
+    const detailKey = row.metadata?.detailKey || `${row.id}:message`;
+    const open = isOpenForKey(detailKey, row.kind === "error" || row.status === "failed");
+    const activeClass = row.status === "running" ? "is-active" : "";
+    const completedClass = row.metadata?.turnCompleted ? "is-completed" : "";
+    const expandHint = row.metadata?.turnCompleted ? ` data-expand-hint="${escapeHtml(t("turn.timeline.expandHint"))}"` : "";
+    return `
+      <details class="terminal-detail runtime-message-event runtime-message-event-${escapeHtml(row.kind)} ${statusClass(row)} ${escapeHtml(activeClass)} ${escapeHtml(completedClass)}" data-detail-key="${escapeHtml(detailKey)}"${open ? " open" : ""}>
+        <summary${expandHint}>${renderEventHeading(row)}<span class="turn-event-arrow" aria-hidden="true"></span></summary>
+        ${row.content ? `<pre class="terminal-pre">${escapeHtml(row.content)}</pre>` : ""}
+      </details>
+    `;
+  }
+
+  function renderToolGroupRow(row) {
+    const detailKey = row.metadata?.detailKey || `${row.id}:message-group`;
+    const tools = Array.isArray(row.metadata?.items) ? row.metadata.items : [];
+    const open = isOpenForKey(detailKey, row.status === "running");
+    const activeClass = row.status === "running" ? "is-active" : "";
+    const completedClass = row.metadata?.turnCompleted ? "is-completed" : "";
+    const expandHint = row.metadata?.turnCompleted ? ` data-expand-hint="${escapeHtml(t("turn.timeline.expandHint"))}"` : "";
+    return `
+      <details class="terminal-detail runtime-message-event runtime-message-event-tool-group ${statusClass(row)} ${escapeHtml(activeClass)} ${escapeHtml(completedClass)}" data-detail-key="${escapeHtml(detailKey)}"${open ? " open" : ""}>
+        <summary${expandHint}>${renderEventHeading(row, t("turn.timeline.exploreTools", { count: tools.length }))}<span class="turn-event-arrow" aria-hidden="true"></span></summary>
+        <ul>${tools.map((tool) => `<li>${escapeHtml(tool.content || t("turn.timeline.emptyEvent"))}</li>`).join("")}</ul>
+      </details>
+    `;
+  }
+
+  function renderWorkedForRow(row) {
+    const detailKey = row.metadata?.detailKey || `${row.id}:message-worked-for`;
+    const open = isOpenForKey(detailKey, false);
+    const traceRows = Array.isArray(row.metadata?.rows) ? row.metadata.rows : [];
+    const debug = row.metadata?.debug || null;
+    const status = row.status || "completed";
+    return `
+      <details class="terminal-detail runtime-message-worked-for runtime-message-worked-for-${escapeHtml(status)}" data-detail-key="${escapeHtml(detailKey)}"${open ? " open" : ""}>
+        <summary>
+          <span class="cb-check" aria-hidden="true"></span>
+          <span class="runtime-completion-title">${escapeHtml(workedForTitle(status))}</span>
+          <span class="runtime-completion-stats">${completionStatsLabel(row.metadata?.summary || {}, traceRows, debug)}</span>
+          <span class="runtime-completion-toggle runtime-completion-toggle-open">${escapeHtml(t("turn.timeline.expandHint"))}</span>
+          <span class="runtime-completion-toggle runtime-completion-toggle-close">${escapeHtml(t("turn.timeline.collapseHint"))}</span>
+        </summary>
+        <div class="runtime-message-trace">
+          ${traceRows.length ? `<div class="runtime-message-trace-section">${traceRows.map(renderTraceRow).join("")}</div>` : ""}
+          ${debug ? `<div class="runtime-message-trace-section runtime-message-trace-debug">${renderDebugRow({ id: `${row.id}:debug`, kind: "debug", metadata: debug })}</div>` : ""}
+        </div>
+      </details>
+    `;
+  }
+
+  function workedForTitle(status) {
+    if (status === "failed") return t("turn.timeline.failedTitle");
+    if (status === "cancelled" || status === "canceled" || status === "stopped") return t("turn.timeline.cancelledTitle");
+    return t("turn.timeline.completionTitle");
+  }
+
+  function renderTraceRow(row) {
+    return `<div class="runtime-message-trace-row runtime-message-trace-row-${escapeHtml(row.kind)}">${renderMessageRowBody(row)}</div>`;
+  }
+  function renderDebugRow(row) {
+    const detailKey = `${row.id}:message-debug`;
+    const open = isOpenForKey(detailKey, false);
+    // 默认只保留摘要节点，完整 JSON 仅在展开时渲染
+    const summary = debugSummary(row.metadata);
+    return `
+      <details class="terminal-detail runtime-message-debug" data-detail-key="${escapeHtml(detailKey)}"${open ? " open" : ""}>
+        <summary>${escapeHtml(t("turn.timeline.debug"))}<span class="debug-summary">${escapeHtml(summary)}</span></summary>
+        ${open
+          ? `<pre class="terminal-pre">${escapeHtml(stringifyDebug(row.metadata))}</pre>`
+          : `<div class="terminal-pre runtime-message-debug-placeholder">${escapeHtml(summary || t("turn.timeline.debug"))}</div><template data-debug-json>${escapeHtml(stringifyDebug(row.metadata))}</template>`}
+      </details>
+    `;
+  }
+
+  function renderQueueRow(row) {
+    return `
+      <div class="runtime-message-queue">
+        <span>${escapeHtml(t("session.followUpQueuedRow"))}</span>
+        <strong>${escapeHtml(row.content)}</strong>
+        ${row.metadata?.attachmentCount ? `<small>${escapeHtml(t("session.followUpAttachmentCount", { count: row.metadata.attachmentCount }))}</small>` : ""}
+      </div>
+    `;
+  }
+
+  function renderLegacyWarningRow() {
+    return `<div class="runtime-message-legacy-warning">${escapeHtml(t("turn.historyIntegrityWarning"))}</div>`;
+  }
+
+  function renderEventHeading(row, title = row.content) {
+    return `
+      <span class="turn-event-dot" aria-hidden="true"></span>
+      <span class="runtime-message-event-kind">${escapeHtml(t(`turn.timeline.kind.${row.kind}`))}</span>
+      <span class="runtime-message-event-title">${escapeHtml(title || t("turn.timeline.emptyEvent"))}</span>
+    `;
+  }
+
+  function workedForLabel(summary) {
+    return t("turn.timeline.workedFor", {
+      duration: formatRuntimeMessageDuration(summary.durationMs),
+      tools: summary.toolCount ? t("turn.timeline.toolCount", { count: summary.toolCount }) : "",
+      files: summary.fileChangeCount ? t("turn.timeline.fileCount", { count: summary.fileChangeCount }) : "",
+    });
+  }
+
+  function completionStatsLabel(summary, traceRows, debug) {
+    const parts = [];
+    if (summary.durationMs) parts.push(t("turn.timeline.duration", { duration: formatRuntimeMessageDuration(summary.durationMs) }));
+    const thinkingCount = traceRows.filter((row) => row.kind === "thinking").length;
+    const runtimeCount = traceRows.filter((row) => row.kind === "runtime").length;
+    const responseCount = traceRows.filter((row) => row.kind === "assistant").length;
+    if (thinkingCount) parts.push(t("turn.timeline.thinkingCount", { count: thinkingCount }));
+    if (summary.toolCount) parts.push(t("turn.timeline.toolCount", { count: summary.toolCount }));
+    if (runtimeCount) parts.push(t("turn.timeline.runtimeCount", { count: runtimeCount }));
+    if (responseCount) parts.push(t("turn.timeline.responseCount", { count: responseCount }));
+    if (summary.fileChangeCount) parts.push(t("turn.timeline.fileCount", { count: summary.fileChangeCount }));
+    const debugCount = debugEventCount(debug);
+    if (debugCount) parts.push(t("turn.timeline.debugCount", { count: debugCount }));
+    return escapeHtml(parts.join(""));
+  }
+
+  // 已有壳只对账消息行；首次进入时才创建 scroller，保证拖动中的 scrollbar 不会失效。
+  function syncMessageList(container, projection) {
+    if (!container) return null;
+    let contentElement = container.querySelector?.("[data-runtime-message-content]") || null;
+    if (!contentElement) {
+      container.innerHTML = renderMessageListShell(projection);
+      contentElement = container.querySelector?.("[data-runtime-message-content]") || null;
+    } else {
+      const result = reconcileMessageList(contentElement, projection.rows, {
+        renderMessageRow,
+        renderMessageRowBody,
+      });
+      contentElement.dataset.lastMutationReport = JSON.stringify(result.report);
+    }
+    const reportText = contentElement.dataset.lastMutationReport;
+    return {
+      scroller: container.querySelector?.("[data-runtime-message-scroller]") || null,
+      contentElement,
+      scrollLatestButton: container.querySelector?.("[data-runtime-scroll-latest]") || null,
+      scrollTargetRow: projection.scrollTargetRowId
+        ? contentElement?.querySelector?.(`[data-message-id="${projection.scrollTargetRowId}"]`) || null
+        : null,
+      mutationReport: reportText ? JSON.parse(reportText) : emptyMutationReport(),
+    };
+  }
+
+  return {
+    renderMessageListShell,
+    renderMessageRow,
+    renderMessageRowBody,
+    syncMessageList,
+  };
+}
+
+// MessageList 自己持有轻量格式化，避免重新依赖已经准备退场的旧轮次视图。
+export function formatRuntimeMessageDuration(durationMs) {
+  const totalSeconds = Math.max(0, Math.floor(Number(durationMs || 0) / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return minutes ? `${minutes}m ${seconds}s` : `${seconds}s`;
+}
+
+// 对账只替换变化行的内部内容；已有行节点保持稳定，滚动条拖动不会失去目标容器。
+export function reconcileMessageList(contentElement, rows, {
+  renderMessageRow,
+  renderMessageRowBody,
+  createRowElement = defaultCreateRowElement,
+} = {}) {
+  if (!contentElement) return { nodes: [], report: emptyMutationReport() };
+  const report = emptyMutationReport();
+  const existing = new Map(
+    [...contentElement.querySelectorAll(":scope > [data-message-id]")]
+      .map((node) => [node.dataset.messageId, node]),
+  );
+  const activeIds = new Set();
+  const nodes = [];
+  let cursor = 0;
+  rows.forEach((row) => {
+    const signature = rowSignature(row);
+    let node = existing.get(row.id) || null;
+    if (!node) {
+      node = createRowElement(renderMessageRow(row));
+      report.addedIds.push(row.id);
+    } else if (node.dataset.messageSignature !== signature) {
+      node.className = messageRowClass(row);
+      node.dataset.messageKind = row.kind;
+      node.dataset.messageSignature = signature;
+      node.innerHTML = renderMessageRowBody(row);
+      report.changedIds.push(row.id);
+    } else {
+      report.stableIds.push(row.id);
+    }
+    if (!node) return;
+    activeIds.add(row.id);
+    // 游标顺序检查：只在位置确实不同时才移动 DOM
+    const currentChild = contentElement.children?.[cursor] || null;
+    if (currentChild !== node) {
+      if (currentChild && typeof contentElement.insertBefore === "function") {
+        contentElement.insertBefore(node, currentChild);
+      } else {
+        contentElement.append(node);
+      }
+      if (!report.addedIds.includes(row.id)) report.movedIds.push(row.id);
+    }
+    cursor++;
+    nodes.push(node);
+  });
+  existing.forEach((node, id) => {
+    if (!activeIds.has(id)) {
+      report.removedIds.push(id);
+      node.remove();
+    }
+  });
+  return { nodes, report };
+}
+
+// 按动画帧合并高频 delta：同一帧内多次对账只执行最后一次。
+export function createMergedReconciler({
+  requestFrame = (cb) => requestAnimationFrame(cb),
+  cancelFrame = (id) => cancelAnimationFrame(id),
+} = {}) {
+  let pendingFrameId = 0;
+  let pendingCall = null;
+
+  function mergeReconcile(contentElement, rows, options) {
+    if (pendingCall) cancelFrame(pendingFrameId);
+    pendingCall = { contentElement, rows, options };
+    pendingFrameId = requestFrame(() => {
+      const call = pendingCall;
+      pendingCall = null;
+      pendingFrameId = 0;
+      if (!call) return;
+      reconcileMessageList(call.contentElement, call.rows, call.options);
+    });
+  }
+
+  function flushPending() {
+    if (!pendingCall) return null;
+    cancelFrame(pendingFrameId);
+    pendingFrameId = 0;
+    const call = pendingCall;
+    pendingCall = null;
+    return reconcileMessageList(call.contentElement, call.rows, call.options);
+  }
+
+  return { mergeReconcile, flushPending };
+}
+
+// 签名只包含影响渲染的字段，避免 JSON.stringify 全量序列化。
+export function rowSignature(row) {
+  const meta = row.metadata || {};
+  const items = Array.isArray(meta.items) ? meta.items.map((item) => item.content || "").join(",") : "";
+  const traceRows = Array.isArray(meta.rows) ? meta.rows.map((r) => rowSignature(r)).join(";") : "";
+  const attachments = Array.isArray(meta.attachments) ? JSON.stringify(meta.attachments) : "";
+  const runtimeImages = Array.isArray(meta.runtimeImages) ? JSON.stringify(meta.runtimeImages) : "";
+  return [
+    row.kind,
+    row.status,
+    row.content,
+    meta.final ? "final" : "",
+    meta.summary ? JSON.stringify(meta.summary) : "",
+    items,
+    traceRows,
+    meta.debug ? JSON.stringify(meta.debug) : "",
+    meta.attachmentCount ?? "",
+    attachments,
+    runtimeImages,
+  ].join("|");
+}
+
+function defaultCreateRowElement(html) {
+  const template = document.createElement("template");
+  template.innerHTML = html.trim();
+  return template.content.firstElementChild;
+}
+
+function emptyMutationReport() {
+  return {
+    addedIds: [],
+    changedIds: [],
+    movedIds: [],
+    removedIds: [],
+    stableIds: [],
+  };
+}
+
+function stringifyDebug(metadata) {
+  try {
+    return JSON.stringify(metadata || {}, null, 2);
+  } catch (error) {
+    return String(error?.message || error);
+  }
+}
+
+function debugSummary(metadata) {
+  if (!metadata) return "";
+  const parts = [];
+  const rawEvents = Array.isArray(metadata.rawEvents) ? metadata.rawEvents : [];
+  const logs = Array.isArray(metadata.logs) ? metadata.logs : [];
+  if (rawEvents.length) parts.push(`${rawEvents.length} events`);
+  if (logs.length) parts.push(`${logs.length} logs`);
+  return parts.length ? ` (${parts.join(", ")})` : "";
+}
+
+export function messageRowClass(row) {
+  const classes = [
+    "runtime-message-row",
+    `runtime-message-row-${row.kind || "event"}`,
+  ];
+  if (row.status) classes.push(`runtime-message-status-${row.status}`);
+  if (row.status === "running") classes.push("is-active");
+  if (row.metadata?.turnCompleted) classes.push("is-completed");
+  return classes.join(" ");
+}
+
+function debugEventCount(metadata) {
+  if (!metadata) return 0;
+  const rawEvents = Array.isArray(metadata.rawEvents) ? metadata.rawEvents.length : 0;
+  const logs = Array.isArray(metadata.logs) ? metadata.logs.length : 0;
+  return rawEvents + logs;
+}
+
+function statusClass(row) {
+  return `runtime-message-status-${row.status || "completed"}`;
+}

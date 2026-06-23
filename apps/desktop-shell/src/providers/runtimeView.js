@@ -12,6 +12,7 @@ import {
   isTargetUnavailableForFleet,
   targetStatusForFleet,
 } from "./agentMetadata.js";
+import { providerSupportsLaunch } from "./providerCatalog.js";
 
 export function runtimeInstancesForProvider(runtimeInstances, providerId) {
   if (!Array.isArray(runtimeInstances)) return [];
@@ -21,6 +22,11 @@ export function runtimeInstancesForProvider(runtimeInstances, providerId) {
 export function availableRuntimeInstancesForProvider(runtimeInstances, providerId) {
   return runtimeInstancesForProvider(runtimeInstances, providerId)
     .filter((instance) => instance.available);
+}
+
+function runtimeVerificationStatus(instance) {
+  if (instance?.verificationStatus) return instance.verificationStatus;
+  return instance?.available ? "verified_available" : "verified_unavailable";
 }
 
 export function runtimeInstanceById(runtimeInstances, id) {
@@ -49,7 +55,8 @@ export function targetsForRuntimeInstance(
   { providers, runtimeInstances, runtimeTargetsByInstance },
 ) {
   const provider = (providers || []).find((entry) => entry.id === instance.providerId);
-  if (!provider || !instance.available) return [];
+  // identityOnly Provider 保留目录身份，但不会生成可启动 Runtime Target。
+  if (!providerSupportsLaunch(provider) || instance.available === false) return [];
   const availableCount = availableRuntimeInstancesForProvider(runtimeInstances, instance.providerId).length;
   const runtimeHost = identityRuntimeHostForInstance(instance);
   const extensionTargets = (runtimeTargetsByInstance && runtimeTargetsByInstance[instance.id]) || [];
@@ -67,9 +74,13 @@ export function targetsForRuntimeInstance(
         kind: target.kind || (target.profileName || target.alias || target.gateway ? "profile" : "runtime"),
         state: typeof target.state === "number" ? target.state : 1,
         available: target.available !== false && (!target.gateway || target.gateway === "running") && target.state !== 9,
+        verificationStatus: target.verificationStatus || instance.verificationStatus || null,
         profileAlias: target.profileAlias || target.alias || null,
         profileExecutable: target.profileExecutable || target.alias || null,
         profilePath: target.profilePath || target.path || null,
+        health: target.health || instance.health || null,
+        healthEvidence: target.healthEvidence || instance.healthEvidence || [],
+        modelControl: target.modelControl || instance.modelControl || provider.modelControl || provider.adapterManifest?.modelControl || null,
       };
       return {
         ...normalized,
@@ -89,7 +100,14 @@ export function targetsForRuntimeInstance(
     subtitle: instance.transport || instance.runtimeLabel || "Manifest Runtime",
     state: 1,
     available: true,
+    verificationStatus: instance.verificationStatus || null,
+    health: instance.health || null,
+    healthEvidence: instance.healthEvidence || [],
+    modelControl: instance.modelControl || provider.modelControl || provider.adapterManifest?.modelControl || null,
   };
+  if (runtimeVerificationStatus(instance) === "unknown") {
+    target.status = { state: "unknown", labelKey: "availability.unverified" };
+  }
   return [{
     ...target,
     status: targetStatusForFleet(target),

@@ -1,6 +1,9 @@
 import { SummaryStats } from "./SummaryStats.js";
 import { ProviderSection } from "./ProviderSection.js";
 import { getLanguage, t } from "../../i18n/index.js";
+import { escapeHtml, healthReasonText, healthRepairText } from "./healthText.js";
+import { renderRepairActions } from "./repairActions.js";
+import { buildRepairActions } from "../../state/repairActions.js";
 
 export function AvailabilityView(data, options = {}) {
   const { summary, providers, problems, lastCheck } = data;
@@ -24,10 +27,23 @@ export function AvailabilityView(data, options = {}) {
         <h4>${t("availability.needsAttention")} (${problems.length})</h4>
         <ul>
           ${problems
-            .map(
-              (p) =>
-                `<li><strong>${escapeHtml(p.provider)}</strong> / ${escapeHtml(p.target || p.runtime)}: ${escapeHtml(p.reasonKey ? t(p.reasonKey) : p.reason)}</li>`
-            )
+            .map((p) => {
+              const reason = healthReasonText({
+                unavailable_reason: p.reason,
+                unavailable_reason_params: p.reasonParams,
+              });
+              const repair = healthRepairText({
+                repair_hint: p.repairHint,
+                repair_hint_params: p.repairHintParams,
+              });
+              const actions = renderRepairActions(
+                buildRepairActions(
+                  { repair_hint: p.repairHint, repair_hint_params: p.repairHintParams },
+                  { providerId: p.providerId, instance: { commandKind: p.commandKind, command: p.command } },
+                ),
+              );
+              return `<li><strong>${escapeHtml(p.provider)}</strong> / ${escapeHtml(p.target || p.runtime)}: ${escapeHtml(reason || t("availability.reason.unknown"))}${repair ? `<br><small>${escapeHtml(repair)}</small>` : ""}${actions}</li>`;
+            })
             .join("")}
         </ul>
       </section>`
@@ -48,12 +64,4 @@ export function AvailabilityView(data, options = {}) {
       ${footerHtml}
     </div>
   `;
-}
-
-function escapeHtml(text) {
-  return String(text || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }

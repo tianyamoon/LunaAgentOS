@@ -12,11 +12,11 @@
   <a href="./README.en.md">English</a>
 </p>
 
-**LunaAgentOS 0.2.2**
+**LunaAgentOS 0.3.0**
 
 LunaAgentOS 是为多 Agent 工作与协作而生的个人桌面操作环境。
 
-它把各类 Agent 工具放进同一个桌面入口里，包括 Claude Code、Hermes 和 OpenAI Codex Manifest，让你在一个地方发起任务、查看过程、切换会话、找回历史，而不是在不同工具之间来回搬运上下文。
+它把各类 Agent 工具放进同一个桌面入口里，包括 Claude Code、Hermes 和 OpenAI Codex，让你在一个地方发起任务、查看过程、切换会话、找回历史，而不是在不同工具之间来回搬运上下文。
 
 **人类指挥。Agents 执行。工作台记住一切。**
 
@@ -88,7 +88,7 @@ LunaAgentOS 不是把 Claude Code、Hermes、Trae 或未来更多 runtime 收编
 | LunaAgentOS App | 已可用 | 打开一个 Windows 优先的本地桌面工作台 |
 | Claude Code | 已接入 | 把任务发进真实 Claude Code runtime session |
 | Hermes | 已接入 | 使用 Windows / WSL ACP runtime instance 与 profile |
-| OpenAI Codex Manifest | 已接入 | 通过 manifest 入口识别和承载 Codex agent |
+| OpenAI Codex | 已接入 | 通过 adapter manifest 识别和承载 Codex agent |
 | Runtime Session Card | 已可用 | 同屏查看 output、thought、runtime events 和 final response |
 | Session Card 事件流 | 已可用 | 将 thought、tool、plan、usage、error 等过程信息整理成可展开的事件节点 |
 | Focus 主视图 | 已可用 | 在工作区内聚焦单个 session，同时保持输入区可用 |
@@ -110,7 +110,7 @@ LunaAgentOS 不是把 Claude Code、Hermes、Trae 或未来更多 runtime 收编
 
 下一阶段不再只是把多个 Agent 摆进同一个界面，而是让 LunaAgentOS 开始承担个人 Agent 工作的管理层。
 
-现在的工作台已经能承载 Claude Code、Hermes 和 OpenAI Codex Manifest，也能展示过程、聚焦会话、区分历史和归档。接下来更重要的是：让这些入口、会话、账号、模型和资源变得可管理、可交接、可治理。
+现在的工作台已经能承载 Claude Code、Hermes 和 OpenAI Codex，也能展示过程、聚焦会话、区分历史和归档。接下来更重要的是：让这些入口、会话、账号、模型和资源变得可管理、可交接、可治理。
 
 - **统一管理 Agent 资产**：把 provider、runtime、账号、API key、模型额度、订阅周期和试用状态放到一个地方，让用户知道哪些还能用、哪些快到期、哪些已经废弃。
 - **减少无形浪费**：识别重复能力、闲置入口、过期配置和仍在消耗预算的 key，让用户不再靠记忆管理成本。
@@ -148,7 +148,7 @@ shell 只是第一层入口。真正要守住的是更深的工作秩序：在�
 - 如需 Claude 入口：本机可用的 Claude Code
 - 如需 Hermes 入口：WSL + Hermes
 
-Claude Code、Hermes 和 OpenAI Codex Manifest 是让工作台真正有价值的 runtime 入口。没有安装时，LunaAgentOS 也可以启动，对应入口会显示明确的配置状态，而不是崩溃或静默失败。
+Claude Code、Hermes 和 OpenAI Codex 是让工作台真正有价值的 runtime 入口。没有安装时，LunaAgentOS 也可以启动，对应入口会显示明确的配置状态，而不是崩溃或静默失败。
 
 ### 运行应用
 
@@ -175,16 +175,16 @@ apps/desktop-shell/src-tauri/target/release/desktop-shell.exe
 
 ## 产品边界
 
-LunaAgentOS 0.2.2 当前是：
+LunaAgentOS 0.3.0 当前是：
 
 - 真实 AI Agent 会话的中立桌面工作台
-- 面向 Claude Code、Hermes 和 OpenAI Codex Manifest session 的 Windows 优先本地应用
+- 面向 Claude Code、Hermes 和 OpenAI Codex session 的 Windows 优先本地应用
 - 以 Runtime Session Card、事件流和 Focus 主视图为中心的工作台
 - 带有 Agent 原生命令入口和 provider identity 的 session workspace
 - Human Command Workspace 的第一块可运行地基
 - 由 protocol、adapters 和 Runtime Session Model 支撑的产品界面
 
-LunaAgentOS 0.2.2 当前不是：
+LunaAgentOS 0.3.0 当前不是：
 
 - 试图把外部 runtime 全部收编成单一内置 Agent 的产品
 - 完整的多 Agent orchestration 平台
@@ -197,7 +197,7 @@ LunaAgentOS 0.2.2 当前不是：
 ### 先看这些
 
 - [文档总览](./docs/README.zh-CN.md)
-- [0.2.2 发布说明](./docs/release-notes-0.2.2.zh-CN.md)
+- [0.3.0 发布说明](./docs/release-notes-0.3.zh-CN.md)
 - [快速开始](./docs/getting-started.zh-CN.md)
 - [当前产品边界](./docs/current-boundary.zh-CN.md)
 - [贡献指南](./CONTRIBUTING.zh-CN.md)

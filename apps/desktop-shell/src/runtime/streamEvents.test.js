@@ -8,11 +8,12 @@ import {
   eventLogText,
   sessionSectionsFromEvents,
 } from "./streamEvents.js";
+import { TURN_STATUS } from "../state/sessionStatus.js";
 
 function makeSession() {
   return {
     id: "session-1",
-    task: "old task",
+    title: "old task",
     state: 1,
     turns: [],
     activeTurnId: "turn-1",
@@ -22,12 +23,13 @@ function makeSession() {
 function makeTurn() {
   return {
     id: "turn-1",
-    task: "build feature",
+    prompt: "build feature",
     thoughts: [],
     outputs: [],
     finalResponse: "",
     logs: [],
     state: 1,
+    status: TURN_STATUS.created,
   };
 }
 
@@ -89,10 +91,54 @@ test("applyEventsToTurn replaces aggregate turn sections and updates session ide
   assert.deepEqual(turn.outputs, ["done"]);
   assert.equal(turn.finalResponse, "done");
   assert.equal(turn.state, 5);
+  assert.equal(turn.status, TURN_STATUS.completed);
   assert.equal(session.state, 5);
-  assert.equal(session.task, "build feature");
+  assert.equal(session.title, "old task");
   assert.equal(session.activeTurnId, "turn-1");
   assert.equal(session.acpSessionId, "acp-1");
+});
+
+test("applyEventsToTurn writes ordered Timeline items for fallback and ACP batch events", () => {
+  const session = makeSession();
+  const turn = makeTurn();
+  applyEventsToTurn(session, turn, [
+    { type: "thought", state: 2, payload: { content: "先检查" } },
+    { type: "tool", state: 3, payload: { title: "Read", status: "done" } },
+    { type: "response", state: 5, payload: { content: "已完成" } },
+  ]);
+  assert.deepEqual(turn.timelineItems.map((item) => item.type), ["thinking", "tool", "assistant"]);
+  assert.equal(turn.timelineItems[1].content, "Read");
+  assert.equal(turn.timelineCompletedAt != null, true);
+});
+
+test("applyEventsToTurn preserves Turn start time when final ACP batch completes later", () => {
+  const session = makeSession();
+  const turn = {
+    ...makeTurn(),
+    timelineStartedAt: "1970-01-01T00:00:01.000Z",
+  };
+
+  applyEventsToTurn(session, turn, [
+    { type: "response", state: 5, payload: { content: "已完成" } },
+  ], { now: () => 6000 });
+
+  assert.equal(turn.timelineStartedAt, "1970-01-01T00:00:01.000Z");
+  assert.equal(turn.timelineCompletedAt, "1970-01-01T00:00:06.000Z");
+});
+
+test("applyEventsToTurn completes final batch response without explicit done state", () => {
+  const session = makeSession();
+  const turn = makeTurn();
+
+  applyEventsToTurn(session, turn, [
+    { type: "thought", state: 2, payload: { content: "checking" } },
+    { type: "tool", state: 3, payload: { title: "Read", status: "completed" } },
+    { type: "response", state: 4, payload: { content: "final answer" } },
+  ]);
+
+  assert.equal(turn.finalResponse, "final answer");
+  assert.equal(turn.status, TURN_STATUS.completed);
+  assert.equal(turn.timelineCompletedAt != null, true);
 });
 
 test("applyStreamEventToTurn appends incremental thought and response chunks", () => {
@@ -106,8 +152,25 @@ test("applyStreamEventToTurn appends incremental thought and response chunks", (
   assert.deepEqual(turn.outputs, ["cd"]);
   assert.equal(turn.finalResponse, "cd");
   assert.equal(turn.state, 4);
+  assert.equal(turn.status, TURN_STATUS.running);
   assert.equal(session.state, 4);
   assert.equal(session.acpSessionId, "acp-2");
+});
+
+test("applyStreamEventToTurn preserves Timeline order when Tool interrupts Assistant stream", () => {
+  const session = makeSession();
+  const turn = makeTurn();
+  applyStreamEventToTurn(session, turn, { type: "response", state: 4, payload: { content: "先检查" } });
+  applyStreamEventToTurn(session, turn, { type: "tool", state: 3, payload: { title: "Read", status: "done" } });
+  applyStreamEventToTurn(session, turn, { type: "response", state: 4, payload: { content: "再处理" } });
+  assert.deepEqual(
+    turn.timelineItems.map((item) => ({ type: item.type, content: item.content })),
+    [
+      { type: "assistant", content: "先检查" },
+      { type: "tool", content: "Read" },
+      { type: "assistant", content: "再处理" },
+    ],
+  );
 });
 
 test("applyStreamEventToTurn prepends tool/plan/usage/state logs", () => {
@@ -124,5 +187,6 @@ test("applyStreamEventToTurn prepends tool/plan/usage/state logs", () => {
     "Run：ok",
   ]);
   assert.equal(turn.state, 5);
+  assert.equal(turn.status, TURN_STATUS.completed);
   assert.equal(session.state, 5);
 });

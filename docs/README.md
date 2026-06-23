@@ -13,7 +13,7 @@ If you are new here, start with the docs that answer three practical questions f
 ## Start here
 
 - [Getting Started](./getting-started.md): install dependencies, run the desktop app, and validate the current workspace
-- [0.2.2 Release Notes](./release-notes-0.2.2.md): new capabilities, fixes, and retained boundaries
+- [0.3.0 Release Notes](./release-notes-0.3.md): Agent management, evidence-backed health diagnostics, image input, and retained boundaries
 - [Current Product Boundary](./current-boundary.md): what LunaAgentOS has built today, where the next stretch of road goes, and which common misreadings to clear up early
 - [Contributing](../CONTRIBUTING.md): development setup, tests, contribution areas, and pull request expectations
 
@@ -23,11 +23,13 @@ If you are new here, start with the docs that answer three practical questions f
 - [Why LunaAgentOS](./why-lunaagentos.md): the problem this project is trying to solve
 - [Light-Core Principles](./light-core-principles.md): the constraints that keep the control layer focused
 - [Roadmap](./roadmap.md): near-term and longer-term direction
-- [0.3 Requirement Definition](./requirements-0.3.md): the next step around agent availability management and session cards as task surfaces
+- [0.3 Requirement Definition](./requirements-0.3.md): Agent management and evidence-backed health diagnostics, with Runtime Session kept separate from Task
 
 ## Architecture and integration
 
 - [Architecture Overview](./architecture-overview.md): current layering and responsibilities
+- [Domain Context](../CONTEXT.md): shared LunaAgentOS vocabulary and model relationships
+- [Architecture Decision Records](./adr/README.md): durable decisions that future architecture work should preserve
 - [Hermes ACP Runtime](./hermes-acp-profile-runtime.md): Hermes runtime semantics and profile loading
 - [Hermes TUI Direction](./hermes-tui-direction.md): visibility goals for live sessions
 - [Protocol](../protocol/README.md): schemas, examples, and the public contract

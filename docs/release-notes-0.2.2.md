@@ -14,7 +14,7 @@ LunaAgentOS 0.2.2 is a small bugfix release focused on provider icon asset paths
 ## Still-Valid Foundation
 
 - Windows-first local desktop workspace.
-- Claude Code, Hermes, and OpenAI Codex Manifest entry messaging.
+- Claude Code, Hermes, and OpenAI Codex entry messaging.
 - Runtime Session Card surfaces for output, thought, runtime events, and final response.
 - Session Card event flow, Focus view, native agent command entry, and provider identity.
 - Separation between live sessions, history sessions, and archived sessions.

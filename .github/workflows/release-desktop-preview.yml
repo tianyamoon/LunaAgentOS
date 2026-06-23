@@ -83,8 +83,10 @@ jobs:
           Copy-Item "../../LICENSE" (Join-Path $assetDir "LICENSE")
           $notesPath = if ($tag -like "v0.1*") {
             "../../docs/release-notes-0.1-preview.md"
-          } else {
+          } elseif ($tag -like "v0.2*") {
             "../../docs/release-notes-0.2-preview.zh-CN.md"
+          } else {
+            "../../docs/release-notes-0.3.zh-CN.md"
           }
           if (Test-Path $notesPath) {
             Copy-Item $notesPath (Join-Path $assetDir "RELEASE_NOTES.md")
@@ -111,10 +113,16 @@ jobs:
             $alternateNotesUrl = "https://github.com/$repo/blob/$tag/docs/release-notes-0.1-preview.zh-CN.md"
             $gettingStartedRelative = "./getting-started.md"
             $gettingStartedUrl = "https://github.com/$repo/blob/$tag/docs/getting-started.md"
-          } else {
+          } elseif ($tag -like "v0.2*") {
             $notesPath = "../../docs/release-notes-0.2-preview.zh-CN.md"
             $alternateNotesRelative = "./release-notes-0.2-preview.md"
             $alternateNotesUrl = "https://github.com/$repo/blob/$tag/docs/release-notes-0.2-preview.md"
+            $gettingStartedRelative = "./getting-started.zh-CN.md"
+            $gettingStartedUrl = "https://github.com/$repo/blob/$tag/docs/getting-started.zh-CN.md"
+          } else {
+            $notesPath = "../../docs/release-notes-0.3.zh-CN.md"
+            $alternateNotesRelative = "./release-notes-0.3.md"
+            $alternateNotesUrl = "https://github.com/$repo/blob/$tag/docs/release-notes-0.3.md"
             $gettingStartedRelative = "./getting-started.zh-CN.md"
             $gettingStartedUrl = "https://github.com/$repo/blob/$tag/docs/getting-started.zh-CN.md"
           }

@@ -169,6 +169,18 @@ test("targetsForRuntimeInstance: unknown provider yields no targets", () => {
   assert.deepEqual(targets, []);
 });
 
+test("targetsForRuntimeInstance: identityOnly provider does not produce a launch row", () => {
+  const targets = targetsForRuntimeInstance(
+    { id: "trae-bridge", providerId: "trae", available: true, runtimeLabel: "IDE" },
+    {
+      providers: [{ id: "trae", name: "Trae IDE", identityOnly: true }],
+      runtimeInstances: [],
+      runtimeTargetsByInstance: {},
+    },
+  );
+  assert.deepEqual(targets, []);
+});
+
 test("targetsForRuntimeInstance: manifest adapter produces a generic runtime row", () => {
   const codexProvider = { id: "codex", name: "OpenAI Codex", dynamicAdapter: true };
   const codexInstance = {
@@ -189,6 +201,29 @@ test("targetsForRuntimeInstance: manifest adapter produces a generic runtime row
   assert.equal(targets[0].providerId, "codex");
   assert.equal(targets[0].runtimeCommand, null);
   assert.equal(targets[0].subtitle, "stdio_json");
+});
+
+test("targetsForRuntimeInstance: unverified manifest runtime remains launchable but is not presented as verified", () => {
+  const providers = [{
+    id: "demo",
+    name: "Demo",
+    adapterManifest: { id: "demo", transport: "stdio_json" },
+  }];
+  const instance = {
+    id: "demo-manifest",
+    providerId: "demo",
+    available: true,
+    verificationStatus: "unknown",
+    runtimeLabel: "Manifest",
+  };
+  const [target] = targetsForRuntimeInstance(instance, {
+    providers,
+    runtimeInstances: [instance],
+    runtimeTargetsByInstance: {},
+  });
+  assert.equal(target.available, true);
+  assert.equal(target.verificationStatus, "unknown");
+  assert.equal(target.status.state, "unknown");
 });
 
 test("runtimeTargets: flattens across all instances", () => {

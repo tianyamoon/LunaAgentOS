@@ -202,11 +202,16 @@ fn skill_command(name: String) -> SlashCommandCapability {
     }
 }
 
-fn discover_skills_from_profile_path(profile_path: &str, command_kind: &str) -> Vec<SlashCommandCapability> {
+fn discover_skills_from_profile_path(
+    profile_path: &str,
+    command_kind: &str,
+) -> Vec<SlashCommandCapability> {
     let names = if cfg!(windows) && command_kind == "wsl" {
         let skills_dir = format!("{}/skills", profile_path.trim_end_matches('/'));
         let quoted = shell_quote(&skills_dir);
-        let script = format!("if [ -d {quoted} ]; then find {quoted} -mindepth 1 -maxdepth 1 -printf '%f\\n'; fi");
+        let script = format!(
+            "if [ -d {quoted} ]; then find {quoted} -mindepth 1 -maxdepth 1 -printf '%f\\n'; fi"
+        );
         run_shell("wsl.exe", &["--exec", "bash", "-lc", &script])
             .map(|raw| {
                 raw.lines()
@@ -401,6 +406,8 @@ pub(super) fn targets(
             profile_name.clone()
         };
         let state = if gateway == "running" { 1 } else { 9 };
+        // 模型/密钥只按"是否配置存在"展示，绝不因存在就声称有效；此处一律 unknown（presence-only honesty）。
+        let model_or_key = "unknown";
         targets.push(serde_json::json!({
             "id": profile_id,
             "providerId": adapter.id,
@@ -428,6 +435,22 @@ pub(super) fn targets(
             "hasEnv": has_env,
             "hasSoul": has_soul,
             "isDefault": is_default,
+            "modelControl": adapter.model_control.clone(),
+            "health": {
+                "installed": "ok",
+                "loggedIn": "unknown",
+                "cliCallable": "ok",
+                "profileConfigured": "ok",
+                "wslOrBridgeAvailable": if command_kind == "wsl" { "ok" } else { "unknown" },
+                "modelOrKeyConfigured": model_or_key,
+                "versionStatus": "unknown",
+                "unavailableReason": if gateway == "running" { Value::Null } else { Value::String("runtime_stopped".into()) },
+                "repairHint": if gateway == "running" { Value::Null } else { Value::String("send_to_connect".into()) }
+            },
+            "healthEvidence": [
+                { "field": "profile_configured", "source": "hermes_profile_show", "detail": if path.is_empty() { "profile discovered" } else { "profile path discovered" } },
+                { "field": "model_or_key_configured", "source": "hermes_profile_show", "detail": "configuration presence observed; validity was not verified" }
+            ]
         }));
     }
 

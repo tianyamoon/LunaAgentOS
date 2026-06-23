@@ -34,6 +34,22 @@
     "--brand-logo-filter": "invert(1) hue-rotate(180deg) brightness(0.95)",
     "--composer-bg": "rgba(0, 0, 0, 0.22)",
     "--composer-input-bg": "rgba(0, 0, 0, 0.42)",
+    "--connection-dialog-bg": "rgba(22, 24, 29, 0.98)",
+    "--connection-dialog-panel": "rgba(34, 38, 46, 0.9)",
+    "--connection-dialog-panel-strong": "rgba(40, 45, 54, 0.94)",
+    "--connection-dialog-card": "rgba(20, 23, 28, 0.68)",
+    "--connection-dialog-border": "rgba(220, 218, 212, 0.14)",
+    "--connection-dialog-border-strong": "rgba(255, 138, 92, 0.36)",
+    "--connection-dialog-text": "#e6e3dd",
+    "--connection-dialog-muted": "#b1aa9d",
+    "--connection-dialog-accent": "#ff8a5c",
+    "--connection-dialog-ok": "#6cd49a",
+    "--connection-dialog-warn": "#e6b566",
+    "--connection-dialog-error": "#ff7878",
+    "--connection-dialog-input-bg": "rgba(0, 0, 0, 0.28)",
+    "--connection-dialog-focus-outline": "rgba(255, 138, 92, 0.22)",
+    "--connection-dialog-focus-border": "rgba(255, 138, 92, 0.46)",
+    "--connection-dialog-shadow": "0 28px 72px rgba(0, 0, 0, 0.56)",
     "--body-background": "radial-gradient(circle at top left, rgba(255, 138, 92, 0.10), transparent 26%), radial-gradient(circle at right, rgba(192, 138, 242, 0.08), transparent 22%), var(--bg)"
   }
 }

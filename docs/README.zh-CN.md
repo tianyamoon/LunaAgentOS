@@ -13,7 +13,7 @@
 ## 先看这些
 
 - [快速开始](./getting-started.zh-CN.md)：安装依赖、运行桌面应用、验证当前工作台
-- [0.2.2 发布说明](./release-notes-0.2.2.zh-CN.md)：本次发版的新增能力、修复内容和保留边界
+- [0.3.0 发布说明](./release-notes-0.3.zh-CN.md)：Agent 管理、证据化健康诊断、图片输入和保留边界
 - [当前产品边界](./current-boundary.zh-CN.md)：LunaAgentOS 现在做实了什么、下一段路怎么走、哪些常见误解需要先讲清
 - [贡献指南](../CONTRIBUTING.zh-CN.md)：开发环境、测试命令、贡献方向、PR 预期
 
@@ -23,11 +23,13 @@
 - [为什么做 LunaAgentOS](./why-lunaagentos.zh-CN.md)：这个项目试图解决什么问题
 - [轻核心原则](./light-core-principles.zh-CN.md)：控制层要保持聚焦的约束条件
 - [路线图](./roadmap.zh-CN.md)：近期和中长期方向
-- [0.3 需求定义](./requirements-0.3.zh-CN.md)：下一步聚焦 Agent 可用性管理和 Session 卡片任务化
+- [0.3 需求定义](./requirements-0.3.zh-CN.md)：聚焦 Agent 管理和证据化健康诊断，并保持 Runtime Session 与 Task 分离
 
 ## 架构与接入
 
 - [架构概览](./architecture-overview.zh-CN.md)：当前分层与职责
+- [领域上下文](../CONTEXT.md)：LunaAgentOS 的统一词汇与模型关系
+- [架构决策记录](./adr/README.md)：后续架构工作需要保留的长期决策
 - [Hermes ACP Runtime](./hermes-acp-profile-runtime.zh-CN.md)：Hermes runtime 语义与 profile 加载
 - [Hermes TUI 方向](./hermes-tui-direction.zh-CN.md)：活会话可见性的设计方向
 - [Protocol](../protocol/README.md)（暂仅英文）：schema、示例和公开契约

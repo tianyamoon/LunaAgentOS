@@ -1,8 +1,18 @@
 import { t } from "../../i18n/index.js";
+import {
+  escapeHtml,
+  healthReasonText,
+  healthRepairText,
+  healthStateClass,
+  healthStateText,
+  renderHealthDiagnostics,
+} from "./healthText.js";
 
 export function RuntimeCard(instance) {
-  const statusClass = instance.available ? "state-ok" : "state-error";
-  const statusText = instance.available ? t("provider.available") : t("provider.unavailable");
+  const statusClass = healthStateClass(instance.health);
+  const statusText = instance.available ? t("provider.available") : healthStateText(instance.health, t("provider.unavailable"));
+  const reason = healthReasonText(instance.health);
+  const repair = healthRepairText(instance.health);
 
   const detailHtml = instance.detail
     ? `<small>${escapeHtml(instance.detail)}</small>`
@@ -21,14 +31,9 @@ export function RuntimeCard(instance) {
       ${instance.summary ? `<p>${escapeHtml(instance.summary)}</p>` : ""}
       ${detailHtml}
       ${versionHtml}
+      ${reason ? `<p class="health-message">${escapeHtml(reason)}</p>` : ""}
+      ${repair ? `<p class="health-repair">${escapeHtml(repair)}</p>` : ""}
+      ${renderHealthDiagnostics(instance.health)}
     </article>
   `;
-}
-
-function escapeHtml(text) {
-  return String(text || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }

@@ -1,3 +1,5 @@
+import { providerSupportsLaunch } from "../providers/providerCatalog.js";
+
 const genericAcpRuntimeCommands = {
   prompt: "runtime_acp_adapter_prompt",
   load: "runtime_acp_adapter_load",
@@ -8,5 +10,6 @@ const genericAcpRuntimeCommands = {
 };
 
 export function acpCommandsForProvider(provider) {
-  return provider?.dynamicAdapter ? genericAcpRuntimeCommands : null;
+  // identityOnly Adapter 不进入通用 ACP Host。
+  return provider?.dynamicAdapter && providerSupportsLaunch(provider) ? genericAcpRuntimeCommands : null;
 }

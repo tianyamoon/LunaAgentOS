@@ -11,6 +11,7 @@
     "@agentclientprotocol/claude-agent-acp"
   ],
   "requires_pty": false,
+  "modelControl": { "mode": "luna_managed" },
   "capabilities": {
     "slashCommands": [
       { "name": "compact", "descriptionKey": "composer.command.compact" },

@@ -8,6 +8,13 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
+    <main id="webUnavailableGate" class="web-unavailable-gate" hidden>
+      <img src="./assets/lunaagentos-logo-wordmark.png" alt="LunaAgentOS" />
+      <div class="web-unavailable-status">Desktop only</div>
+      <h1>网页版不可用</h1>
+      <p>该地址仅用于桌面客户端加载界面，不提供可独立使用的 Web 服务。</p>
+      <p class="web-unavailable-action">请启动 LunaAgentOS 桌面客户端。</p>
+    </main>
     <div class="app-shell">
       <header class="topbar">
         <div class="brand">
@@ -16,8 +23,8 @@
             <h1 class="brand-title">
               <img class="brand-logo" src="./assets/lunaagentos-logo-wordmark.png" alt="LunaAgentOS" />
             </h1>
+            <p id="appNotice" class="app-notice topbar-notice" aria-live="polite"></p>
           </div>
-          <p id="appNotice" class="app-notice" aria-live="polite"></p>
         </div>
         <div class="topbar-tools">
           <button id="languageBtn" type="button" class="mini-btn ghost-btn language-switch-btn">语言：中文</button>
@@ -39,7 +46,7 @@
           <div class="panel-header workspace-header">
             <div>
               <h2 data-i18n="workspace.title">会话工作台</h2>
-              <p id="workspaceStatus" class="caption">请选择当前发送目标，然后发送第一条任务。</p>
+              <p id="workspaceStatus" class="caption">请选择当前发送目标，然后发送第一条消息。</p>
             </div>
           </div>
 
@@ -53,7 +60,18 @@
 
           <div class="composer">
             <div class="composer-row">
-              <textarea id="promptBox" rows="4" placeholder="输入发送给当前目标的任务。"></textarea>
+              <div id="composerInputShell" class="composer-input-shell">
+                <textarea id="promptBox" rows="4" placeholder="输入发送给当前目标的内容。" spellcheck="true"></textarea>
+                <div id="composerAttachmentTray" class="composer-attachment-tray" hidden></div>
+                <div class="composer-input-footer">
+                  <div class="composer-input-tools">
+                    <input id="composerFileInput" type="file" multiple hidden>
+                    <button id="attachBtn" type="button" class="composer-attach-btn"></button>
+                    <span id="promptStats" class="composer-input-stats">0 字</span>
+                  </div>
+                  <span data-i18n="composer.inputHint">Shift+Enter 换行</span>
+                </div>
+              </div>
               <div class="composer-primary-action">
                 <button id="sendBtn" class="primary compact">发送</button>
                 <div class="composer-options">

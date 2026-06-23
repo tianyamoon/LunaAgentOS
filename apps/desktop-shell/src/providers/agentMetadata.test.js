@@ -41,7 +41,7 @@ test("providerStatusForFleet: not connected provider returns is-not-connected", 
 });
 
 test("providerStatusForFleet: planned provider returns is-planned with muted card", () => {
-  const provider = { id: "trae", name: "Trae" };
+  const provider = { id: "future-bridge", name: "Future Bridge" };
   const availability = { available: false, summary: "planned" };
   const status = providerStatusForFleet(provider, availability);
   assert.equal(status.state, "planned");

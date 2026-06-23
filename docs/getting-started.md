@@ -86,7 +86,7 @@ You can also run targeted checks such as `npm run test:runtime`, `npm run test:h
 ## Current product shape
 
 - Claude Code and Hermes are the real runtime entries today
-- Trae IDE is the bridge target for the IDE-first adapter path
+- Trae IDE remains a later IDE-first bridge path and is not shown in the current desktop Fleet until that bridge is real
 - The center workspace is organized around Runtime Session Cards
 - The right panel separates live sessions from archived sessions
 - Call flow between entries and sessions belongs to the next product layer

@@ -26,7 +26,7 @@ LunaAgentOS 0.1 Preview 是真实 AI Agent 会话的中立桌面工作台。
 │      ACP / CLI / Gateway / IDE Bridge         │
 ├──────────────────────────────────────────────┤
 │              External Runtimes               │
-│        Claude Code / Hermes / Trae IDE        │
+│        Claude Code / Hermes / future bridges  │
 └──────────────────────────────────────────────┘
 ```
 
@@ -98,7 +98,7 @@ Hermes 代表基于 profile 的 runtime entries 和过程可见性。它的 ACP 
 
 ### Trae IDE
 
-Trae IDE 是 IDE-first bridge adapter 路线。LunaAgentOS 让它作为真实 bridge entry 保持在 Agent Fleet 中可见。
+Trae IDE 是 IDE-first bridge adapter 路线。LunaAgentOS 保留这条 bridge contract，但在真实 bridge 落地前不把 Trae 占位入口展示在当前 Agent Fleet 中。
 
 ## 方向
 

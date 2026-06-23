@@ -11,7 +11,14 @@
     "--accept-hooks"
   ],
   "requires_pty": false,
+  "modelControl": { "mode": "native_runtime" },
   "capabilities": {
+    "startupNotice": {
+      "prefix": "Hermes profile",
+      "identityField": "profileName",
+      "messageKey": "runtime.hermesStartupNotice"
+    },
+    "refreshTargetsAfterPrompt": true,
     "slashCommands": [
       { "name": "compress", "descriptionKey": "composer.command.compress" },
       { "name": "clear", "descriptionKey": "composer.command.clear" },

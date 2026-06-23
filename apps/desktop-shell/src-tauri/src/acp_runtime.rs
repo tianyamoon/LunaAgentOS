@@ -1,13 +1,16 @@
+use chrono::Utc;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
-use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio};
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::sync::OnceLock;
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::{Duration, Instant};
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -58,19 +61,131 @@ enum SessionStartMode {
 struct AcpSession {
     child: Child,
     stdin: ChildStdin,
-    reader: BufReader<ChildStdout>,
+    inbox: Receiver<Value>,
     stderr_log: Arc<Mutex<String>>,
+    stderr_done: Receiver<()>,
     next_id: i64,
     session_id: String,
+    config_options: Vec<Value>,
+    // Agent 在 initialize 时声明的 promptCapabilities.image。
+    // 仅当为 true 时，send_prompt 才会把 image block 发给该 runtime。
+    prompt_image_capable: bool,
+}
+
+// 旁路随 prompt 一起下传的非文本内容块。首发只支持 image，
+// 未来 audio/resource 只需新增枚举变体，无需改动各层透传签名。
+//
+// 注意：enum 上的 rename_all 只改 variant 标签（Image→image），不改字段名。
+// 前端发的是 camelCase 的 mimeType，必须对字段单独标 rename，否则反序列化报
+// "missing field `mime_type`"。
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum PromptBlock {
+    // data 为裸 base64（不含 data: 前缀），mimeType 必填。
+    Image {
+        data: String,
+        #[serde(rename = "mimeType")]
+        mime_type: String,
+    },
+}
+
+fn model_config_option(options: &[Value]) -> Option<&Value> {
+    options.iter().find(|option| {
+        option.get("category").and_then(Value::as_str) == Some("model")
+            || option.get("id").and_then(Value::as_str) == Some("model")
+    })
+}
+
+fn option_values(option: &Value) -> Vec<String> {
+    let mut values = Vec::new();
+    for item in option
+        .get("options")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        if let Some(value) = item.get("value").and_then(Value::as_str) {
+            values.push(value.to_string());
+        } else if let Some(group) = item.get("options").and_then(Value::as_array) {
+            values.extend(group.iter().filter_map(|entry| {
+                entry
+                    .get("value")
+                    .and_then(Value::as_str)
+                    .map(ToString::to_string)
+            }));
+        }
+    }
+    values
+}
+
+fn apply_preferred_model(
+    runtime: &AcpRuntime,
+    session_id: &str,
+    preferred_model: Option<&str>,
+    config_options: &mut Vec<Value>,
+    next_id: &mut i64,
+    inbox: &Receiver<Value>,
+    stdin: &mut ChildStdin,
+    stderr_log: &Arc<Mutex<String>>,
+    stderr_done: &Receiver<()>,
+    child: &mut Child,
+    events: &mut Vec<Value>,
+    on_event: &mut Option<&mut dyn FnMut(Value)>,
+) -> Result<(), String> {
+    let Some(preferred_model) = preferred_model
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    else {
+        return Ok(());
+    };
+    let option = model_config_option(config_options)
+        .ok_or_else(|| format!("{} 未提供可配置模型列表。", runtime.display()))?;
+    let config_id = option
+        .get("id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| format!("{} 模型配置缺少 id。", runtime.display()))?;
+    if !option_values(option)
+        .iter()
+        .any(|value| value == preferred_model)
+    {
+        return Err(format!(
+            "{} 不支持已保存的默认模型 {preferred_model}。",
+            runtime.display()
+        ));
+    }
+    let request = json!({
+        "jsonrpc": "2.0", "id": next_request_id(next_id), "method": "session/set_config_option",
+        "params": { "sessionId": session_id, "configId": config_id, "value": preferred_model }
+    });
+    write_message(stdin, &request)?;
+    let result = read_response(
+        runtime,
+        inbox,
+        stdin,
+        request["id"].as_i64().unwrap(),
+        Some(stderr_log),
+        Some(stderr_done),
+        Some(child),
+        events,
+        on_event,
+    )?;
+    *config_options = result
+        .get("configOptions")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    Ok(())
 }
 
 pub fn run_adapter_acp_prompt(
     adapter: AdapterLaunchSpec,
     runtime_session_id: String,
     prompt: String,
+    extra_blocks: Option<Vec<PromptBlock>>,
     cwd: Option<String>,
     _config: RuntimeConfig,
     on_event: Option<&mut dyn FnMut(Value)>,
+    preferred_model: Option<String>,
 ) -> Result<Vec<Value>, String> {
     run_acp_prompt(
         AcpRuntime::Adapter {
@@ -79,9 +194,11 @@ pub fn run_adapter_acp_prompt(
         },
         runtime_session_id,
         prompt,
+        extra_blocks,
         cwd,
         Some(adapter),
         on_event,
+        preferred_model,
     )
 }
 
@@ -89,9 +206,11 @@ fn run_acp_prompt(
     runtime: AcpRuntime,
     runtime_session_id: String,
     prompt: String,
+    extra_blocks: Option<Vec<PromptBlock>>,
     cwd: Option<String>,
     adapter: Option<AdapterLaunchSpec>,
     mut on_event: Option<&mut dyn FnMut(Value)>,
+    preferred_model: Option<String>,
 ) -> Result<Vec<Value>, String> {
     let cwd = match cwd {
         Some(value) if !value.trim().is_empty() => PathBuf::from(value),
@@ -111,6 +230,7 @@ fn run_acp_prompt(
                 SessionStartMode::New,
                 adapter.as_ref(),
                 &mut on_event,
+                preferred_model.as_deref(),
             )?;
             sessions.insert(session_key.clone(), session);
             sessions
@@ -119,7 +239,7 @@ fn run_acp_prompt(
         }
     };
 
-    match send_prompt(&runtime, session, prompt, &mut events, &mut on_event) {
+    match send_prompt(&runtime, session, prompt, extra_blocks, &mut events, &mut on_event) {
         Ok(()) => Ok(events),
         Err(error) => {
             if let Some(mut broken) = sessions.remove(&session_key) {
@@ -184,6 +304,7 @@ fn resume_acp_session(
         SessionStartMode::Resume(acp_session_id.clone()),
         adapter.as_ref(),
         &mut on_event,
+        None,
     )?;
     sessions.insert(session_key, session);
     Ok(events)
@@ -242,6 +363,7 @@ fn load_acp_session(
         SessionStartMode::Load(acp_session_id.clone()),
         adapter.as_ref(),
         &mut on_event,
+        None,
     )?;
     sessions.insert(session_key, session);
     Ok(events)
@@ -336,7 +458,9 @@ fn start_acp_session(
     mode: SessionStartMode,
     adapter: Option<&AdapterLaunchSpec>,
     on_event: &mut Option<&mut dyn FnMut(Value)>,
+    preferred_model: Option<&str>,
 ) -> Result<AcpSession, String> {
+    let is_new_session = matches!(mode, SessionStartMode::New);
     let mut child = build_acp_command(cwd, adapter)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -344,21 +468,13 @@ fn start_acp_session(
         .spawn()
         .map_err(|error| format!("启动 {} adapter 失败：{error}", runtime.display()))?;
 
-    let stderr = child.stderr.take();
-    let stderr_log = Arc::new(Mutex::new(String::new()));
-    if let Some(stderr) = stderr {
-        let stderr_log = Arc::clone(&stderr_log);
-        thread::spawn(move || {
-            let mut reader = BufReader::new(stderr);
-            let mut line = String::new();
-            while reader.read_line(&mut line).unwrap_or(0) > 0 {
-                if let Ok(mut log) = stderr_log.lock() {
-                    log.push_str(&line);
-                }
-                line.clear();
-            }
-        });
-    }
+    let stderr = child.stderr.take().ok_or_else(|| {
+        abort_started_child(
+            &mut child,
+            format!("{} adapter stderr 不可用。", runtime.display()),
+        )
+    })?;
+    let (stderr_log, stderr_done) = spawn_stderr_reader(stderr);
 
     let mut stdin = child.stdin.take().ok_or_else(|| {
         abort_started_child(
@@ -372,7 +488,7 @@ fn start_acp_session(
             format!("{} adapter stdout 不可用。", runtime.display()),
         )
     })?;
-    let mut reader = BufReader::new(stdout);
+    let inbox = spawn_stdout_reader(stdout);
     let mut next_id: i64 = 0;
 
     let init = json!({
@@ -399,16 +515,25 @@ fn start_acp_session(
     }
     let init_result = match read_response(
         runtime,
-        &mut reader,
+        &inbox,
         &mut stdin,
         init["id"].as_i64().unwrap(),
         Some(&stderr_log),
+        Some(&stderr_done),
+        Some(&mut child),
         &mut events,
         on_event,
     ) {
         Ok(result) => result,
         Err(error) => return Err(abort_started_child(&mut child, error)),
     };
+    // 捕获 promptCapabilities.image（缺失视为不支持），供 send_prompt 门控图片块。
+    let prompt_image_capable = init_result
+        .get("agentCapabilities")
+        .and_then(|caps| caps.get("promptCapabilities"))
+        .and_then(|prompt_caps| prompt_caps.get("image"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
     push_event(
         &mut events,
         json!({
@@ -461,10 +586,12 @@ fn start_acp_session(
     }
     let session_result = match read_response(
         runtime,
-        &mut reader,
+        &inbox,
         &mut stdin,
         session_request["id"].as_i64().unwrap(),
         Some(&stderr_log),
+        Some(&stderr_done),
+        Some(&mut child),
         &mut events,
         on_event,
     ) {
@@ -486,6 +613,29 @@ fn start_acp_session(
                 format!("{} 未返回 sessionId。", runtime.display()),
             )
         })?;
+    let mut config_options = session_result
+        .get("configOptions")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    if is_new_session {
+        if let Err(error) = apply_preferred_model(
+            runtime,
+            &session_id,
+            preferred_model,
+            &mut config_options,
+            &mut next_id,
+            &inbox,
+            &mut stdin,
+            &stderr_log,
+            &stderr_done,
+            &mut child,
+            &mut events,
+            on_event,
+        ) {
+            return Err(abort_started_child(&mut child, error));
+        }
+    }
 
     let content = match method {
         "session/resume" => format!("{} 会话已恢复。", runtime.display()),
@@ -500,7 +650,8 @@ fn start_acp_session(
             "state": 1,
             "payload": {
                 "content": content,
-                "sessionId": session_id
+                "sessionId": session_id,
+                "configOptions": config_options
             }
         }),
         on_event,
@@ -509,11 +660,59 @@ fn start_acp_session(
     Ok(AcpSession {
         child,
         stdin,
-        reader,
+        inbox,
         stderr_log,
+        stderr_done,
         next_id,
         session_id,
+        config_options,
+        prompt_image_capable,
     })
+}
+
+pub fn inspect_adapter_model_control(
+    adapter: AdapterLaunchSpec,
+    cwd: Option<String>,
+) -> Result<Value, String> {
+    let runtime = AcpRuntime::Adapter {
+        id: adapter.id.clone(),
+        name: adapter.name.clone(),
+    };
+    let cwd = match cwd {
+        Some(value) if !value.trim().is_empty() => PathBuf::from(value),
+        _ => isolated_runtime_cwd("model-discovery")?,
+    };
+    let mut events = Vec::new();
+    let mut on_event = None;
+    let mut session = start_acp_session(
+        &runtime,
+        &cwd,
+        &mut events,
+        SessionStartMode::New,
+        Some(&adapter),
+        &mut on_event,
+        None,
+    )?;
+    let option = model_config_option(&session.config_options).cloned();
+    let _ = session.child.kill();
+    let _ = session.child.wait();
+    let checked_at = Utc::now().to_rfc3339();
+    let Some(option) = option else {
+        return Ok(json!({
+            "mode": "native_runtime",
+            "availableModels": [],
+            "source": "acp_session_config",
+            "checkedAt": checked_at
+        }));
+    };
+    Ok(json!({
+        "mode": "luna_managed",
+        "configId": option.get("id").cloned().unwrap_or(Value::String("model".into())),
+        "defaultModel": option.get("currentValue").cloned().unwrap_or(Value::Null),
+        "availableModels": option_values(&option),
+        "source": "acp_session_config",
+        "checkedAt": checked_at
+    }))
 }
 
 fn abort_started_child(child: &mut Child, error: String) -> String {
@@ -522,35 +721,96 @@ fn abort_started_child(child: &mut Child, error: String) -> String {
     error
 }
 
+// 构造 ACP session/prompt 的 content blocks 数组。
+// 文本块恒在最前；图片块仅当 runtime 声明 image 能力时追加，否则丢弃，
+// 避免向不支持的 agent 发出无法解析的内容块。无图时与旧行为逐字节一致。
+fn build_prompt_blocks(
+    prompt: &str,
+    extra_blocks: Option<Vec<PromptBlock>>,
+    image_capable: bool,
+) -> Vec<Value> {
+    let mut blocks = vec![json!({ "type": "text", "text": prompt })];
+    if image_capable {
+        for block in extra_blocks.into_iter().flatten() {
+            match block {
+                PromptBlock::Image { data, mime_type } => {
+                    blocks.push(json!({
+                        "type": "image",
+                        "data": data,
+                        "mimeType": mime_type
+                    }));
+                }
+            }
+        }
+    }
+    blocks
+}
+
 fn send_prompt(
     runtime: &AcpRuntime,
     session: &mut AcpSession,
     prompt: String,
+    extra_blocks: Option<Vec<PromptBlock>>,
     events: &mut Vec<Value>,
     on_event: &mut Option<&mut dyn FnMut(Value)>,
 ) -> Result<(), String> {
+    // 上一轮 response 后才进入缓冲区的 update 已失去可靠归属，发送新 prompt 前必须隔离。
+    let discarded_updates = quarantine_idle_messages(
+        runtime,
+        &session.inbox,
+        &mut session.stdin,
+        Some(&session.stderr_log),
+        Some(&session.stderr_done),
+        Some(&mut session.child),
+    )?;
+    if discarded_updates > 0 {
+        crate::log_diagnostic(&format!(
+            "{} 隔离了 {discarded_updates} 条失去轮次归属的空闲 update。",
+            runtime.display()
+        ));
+    }
+    let dropped_images = !session.prompt_image_capable && extra_blocks.iter().flatten().next().is_some();
+    let prompt_blocks = build_prompt_blocks(&prompt, extra_blocks, session.prompt_image_capable);
+    if dropped_images {
+        crate::log_diagnostic(&format!(
+            "{} 未声明 image 能力，已丢弃随 prompt 附带的图片块。",
+            runtime.display()
+        ));
+    }
     let prompt_request = json!({
         "jsonrpc": "2.0",
         "id": next_request_id(&mut session.next_id),
         "method": "session/prompt",
         "params": {
             "sessionId": session.session_id,
-            "prompt": [{
-                "type": "text",
-                "text": prompt
-            }]
+            "prompt": prompt_blocks
         }
     });
     write_message(&mut session.stdin, &prompt_request)?;
     let prompt_result = read_response(
         runtime,
-        &mut session.reader,
+        &session.inbox,
         &mut session.stdin,
         prompt_request["id"].as_i64().unwrap(),
         Some(&session.stderr_log),
+        Some(&session.stderr_done),
+        Some(&mut session.child),
         events,
         on_event,
     )?;
+    collect_trailing_updates(
+        runtime,
+        &session.inbox,
+        &mut session.stdin,
+        Some(&session.stderr_log),
+        Some(&session.stderr_done),
+        Some(&mut session.child),
+        events,
+        on_event,
+    )?;
+    if !has_assistant_response(events) {
+        return Err(format!("{} 未返回助手回复。", runtime.display()));
+    }
 
     push_event(
         events,
@@ -572,6 +832,163 @@ fn send_prompt(
 
     let _ = session.child.id();
     Ok(())
+}
+
+fn has_assistant_response(events: &[Value]) -> bool {
+    events.iter().any(|event| {
+        event.get("type").and_then(Value::as_str) == Some("response")
+            && event
+                .get("payload")
+                .and_then(|payload| payload.get("content"))
+                .and_then(Value::as_str)
+                .is_some_and(|content| !content.trim().is_empty())
+    })
+}
+
+fn spawn_stdout_reader(stdout: ChildStdout) -> Receiver<Value> {
+    let (sender, receiver) = mpsc::channel();
+    thread::spawn(move || {
+        let mut reader = BufReader::new(stdout);
+        // 按字节读取并用 from_utf8_lossy 解码：一个非 UTF-8/ANSI/二进制坏字节只会
+        // 损坏一行，而不会像 read_line 那样把 InvalidData 当成 EOF 永久终止读取线程，
+        // 进而丢失后续有效响应并把"放弃读取"误报成"adapter 关闭了 stdout"。
+        let mut buf = Vec::new();
+        loop {
+            buf.clear();
+            match reader.read_until(b'\n', &mut buf) {
+                Ok(0) => break, // 真正的 EOF
+                Ok(_) => {
+                    let line = String::from_utf8_lossy(&buf);
+                    if let Ok(message) = serde_json::from_str::<Value>(line.trim()) {
+                        if sender.send(message).is_err() {
+                            break;
+                        }
+                    }
+                }
+                Err(ref error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(_) => break,
+            }
+        }
+    });
+    receiver
+}
+
+fn spawn_stderr_reader(stderr: ChildStderr) -> (Arc<Mutex<String>>, Receiver<()>) {
+    let stderr_log = Arc::new(Mutex::new(String::new()));
+    let thread_log = Arc::clone(&stderr_log);
+    let (done_sender, done_receiver) = mpsc::channel();
+    thread::spawn(move || {
+        let mut reader = BufReader::new(stderr);
+        // 同 stdout reader：字节式读取 + lossy 解码，避免一个坏字节杀死 stderr 日志线程。
+        let mut buf = Vec::new();
+        loop {
+            buf.clear();
+            match reader.read_until(b'\n', &mut buf) {
+                Ok(0) => break,
+                Ok(_) => {
+                    if let Ok(mut log) = thread_log.lock() {
+                        log.push_str(&String::from_utf8_lossy(&buf));
+                    }
+                }
+                Err(ref error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(_) => break,
+            }
+        }
+        let _ = done_sender.send(());
+    });
+    (stderr_log, done_receiver)
+}
+
+fn quarantine_idle_messages(
+    runtime: &AcpRuntime,
+    inbox: &Receiver<Value>,
+    stdin: &mut impl Write,
+    stderr_log: Option<&Arc<Mutex<String>>>,
+    stderr_done: Option<&Receiver<()>>,
+    mut child: Option<&mut Child>,
+) -> Result<usize, String> {
+    let mut discarded_updates = 0;
+    let started_at = Instant::now();
+    let quiet_window = Duration::from_millis(20);
+    let max_wait = Duration::from_millis(200);
+    loop {
+        // 新 prompt 前等待一个很短的安静窗口，覆盖刚离开 OS pipe 的迟到 update。
+        let remaining = max_wait.saturating_sub(started_at.elapsed());
+        if remaining.is_zero() {
+            return Ok(discarded_updates);
+        }
+        let message = match inbox.recv_timeout(quiet_window.min(remaining)) {
+            Ok(message) => message,
+            Err(RecvTimeoutError::Timeout) => return Ok(discarded_updates),
+            Err(RecvTimeoutError::Disconnected) => {
+                return Err(format_adapter_process_closed(
+                    runtime,
+                    stderr_log,
+                    stderr_done,
+                    child.as_deref_mut(),
+                ));
+            }
+        };
+
+        if let Some(id) = message.get("id").and_then(|value| value.as_i64()) {
+            if message.get("method").is_some() {
+                respond_to_client_request(stdin, id, &message)?;
+                continue;
+            }
+        }
+
+        if message.get("method").and_then(|value| value.as_str()) == Some("session/update") {
+            discarded_updates += 1;
+        }
+    }
+}
+
+fn collect_trailing_updates(
+    runtime: &AcpRuntime,
+    inbox: &Receiver<Value>,
+    stdin: &mut impl Write,
+    stderr_log: Option<&Arc<Mutex<String>>>,
+    stderr_done: Option<&Receiver<()>>,
+    mut child: Option<&mut Child>,
+    events: &mut Vec<Value>,
+    on_event: &mut Option<&mut dyn FnMut(Value)>,
+) -> Result<usize, String> {
+    let mut collected_updates = 0;
+    let started_at = Instant::now();
+    let quiet_window = Duration::from_millis(20);
+    let max_wait = Duration::from_millis(200);
+    loop {
+        let remaining = max_wait.saturating_sub(started_at.elapsed());
+        if remaining.is_zero() {
+            return Ok(collected_updates);
+        }
+        let message = match inbox.recv_timeout(quiet_window.min(remaining)) {
+            Ok(message) => message,
+            Err(RecvTimeoutError::Timeout) => return Ok(collected_updates),
+            Err(RecvTimeoutError::Disconnected) => {
+                return Err(format_adapter_process_closed(
+                    runtime,
+                    stderr_log,
+                    stderr_done,
+                    child.as_deref_mut(),
+                ));
+            }
+        };
+
+        if let Some(id) = message.get("id").and_then(|value| value.as_i64()) {
+            if message.get("method").is_some() {
+                respond_to_client_request(stdin, id, &message)?;
+                continue;
+            }
+        }
+
+        if message.get("method").and_then(|value| value.as_str()) == Some("session/update") {
+            collected_updates += 1;
+            if let Some(event) = map_session_update(&message) {
+                push_event(events, event, on_event);
+            }
+        }
+    }
 }
 
 fn build_acp_command(cwd: &PathBuf, adapter: Option<&AdapterLaunchSpec>) -> Command {
@@ -635,26 +1052,19 @@ fn write_message(stdin: &mut impl Write, message: &Value) -> Result<(), String> 
 
 fn read_response(
     runtime: &AcpRuntime,
-    reader: &mut impl BufRead,
+    inbox: &Receiver<Value>,
     stdin: &mut impl Write,
     target_id: i64,
     stderr_log: Option<&Arc<Mutex<String>>>,
+    stderr_done: Option<&Receiver<()>>,
+    mut child: Option<&mut Child>,
     events: &mut Vec<Value>,
     on_event: &mut Option<&mut dyn FnMut(Value)>,
 ) -> Result<Value, String> {
-    let mut line = String::new();
     loop {
-        line.clear();
-        let bytes = reader
-            .read_line(&mut line)
-            .map_err(|error| error.to_string())?;
-        if bytes == 0 {
-            return Err(format_adapter_stdout_closed(runtime, stderr_log));
-        }
-
-        let Ok(message) = serde_json::from_str::<Value>(line.trim()) else {
-            continue;
-        };
+        let message = inbox.recv().map_err(|_| {
+            format_adapter_process_closed(runtime, stderr_log, stderr_done, child.as_deref_mut())
+        })?;
 
         if let Some(id) = message.get("id").and_then(|value| value.as_i64()) {
             if message.get("method").is_some() {
@@ -678,20 +1088,46 @@ fn read_response(
     }
 }
 
-fn format_adapter_stdout_closed(
+fn format_adapter_process_closed(
     runtime: &AcpRuntime,
     stderr_log: Option<&Arc<Mutex<String>>>,
+    stderr_done: Option<&Receiver<()>>,
+    mut child: Option<&mut Child>,
 ) -> String {
+    // stdout EOF 往往先于 stderr 线程完成，短暂等待可避免吞掉真正退出原因。
+    let mut exit_status = child
+        .as_deref_mut()
+        .and_then(|child| child.try_wait().ok().flatten());
+    if exit_status.is_none() {
+        for _ in 0..5 {
+            thread::sleep(Duration::from_millis(10));
+            exit_status = child
+                .as_deref_mut()
+                .and_then(|child| child.try_wait().ok().flatten());
+            if exit_status.is_some() {
+                break;
+            }
+        }
+    }
+    if let Some(done) = stderr_done {
+        let _ = done.recv_timeout(Duration::from_millis(100));
+    }
     let stderr = stderr_log
         .and_then(|log| log.lock().ok().map(|value| value.trim().to_string()))
         .filter(|value| !value.is_empty());
+    let summary = match exit_status {
+        Some(status) => match status.code() {
+            Some(code) => format!(
+                "{} adapter 进程已退出（exit code {code}）。",
+                runtime.display()
+            ),
+            None => format!("{} adapter 进程已退出。", runtime.display()),
+        },
+        None => format!("{} adapter 意外关闭 stdout。", runtime.display()),
+    };
     match stderr {
-        Some(stderr) => format!(
-            "{} adapter 已关闭 stdout。adapter stderr：{}",
-            runtime.display(),
-            stderr
-        ),
-        None => format!("{} adapter 已关闭 stdout。", runtime.display()),
+        Some(stderr) => format!("{summary} adapter stderr：{stderr}"),
+        None => summary,
     }
 }
 
@@ -726,6 +1162,274 @@ fn respond_to_client_request(
             "result": result
         }),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn prompt_block_deserializes_from_frontend_camelcase_json() {
+        // 前端 toPromptImageBlocks 实际发出的形状：{type:"image", data, mimeType}。
+        // 守住这条跨界契约，避免 enum rename_all 不作用于字段导致的 missing field。
+        let json = json!({ "type": "image", "data": "AAAA", "mimeType": "image/png" });
+        let block: PromptBlock = serde_json::from_value(json).expect("should deserialize");
+        match block {
+            PromptBlock::Image { data, mime_type } => {
+                assert_eq!(data, "AAAA");
+                assert_eq!(mime_type, "image/png");
+            }
+        }
+    }
+
+    #[test]
+    fn build_prompt_blocks_text_only_matches_legacy_shape() {
+        let blocks = build_prompt_blocks("hello", None, true);
+        assert_eq!(blocks, vec![json!({ "type": "text", "text": "hello" })]);
+    }
+
+    #[test]
+    fn build_prompt_blocks_appends_image_after_text_when_capable() {
+        let images = vec![PromptBlock::Image {
+            data: "AAAA".into(),
+            mime_type: "image/png".into(),
+        }];
+        let blocks = build_prompt_blocks("look", Some(images), true);
+        assert_eq!(blocks.len(), 2);
+        assert_eq!(blocks[0], json!({ "type": "text", "text": "look" }));
+        assert_eq!(
+            blocks[1],
+            json!({ "type": "image", "data": "AAAA", "mimeType": "image/png" })
+        );
+    }
+
+    #[test]
+    fn build_prompt_blocks_drops_images_when_runtime_lacks_capability() {
+        let images = vec![PromptBlock::Image {
+            data: "AAAA".into(),
+            mime_type: "image/png".into(),
+        }];
+        let blocks = build_prompt_blocks("look", Some(images), false);
+        assert_eq!(blocks, vec![json!({ "type": "text", "text": "look" })]);
+    }
+
+    #[test]
+    fn model_config_options_support_flat_and_grouped_values() {
+        let flat = json!({ "id": "model", "category": "model", "options": [
+            { "value": "fast", "name": "Fast" }, { "value": "deep", "name": "Deep" }
+        ] });
+        assert_eq!(option_values(&flat), ["fast", "deep"]);
+        let grouped = json!({ "id": "model", "category": "model", "options": [
+            { "group": "family", "name": "Family", "options": [{ "value": "pro", "name": "Pro" }] }
+        ] });
+        assert_eq!(option_values(&grouped), ["pro"]);
+        assert!(model_config_option(&[flat]).is_some());
+    }
+
+    fn spawn_failing_adapter() -> Child {
+        #[cfg(windows)]
+        let mut command = {
+            let mut command = Command::new("cmd");
+            command.args(["/C", "echo missing npx 1>&2 & exit /b 7"]);
+            command
+        };
+        #[cfg(not(windows))]
+        let mut command = {
+            let mut command = Command::new("sh");
+            command.args(["-c", "echo missing npx >&2; exit 7"]);
+            command
+        };
+        command
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap()
+    }
+
+    #[test]
+    fn adapter_exit_keeps_exit_code_and_stderr() {
+        let runtime = AcpRuntime::Adapter {
+            id: "test".to_string(),
+            name: "Test".to_string(),
+        };
+        let mut child = spawn_failing_adapter();
+        let stdout = child.stdout.take().unwrap();
+        let stderr = child.stderr.take().unwrap();
+        let inbox = spawn_stdout_reader(stdout);
+        let (stderr_log, stderr_done) = spawn_stderr_reader(stderr);
+        let mut stdin = Vec::new();
+        let mut events = Vec::new();
+        let mut callback = None;
+
+        let error = read_response(
+            &runtime,
+            &inbox,
+            &mut stdin,
+            1,
+            Some(&stderr_log),
+            Some(&stderr_done),
+            Some(&mut child),
+            &mut events,
+            &mut callback,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("exit code 7"), "{error}");
+        assert!(error.contains("missing npx"), "{error}");
+    }
+
+    #[test]
+    fn late_update_after_response_is_quarantined_before_next_prompt() {
+        let runtime = AcpRuntime::Adapter {
+            id: "test".to_string(),
+            name: "Test".to_string(),
+        };
+        let (sender, inbox) = mpsc::channel();
+        sender
+            .send(json!({"jsonrpc":"2.0","id":1,"result":{"stopReason":"end_turn"}}))
+            .unwrap();
+        sender
+            .send(json!({"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"session-1","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"上一轮迟到正文"}}}}))
+            .unwrap();
+        let mut stdin = Vec::new();
+        let mut first_events = Vec::new();
+        let mut first_callback = None;
+        read_response(
+            &runtime,
+            &inbox,
+            &mut stdin,
+            1,
+            None,
+            None,
+            None,
+            &mut first_events,
+            &mut first_callback,
+        )
+        .unwrap();
+
+        let discarded =
+            quarantine_idle_messages(&runtime, &inbox, &mut stdin, None, None, None).unwrap();
+        assert_eq!(discarded, 1);
+    }
+
+    #[test]
+    fn idle_quarantine_waits_for_update_still_leaving_os_pipe() {
+        let (sender, inbox) = mpsc::channel();
+        let delayed_sender = sender.clone();
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(5));
+            delayed_sender
+                .send(json!({"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"session-1","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"稍后抵达的旧正文"}}}}))
+                .unwrap();
+        });
+        let mut stdin = Vec::new();
+
+        let runtime = AcpRuntime::Adapter {
+            id: "test".to_string(),
+            name: "Test".to_string(),
+        };
+        let discarded =
+            quarantine_idle_messages(&runtime, &inbox, &mut stdin, None, None, None).unwrap();
+
+        assert_eq!(discarded, 1);
+    }
+
+    #[test]
+    fn post_response_update_is_collected_for_current_prompt() {
+        let runtime = AcpRuntime::Adapter {
+            id: "test".to_string(),
+            name: "Test".to_string(),
+        };
+        let (sender, inbox) = mpsc::channel();
+        sender
+            .send(json!({"jsonrpc":"2.0","id":1,"result":{"stopReason":"end_turn"}}))
+            .unwrap();
+        let delayed_sender = sender.clone();
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(5));
+            delayed_sender
+                .send(json!({"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"session-1","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"trailing response"}}}}))
+                .unwrap();
+        });
+        let mut stdin = Vec::new();
+        let mut events = Vec::new();
+        let mut callback = None;
+
+        read_response(
+            &runtime,
+            &inbox,
+            &mut stdin,
+            1,
+            None,
+            None,
+            None,
+            &mut events,
+            &mut callback,
+        )
+        .unwrap();
+        let collected = collect_trailing_updates(
+            &runtime,
+            &inbox,
+            &mut stdin,
+            None,
+            None,
+            None,
+            &mut events,
+            &mut callback,
+        )
+        .unwrap();
+
+        assert_eq!(collected, 1);
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0]["payload"]["content"], "trailing response");
+    }
+
+    #[test]
+    fn prompt_without_assistant_response_is_not_successful() {
+        let usage_only = vec![json!({
+            "type": "usage",
+            "payload": { "used": 42 }
+        })];
+        let response = vec![json!({
+            "type": "response",
+            "payload": { "content": "answer" }
+        })];
+
+        assert!(!has_assistant_response(&usage_only));
+        assert!(has_assistant_response(&response));
+    }
+
+    #[test]
+    fn current_prompt_update_is_still_collected_before_response() {
+        let runtime = AcpRuntime::Adapter {
+            id: "test".to_string(),
+            name: "Test".to_string(),
+        };
+        let (sender, inbox) = mpsc::channel();
+        sender
+            .send(json!({"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"session-1","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"当前轮正文"}}}}))
+            .unwrap();
+        sender
+            .send(json!({"jsonrpc":"2.0","id":2,"result":{"stopReason":"end_turn"}}))
+            .unwrap();
+        let mut stdin = Vec::new();
+        let mut second_events = Vec::new();
+        let mut second_callback = None;
+        read_response(
+            &runtime,
+            &inbox,
+            &mut stdin,
+            2,
+            None,
+            None,
+            None,
+            &mut second_events,
+            &mut second_callback,
+        )
+        .unwrap();
+
+        assert_eq!(second_events.len(), 1);
+    }
 }
 
 fn select_permission(message: &Value) -> Value {

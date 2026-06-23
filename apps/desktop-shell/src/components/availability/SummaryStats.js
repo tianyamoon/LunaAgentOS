@@ -2,13 +2,19 @@ import { t } from "../../i18n/index.js";
 
 export function SummaryStats(data) {
   const { summary, currentTarget } = data;
+  const currentTargetStateClass = currentTarget?.sendable ? "state-ok" : currentTarget?.activatable ? "state-warn" : "state-error";
+  const currentTargetStateText = currentTarget?.sendable
+    ? t("availability.sendable")
+    : currentTarget?.activatable
+      ? t("availability.activatable")
+      : t("availability.notSendable");
 
   const currentTargetHtml = currentTarget
     ? `<div class="summary-current-target">
         <span class="summary-label">${t("availability.currentTarget")}</span>
         <strong>${escapeHtml(currentTarget.displayName)}</strong>
-        <span class="state-pill ${currentTarget.sendable ? "state-ok" : "state-error"}">
-          ${currentTarget.sendable ? t("availability.sendable") : t("availability.notSendable")}
+        <span class="state-pill ${currentTargetStateClass}">
+          ${currentTargetStateText}
         </span>
       </div>`
     : "";
@@ -17,15 +23,15 @@ export function SummaryStats(data) {
     <div class="summary-stats">
       <div class="summary-card">
         <span class="summary-number">${summary.providers.available}/${summary.providers.total}</span>
-        <span class="summary-label">Provider</span>
+        <span class="summary-label">${t("availability.providers")}</span>
       </div>
       <div class="summary-card">
         <span class="summary-number">${summary.runtimes.available}/${summary.runtimes.total}</span>
-        <span class="summary-label">Runtime</span>
+        <span class="summary-label">${t("availability.runtimes")}</span>
       </div>
       <div class="summary-card">
         <span class="summary-number">${summary.targets.sendable}/${summary.targets.total}</span>
-        <span class="summary-label">Agent</span>
+        <span class="summary-label">${t("availability.agents")}</span>
       </div>
       ${currentTargetHtml}
     </div>

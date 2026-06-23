@@ -1,5 +1,14 @@
 // Availability store: aggregates provider/runtime/target health status
-// Self-contained: no external imports, receives all data via refresh()
+import {
+  isTargetActivatable,
+  isTargetSelectable,
+  isTargetSendable,
+} from "./targetActivation.js";
+import {
+  deriveProviderHealth,
+  deriveRuntimeHealth,
+  deriveTargetHealth,
+} from "./agentHealth.js";
 
 let store = null;
 
@@ -29,29 +38,22 @@ export function createAvailabilityStore() {
     });
   };
 
-  // Helper functions for display logic
   const displayAgentName = (agent) => agent?.nameKey || agent?.name || "";
-  
-  const isTargetSendable = (target) => {
-    if (!target) return false;
-    if (target.providerId === "hermes" && target.gateway && target.gateway !== "running") return false;
-    return target.available !== false;
-  };
 
   const compactTargetSubtitle = (target) => {
     if (!target) return { text: "", key: "" };
-    if (target.providerId === "hermes") {
-      if (target.gateway === "running") return { text: "", key: "availability.gatewayRunning" };
-      if (target.gateway) return { text: "", key: "availability.gatewayStopped" };
-      if (target.model) return { text: target.model, key: "" };
-    }
+    if (target.subtitle) return { text: target.subtitle, key: "" };
+    if (target.gateway === "running") return { text: "", key: "availability.gatewayRunning" };
+    if (target.gateway) return { text: "", key: "availability.gatewayStopped" };
+    if (target.model) return { text: target.model, key: "" };
     return { text: "", key: "" };
   };
 
-  const refresh = (providersInput, runtimeInstancesInput, currentTargetAgent) => {
+  const refresh = (providersInput, runtimeInstancesInput, currentTargetAgent, runtimeAvailabilityInput = {}) => {
     const providerList = providersInput || [];
     const allInstances = runtimeInstancesInput || [];
     const currentTarget = currentTargetAgent || null;
+    const runtimeAvailability = runtimeAvailabilityInput || {};
 
     // Calculate summary stats
     const summary = {
@@ -78,12 +80,21 @@ export function createAvailabilityStore() {
 
       // Check provider availability
       const availableCount = instancesForProvider.filter((i) => i.available).length;
-      const isAvailable = instancesForProvider.length > 0 && availableCount > 0;
+      const verifiedAvailableCount = instancesForProvider.filter((instance) =>
+        (instance.verificationStatus || (instance.available ? "verified_available" : "verified_unavailable")) === "verified_available"
+      ).length;
+      const isAvailable = verifiedAvailableCount > 0;
       const availabilitySummary = isAvailable
-        ? availableCount === instancesForProvider.length
-          ? "available"
-          : "partial"
-        : "not_connected";
+        ? "available"
+        : availableCount > 0
+          ? "unknown"
+          : "not_connected";
+      const availability = runtimeAvailability[provider.id] || {
+        configured: instancesForProvider.length ? instancesForProvider.some((instance) => instance.configured) : undefined,
+        available: isAvailable,
+        summary: availabilitySummary,
+        detail: provider.note || "",
+      };
 
       if (isAvailable) summary.providers.available++;
 
@@ -92,33 +103,51 @@ export function createAvailabilityStore() {
       summary.targets.total += targets.length;
       summary.targets.sendable += targets.filter(isTargetSendable).length;
 
+      const providerHealth = deriveProviderHealth({
+        ...provider,
+        health: availability.health || provider.health,
+        healthEvidence: availability.healthEvidence || provider.healthEvidence,
+      }, availability, instancesForProvider);
       return {
         id: provider.id,
         name: provider.name,
         available: isAvailable,
         availabilitySummary,
-        instances: instancesForProvider.map((instance) => ({
-          id: instance.id,
-          runtimeLabel: instance.runtimeLabel,
-          available: instance.available,
-          summary: instance.summary || "",
-          detail: instance.detail || "",
-          version: instance.version || "",
-          commandKind: instance.commandKind,
-          command: instance.command,
-        })),
+        health: providerHealth,
+        instances: instancesForProvider.map((instance) => {
+          const health = deriveRuntimeHealth(instance);
+          return {
+            id: instance.id,
+            runtimeLabel: instance.runtimeLabel,
+            available: instance.available,
+            summary: instance.summary || "",
+            detail: instance.detail || "",
+            version: instance.version || "",
+            commandKind: instance.commandKind,
+            command: instance.command,
+            health,
+            healthEvidence: instance.healthEvidence || [],
+          };
+        }),
         targets: targets.map((target) => {
           const subtitle = compactTargetSubtitle(target);
+          const sendable = isTargetSendable(target);
+          const activatable = isTargetActivatable(target);
+          const health = deriveTargetHealth(target, { sendable, activatable });
           return {
             id: target.id,
             name: displayAgentName(target),
             displayName: target.name || provider.name,
             subtitle: subtitle.text,
             subtitleKey: subtitle.key,
-            sendable: isTargetSendable(target),
+            sendable,
+            activatable,
+            selectable: sendable || activatable,
             state: target.state,
             runtimeInstanceId: target.runtimeInstanceId,
             isCurrent: currentTarget && target.id === currentTarget.id,
+            health,
+            healthEvidence: target.healthEvidence || [],
           };
         }),
       };
@@ -132,18 +161,28 @@ export function createAvailabilityStore() {
           problems.push({
             type: "target",
             provider: p.name,
+            providerId: p.id,
             target: t.name,
-            reasonKey: t.state === 9 ? "availability.unavailable" : "availability.gatewayStopped",
+            reason: t.health?.unavailable_reason,
+            reasonParams: t.health?.unavailable_reason_params,
+            repairHint: t.health?.repair_hint,
+            repairHintParams: t.health?.repair_hint_params,
           });
         }
       });
       p.instances.forEach((i) => {
-        if (!i.available && i.detail?.includes("update")) {
+        if (!i.available) {
           problems.push({
             type: "runtime",
             provider: p.name,
+            providerId: p.id,
             runtime: i.runtimeLabel,
-            reasonKey: "availability.updateAvailable",
+            commandKind: i.commandKind,
+            command: i.command,
+            reason: i.health?.unavailable_reason,
+            reasonParams: i.health?.unavailable_reason_params,
+            repairHint: i.health?.repair_hint,
+            repairHintParams: i.health?.repair_hint_params,
           });
         }
       });
@@ -159,7 +198,13 @@ export function createAvailabilityStore() {
           providerId: currentTarget.providerId,
           providerName: providerList.find((p) => p.id === currentTarget.providerId)?.name,
           sendable: isTargetSendable(currentTarget),
+          activatable: isTargetActivatable(currentTarget),
+          selectable: isTargetSelectable(currentTarget),
           state: currentTarget.state,
+          health: deriveTargetHealth(currentTarget, {
+            sendable: isTargetSendable(currentTarget),
+            activatable: isTargetActivatable(currentTarget),
+          }),
         }
       : null;
     if (currentTargetData) {

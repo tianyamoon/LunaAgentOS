@@ -2,7 +2,7 @@
 
 [中文](./current-boundary.zh-CN.md)
 
-LunaAgentOS is heading toward a personal Agent operating system for the AI era — a desktop layer where users install agents like apps, schedule tasks like processes, and own agent memory like local files. 0.2 Preview lays down the foundational capabilities on the way to that goal: a credible, archivable, neutral desktop workspace that hosts real AI agent sessions.
+LunaAgentOS is heading toward a personal Agent operating system for the AI era — a desktop layer where users install agents like apps, schedule tasks like processes, and own agent memory like local files. 0.3 lays down the foundational capabilities on the way to that goal: a credible, archivable, neutral desktop workspace that hosts real AI agent sessions.
 
 This page captures the current release boundary: what is actually built today, where the next stretch of road goes, and which common misreadings to clear up early.
 
@@ -18,22 +18,22 @@ This page captures the current release boundary: what is actually built today, w
 
 - Claude Code can be used as a real runtime entry.
 - Hermes can be used through Windows / WSL ACP runtime instances and profiles.
-- Trae IDE is represented as an IDE-first bridge path.
+- Trae IDE remains a documented IDE-first bridge path, but it is not surfaced in the current desktop Agent Fleet until the bridge is real.
 - The left side shows the Agent Fleet and current send target.
 - The center workspace shows active Runtime Session Cards.
 - Each card holds output stream, thought stream, runtime stream, and final response.
 - The right side separates live sessions from archived sessions.
 - Local JSON history stores session turns and supports restore/read-only states.
-- When a runtime entry is not installed, its entry remains visible in the Agent Fleet with a clear configuration state. This is an explainable state, not a crash or silent failure.
+- When a surfaced runtime entry is not installed, its entry remains visible in the Agent Fleet with a clear configuration state. This is an explainable state, not a crash or silent failure.
 
 ## How far the full form still is
 
-0.2 Preview is a foundation stage. The next stretch of road grows naturally in these directions:
+The current 0.3 stage closes out Agent management, evidence-backed health diagnostics, and Runtime Session semantics:
 
-- **Multi-agent orchestration**: the "current send target" carries single-track work today; cross-agent scheduling and collaboration is the headline of the next stage.
-- **Cross-agent context bridging and shared memory**: first make sessions resumable in place, then targeted session handoff, and only then a shared memory bus across agents.
-- **Remote and team entries**: an expansion direction for after the local experience is steady.
-- **Agent marketplace and ecosystem layer**: the adapter manifest already reserves the integration surface; the product shape comes in later releases.
+- **Agent management**: identity, environment, Profile, working directory, model control, capabilities, safety, and best practices.
+- **Health diagnostics**: conclusions prefer runtime probes, adapter health checks, or verifiable configuration; unconfirmed facts stay unknown.
+- **Runtime Session**: remains responsible only for session state, execution, responses, history, and recovery.
+- **Explicitly outside 0.3**: Task, Task Board, Handoff, automatic assignment, multi-Agent orchestration, team mode, shared memory, and Marketplace.
 
 A few boundaries are worth stating once, to keep LunaAgentOS from being mistaken for something it is not:
 
@@ -48,7 +48,7 @@ The left fleet represents external entry objects:
 
 - Claude Code
 - Hermes
-- Trae IDE bridge path
+- Future Trae IDE bridge path
 
 Claude internal subagents or delegation workers remain part of Claude's own internal mechanism.
 
@@ -74,7 +74,8 @@ The active session workspace remains the center of multi-session work.
 
 A session card is the shared surface for:
 
-- User task
+- Stable Session title
+- User prompt for each Turn
 - Runtime output
 - Thought stream
 - Runtime/tool/plan/usage stream
@@ -83,10 +84,8 @@ A session card is the shared surface for:
 
 ## Next layer
 
-The next layer builds on the 0.2 workspace foundation. It focuses on:
+0.3 builds on the workspace foundation. It focuses on:
 
-- Hardening Claude Code and Hermes runtime entry reliability.
-- Making local history and restore behavior easier to trust.
-- Clarifying adapter installation and capability boundaries.
-- Strengthening the Trae IDE bridge path.
-- Designing targeted session handoff so users can intentionally move selected context between entries or sessions when that capability is actually implemented.
+- Making Agent availability, evidence, and next steps understandable.
+- Offering LunaAgentOS model selection only where a persistent runtime-backed default is real.
+- Keeping Runtime Session, Turn, and future Task fields and semantics separate.

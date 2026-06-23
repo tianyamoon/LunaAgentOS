@@ -46,6 +46,11 @@ markdownRenderer.renderer.rules.fence = (tokens, index) => {
 markdownRenderer.renderer.rules.table_open = () => "<div class=\"md-table-wrap\"><table class=\"md-table\">\n";
 markdownRenderer.renderer.rules.table_close = () => "</table></div>\n";
 
+export const richTextSanitizeOptions = {
+  ADD_ATTR: ["target", "rel"],
+  ADD_TAGS: ["img"],
+};
+
 export function renderInlineMarkdown(text) {
   return escapeHtml(text)
     .replace(/`([^`]+)`/g, "<code>$1</code>")
@@ -87,9 +92,7 @@ export function renderMarkdownTable(lines) {
 export function renderRichText(text) {
   const normalized = normalizeLooseMarkdownTables(normalizeRuntimeMarkdown(text));
   const html = markdownRenderer.render(normalized);
-  return DOMPurify.sanitize(html, {
-    ADD_ATTR: ["target", "rel"],
-  });
+  return DOMPurify.sanitize(html, richTextSanitizeOptions);
 }
 
 export function renderCodeFence(lang, code) {

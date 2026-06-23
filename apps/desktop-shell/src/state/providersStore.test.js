@@ -2,21 +2,25 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createProvidersStore } from "./providersStore.js";
 
-test("providersStore: default providers contain claude/hermes/trae", () => {
+test("providersStore: default providers contain only surfaced desktop entries", () => {
   const store = createProvidersStore();
-  const ids = store.getProvidersRef().map((p) => p.id);
-  assert.deepEqual(ids, ["claude", "hermes", "trae"]);
+  const ids = store.getProvidersSnapshot().map((p) => p.id);
+  assert.deepEqual(ids, ["claude", "hermes"]);
 });
 
-test("providersStore: getProvidersRef returns a stable array reference", () => {
+test("providersStore: provider snapshots isolate callers", () => {
   const store = createProvidersStore();
-  const ref = store.getProvidersRef();
+  const snapshot = store.getProvidersSnapshot();
   store.setProviderNote("hermes", { note: null, noteKey: "provider.hermes.loadedNote" });
-  assert.equal(store.getProvidersRef(), ref);
   store.setProviderAgents("hermes", []);
-  assert.equal(store.getProvidersRef(), ref);
+  snapshot.push({ id: "leaked" });
+  snapshot.find((provider) => provider.id === "hermes").agents.push({ id: "leaked-agent" });
+  snapshot.find((provider) => provider.id === "claude").agentDetail.models.available.push("leaked-model");
+  assert.equal(store.getProvidersSnapshot().some((provider) => provider.id === "leaked"), false);
+  assert.deepEqual(store.providerById("hermes").agents, []);
+  assert.deepEqual(store.providerById("claude").agentDetail.models.available, ["agentDetail.model.nativeRuntime"]);
   store.reset();
-  assert.equal(store.getProvidersRef(), ref);
+  assert.deepEqual(store.getProvidersSnapshot().map((provider) => provider.id), ["claude", "hermes"]);
 });
 
 test("providersStore: providerById returns null for unknown id", () => {
@@ -24,7 +28,10 @@ test("providersStore: providerById returns null for unknown id", () => {
   assert.equal(store.providerById("nope"), null);
   assert.equal(store.providerById(""), null);
   assert.equal(store.providerById(null), null);
-  assert.equal(store.providerById("claude").name, "Claude Code");
+  const claude = store.providerById("claude");
+  assert.equal(claude.name, "Claude Code");
+  claude.agentDetail.models.available.push("leaked-model");
+  assert.deepEqual(store.providerById("claude").agentDetail.models.available, ["agentDetail.model.nativeRuntime"]);
 });
 
 test("providersStore: setProviderNote replaces note/noteKey/noteParams", () => {
@@ -42,9 +49,7 @@ test("providersStore: setProviderNote replaces note/noteKey/noteParams", () => {
 
 test("providersStore: setProviderAgents replaces agents in place", () => {
   const store = createProvidersStore();
-  const ref = store.getProvidersRef();
   store.setProviderAgents("hermes", [{ id: "p1", providerId: "hermes" }]);
-  assert.equal(store.getProvidersRef(), ref);
   assert.deepEqual(
     store.providerById("hermes").agents.map((a) => a.id),
     ["p1"],
@@ -66,7 +71,6 @@ test("providersStore: appendProviderAgent / removeProviderAgent", () => {
 
 test("providersStore: syncAdapterProviders marks built-ins and prunes manifest providers", () => {
   const store = createProvidersStore();
-  const ref = store.getProvidersRef();
   store.syncAdapterProviders([
     {
       id: "codex",
@@ -81,7 +85,6 @@ test("providersStore: syncAdapterProviders marks built-ins and prunes manifest p
       capabilities: { slashCommands: [{ name: "model" }] },
     },
   ]);
-  assert.equal(store.getProvidersRef(), ref);
   assert.equal(store.providerById("claude").dynamicAdapter, true);
   assert.equal(store.providerById("codex").dynamicAdapter, true);
   assert.deepEqual(
@@ -100,57 +103,66 @@ test("providersStore: syncAdapterProviders marks built-ins and prunes manifest p
   assert.equal(store.getRuntimeAvailabilityFor("codex"), null);
 });
 
-test("providersStore: runtimeAvailability stable ref + patch", () => {
+test("providersStore: runtimeAvailability snapshot + patch", () => {
   const store = createProvidersStore();
-  const ref = store.getRuntimeAvailabilityRef();
-  assert.equal(ref.claude.summary, "probing");
+  const snapshot = store.getRuntimeAvailabilitySnapshot();
+  assert.equal(snapshot.claude.summary, "probing");
   store.patchRuntimeAvailability({
     claude: { summary: "available", configured: true, available: true, command: "claude" },
   });
-  assert.equal(store.getRuntimeAvailabilityRef(), ref);
-  assert.equal(ref.claude.summary, "available");
+  assert.equal(snapshot.claude.summary, "probing");
+  assert.equal(store.getRuntimeAvailabilitySnapshot().claude.summary, "available");
   assert.equal(store.getRuntimeAvailabilityFor("claude").available, true);
   assert.equal(store.getRuntimeAvailabilityFor("nope"), null);
 });
 
-test("providersStore: replaceRuntimeInstances mutates in place + isolates from caller", () => {
+test("providersStore: hidden bridge manifests do not surface placeholder providers", () => {
   const store = createProvidersStore();
-  const ref = store.getRuntimeInstancesRef();
+  store.syncAdapterProviders([{ id: "trae", name: "Trae IDE", identityOnly: true }]);
+  assert.equal(store.providerById("trae"), null);
+  assert.deepEqual(store.getProvidersSnapshot().map((provider) => provider.id), ["claude", "hermes"]);
+});
+
+test("providersStore: runtime instance snapshots isolate callers", () => {
+  const store = createProvidersStore();
   const input = [{ id: "a", providerId: "claude", available: true }];
   store.replaceRuntimeInstances(input);
-  assert.equal(store.getRuntimeInstancesRef(), ref);
-  assert.deepEqual(ref.map((r) => r.id), ["a"]);
+  const snapshot = store.getRuntimeInstancesSnapshot();
+  assert.deepEqual(snapshot.map((r) => r.id), ["a"]);
   input.push({ id: "leaked", providerId: "hermes" });
-  assert.deepEqual(ref.map((r) => r.id), ["a"]);
+  input[0].id = "mutated-input";
+  snapshot.push({ id: "mutated-snapshot" });
+  snapshot[0].id = "mutated-instance";
+  assert.deepEqual(store.getRuntimeInstancesSnapshot().map((r) => r.id), ["a"]);
   store.replaceRuntimeInstances(null);
-  assert.equal(ref.length, 0);
+  assert.equal(store.getRuntimeInstancesSnapshot().length, 0);
 });
 
 test("providersStore: runtime targets per instance + prune + total count", () => {
   const store = createProvidersStore();
-  const ref = store.getRuntimeTargetsByInstanceRef();
   store.setRuntimeTargetsForInstance("inst-1", [{ id: "p1" }, { id: "p2" }]);
   store.setRuntimeTargetsForInstance("inst-2", [{ id: "p3" }]);
-  assert.equal(store.getRuntimeTargetsByInstanceRef(), ref);
+  const snapshot = store.getRuntimeTargetsByInstanceSnapshot();
+  assert.deepEqual(snapshot["inst-1"].map((item) => item.id), ["p1", "p2"]);
+  snapshot["inst-1"].push({ id: "leaked" });
+  assert.deepEqual(store.getRuntimeTargetsByInstanceSnapshot()["inst-1"].map((item) => item.id), ["p1", "p2"]);
   assert.equal(store.totalRuntimeTargetCount(), 3);
   store.pruneRuntimeTargetsByInstanceIds(["inst-2"]);
-  assert.deepEqual(Object.keys(ref), ["inst-2"]);
+  assert.deepEqual(Object.keys(store.getRuntimeTargetsByInstanceSnapshot()), ["inst-2"]);
   assert.equal(store.totalRuntimeTargetCount(), 1);
   store.pruneRuntimeTargetsByInstanceIds(["inst-2"]);
-  assert.deepEqual(Object.keys(ref), ["inst-2"]);
+  assert.deepEqual(Object.keys(store.getRuntimeTargetsByInstanceSnapshot()), ["inst-2"]);
 });
 
 test("providersStore: slash commands per provider are stable and resettable", () => {
   const store = createProvidersStore();
-  const ref = store.getSlashCommandsByProviderRef();
   store.setSlashCommandsForProvider("hermes", [{ name: "demo", kind: "skill" }]);
-  assert.equal(store.getSlashCommandsByProviderRef(), ref);
-  assert.deepEqual(ref.hermes.map((item) => item.name), ["demo"]);
+  assert.deepEqual(store.getSlashCommandsForProvider("hermes").map((item) => item.name), ["demo"]);
   store.setSlashCommandsForProvider("hermes", null);
-  assert.deepEqual(ref.hermes, []);
+  assert.deepEqual(store.getSlashCommandsForProvider("hermes"), []);
   store.setSlashCommandsForProvider("hermes", [{ name: "demo" }]);
   store.reset();
-  assert.deepEqual(ref, {});
+  assert.deepEqual(store.getSlashCommandsForProvider("hermes"), []);
 });
 
 test("providersStore: subscribe is notified on each mutation, batched in batch()", () => {
@@ -187,7 +199,7 @@ test("providersStore: reset restores defaults and notifies", () => {
   });
   store.reset();
   assert.equal(notifyCount, 1);
-  assert.equal(store.getRuntimeInstancesRef().length, 0);
+  assert.equal(store.getRuntimeInstancesSnapshot().length, 0);
   assert.equal(store.totalRuntimeTargetCount(), 0);
   assert.equal(store.getRuntimeAvailabilityFor("claude").summary, "probing");
   assert.equal(store.providerById("hermes").agents.length, 1);

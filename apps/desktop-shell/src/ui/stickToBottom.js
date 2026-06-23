@@ -1,100 +1,233 @@
-// stick-to-bottom controller
+// Session 流式滚动控制器。
 //
-// Streaming chat surfaces (Hermes thought stream, Claude response stream)
-// need to follow new content automatically when the user is at the bottom,
-// but never yank the viewport back when the user has scrolled up to read.
+// 状态机适配自 AionUi useAutoScroll：
+// https://github.com/iOfficeAI/AionUi/blob/main/packages/desktop/src/renderer/pages/conversation/Messages/useAutoScroll.ts
+// Copyright 2025 AionUi (aionui.com), Apache-2.0。
 //
-// Inspired by stackblitz-labs/use-stick-to-bottom: track stickiness as an
-// intent flag, not an unconditional `scrollTop = scrollHeight` write.
-//
-// Design:
-//   - Each scroll container (`.session-card-body`) gets its own controller.
-//   - The controller starts as "stuck to bottom".
-//   - When the user scrolls and ends up above the bottom threshold, we drop
-//     the stuck flag. Programmatic scrolls do NOT toggle the flag.
-//   - When new content arrives we only adjust scrollTop while stuck.
-//   - Optional ResizeObserver follows DOM-driven height changes without
-//     touching the flag on its own.
-//
-// The implementation is intentionally framework-free so it can be unit
-// tested with a minimal DOM stub.
+// Luna 使用原生 DOM + Tauri WebView，因此保留 AionUi 的交互语义，
+// 但将 React Hook 改写为可测试的轻量控制器。
 
-const DEFAULT_BOTTOM_THRESHOLD = 24;
+const PROGRAMMATIC_SCROLL_GUARD_MS = 150;
+const AT_BOTTOM_THRESHOLD_PX = 100;
+const FOLLOW_BOTTOM_THRESHOLD_PX = 4;
 
-export function isAtBottom(element, threshold = DEFAULT_BOTTOM_THRESHOLD) {
-  if (!element) return false;
-  const distance = element.scrollHeight - element.scrollTop - element.clientHeight;
-  return distance <= threshold;
+function defaultRequestFrame(callback) {
+  if (typeof requestAnimationFrame === "function") return requestAnimationFrame(callback);
+  callback();
+  return 0;
+}
+
+function defaultCancelFrame(frameId) {
+  if (typeof cancelAnimationFrame === "function") cancelAnimationFrame(frameId);
+}
+
+function scrollTarget(element) {
+  return Math.max(0, element.scrollHeight - element.clientHeight);
+}
+
+export function bottomGap(element) {
+  if (!element) return Number.POSITIVE_INFINITY;
+  return element.scrollHeight - element.clientHeight - element.scrollTop;
+}
+
+export function isAtBottom(element, threshold = AT_BOTTOM_THRESHOLD_PX) {
+  return bottomGap(element) <= threshold;
 }
 
 export function createStickToBottomController(element, options = {}) {
   if (!element) throw new Error("stickToBottom: element is required");
-  const threshold = options.threshold ?? DEFAULT_BOTTOM_THRESHOLD;
   const observeResize = options.observeResize !== false;
-  let stuck = options.initialStuck !== false;
-  let programmaticScroll = false;
+  const onStateChange = typeof options.onStateChange === "function" ? options.onStateChange : null;
+  const requestFrame = options.requestFrame || defaultRequestFrame;
+  const cancelFrame = options.cancelFrame || defaultCancelFrame;
+  const now = options.now || (() => Date.now());
+  let contentElement = options.contentElement || element.firstElementChild || null;
+  let userScrolled = !(options.initialFollowing ?? options.initialStuck ?? true);
+  let userInputActive = false;
+  let showScrollButton = bottomGap(element) > AT_BOTTOM_THRESHOLD_PX;
+  let lastScrollTop = element.scrollTop;
+  let lastProgrammaticScrollTime = 0;
+  let pendingAutoFollowFrame = null;
   let disposed = false;
+  let resizeObserver = null;
 
-  const setStuckFromDom = () => {
-    stuck = isAtBottom(element, threshold);
-  };
+  function markProgrammaticScroll() {
+    lastProgrammaticScrollTime = now();
+  }
 
-  const onScroll = () => {
-    if (disposed) return;
-    if (programmaticScroll) {
-      programmaticScroll = false;
-      return;
+  function emitStateChange() {
+    onStateChange?.({
+      isFollowing: !userScrolled,
+      showScrollButton,
+      bottomGap: bottomGap(element),
+    });
+  }
+
+  function setUserScrolled(nextValue) {
+    const previous = userScrolled;
+    userScrolled = Boolean(nextValue);
+    if (previous !== userScrolled) emitStateChange();
+  }
+
+  function setShowScrollButton(nextValue) {
+    const previous = showScrollButton;
+    showScrollButton = Boolean(nextValue);
+    if (previous !== showScrollButton) emitStateChange();
+  }
+
+  // 回到底部后恢复自动跟随；这与 AionUi 的用户预期一致。
+  function updateBottomState() {
+    const gap = bottomGap(element);
+    const pinnedToBottom = gap <= FOLLOW_BOTTOM_THRESHOLD_PX;
+    setShowScrollButton(gap > AT_BOTTOM_THRESHOLD_PX);
+    if (pinnedToBottom) {
+      setUserScrolled(false);
+      userInputActive = false;
+      lastProgrammaticScrollTime = now() - (PROGRAMMATIC_SCROLL_GUARD_MS - 50);
     }
-    setStuckFromDom();
-  };
+    return pinnedToBottom;
+  }
 
-  const scrollToBottom = () => {
+  function onScroll() {
     if (disposed) return;
-    programmaticScroll = true;
-    element.scrollTop = element.scrollHeight;
-    stuck = true;
-  };
+    const currentScrollTop = element.scrollTop;
+    const delta = currentScrollTop - lastScrollTop;
+    const pinnedToBottom = bottomGap(element) <= FOLLOW_BOTTOM_THRESHOLD_PX;
+    const outsideProgrammaticGuard = now() - lastProgrammaticScrollTime >= PROGRAMMATIC_SCROLL_GUARD_MS;
+    if (!pinnedToBottom && Math.abs(delta) > 2 && (userInputActive || outsideProgrammaticGuard)) {
+      setUserScrolled(true);
+    }
+    if (pinnedToBottom) {
+      userInputActive = false;
+    } else if (Math.abs(delta) > 2) {
+      userInputActive = false;
+    }
+    lastScrollTop = currentScrollTop;
+    updateBottomState();
+  }
 
-  const onResize = () => {
+  function onWheel(event = {}) {
+    if (Math.abs(event.deltaY || 0) > 0 || Math.abs(event.deltaX || 0) > 0) {
+      userInputActive = true;
+    }
+  }
+
+  function onPointerDown() {
+    userInputActive = true;
+  }
+
+  function scrollToBottom(behavior = "auto") {
     if (disposed) return;
-    if (!stuck) return;
-    scrollToBottom();
-  };
+    markProgrammaticScroll();
+    const top = scrollTarget(element);
+    if (typeof element.scrollTo === "function") {
+      element.scrollTo({ top, behavior });
+    } else {
+      element.scrollTop = top;
+    }
+    lastScrollTop = element.scrollTop;
+    setUserScrolled(false);
+    setShowScrollButton(false);
+  }
+
+  function scheduleAutoFollow() {
+    if (disposed || userScrolled) return;
+    if (pendingAutoFollowFrame !== null) cancelFrame(pendingAutoFollowFrame);
+    pendingAutoFollowFrame = requestFrame(() => {
+      pendingAutoFollowFrame = null;
+      if (disposed || userScrolled) return;
+      if (bottomGap(element) > 2) scrollToBottom("auto");
+    });
+  }
+
+  function observeContentElement() {
+    if (!resizeObserver) return;
+    resizeObserver.disconnect();
+    resizeObserver.observe(element);
+    const nextContentElement = contentElement || element.firstElementChild;
+    if (nextContentElement) resizeObserver.observe(nextContentElement);
+  }
+
+  function resumeFollowing(behavior = "smooth") {
+    if (disposed) return;
+    setUserScrolled(false);
+    scrollToBottom(behavior);
+  }
+
+  function notifyUserSubmission() {
+    if (disposed) return;
+    setUserScrolled(false);
+    requestFrame(() => requestFrame(() => scrollToBottom("auto")));
+  }
+
+  function scrollElementIntoView(target, options = {}) {
+    if (!target?.scrollIntoView) return;
+    setUserScrolled(false);
+    setShowScrollButton(false);
+    markProgrammaticScroll();
+    target.scrollIntoView({
+      behavior: options.behavior || "smooth",
+      block: options.block || "start",
+      inline: "nearest",
+    });
+  }
 
   element.addEventListener("scroll", onScroll, { passive: true });
+  element.addEventListener("wheel", onWheel, { passive: true });
+  element.addEventListener("pointerdown", onPointerDown, { passive: true });
+  element.addEventListener("touchstart", onPointerDown, { passive: true });
 
-  let resizeObserver = null;
   if (observeResize && typeof ResizeObserver !== "undefined") {
-    resizeObserver = new ResizeObserver(onResize);
-    resizeObserver.observe(element);
-    // Observing only the scroll container will not fire when inner content
-    // grows beyond clientHeight, so also watch the first child if present.
-    const inner = element.firstElementChild;
-    if (inner instanceof Element) resizeObserver.observe(inner);
+    resizeObserver = new ResizeObserver(() => {
+      scheduleAutoFollow();
+      updateBottomState();
+    });
+    observeContentElement();
   }
 
   return {
-    get isStuck() {
-      return stuck;
+    get isFollowing() {
+      return !userScrolled;
     },
+    get showScrollButton() {
+      return showScrollButton;
+    },
+    // 兼容旧调用方读取；新代码统一使用 isFollowing。
+    get isStuck() {
+      return !userScrolled;
+    },
+    pauseFollowing() {
+      setUserScrolled(true);
+    },
+    resumeFollowing,
     scrollToBottom,
+    scrollElementIntoView,
     notifyContentChanged() {
-      if (stuck) scrollToBottom();
+      observeContentElement();
+      scheduleAutoFollow();
+    },
+    notifyUserSubmission,
+    setContentElement(nextContentElement) {
+      contentElement = nextContentElement || null;
+      observeContentElement();
     },
     markUserIntent() {
-      setStuckFromDom();
+      userInputActive = true;
     },
     dispose() {
       if (disposed) return;
       disposed = true;
+      if (pendingAutoFollowFrame !== null) cancelFrame(pendingAutoFollowFrame);
       element.removeEventListener("scroll", onScroll);
+      element.removeEventListener("wheel", onWheel);
+      element.removeEventListener("pointerdown", onPointerDown);
+      element.removeEventListener("touchstart", onPointerDown);
       resizeObserver?.disconnect();
     },
   };
 }
 
-// Manages a controller per element keyed by string id. Renderers that wipe
-// the DOM tree can call ensure() after each render to refresh references.
+// 渲染器按 Session 复用控制器，确保局部刷新不会丢失用户滚动意图。
 export function createStickToBottomRegistry(options = {}) {
   const controllers = new Map();
   const factory = options.factory || ((element, opts) => createStickToBottomController(element, opts));

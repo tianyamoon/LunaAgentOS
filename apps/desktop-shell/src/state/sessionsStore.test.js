@@ -3,42 +3,35 @@ import assert from "node:assert/strict";
 import { createSessionsStore } from "./sessionsStore.js";
 
 function makeSession(id, overrides = {}) {
-  return { id, task: `task-${id}`, turns: [], ...overrides };
+  return { id, title: `session-${id}`, turns: [], ...overrides };
 }
 
 test("sessionsStore: replaceSessions copies the array (no aliasing)", () => {
   const store = createSessionsStore();
   const input = [makeSession("a"), makeSession("b")];
   store.replaceSessions(input);
-  assert.deepEqual(store.getSessions().map((s) => s.id), ["a", "b"]);
+  assert.deepEqual(store.getSessionsSnapshot().map((s) => s.id), ["a", "b"]);
   input.push(makeSession("c"));
   // Mutating the caller's array must not leak into store.
-  assert.deepEqual(store.getSessions().map((s) => s.id), ["a", "b"]);
+  assert.deepEqual(store.getSessionsSnapshot().map((s) => s.id), ["a", "b"]);
 });
 
-test("sessionsStore: getSessions returns a stable array reference across mutations", () => {
+test("sessionsStore: getSessionsSnapshot returns an isolated array", () => {
   const store = createSessionsStore();
-  const ref = store.getSessions();
   store.replaceSessions([makeSession("a")]);
-  assert.equal(store.getSessions(), ref);
-  store.upsertHead(makeSession("b"));
-  assert.equal(store.getSessions(), ref);
-  store.removeSessionById("a");
-  assert.equal(store.getSessions(), ref);
-  store.filterSessions(() => false);
-  assert.equal(store.getSessions(), ref);
-  store.reset();
-  assert.equal(store.getSessions(), ref);
+  const snapshot = store.getSessionsSnapshot();
+  snapshot.push(makeSession("hacked"));
+  assert.deepEqual(store.getSessionsSnapshot().map((session) => session.id), ["a"]);
 });
 
 test("sessionsStore: upsertHead inserts at front and dedupes by id", () => {
   const store = createSessionsStore();
   store.replaceSessions([makeSession("a"), makeSession("b")]);
   store.upsertHead(makeSession("c"));
-  assert.deepEqual(store.getSessions().map((s) => s.id), ["c", "a", "b"]);
-  store.upsertHead(makeSession("a", { task: "updated" }));
-  assert.deepEqual(store.getSessions().map((s) => s.id), ["a", "c", "b"]);
-  assert.equal(store.getSession("a").task, "updated");
+  assert.deepEqual(store.getSessionsSnapshot().map((s) => s.id), ["c", "a", "b"]);
+  store.upsertHead(makeSession("a", { title: "updated" }));
+  assert.deepEqual(store.getSessionsSnapshot().map((s) => s.id), ["a", "c", "b"]);
+  assert.equal(store.getSession("a").title, "updated");
 });
 
 test("sessionsStore: removeSessionById and filterSessions only notify on change", () => {
@@ -57,7 +50,79 @@ test("sessionsStore: removeSessionById and filterSessions only notify on change"
   assert.equal(notifyCount, 1);
   store.filterSessions((session) => session.id !== "b");
   assert.equal(notifyCount, 2);
-  assert.equal(store.getSessions().length, 0);
+  assert.equal(store.getSessionsSnapshot().length, 0);
+});
+
+test("sessionsStore: workspace visibility uses an explicit mutation interface", () => {
+  const store = createSessionsStore();
+  let notifyCount = 0;
+  store.subscribe(() => {
+    notifyCount += 1;
+  });
+  store.replaceSessions([makeSession("a")]);
+  notifyCount = 0;
+  assert.equal(store.setWorkspaceVisibility("a", false), true);
+  assert.equal(store.getSession("a").inWorkspace, false);
+  assert.equal(notifyCount, 1);
+  assert.equal(store.setWorkspaceVisibility("a", false), false);
+  assert.equal(notifyCount, 1);
+  assert.equal(store.setWorkspaceVisibility("missing", true), false);
+});
+
+test("sessionsStore: updateSession owns object mutation and notifies once", () => {
+  const store = createSessionsStore();
+  let notifyCount = 0;
+  store.subscribe(() => {
+    notifyCount += 1;
+  });
+  store.replaceSessions([makeSession("a")]);
+  notifyCount = 0;
+
+  assert.equal(
+    store.updateSession("a", (session) => {
+      session.title = "updated";
+      return true;
+    }),
+    true,
+  );
+  assert.equal(store.getSession("a").title, "updated");
+  assert.equal(notifyCount, 1);
+
+  assert.equal(
+    store.updateSession("a", () => false),
+    false,
+  );
+  assert.equal(notifyCount, 1);
+  assert.equal(store.updateSession("missing", () => true), false);
+  assert.equal(notifyCount, 1);
+});
+
+test("sessionsStore: batched session mutations preserve changed session ids", () => {
+  const store = createSessionsStore();
+  const changes = [];
+  store.replaceSessions([makeSession("a"), makeSession("b")]);
+  store.subscribe((change) => {
+    changes.push(change);
+  });
+
+  store.batch(() => {
+    store.updateSession("a", (session) => {
+      session.title = "updated-a";
+      return true;
+    });
+    store.updateSession("b", (session) => {
+      session.title = "updated-b";
+      return true;
+    });
+  });
+
+  assert.deepEqual(changes, [{
+    type: "batch",
+    changes: [
+      { type: "session-updated", sessionId: "a" },
+      { type: "session-updated", sessionId: "b" },
+    ],
+  }]);
 });
 
 test("sessionsStore: currentSessionId clear on demand", () => {
@@ -138,22 +203,6 @@ test("sessionsStore: flow detail open default fallback", () => {
   assert.equal(store.getFlowDetailOpen("turn:logs", true), false);
 });
 
-test("sessionsStore: turn collapse only notifies on change", () => {
-  const store = createSessionsStore();
-  let notifyCount = 0;
-  store.subscribe(() => {
-    notifyCount += 1;
-  });
-  store.setTurnCollapsed("turn-1", true);
-  assert.ok(store.isTurnCollapsed("turn-1"));
-  assert.equal(notifyCount, 1);
-  store.setTurnCollapsed("turn-1", true);
-  assert.equal(notifyCount, 1);
-  store.setTurnCollapsed("turn-1", false);
-  assert.ok(!store.isTurnCollapsed("turn-1"));
-  assert.equal(notifyCount, 2);
-});
-
 test("sessionsStore: batch coalesces notifications", () => {
   const store = createSessionsStore();
   let notifyCount = 0;
@@ -192,7 +241,7 @@ test("sessionsStore: reset clears everything and notifies", () => {
   store.setCurrentSessionId("a");
   notifyCount = 0;
   store.reset();
-  assert.equal(store.getSessions().length, 0);
+  assert.equal(store.getSessionsSnapshot().length, 0);
   assert.equal(store.getCurrentSessionId(), null);
   assert.ok(!store.isSessionActive("a"));
   assert.ok(!store.isSessionStopped("a"));

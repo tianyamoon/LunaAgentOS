@@ -1,35 +1,21 @@
-// Pure helpers around the history.json payload contract with the Tauri backend.
-//
-// These do NOT call invoke() or touch DOM/state. They model:
-// - what fields make up a single history entry payload
-// - how a freshly-appended entry merges back into the in-memory historyEntries list
-// - how the Rust compact_history_entries result maps to a user-facing notice
-//
-// Keeping them pure makes them trivial to unit-test under Node and lets
-// `saveTurnToHistory` / `loadHistory` in main.js focus on IO + state mutation.
+// History Payload Module。
+// 这里仅负责前后端 History 契约的纯数据转换，不执行 invoke，也不触碰 DOM 或 Store。
 
 import { historyTurnKey } from "./entries.js";
 
-/**
- * Build the payload object that the backend `append_history_entry` command expects.
- *
- * Caller supplies a `getStateName(state)` function so the module stays free of the
- * state-name mapping table (which lives in main.js for now).
- */
+// 构造后端 append_history_entry 命令所需的数据。
+// 状态名称映射由调用方注入，使这个 Module 不依赖主程序中的映射表。
 export function buildHistoryEntryPayload({
   session,
   turn,
-  hermesProfile,
+  agentEntrySnapshot,
   schemaVersion,
   runtimeState,
   getStateName,
 }) {
-  const turnForHistory = hermesProfile
-    ? { ...turn, meta: { ...(turn.meta || {}), hermesProfile } }
-    : turn;
-  const status = typeof getStateName === "function"
+  const status = turn.status || (typeof getStateName === "function"
     ? getStateName(turn.state) || "UNKNOWN"
-    : "UNKNOWN";
+    : "UNKNOWN");
   const summary = turn.finalResponse
     || (Array.isArray(turn.outputs) ? turn.outputs.at(-1) : undefined)
     || (Array.isArray(turn.logs) ? turn.logs.at(0) : undefined)
@@ -47,20 +33,22 @@ export function buildHistoryEntryPayload({
     targetId: session.targetId || session.agentId,
     targetName: session.targetName || session.agentName,
     profileExecutable: session.profileExecutable || null,
+    agentEntrySnapshot: agentEntrySnapshot || null,
     sessionId: session.id,
     acpSessionId: session.acpSessionId || null,
-    task: turn.task,
+    sessionTitle: session.title,
+    prompt: turn.prompt,
     status,
     summary,
-    turn: turnForHistory,
-    runtimeState,
+    turn,
+    runtime_state: runtimeState,
+    record_state: session.record_state || null,
+    access_mode: session.access_mode || null,
+    runtime_binding: session.runtime_binding || null,
   };
 }
 
-/**
- * Insert (or replace) `entry` inside `entries`, keyed by historyTurnKey.
- * Always returns a new array — never mutates the input.
- */
+// 按 historyTurnKey 插入或替换条目，并返回新的数组，避免修改调用方持有的快照。
 export function upsertHistoryEntry(entries, entry) {
   const list = Array.isArray(entries) ? entries : [];
   const key = historyTurnKey(entry);
@@ -71,10 +59,7 @@ export function upsertHistoryEntry(entries, entry) {
   return [entry, ...list];
 }
 
-/**
- * Map the backend compact_history_entries result to a user-facing notice.
- * Returns null if there is nothing to surface.
- */
+// 把后端压缩结果转换为用户可读通知；没有变化时不展示提示。
 export function formatCompactHistoryNotice(result) {
   const removedCount = result?.removedCount || 0;
   const upgradedCount = result?.upgradedCount || 0;

@@ -1,38 +1,37 @@
 // 集中收纳跟 session 工作台直接相关的可变状态：
 // - 工作台 sessions 数组、当前发送目标 sessionId、活跃 session 集合
 // - stopped / deleted 墓碑 Set
-// - 三个 UI flag 容器（latestOnly / flowDetailOpen / collapsedTurns）
+// - 两个 UI flag 容器（latestOnly / flowDetailOpen）
 // 模块本身不依赖 DOM、不直接驱动渲染。订阅 subscribe(listener) 后，状态发生变化时
 // 调用方有机会自己触发渲染。这里刻意保持纯函数接口，方便单测以及未来切换到
 // reactive UI。
 //
-// 注意：sessions 数组是 store 的私有引用，外部读取通过 getSessions() 拿到当前快照
-// （不要长期持有），任何 mutation 必须走显式方法，避免状态从外部被偷偷改写。
+// 注意：sessions 数组是 Store 的私有引用，外部读取通过 getSessionsSnapshot() 拿到数组快照。
+// 任何 mutation 必须走显式方法，避免容器或字段从外部被偷偷改写。
 
 export function createSessionsStore() {
-  // sessions 数组持有 stable reference：所有 mutation 都通过 in-place 操作
-  // （length=0 / splice / unshift / push）完成，外部消费者拿到这个数组的引用后
-  // 可以一直保留，不需要担心 store 重新分配数组导致引用失效。
+  // sessions 数组只在 Store 内部持有稳定引用；外部读取数组快照并通过显式方法修改状态。
   const sessions = [];
   let currentSessionId = null;
   const activeSessionIds = new Set();
   const stoppedSessionIds = new Set();
   const deletedSessionIds = new Set();
   const flowDetailOpenState = new Map();
-  const collapsedTurnIds = new Set();
   const sessionLatestOnlyState = new Map();
   const listeners = new Set();
   let suppressNotify = 0;
   let pendingNotify = false;
+  let pendingChanges = [];
 
-  function notify() {
+  function notify(change) {
     if (suppressNotify > 0) {
       pendingNotify = true;
+      if (change) pendingChanges.push(change);
       return;
     }
     listeners.forEach((listener) => {
       try {
-        listener();
+        listener(change);
       } catch (error) {
         console.error("sessionsStore listener threw:", error);
       }
@@ -47,18 +46,33 @@ export function createSessionsStore() {
       suppressNotify -= 1;
       if (suppressNotify === 0 && pendingNotify) {
         pendingNotify = false;
-        notify();
+        const changes = pendingChanges;
+        pendingChanges = [];
+        const change = changes.length > 1
+          ? { type: "batch", changes }
+          : changes[0];
+        notify(change);
       }
     }
   }
 
   return {
     // ---- sessions array ----
-    getSessions() {
-      return sessions;
+    // 返回新的数组快照，避免调用方长期持有 Store 的内部容器并绕过 mutation 接口。
+    getSessionsSnapshot() {
+      return [...sessions];
     },
     getSession(id) {
       return id ? sessions.find((session) => session.id === id) || null : null;
+    },
+    // Session 对象字段只能通过 Store 更新；mutator 返回 false 表示没有实际变化。
+    updateSession(id, mutator) {
+      const session = id ? sessions.find((item) => item.id === id) : null;
+      if (!session || typeof mutator !== "function") return false;
+      const changed = mutator(session);
+      if (changed === false) return false;
+      notify({ type: "session-updated", sessionId: id });
+      return true;
     },
     replaceSessions(next) {
       sessions.length = 0;
@@ -89,6 +103,16 @@ export function createSessionsStore() {
       sessions.length = 0;
       sessions.push(...next);
       notify();
+    },
+    // 工作区可见性属于 Store 状态，View 与 Controller 不得直接改写 Session 对象。
+    setWorkspaceVisibility(id, visible) {
+      const session = id ? sessions.find((item) => item.id === id) : null;
+      if (!session) return false;
+      const next = Boolean(visible);
+      if ((session.inWorkspace !== false) === next) return false;
+      session.inWorkspace = next;
+      notify();
+      return true;
     },
 
     // ---- currentSessionId ----
@@ -183,48 +207,6 @@ export function createSessionsStore() {
       flowDetailOpenState.set(key, next);
       if (prev !== next) notify();
     },
-
-    // ---- UI flags: turn collapsed ----
-    isTurnCollapsed(turnId) {
-      return Boolean(turnId) && collapsedTurnIds.has(turnId);
-    },
-    setTurnCollapsed(turnId, value) {
-      if (!turnId) return;
-      const next = Boolean(value);
-      const prev = collapsedTurnIds.has(turnId);
-      if (next === prev) return;
-      if (next) collapsedTurnIds.add(turnId);
-      else collapsedTurnIds.delete(turnId);
-      notify();
-    },
-
-    // ---- stable references for legacy call sites ----
-    // 这些方法返回 store 内部的真实容器引用，调用方不要长期持有这些引用做并发
-    // 写入。它们存在的唯一目的是让旧代码（main.js 中 .has/.add/.delete/.find/
-    // .filter 等大量读路径）可以拿到稳定的 reference 而不需要每个调用点改写。
-    // 在迁移到 reactive UI 时可以收紧成只读视图。
-    getSessionsRef() {
-      return sessions;
-    },
-    getActiveSessionIdsRef() {
-      return activeSessionIds;
-    },
-    getStoppedSessionIdsRef() {
-      return stoppedSessionIds;
-    },
-    getDeletedSessionIdsRef() {
-      return deletedSessionIds;
-    },
-    getFlowDetailOpenStateRef() {
-      return flowDetailOpenState;
-    },
-    getCollapsedTurnIdsRef() {
-      return collapsedTurnIds;
-    },
-    getSessionLatestOnlyStateRef() {
-      return sessionLatestOnlyState;
-    },
-
     // ---- subscribe / batch ----
     subscribe(listener) {
       if (typeof listener !== "function") return () => {};
@@ -241,8 +223,8 @@ export function createSessionsStore() {
       stoppedSessionIds.clear();
       deletedSessionIds.clear();
       flowDetailOpenState.clear();
-      collapsedTurnIds.clear();
       sessionLatestOnlyState.clear();
+      pendingChanges = [];
       notify();
     },
   };

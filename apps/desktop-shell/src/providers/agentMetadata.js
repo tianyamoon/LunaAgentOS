@@ -2,6 +2,7 @@ const providerStatusLabelKeys = {
   probing: "provider.probing",
   available: "provider.available",
   partial: "provider.partial",
+  unknown: "provider.probing",
   not_connected: "provider.notConnected",
   not_configured: "provider.not_configured",
   unavailable: "provider.unavailable",
@@ -10,6 +11,7 @@ const providerStatusLabelKeys = {
 
 const targetStatusLabelKeys = {
   available: "availability.sendable",
+  unknown: "availability.unverified",
   unavailable: "availability.unavailable",
   gateway_running: "availability.gatewayRunning",
   gateway_stopped: "availability.gatewayStopped",
@@ -34,7 +36,7 @@ export function providerStatusForFleet(provider, availability = {}) {
     state,
     className: classNameForState("is-", state),
     labelKey: explicit?.labelKey || providerStatusLabelKeys[state] || providerStatusLabelKeys.unavailable,
-    mutedCard: state === "planned" || state === "not_configured" || (!availability.available && provider?.id === "trae"),
+    mutedCard: state === "planned" || state === "not_configured",
   };
 }
 

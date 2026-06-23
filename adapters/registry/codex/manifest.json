@@ -10,6 +10,11 @@
     "@openai/codex"
   ],
   "requires_pty": false,
+  "modelControl": { "mode": "native_runtime" },
+  "healthCheck": {
+    "command": ["npx", "--no-install", "@openai/codex", "--version"],
+    "timeoutMs": 15000
+  },
   "capabilities": {
     "slashCommands": [
       { "name": "compact", "descriptionKey": "composer.command.compact" },

@@ -1,9 +1,37 @@
+import { isIdentityOnlyProvider } from "../providers/providerCatalog.js";
+
 const DEFAULT_PROVIDERS = [
   {
     id: "claude",
     name: "Claude Code",
     lane: "",
     noteKey: "provider.claude.note",
+    agentDetail: {
+      summaryKey: "agentDetail.claude.summary",
+      runtimeEnvironmentKey: "agentDetail.runtime.windowsWsl",
+      defaultWorkingDirectoryKey: "agentDetail.cwd.currentProject",
+      models: {
+        available: ["agentDetail.model.nativeRuntime"],
+        default: "agentDetail.model.nativeRuntime",
+        recommended: ["agentDetail.model.claudeRecommended"],
+      },
+      capabilities: {
+        files: { state: "enabled", noteKey: "agentDetail.capabilityNote.filesRepo" },
+        commands: { state: "limited", noteKey: "agentDetail.capabilityNote.commandsApproval" },
+        network: { state: "depends", noteKey: "agentDetail.capabilityNote.runtimePolicy" },
+        images: { state: "depends", noteKey: "agentDetail.capabilityNote.modelSupport" },
+        browser: { state: "limited", noteKey: "agentDetail.capabilityNote.viaTools" },
+        localRepo: { state: "enabled", noteKey: "agentDetail.capabilityNote.localRepo" },
+      },
+      safetyBoundaries: [
+        "agentDetail.claude.safety.permissions",
+        "agentDetail.safety.destructive",
+      ],
+      bestPractices: [
+        "agentDetail.claude.practice.scope",
+        "agentDetail.practice.repoContext",
+      ],
+    },
     agents: [
       {
         id: "claude-main",
@@ -20,6 +48,37 @@ const DEFAULT_PROVIDERS = [
     name: "Hermes",
     lane: "",
     noteKey: "provider.hermes.note",
+    // Hermes 使用独立空状态文案，但 Fleet 视图只读取通用元数据。
+    noRuntimeKey: "provider.noHermesRuntime",
+    targetCountKey: "provider.profileCount",
+    loadedTargetsNoteKey: "provider.hermes.loadedNote",
+    emptyTargetsNoticeKey: "provider.noHermesProfiles",
+    agentDetail: {
+      summaryKey: "agentDetail.hermes.summary",
+      runtimeEnvironmentKey: "agentDetail.runtime.windowsWsl",
+      defaultWorkingDirectoryKey: "agentDetail.cwd.profileRuntime",
+      models: {
+        available: ["agentDetail.model.profileConfigured"],
+        default: "agentDetail.model.profileDefault",
+        recommended: ["agentDetail.model.profileRecommended"],
+      },
+      capabilities: {
+        files: { state: "depends", noteKey: "agentDetail.capabilityNote.profileTools" },
+        commands: { state: "depends", noteKey: "agentDetail.capabilityNote.profileTools" },
+        network: { state: "depends", noteKey: "agentDetail.capabilityNote.profileTools" },
+        images: { state: "depends", noteKey: "agentDetail.capabilityNote.modelSupport" },
+        browser: { state: "depends", noteKey: "agentDetail.capabilityNote.profileTools" },
+        localRepo: { state: "depends", noteKey: "agentDetail.capabilityNote.cwd" },
+      },
+      safetyBoundaries: [
+        "agentDetail.hermes.safety.profile",
+        "agentDetail.safety.destructive",
+      ],
+      bestPractices: [
+        "agentDetail.hermes.practice.profile",
+        "agentDetail.practice.handoffContext",
+      ],
+    },
     agents: [
       {
         id: "hermes-main",
@@ -31,48 +90,46 @@ const DEFAULT_PROVIDERS = [
       },
     ],
   },
-  {
-    id: "trae",
-    name: "Trae IDE",
-    lane: "",
-    noteKey: "provider.trae.note",
-    agents: [
-      {
-        id: "trae-main",
-        providerId: "trae",
-        nameKey: "agent.main",
-        subtitle: "IDE Bridge",
-        noteKey: "agent.trae.note",
-        state: 1,
-      },
-    ],
-  },
 ];
 const BUILTIN_PROVIDER_IDS = new Set(DEFAULT_PROVIDERS.map((provider) => provider.id));
+const HIDDEN_DESKTOP_PROVIDER_IDS = new Set(["trae"]);
 
 const DEFAULT_RUNTIME_AVAILABILITY = {
   claude: { summary: "probing", configured: false, available: false, command: "" },
   hermes: { summary: "probing", configured: false, available: false, command: "" },
-  trae: { summary: "planned", configured: false, available: false, command: "IDE Bridge" },
 };
 
+function clonePlainData(value) {
+  if (Array.isArray(value)) return value.map(clonePlainData);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, clonePlainData(item)]),
+    );
+  }
+  return value;
+}
+
 function cloneProvider(entry) {
+  const provider = clonePlainData(entry || {});
   return {
-    ...entry,
-    agents: Array.isArray(entry.agents) ? entry.agents.map((agent) => ({ ...agent })) : [],
+    ...provider,
+    agents: Array.isArray(provider.agents) ? provider.agents : [],
   };
 }
 
 function providerFromAdapter(adapter) {
   const id = adapter?.id;
   if (!id) return null;
+  if (HIDDEN_DESKTOP_PROVIDER_IDS.has(id)) return null;
+  const identityOnly = adapter.identityOnly === true;
   return {
     id,
     name: adapter.name || id,
     lane: "",
     dynamicAdapter: true,
+    identityOnly,
     adapterManifest: adapter,
-    agents: [
+    agents: identityOnly ? [] : [
       {
         id: `${id}-main`,
         providerId: id,
@@ -126,12 +183,13 @@ export function createProvidersStore(initial = {}) {
   }
 
   return {
-    getProvidersRef() {
-      return providers;
+    getProvidersSnapshot() {
+      return providers.map(cloneProvider);
     },
     providerById(id) {
       if (!id) return null;
-      return providers.find((provider) => provider.id === id) || null;
+      const provider = providers.find((entry) => entry.id === id);
+      return provider ? cloneProvider(provider) : null;
     },
     setProviderNote(id, { note = null, noteKey = null, noteParams = null } = {}) {
       const provider = providers.find((item) => item.id === id);
@@ -165,8 +223,11 @@ export function createProvidersStore(initial = {}) {
         if (existing) {
           existing.name = provider.name;
           existing.dynamicAdapter = true;
+          existing.identityOnly = provider.identityOnly;
           existing.adapterManifest = provider.adapterManifest;
-          if (!Array.isArray(existing.agents) || existing.agents.length === 0) {
+          if (isIdentityOnlyProvider(existing)) {
+            existing.agents = [];
+          } else if (!Array.isArray(existing.agents) || existing.agents.length === 0) {
             existing.agents = provider.agents;
           }
         } else {
@@ -186,6 +247,7 @@ export function createProvidersStore(initial = {}) {
         const provider = providers[index];
         if (provider.dynamicAdapter && BUILTIN_PROVIDER_IDS.has(provider.id) && !adapterIds.has(provider.id)) {
           delete provider.dynamicAdapter;
+          delete provider.identityOnly;
           delete provider.adapterManifest;
           changed = true;
         } else if (provider.dynamicAdapter && !BUILTIN_PROVIDER_IDS.has(provider.id) && !adapterIds.has(provider.id)) {
@@ -205,8 +267,8 @@ export function createProvidersStore(initial = {}) {
       notify();
     },
 
-    getRuntimeAvailabilityRef() {
-      return runtimeAvailability;
+    getRuntimeAvailabilitySnapshot() {
+      return { ...runtimeAvailability };
     },
     getRuntimeAvailabilityFor(providerId) {
       return runtimeAvailability[providerId] || null;
@@ -226,20 +288,31 @@ export function createProvidersStore(initial = {}) {
       if (changed) notify();
     },
 
-    getRuntimeInstancesRef() {
-      return runtimeInstances;
+    getRuntimeInstancesSnapshot() {
+      return runtimeInstances.map((instance) => ({ ...instance }));
     },
     replaceRuntimeInstances(next) {
       runtimeInstances.length = 0;
-      if (Array.isArray(next)) runtimeInstances.push(...next);
+      if (Array.isArray(next)) runtimeInstances.push(...next.map((instance) => ({ ...instance })));
+      notify();
+    },
+    setRuntimeInstanceModelControl(instanceId, modelControl) {
+      const instance = runtimeInstances.find((item) => item.id === instanceId);
+      if (!instance) return;
+      instance.modelControl = modelControl && typeof modelControl === "object" ? { ...modelControl } : null;
       notify();
     },
 
-    getRuntimeTargetsByInstanceRef() {
-      return runtimeTargetsByInstance;
+    getRuntimeTargetsByInstanceSnapshot() {
+      return Object.fromEntries(
+        Object.entries(runtimeTargetsByInstance).map(([instanceId, targets]) => [
+          instanceId,
+          Array.isArray(targets) ? [...targets] : [],
+        ]),
+      );
     },
-    getSlashCommandsByProviderRef() {
-      return slashCommandsByProvider;
+    getSlashCommandsForProvider(providerId) {
+      return providerId ? slashCommandsByProvider[providerId] || [] : [];
     },
     setSlashCommandsForProvider(providerId, commands) {
       if (!providerId) return;
@@ -268,19 +341,6 @@ export function createProvidersStore(initial = {}) {
         0,
       );
     },
-    getHermesProfilesByInstanceRef() {
-      return runtimeTargetsByInstance;
-    },
-    setHermesProfilesForInstance(instanceId, profiles) {
-      this.setRuntimeTargetsForInstance(instanceId, profiles);
-    },
-    pruneHermesProfilesByInstanceIds(validIds) {
-      this.pruneRuntimeTargetsByInstanceIds(validIds);
-    },
-    totalHermesProfileCount() {
-      return this.totalRuntimeTargetCount();
-    },
-
     subscribe(listener) {
       if (typeof listener !== "function") return () => {};
       listeners.add(listener);
